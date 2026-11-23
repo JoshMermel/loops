@@ -25,8 +25,26 @@ const prefixes = arg('glob', id).split(',');
 const dir = path.resolve(root, arg('dir', 'tools/library'));
 const limit = +arg('limit', 0);
 const evenTiers = hasFlag('even-tiers');
-const tierShares = arg('tiers', '') ? arg('tiers').split(',').map(Number) : null; // B,M,H
+const tierShares = arg('tiers', '') ? arg('tiers').split(',').map(Number) : null; // B,M,H,E
 const onlyTier = arg('only-tier', null);
+const minScore = arg('min-score', null) !== null ? +arg('min-score') : null;
+const maxScore = arg('max-score', null) !== null ? +arg('max-score') : null;
+const expertPlus = +arg('expert-plus', 0);
+const bonusPrefixes = arg('bonus-glob', '') ? arg('bonus-glob').split(',').filter(Boolean) : [];
+const bonusCount = +arg('bonus-count', 0);
+const parseBands = (s) => {
+  if (!s) return null;
+  const parts = s.split(',');
+  const out = {};
+  ['Beginner', 'Medium', 'Hard', 'Expert'].forEach((t, i) => {
+    const seg = parts[i];
+    if (!seg) return;
+    const [lo, hi] = seg.split(':');
+    out[t] = { min: lo !== '' && lo !== undefined ? +lo : null, max: hi !== '' && hi !== undefined ? +hi : null };
+  });
+  return out;
+};
+const tierBands = parseBands(arg('tier-bands', ''));
 const group = arg('group', null);
 const sub = arg('sub', null);
 const blurb = arg('blurb', null);
@@ -34,6 +52,20 @@ const hidden = hasFlag('hidden');
 const preserveExisting = hasFlag('preserve-existing');
 const balanceGroups = hasFlag('balance-groups');
 const excludeFiles = arg('exclude', '') ? arg('exclude').split(',').filter(Boolean) : [];
+
+const matchesBand = (p) => {
+  if (p.rules === 'unsolved') return expertPlus > 0;
+  if (onlyTier && p.tier !== onlyTier) return false;
+  const sc = p.score ?? 0;
+  if (minScore !== null && sc < minScore) return false;
+  if (maxScore !== null && sc > maxScore) return false;
+  if (tierBands && tierBands[p.tier]) {
+    const b = tierBands[p.tier];
+    if (b.min !== null && sc < b.min) return false;
+    if (b.max !== null && sc > b.max) return false;
+  }
+  return true;
+};
 
 const excluded = new Set();
 for (const ef of excludeFiles) {
@@ -46,6 +78,7 @@ for (const ef of excludeFiles) {
 const byOrder = (a, b) => (
   (a.rows * a.cols) - (b.rows * b.cols)
   || TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier)
+  || (a.rules === 'unsolved' ? 1 : 0) - (b.rules === 'unsolved' ? 1 : 0)
   || (a.score ?? 0) - (b.score ?? 0)
 );
 
@@ -54,7 +87,7 @@ const locked = [];
 const existingBookPath = path.join(root, 'data', `${id}.csv`);
 if (preserveExisting && fs.existsSync(existingBookPath)) {
   for (const p of parseCsv(fs.readFileSync(existingBookPath, 'utf8'))) {
-    if (onlyTier && p.tier !== onlyTier) continue;
+    if (!matchesBand(p)) continue;
     const sk = symmetryKey(p);
     if (seen.has(sk)) continue;
     seen.add(sk);
@@ -63,6 +96,7 @@ if (preserveExisting && fs.existsSync(existingBookPath)) {
 }
 
 let puzzles = [];
+const expertPlusPool = [];
 if (fs.existsSync(dir)) {
   const files = fs.readdirSync(dir)
     .filter((f) => prefixes.some((pre) => f.startsWith(pre)) && f.endsWith('.csv'))
@@ -70,17 +104,19 @@ if (fs.existsSync(dir)) {
   for (const f of files) {
     const grp = prefixes.find((pre) => f.startsWith(pre)) || f;
     for (const p of parseCsv(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-      if (onlyTier && p.tier !== onlyTier) continue;
+      if (!matchesBand(p)) continue;
       const sk = symmetryKey(p);
       if (seen.has(sk)) continue;
       seen.add(sk);
       p._group = grp;
-      puzzles.push(p);
+      if (p.rules === 'unsolved') expertPlusPool.push(p);
+      else puzzles.push(p);
     }
   }
 }
 
 puzzles.sort(byOrder);
+expertPlusPool.sort(byOrder);
 
 const pickEvenly = (list, n) => {
   if (n <= 0) return [];
@@ -139,12 +175,19 @@ const pickWithLocked = (lockedList, poolList, target) => {
 
 const groupReport = [];
 if (tierShares) {
-  const lByT = { Beginner: [], Medium: [], Hard: [] };
-  const byT = { Beginner: [], Medium: [], Hard: [] };
+  const lByT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
+  const byT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
   for (const p of locked) if (lByT[p.tier]) lByT[p.tier].push(p);
   for (const p of puzzles) if (byT[p.tier]) byT[p.tier].push(p);
   const picked = [];
-  for (const [tierName, target] of [['Beginner', tierShares[0] || 0], ['Medium', tierShares[1] || 0], ['Hard', tierShares[2] || 0]]) {
+  const specs = [
+    ['Beginner', tierShares[0] || 0],
+    ['Medium', tierShares[1] || 0],
+    ['Hard', tierShares[2] || 0],
+    ['Expert', tierShares[3] || 0],
+  ];
+  for (const [tierName, target] of specs) {
+    if (target <= 0) continue;
     const res = pickWithLocked(lByT[tierName], byT[tierName], target);
     picked.push(...res);
     if (balanceGroups && prefixes.length > 1) {
@@ -154,27 +197,58 @@ if (tierShares) {
   }
   puzzles = picked.sort(byOrder);
 } else if (evenTiers && limit > 0) {
-  const lByT = { Beginner: [], Medium: [], Hard: [] };
-  const byT = { Beginner: [], Medium: [], Hard: [] };
+  const lByT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
+  const byT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
   for (const p of locked) if (lByT[p.tier]) lByT[p.tier].push(p);
   for (const p of puzzles) if (byT[p.tier]) byT[p.tier].push(p);
-  const per = Math.floor(limit / 3);
-  const rem = limit - per * 3;
-  const targets = [per + (rem >= 1 ? 1 : 0), per + (rem >= 2 ? 1 : 0), per];
+  const activeTiers = byT.Expert.length + lByT.Expert.length > 0 ? ['Beginner', 'Medium', 'Hard', 'Expert'] : ['Beginner', 'Medium', 'Hard'];
+  const per = Math.floor(limit / activeTiers.length);
+  const rem = limit - per * activeTiers.length;
   const picked = [];
-  for (const [tierName, target] of [['Beginner', targets[0]], ['Medium', targets[1]], ['Hard', targets[2]]]) {
+  activeTiers.forEach((tierName, idx) => {
+    const target = per + (idx < rem ? 1 : 0);
     const res = pickWithLocked(lByT[tierName], byT[tierName], target);
     picked.push(...res);
     if (balanceGroups && prefixes.length > 1) {
       const counts = prefixes.map((g) => `${g}=${res.filter((p) => p._group === g).length}`).join(' ');
       groupReport.push(`  ${tierName}: ${counts}`);
     }
-  }
+  });
   puzzles = picked.sort(byOrder);
 } else if (limit > 0) {
   puzzles = pickWithLocked(locked, puzzles, limit).sort(byOrder);
 } else {
   puzzles = [...locked, ...puzzles].sort(byOrder);
+}
+
+if (expertPlus > 0) {
+  const pickedPlus = pickEvenly(expertPlusPool, expertPlus);
+  puzzles = [...puzzles, ...pickedPlus].sort(byOrder);
+}
+
+let bonusPickedCount = 0;
+if (bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
+  const bonusPool = [];
+  const bonusFiles = fs.readdirSync(dir)
+    .filter((f) => bonusPrefixes.some((pre) => f.startsWith(pre)) && f.endsWith('.csv'))
+    .sort();
+  for (const f of bonusFiles) {
+    const grp = bonusPrefixes.find((pre) => f.startsWith(pre)) || f;
+    for (const p of parseCsv(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+      if (p.rules === 'unsolved') continue;
+      const sk = symmetryKey(p);
+      if (seen.has(sk)) continue;
+      seen.add(sk);
+      p._group = grp;
+      bonusPool.push(p);
+    }
+  }
+  bonusPool.sort(byOrder);
+  const pickedBonus = (balanceGroups && bonusPrefixes.length > 1)
+    ? pickBalancedAcrossGroups(bonusPool, bonusCount, bonusPrefixes).picked.sort(byOrder)
+    : pickEvenly(bonusPool, bonusCount).sort(byOrder);
+  bonusPickedCount = pickedBonus.length;
+  puzzles = [...puzzles, ...pickedBonus];
 }
 
 const pad = Math.max(2, String(puzzles.length).length);
@@ -211,7 +285,12 @@ else manifest.books.push(entry);
 if (!manifest.default && !hidden) manifest.default = id;
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
-const tc = { Beginner: 0, Medium: 0, Hard: 0, Expert: 0 };
-for (const p of puzzles) tc[p.tier] = (tc[p.tier] || 0) + 1;
-console.log(`Built data/${id}.csv: ${puzzles.length} puzzles (B=${tc.Beginner} M=${tc.Medium} H=${tc.Hard})`);
+const tc = { Beginner: 0, Medium: 0, Hard: 0, Expert: 0, Plus: 0 };
+for (const p of puzzles) {
+  if (p.rules === 'unsolved') tc.Plus++;
+  else tc[p.tier] = (tc[p.tier] || 0) + 1;
+}
+const plusTag = tc.Plus ? ` E+=${tc.Plus}` : '';
+const bonusTag = bonusPickedCount ? ` +${bonusPickedCount} bonus` : '';
+console.log(`Built data/${id}.csv: ${puzzles.length} puzzles (B=${tc.Beginner} M=${tc.Medium} H=${tc.Hard} E=${tc.Expert}${plusTag}${bonusTag})`);
 for (const line of groupReport) console.log(line);

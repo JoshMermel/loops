@@ -651,11 +651,25 @@ function renderBrowse() {
   const doneCount = book.puzzles.filter(isDone).length;
   $('browse-summary').textContent = `${book.name}: ${doneCount} of ${book.puzzles.length} solved`;
 
-  const TIER_ORDER = ['Beginner', 'Medium', 'Hard', 'Expert'];
+  const TIER_ORDER = ['Beginner', 'Medium', 'Hard', 'Expert', 'Expert+ (beyond hints)'];
+  const tierLabel = (P) => (beyondHints(P) ? 'Expert+ (beyond hints)' : P.tier);
   const inOrder = (vals) => new Set(vals).size > 1 && vals.every((v, i) => i === 0 || v >= vals[i - 1]);
-  const byTier = book.puzzles.every((P) => P.tier) && inOrder(book.puzzles.map((P) => TIER_ORDER.indexOf(P.tier)));
-  const bySize = !byTier && inOrder(book.puzzles.map((P) => P.rows * P.cols));
-  const section = (P) => (byTier ? P.tier : bySize ? `${P.cols}×${P.rows}` : null);
+  const mainArea = book.puzzles.length ? book.puzzles[0].rows * book.puzzles[0].cols : 0;
+  const mainPuzzles = book.puzzles.filter((P) => P.rows * P.cols === mainArea);
+  const tailPuzzles = book.puzzles.slice(mainPuzzles.length);
+  const hasOversizedTail = mainPuzzles.length > 0 && tailPuzzles.length > 0
+    && mainPuzzles.every((P, idx) => book.puzzles[idx] === P)
+    && tailPuzzles.every((P) => P.rows * P.cols > mainArea)
+    && mainPuzzles.every((P) => P.tier)
+    && inOrder(mainPuzzles.map((P) => TIER_ORDER.indexOf(tierLabel(P))));
+  const byTier = !hasOversizedTail && book.puzzles.every((P) => P.tier) && inOrder(book.puzzles.map((P) => TIER_ORDER.indexOf(tierLabel(P))));
+  const bySize = !hasOversizedTail && !byTier && inOrder(book.puzzles.map((P) => P.rows * P.cols));
+  const section = (P) => (
+    hasOversizedTail ? (P.rows * P.cols > mainArea ? `Bonus · ${P.cols}×${P.rows}` : tierLabel(P))
+      : byTier ? tierLabel(P)
+      : bySize ? `${P.cols}×${P.rows}`
+      : null
+  );
 
   let current = null;
   book.puzzles.forEach((P, i) => {

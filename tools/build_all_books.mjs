@@ -29,50 +29,26 @@ const manifest = {
     {
       name: 'Default',
       icon: '📚',
-      blurb: 'Standard Masyu boards by size — from quick 6×6 warm-ups up to giant 18×18 and 12×20 grids, easiest first.',
+      blurb: 'Standard Masyu boards by size — 500-puzzle difficulty books for 8×8 and 12×12, plus Giant boards up to full-page 24×30.',
+      subs: {
+        '8×8': {
+          icon: '8️⃣',
+          blurb: 'Compact 8×8 boards — 500 puzzles each in Beginner, Medium, Hard, and Expert (+ 10 Expert+ beyond hints).',
+        },
+        '12×12': {
+          icon: '🔷',
+          blurb: 'Classic 12×12 boards — 500 puzzles each in Beginner, Medium, Hard, and Expert (+ 10 Expert+ beyond hints).',
+        },
+        'Giants': {
+          icon: '🗻',
+          blurb: 'Large and printable full-page boards (16×16, 12×20, and 24×30) for long, relaxing solves.',
+        },
+      },
     },
     {
       name: 'Bonus',
       icon: '🎁',
-      blurb: 'Themed variations using the exact same rules with a distinct feel.',
-      subs: {
-        'All white': {
-          icon: '⚪',
-          blurb: 'Every circle is white: straight lines and forced turns everywhere.',
-        },
-        'All black': {
-          icon: '⚫',
-          blurb: 'Every circle is black: sharp corners and long two-step legs.',
-        },
-        'Sparse': {
-          icon: '🔹',
-          blurb: 'Stripped down to as few circles as uniqueness allows.',
-        },
-        'Skyscraper': {
-          icon: '🏙️',
-          blurb: 'Tall, narrow towers (up to 6×30) where the loop snakes up and down.',
-        },
-        'Exact symmetry': {
-          icon: '🪞',
-          blurb: 'Mirror, diagonal-mirror, and 180° rotational puzzles where both clues and solution loop are symmetric.',
-        },
-        'Yin-Yang': {
-          icon: '☯️',
-          blurb: '180° opposite-color symmetry: turn the board upside down and every white circle lands on a black circle.',
-        },
-        'No edge clues': {
-          icon: '🎯',
-          blurb: 'Zero circles on the outer border — no free wall openings, work outward from the interior.',
-        },
-        'Lattice': {
-          icon: '💠',
-          blurb: 'Every even row and even column holds a circle — all dots present, and none anywhere else.',
-        },
-        'Full board': {
-          icon: '🧱',
-          blurb: 'Every single intersection on the grid is visited by the loop (100% fill, standard Masyu rules).',
-        },
-      },
+      blurb: 'Themed variations using the exact same rules — 500 puzzles (10% Beginner, 40% Medium, 40% Hard, 10% Expert) plus 10 oversized bonus puzzles at the end, plus the curated Lattice showcase.',
     },
   ],
   books: existingHidden,
@@ -83,173 +59,125 @@ const recipes = [
   // ---- Start here
   {
     id: 'intro', name: 'Gentle intro', label: 'Gentle intro', group: 'Start here',
-    glob: 'intro_', limit: 60, onlyTier: 'Beginner',
-    blurb: '60 small Beginner puzzles (5×5 and 6×6), easiest first.',
+    glob: 'intro_5x5,intro_6x6', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
+    blurb: '100 small Beginner puzzles (50 each of 5×5 and 6×6), easiest first.',
   },
 
-  // ---- Default sizes (6x6 through giant 18x18 & 12x20)
+  // ---- Default: 8×8 (4 separate books × 500, + 10 Expert+ in Expert)
   {
-    id: '6x6', name: '6×6', label: '6×6', group: 'Default',
-    glob: 'balanced_6x6', tiers: '40,40,40',
-    blurb: '120 puzzles on 6×6 boards — 40 each of Beginner, Medium, and Hard.',
+    id: '8x8-beginner', name: '8×8 Beginner', label: 'Beginner', group: 'Default', sub: '8×8',
+    glob: 'balanced_8x8', limit: 500, onlyTier: 'Beginner', maxScore: 235,
+    blurb: '500 Beginner 8×8 puzzles (score ≤ 235), easiest first.',
   },
   {
-    id: '8x8', name: '8×8', label: '8×8', group: 'Default',
-    glob: 'balanced_8x8', tiers: '40,40,40',
-    blurb: '120 puzzles on 8×8 boards — 40 each of Beginner, Medium, and Hard.',
+    id: '8x8-medium', name: '8×8 Medium', label: 'Medium', group: 'Default', sub: '8×8',
+    glob: 'balanced_8x8', limit: 500, onlyTier: 'Medium', minScore: 235, maxScore: 310,
+    blurb: '500 Medium 8×8 puzzles (score 235–310), easiest first.',
   },
   {
-    id: '10x10', name: '10×10', label: '10×10', group: 'Default',
-    glob: 'balanced_10x10', tiers: '30,30,30',
-    blurb: '90 puzzles on 10×10 boards — 30 each of Beginner, Medium, and Hard.',
+    id: '8x8-hard', name: '8×8 Hard', label: 'Hard', group: 'Default', sub: '8×8',
+    glob: 'balanced_8x8', limit: 500, onlyTier: 'Hard', minScore: 310, maxScore: 520,
+    blurb: '500 pure-logic Hard 8×8 puzzles (score 310–520), easiest first.',
   },
   {
-    id: '12x12', name: '12×12', label: '12×12', group: 'Default',
-    glob: 'balanced_12x12', tiers: '25,25,25',
-    blurb: '75 puzzles on 12×12 boards — 25 each of Beginner, Medium, and Hard.',
-  },
-  {
-    id: '14x14', name: '14×14', label: '14×14', group: 'Default',
-    glob: 'balanced_14x14', tiers: '15,15,15',
-    blurb: '45 large puzzles on 14×14 boards — 15 each of Beginner, Medium, and Hard.',
-  },
-  {
-    id: '16x16', name: '16×16', label: '16×16', group: 'Default',
-    glob: 'balanced_16x16', tiers: '12,12,12',
-    blurb: '36 big puzzles on 16×16 boards — 12 each of Beginner, Medium, and Hard.',
-  },
-  {
-    id: '18x18', name: '18×18', label: '18×18', group: 'Default',
-    glob: 'balanced_18x18', limit: 24,
-    blurb: '24 giant 18×18 square boards for long, deep solves.',
-  },
-  {
-    id: '12x20', name: '12×20 Giant', label: '12×20 Giant', group: 'Default',
-    glob: 'balanced_12x20', limit: 24,
-    blurb: '24 tall giant 12×20 boards (classic magazine-page proportions).',
+    id: '8x8-expert', name: '8×8 Expert', label: 'Expert', group: 'Default', sub: '8×8',
+    glob: 'balanced_8x8', limit: 500, onlyTier: 'Expert', minScore: 520, expertPlus: 10,
+    blurb: '500 Expert 8×8 puzzles (score ≥ 520) plus 10 Expert+ puzzles beyond hints.',
   },
 
-  // ---- Bonus: All white
+  // ---- Default: 12×12 (4 separate books × 500, + 10 Expert+ in Expert)
   {
-    id: 'bonus-white-6x6', name: 'All white 6×6', label: '6×6', group: 'Bonus', sub: 'All white',
-    glob: 'white_6x6', limit: 60,
-    blurb: '60 all-white Masyu puzzles on 6×6 boards, easiest first.',
+    id: '12x12-beginner', name: '12×12 Beginner', label: 'Beginner', group: 'Default', sub: '12×12',
+    glob: 'balanced_12x12', limit: 500, onlyTier: 'Beginner', maxScore: 535,
+    blurb: '500 Beginner 12×12 puzzles (score ≤ 535), easiest first.',
   },
   {
-    id: 'bonus-white-8x8', name: 'All white 8×8', label: '8×8', group: 'Bonus', sub: 'All white',
-    glob: 'white_8x8', limit: 60,
-    blurb: '60 all-white Masyu puzzles on 8×8 boards, easiest first.',
+    id: '12x12-medium', name: '12×12 Medium', label: 'Medium', group: 'Default', sub: '12×12',
+    glob: 'balanced_12x12', limit: 500, onlyTier: 'Medium', minScore: 535, maxScore: 660,
+    blurb: '500 Medium 12×12 puzzles (score 535–660), easiest first.',
   },
   {
-    id: 'bonus-white-10x10', name: 'All white 10×10', label: '10×10', group: 'Bonus', sub: 'All white',
-    glob: 'white_10x10', limit: 45,
-    blurb: '45 all-white Masyu puzzles on 10×10 boards, easiest first.',
-  },
-
-  // ---- Bonus: All black
-  {
-    id: 'bonus-black-6x6', name: 'All black 6×6', label: '6×6', group: 'Bonus', sub: 'All black',
-    glob: 'black_6x6', limit: 60,
-    blurb: '60 all-black Masyu puzzles on 6×6 boards, easiest first.',
+    id: '12x12-hard', name: '12×12 Hard', label: 'Hard', group: 'Default', sub: '12×12',
+    glob: 'balanced_12x12', limit: 500, onlyTier: 'Hard', minScore: 660, maxScore: 1050,
+    blurb: '500 pure-logic Hard 12×12 puzzles (score 660–1,050), easiest first.',
   },
   {
-    id: 'bonus-black-8x8', name: 'All black 8×8', label: '8×8', group: 'Bonus', sub: 'All black',
-    glob: 'black_8x8', limit: 60,
-    blurb: '60 all-black Masyu puzzles on 8×8 boards, easiest first.',
-  },
-  {
-    id: 'bonus-black-10x10', name: 'All black 10×10', label: '10×10', group: 'Bonus', sub: 'All black',
-    glob: 'black_10x10', limit: 45,
-    blurb: '45 all-black Masyu puzzles on 10×10 boards, easiest first.',
+    id: '12x12-expert', name: '12×12 Expert', label: 'Expert', group: 'Default', sub: '12×12',
+    glob: 'balanced_12x12', limit: 500, onlyTier: 'Expert', minScore: 1050, expertPlus: 10,
+    blurb: '500 Expert 12×12 puzzles (score ≥ 1,050) plus 10 Expert+ puzzles beyond hints.',
   },
 
-  // ---- Bonus: Sparse
+  // ---- Default: Giants (curated smaller counts with per-tier score bands)
   {
-    id: 'bonus-sparse-8x8', name: 'Sparse 8×8', label: '8×8', group: 'Bonus', sub: 'Sparse',
-    glob: 'sparse_8x8', limit: 60,
-    blurb: '60 minimal-clue 8×8 puzzles stripped as far as uniqueness allows.',
+    id: '16x16', name: '16×16', label: '16×16', group: 'Default', sub: 'Giants',
+    glob: 'balanced_16x16', tiers: '50,50,50,50', tierBands: '0:940,940:1100,1100:1650,1650:',
+    blurb: '200 big 16×16 puzzles — 50 each of Beginner, Medium, Hard, and Expert.',
   },
   {
-    id: 'bonus-sparse-10x10', name: 'Sparse 10×10', label: '10×10', group: 'Bonus', sub: 'Sparse',
-    glob: 'sparse_10x10', limit: 45,
-    blurb: '45 minimal-clue 10×10 puzzles stripped as far as uniqueness allows.',
-  },
-
-  // ---- Bonus: Skyscraper
-  {
-    id: 'bonus-skyscraper', name: 'Skyscraper', label: 'Standard (5×14 – 6×20)', group: 'Bonus', sub: 'Skyscraper',
-    glob: 'sky_', limit: 60,
-    blurb: '60 tall, narrow puzzles (5×14, 6×16, and 6×20), easiest first.',
+    id: '12x20', name: '12×20 Giant', label: '12×20 Giant', group: 'Default', sub: 'Giants',
+    glob: 'balanced_12x20', tiers: '25,25,25,25', tierBands: '0:900,900:1050,1050:1650,1650:',
+    blurb: '100 tall 12×20 puzzles (magazine-page proportions) — 25 each of Beginner, Medium, Hard, and Expert.',
   },
   {
-    id: 'bonus-skyscraper-tall', name: 'Tall Skyscraper', label: 'Mega (6×24 – 6×30)', group: 'Bonus', sub: 'Skyscraper',
-    glob: 'tallsky_', limit: 36,
-    blurb: '36 extra-tall tower puzzles (6×24, 8×24, and 6×30), easiest first.',
+    id: '24x30', name: '24×30 Full Page', label: '24×30 Full Page', group: 'Default', sub: 'Giants',
+    glob: 'balanced_24x30', tiers: '15,15,15,15', tierBands: '0:2580,2520:2750,2750:3300,3300:',
+    blurb: '60 huge 24×30 boards sized for one full printer page — 15 each of Beginner, Medium, Hard, and Expert.',
   },
 
-  // ---- Bonus: Exact symmetry (balanced evenly across 180°, mirror, and diagonal-mirror in every tier)
+  // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 oversized bonus) + Lattice showcase
   {
-    id: 'bonus-symmetry-8x8', name: 'Exact symmetry 8×8', label: '8×8', group: 'Bonus', sub: 'Exact symmetry',
-    glob: 'sym_rot180_8x8,sym_mirror_8x8,sym_transpose_8x8', tiers: '20,20,20', balanceGroups: true,
-    blurb: '60 symmetric 8×8 puzzles — evenly balanced across mirror, diagonal-mirror, and 180° rotational symmetry in every tier.',
+    id: 'bonus-white', name: 'All white', label: '⚪ All white (8×8)', group: 'Bonus',
+    glob: 'white_8x8', tiers: '50,200,200,50', tierBands: '0:275,265:345,345:650,650:',
+    bonusGlob: 'white_12x12', bonusCount: 10,
+    blurb: '500 all-white 8×8 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
-    id: 'bonus-symmetry-10x10', name: 'Exact symmetry 10×10', label: '10×10', group: 'Bonus', sub: 'Exact symmetry',
-    glob: 'sym_rot180_10x10,sym_mirror_10x10,sym_transpose_10x10', tiers: '15,15,15', balanceGroups: true,
-    blurb: '45 symmetric 10×10 puzzles — 5 each of mirror, diagonal-mirror, and 180° rotational symmetry in every tier.',
-  },
-
-  // ---- Bonus: Yin-Yang
-  {
-    id: 'bonus-yinyang-8x8', name: 'Yin-Yang 8×8', label: '8×8', group: 'Bonus', sub: 'Yin-Yang',
-    glob: 'yinyang_8x8', limit: 45,
-    blurb: '45 opposite-color 180° symmetric puzzles on 8×8 boards.',
+    id: 'bonus-black', name: 'All black', label: '⚫ All black (10×10)', group: 'Bonus',
+    glob: 'black_10x10', tiers: '50,200,200,50', tierBands: '0:350,335:405,390:680,680:',
+    bonusGlob: 'black_12x12', bonusCount: 10,
+    blurb: '500 all-black 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
-    id: 'bonus-yinyang-10x10', name: 'Yin-Yang 10×10', label: '10×10', group: 'Bonus', sub: 'Yin-Yang',
-    glob: 'yinyang_10x10', limit: 30,
-    blurb: '30 opposite-color 180° symmetric puzzles on 10×10 boards.',
-  },
-
-  // ---- Bonus: No edge clues (Interior only)
-  {
-    id: 'bonus-interior-8x8', name: 'No edge clues 8×8', label: '8×8', group: 'Bonus', sub: 'No edge clues',
-    glob: 'interior_8x8', limit: 45,
-    blurb: '45 puzzles on 8×8 boards with zero circles on the outer border.',
+    id: 'bonus-sparse', name: 'Sparse', label: '🔹 Sparse (10×10)', group: 'Bonus',
+    glob: 'sparse_10x10', tiers: '50,200,200,50', tierBands: '0:390,375:480,475:820,820:',
+    bonusGlob: 'sparse_12x12', bonusCount: 10,
+    blurb: '500 minimal-clue 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
-    id: 'bonus-interior-10x10', name: 'No edge clues 10×10', label: '10×10', group: 'Bonus', sub: 'No edge clues',
-    glob: 'interior_10x10', limit: 45,
-    blurb: '45 puzzles on 10×10 boards with zero circles on the outer border.',
-  },
-
-  // ---- Bonus: Lattice (all even-row, even-col dots present)
-  {
-    id: 'bonus-lattice-9x9', name: 'Lattice 9×9', label: '9×9 (all 22)', group: 'Bonus', sub: 'Lattice',
-    glob: 'lattice_9x9', limit: 22,
-    blurb: 'All 22 unique 9×9 full-lattice puzzles (up to symmetry) with every even-row, even-column circle present.',
+    id: 'bonus-skyscraper', name: 'Skyscraper', label: '🏙️ Skyscraper (6×20)', group: 'Bonus',
+    glob: 'sky_6x20', tiers: '50,200,200,50', tierBands: '0:480,430:550,550:900,880:',
+    bonusGlob: 'tallsky_6x30', bonusCount: 10,
+    blurb: '500 tall 6×20 tower puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 6×30 Mega Skyscrapers.',
   },
   {
-    id: 'bonus-lattice-big', name: 'Lattice big', label: '9×11 & 13×13', group: 'Bonus', sub: 'Lattice',
-    glob: 'lattice_9x11,lattice_13x13', limit: 32,
-    blurb: '32 larger full-lattice puzzles on 9×11 (20 dots) and 13×13 (36 dots) boards.',
-  },
-
-  // ---- Bonus: Full board (100% loop fill)
-  {
-    id: 'bonus-full-6x6', name: 'Full board 6×6', label: '6×6', group: 'Bonus', sub: 'Full board',
-    glob: 'full_6x6', limit: 45,
-    blurb: '45 full-fill 6×6 puzzles where the loop visits every intersection.',
+    id: 'bonus-symmetry', name: 'Exact symmetry', label: '🪞 Exact symmetry (10×10)', group: 'Bonus',
+    glob: 'sym_rot180_10x10,sym_mirror_10x10,sym_transpose_10x10',
+    tiers: '50,200,200,50', tierBands: '0:360,340:440,440:760,760:', balanceGroups: true,
+    bonusGlob: 'sym_rot180_12x12,sym_mirror_12x12,sym_transpose_12x12', bonusCount: 10,
+    blurb: '500 symmetric 10×10 puzzles (balanced across mirror, diagonal-mirror, and 180° in every tier) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
-    id: 'bonus-full-8x8', name: 'Full board 8×8', label: '8×8', group: 'Bonus', sub: 'Full board',
-    glob: 'full_8x8', limit: 45,
-    blurb: '45 full-fill 8×8 puzzles where the loop visits every intersection.',
+    id: 'bonus-yinyang', name: 'Yin-Yang', label: '☯️ Yin-Yang (10×10)', group: 'Bonus',
+    glob: 'yinyang_10x10', tiers: '50,200,200,50', tierBands: '0:355,340:460,460:780,780:',
+    bonusGlob: 'yinyang_12x12', bonusCount: 10,
+    blurb: '500 opposite-color 180° symmetric 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
-    id: 'bonus-full-10x10', name: 'Full board 10×10', label: '10×10', group: 'Bonus', sub: 'Full board',
-    glob: 'full_10x10', limit: 30,
-    blurb: '30 full-fill 10×10 puzzles where the loop visits every intersection.',
+    id: 'bonus-interior', name: 'No edge clues', label: '🎯 No edge clues (10×10)', group: 'Bonus',
+    glob: 'interior_10x10', tiers: '50,200,200,50', tierBands: '0:385,370:445,445:720,720:',
+    bonusGlob: 'interior_12x12', bonusCount: 10,
+    blurb: '500 borderless-clue 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
+  },
+  {
+    id: 'bonus-full', name: 'Full board', label: '🧱 Full board (10×10)', group: 'Bonus',
+    glob: 'full_10x10', tiers: '50,200,200,50', tierBands: '0:425,400:485,480:850,820:',
+    bonusGlob: 'full_10x12', bonusCount: 10,
+    blurb: '500 full-fill 10×10 puzzles where the loop visits every cell (50 B / 200 M / 200 H / 50 E) plus 10 oversized 10×12 bonus puzzles.',
+  },
+  {
+    id: 'bonus-lattice', name: 'Lattice', label: '💠 Lattice showcase (9×9 – 13×13)', group: 'Bonus',
+    glob: 'lattice_9x9,lattice_9x11,lattice_13x13', limit: 60,
+    blurb: 'Curated full-lattice showcase: all 22 unique 9×9 puzzles plus 24 on 9×11 and 14 on 13×13.',
   },
 ];
 
@@ -268,6 +196,12 @@ for (const r of recipes) {
   if (r.limit) args.push('--limit', String(r.limit));
   if (r.tiers) args.push('--tiers', r.tiers);
   if (r.onlyTier) args.push('--only-tier', r.onlyTier);
+  if (r.minScore !== undefined) args.push('--min-score', String(r.minScore));
+  if (r.maxScore !== undefined) args.push('--max-score', String(r.maxScore));
+  if (r.tierBands) args.push('--tier-bands', r.tierBands);
+  if (r.expertPlus) args.push('--expert-plus', String(r.expertPlus));
+  if (r.bonusGlob) args.push('--bonus-glob', r.bonusGlob);
+  if (r.bonusCount) args.push('--bonus-count', String(r.bonusCount));
   if (r.balanceGroups) args.push('--balance-groups');
   if (builtFiles.length) args.push('--exclude', builtFiles.join(','));
   execFileSync(process.execPath, args, { stdio: 'inherit' });

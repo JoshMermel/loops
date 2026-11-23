@@ -23,6 +23,7 @@ const seen = new Set();
 const addFile = (f) => {
   if (!fs.existsSync(f)) return;
   for (const p of parseCsv(fs.readFileSync(f, 'utf8'))) {
+    if (p.rows * p.cols > 196) continue; // keep how-to-solve diagrams readable
     const sk = symmetryKey(p);
     if (seen.has(sk)) continue;
     seen.add(sk);

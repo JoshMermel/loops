@@ -34,7 +34,7 @@ const style = arg('style', 'balanced'); // balanced | white | black | sparse
 const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
 const tier = arg('tier', 'any');        // any | Beginner | Medium | Hard
-const maxTier = arg('max-tier', 'Hard');
+const maxTier = arg('max-tier', 'Expert');
 const keepFrac = arg('keep', null) !== null ? +arg('keep') : null;
 const prefix = arg('prefix', `${layout !== 'none' ? layout : style}_${cols}x${rows}`);
 const defaultOut = path.join('tools', 'library', `${prefix}.csv`);
@@ -101,4 +101,4 @@ while (added < count && Date.now() < deadline) {
   process.stdout.write(`[${added}/${count}] ${p.name} (${p.clues.length} clues) -> ${p.tier} / ${p.rules} / ${p.score}\n`);
 }
 
-console.log(`Done: added ${added} puzzles to ${outPath} (tiers: B=${tierCounts.Beginner} M=${tierCounts.Medium} H=${tierCounts.Hard})`);
+console.log(`Done: added ${added} puzzles to ${outPath} (tiers: B=${tierCounts.Beginner} M=${tierCounts.Medium} H=${tierCounts.Hard} E=${tierCounts.Expert})`);

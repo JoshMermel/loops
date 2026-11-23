@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { RULES, TIERS, TIER_INFO, HUMAN_ORDER } from '../js/rating.js';
+import { MEDIUM_MAX } from '../js/imagine.js';
 
 const root = new URL('..', import.meta.url).pathname;
 const examples = JSON.parse(fs.readFileSync(path.join(root, 'docs', 'examples', 'examples.json'), 'utf8'));
@@ -47,7 +48,7 @@ say(
   '',
   '## Bookkeeping',
   '',
-  'Four bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:',
+  'Five bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:',
   '',
 );
 
@@ -62,7 +63,7 @@ for (const tier of TIERS.filter((t) => RULES.some((r) => r.tier === t && !r.free
   if (info && info.blurb) say(`A puzzle is rated **${tier}** when its hardest required step is in this tier: ${info.blurb}.`, '');
 
   for (const r of orderedForTier(tier)) {
-    const costLabel = r.id === 'imagine' ? `cost ≤ ${r.cost} (dynamic)` : r.id === 'imagineLong' ? 'cost > 30 (dynamic)' : `cost ${r.cost}`;
+    const costLabel = r.id === 'imagine' ? `cost ≤ ${MEDIUM_MAX} (dynamic)` : r.id === 'imagineLong' ? `cost > ${MEDIUM_MAX} (dynamic)` : `cost ${r.cost}`;
     say(`### ${r.id}`, '', `*${tier}, ${costLabel}*`, '');
     say(`${cap(r.label)}.`, '');
     const e = byRule.get(r.id);

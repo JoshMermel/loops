@@ -84,7 +84,8 @@ if (process.argv.includes('--worker')) {
 // Main coordinator
 const only = arg('book', '') ? arg('book').split(',') : null;
 const includeHidden = process.argv.includes('--all');
-const chunk = +arg('chunk', 25);
+const userChunk = arg('chunk', null);
+const chunk = userChunk ? +userChunk : 25;
 const jobs = Math.max(1, +arg('jobs', Math.max(2, os.availableParallelism() - 1)));
 const withRating = process.argv.includes('--rate');
 
@@ -109,8 +110,13 @@ for (const entry of booksToAudit) {
     hashes.set(sk, p.name);
     if (!entry.hidden && !everywhere.has(sk)) everywhere.set(sk, `${entry.id}:${p.name}`);
   }
-  for (let from = 0; from < ps.length; from += chunk) {
-    tasks.push({ id: entry.id, range: `${from}-${Math.min(ps.length, from + chunk)}` });
+  const bigBook = ps.length > 0 && ps[0].rows * ps[0].cols >= 225;
+  const bookChunk = userChunk ? chunk
+    : bigBook ? Math.min(chunk, 3)
+    : booksToAudit.length === 1 ? Math.min(chunk, Math.max(4, Math.ceil(ps.length / jobs)))
+    : chunk;
+  for (let from = 0; from < ps.length; from += bookChunk) {
+    tasks.push({ id: entry.id, range: `${from}-${Math.min(ps.length, from + bookChunk)}` });
   }
 }
 
