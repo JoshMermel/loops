@@ -26,8 +26,8 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 
 ## Books & scaling
 
-- [x] **Larger board sizes & grown starter books:** expanded `intro`–`12×12` (60–120 puzzles each), added `14×14`, `16×16`, `18×18`, and `12×20` to Default, added `10×10` All white / All black / Sparse, and added Tall Skyscraper (`6×24`, `8×24`, `6×30`) — **1,572 audited puzzles across 30 visible books**.
-- [x] **New themed Bonus corpuses:** Exact symmetry (`rot180`, `mirror`, `transpose`, `rot90`), Yin-Yang (180° opposite-color symmetry), No edge clues (`interior`), Lattice (full even-row/even-col dot grid), and Full board (`100%` loop fill).
+- [x] **Larger board sizes & grown starter books:** expanded `intro`–`12×12` (60–120 puzzles each), added `14×14`, `16×16`, `18×18`, and `12×20` to Default, added `10×10` All white / All black / Sparse, and added Tall Skyscraper (`6×24`, `8×24`, `6×30`) — **1,569 audited puzzles across 30 visible books**.
+- [x] **New themed Bonus corpuses:** Exact symmetry (`rot180`, `mirror`, `transpose`, balanced per tier), Yin-Yang (180° opposite-color symmetry), No edge clues (`interior`), Lattice (full even-row/even-col dot grid), and Full board (`100%` loop fill).
 - [ ] **Grow further with `tools/fill_pools.mjs` / `tools/overnight.mjs`:** scale Default books toward 250–1000 puzzles each, or try `20×20` / `20×36` mega boards.
 - [ ] **More themed Bonus ideas to explore:**
   - **Symmetric layout (asymmetric colors):** 180° symmetric clue *positions* with free circle colors and asymmetric loops.

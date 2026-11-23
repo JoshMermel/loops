@@ -34,7 +34,7 @@
         },
         "Exact symmetry": {
           "icon": "🪞",
-          "blurb": "Mirror, diagonal-mirror, 180°, and 90° rotational puzzles where both clues and solution loop are symmetric."
+          "blurb": "Mirror, diagonal-mirror, and 180° rotational puzzles where both clues and solution loop are symmetric."
         },
         "Yin-Yang": {
           "icon": "☯️",
@@ -245,17 +245,17 @@
       "count": 60,
       "group": "Bonus",
       "sub": "Exact symmetry",
-      "blurb": "60 symmetric 8×8 puzzles mixing mirror, diagonal-mirror, 180°, and 90° rotational symmetry."
+      "blurb": "60 symmetric 8×8 puzzles — evenly balanced across mirror, diagonal-mirror, and 180° rotational symmetry in every tier."
     },
     {
       "id": "bonus-symmetry-10x10",
       "name": "Exact symmetry 10×10",
       "label": "10×10",
       "file": "data/bonus-symmetry-10x10.csv",
-      "count": 48,
+      "count": 45,
       "group": "Bonus",
       "sub": "Exact symmetry",
-      "blurb": "48 symmetric 10×10 puzzles mixing mirror, diagonal-mirror, 180°, and 90° rotational symmetry."
+      "blurb": "45 symmetric 10×10 puzzles — 5 each of mirror, diagonal-mirror, and 180° rotational symmetry in every tier."
     },
     {
       "id": "bonus-yinyang-8x8",

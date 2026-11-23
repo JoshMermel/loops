@@ -123,16 +123,30 @@ const JOBS = [
   { group: 'bonus-existing', pool: 'tallsky_8x24', cols: 8, rows: 24, total: 14, budgetSec: 80, perPuzzleMs: 30000 },
   { group: 'bonus-existing', pool: 'tallsky_6x30', cols: 6, rows: 30, total: 14, budgetSec: 80, perPuzzleMs: 30000 },
 
-  // ---- Brand-new Bonus corpus themes
-  { group: 'bonus-new', pool: 'sym_rot180_8x8', cols: 8, rows: 8, layout: 'rot180', total: 22, budgetSec: 45 },
-  { group: 'bonus-new', pool: 'sym_mirror_8x8', cols: 8, rows: 8, layout: 'mirror', total: 22, budgetSec: 45 },
-  { group: 'bonus-new', pool: 'sym_transpose_8x8', cols: 8, rows: 8, layout: 'transpose', total: 22, budgetSec: 45 },
-  { group: 'bonus-new', pool: 'sym_rot90_8x8', cols: 8, rows: 8, layout: 'rot90', total: 22, budgetSec: 45 },
+  // ---- Brand-new Bonus corpus themes (Exact symmetry: per-tier pools for balanced 180° / mirror / diagonal-mirror books)
+  { group: 'bonus-sym', pool: 'sym_rot180_8x8', cols: 8, rows: 8, layout: 'rot180', tier: 'Beginner', totalTier: 9, budgetSec: 40 },
+  { group: 'bonus-sym', pool: 'sym_rot180_8x8', cols: 8, rows: 8, layout: 'rot180', tier: 'Medium', totalTier: 9, budgetSec: 45 },
+  { group: 'bonus-sym', pool: 'sym_rot180_8x8', cols: 8, rows: 8, layout: 'rot180', tier: 'Hard', totalTier: 9, budgetSec: 55 },
 
-  { group: 'bonus-new', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', total: 16, budgetSec: 60 },
-  { group: 'bonus-new', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', total: 16, budgetSec: 60 },
-  { group: 'bonus-new', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose', total: 16, budgetSec: 60 },
-  { group: 'bonus-new', pool: 'sym_rot90_10x10', cols: 10, rows: 10, layout: 'rot90', total: 16, budgetSec: 60 },
+  { group: 'bonus-sym', pool: 'sym_mirror_8x8', cols: 8, rows: 8, layout: 'mirror', tier: 'Beginner', totalTier: 9, budgetSec: 40 },
+  { group: 'bonus-sym', pool: 'sym_mirror_8x8', cols: 8, rows: 8, layout: 'mirror', tier: 'Medium', totalTier: 9, budgetSec: 45 },
+  { group: 'bonus-sym', pool: 'sym_mirror_8x8', cols: 8, rows: 8, layout: 'mirror', tier: 'Hard', totalTier: 9, budgetSec: 55 },
+
+  { group: 'bonus-sym', pool: 'sym_transpose_8x8', cols: 8, rows: 8, layout: 'transpose', tier: 'Beginner', totalTier: 9, budgetSec: 40 },
+  { group: 'bonus-sym', pool: 'sym_transpose_8x8', cols: 8, rows: 8, layout: 'transpose', tier: 'Medium', totalTier: 9, budgetSec: 45 },
+  { group: 'bonus-sym', pool: 'sym_transpose_8x8', cols: 8, rows: 8, layout: 'transpose', tier: 'Hard', totalTier: 9, budgetSec: 55 },
+
+  { group: 'bonus-sym', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', tier: 'Beginner', totalTier: 7, budgetSec: 50 },
+  { group: 'bonus-sym', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', tier: 'Medium', totalTier: 7, budgetSec: 55 },
+  { group: 'bonus-sym', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', tier: 'Hard', totalTier: 7, budgetSec: 65 },
+
+  { group: 'bonus-sym', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', tier: 'Beginner', totalTier: 7, budgetSec: 50 },
+  { group: 'bonus-sym', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', tier: 'Medium', totalTier: 7, budgetSec: 55 },
+  { group: 'bonus-sym', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', tier: 'Hard', totalTier: 7, budgetSec: 65 },
+
+  { group: 'bonus-sym', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose', tier: 'Beginner', totalTier: 7, budgetSec: 50 },
+  { group: 'bonus-sym', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose', tier: 'Medium', totalTier: 7, budgetSec: 55 },
+  { group: 'bonus-sym', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose', tier: 'Hard', totalTier: 7, budgetSec: 65 },
 
   { group: 'bonus-new', pool: 'yinyang_8x8', cols: 8, rows: 8, layout: 'yinyang', total: 48, budgetSec: 95, perPuzzleMs: 20000 },
   { group: 'bonus-new', pool: 'yinyang_10x10', cols: 10, rows: 10, layout: 'yinyang', total: 32, budgetSec: 120, perPuzzleMs: 30000 },

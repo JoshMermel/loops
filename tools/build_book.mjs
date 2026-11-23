@@ -32,6 +32,7 @@ const sub = arg('sub', null);
 const blurb = arg('blurb', null);
 const hidden = hasFlag('hidden');
 const preserveExisting = hasFlag('preserve-existing');
+const balanceGroups = hasFlag('balance-groups');
 const excludeFiles = arg('exclude', '') ? arg('exclude').split(',').filter(Boolean) : [];
 
 const excluded = new Set();
@@ -67,11 +68,13 @@ if (fs.existsSync(dir)) {
     .filter((f) => prefixes.some((pre) => f.startsWith(pre)) && f.endsWith('.csv'))
     .sort();
   for (const f of files) {
+    const grp = prefixes.find((pre) => f.startsWith(pre)) || f;
     for (const p of parseCsv(fs.readFileSync(path.join(dir, f), 'utf8'))) {
       if (onlyTier && p.tier !== onlyTier) continue;
       const sk = symmetryKey(p);
       if (seen.has(sk)) continue;
       seen.add(sk);
+      p._group = grp;
       puzzles.push(p);
     }
   }
@@ -90,22 +93,65 @@ const pickEvenly = (list, n) => {
   return out;
 };
 
+/**
+ * Apportion `target` evenly across `groups` using largest-remainder + level-fill backfill
+ * (same pattern as multiverse-star-battle/tools/build_books.py).
+ */
+function pickBalancedAcrossGroups(poolList, target, groups) {
+  const byG = new Map(groups.map((g) => [g, []]));
+  for (const p of poolList) {
+    const g = byG.has(p._group) ? p._group : groups[0];
+    byG.get(g).push(p);
+  }
+  const avail = new Map(groups.map((g) => [g, byG.get(g).length]));
+  const totalAvail = [...avail.values()].reduce((a, b) => a + b, 0);
+  const want = Math.min(target, totalAvail);
+  const alloc = new Map(groups.map((g) => [g, 0]));
+
+  // Level-fill: repeatedly bump whichever available group currently has the smallest allocation
+  let assigned = 0;
+  while (assigned < want) {
+    let bestG = null, bestA = Infinity;
+    for (const g of groups) {
+      if (alloc.get(g) >= avail.get(g)) continue;
+      const a = alloc.get(g);
+      if (a < bestA) { bestA = a; bestG = g; }
+    }
+    if (!bestG) break;
+    alloc.set(bestG, bestA + 1);
+    assigned++;
+  }
+
+  const picked = [];
+  for (const g of groups) picked.push(...pickEvenly(byG.get(g), alloc.get(g)));
+  return { picked, alloc, avail };
+}
+
 const pickWithLocked = (lockedList, poolList, target) => {
   if (!target) return [...lockedList, ...poolList];
   if (lockedList.length >= target) return lockedList.slice();
-  return [...lockedList, ...pickEvenly(poolList, target - lockedList.length)];
+  const need = target - lockedList.length;
+  if (balanceGroups && prefixes.length > 1) {
+    return [...lockedList, ...pickBalancedAcrossGroups(poolList, need, prefixes).picked];
+  }
+  return [...lockedList, ...pickEvenly(poolList, need)];
 };
 
+const groupReport = [];
 if (tierShares) {
   const lByT = { Beginner: [], Medium: [], Hard: [] };
   const byT = { Beginner: [], Medium: [], Hard: [] };
   for (const p of locked) if (lByT[p.tier]) lByT[p.tier].push(p);
   for (const p of puzzles) if (byT[p.tier]) byT[p.tier].push(p);
-  const picked = [
-    ...pickWithLocked(lByT.Beginner, byT.Beginner, tierShares[0] || 0),
-    ...pickWithLocked(lByT.Medium, byT.Medium, tierShares[1] || 0),
-    ...pickWithLocked(lByT.Hard, byT.Hard, tierShares[2] || 0),
-  ];
+  const picked = [];
+  for (const [tierName, target] of [['Beginner', tierShares[0] || 0], ['Medium', tierShares[1] || 0], ['Hard', tierShares[2] || 0]]) {
+    const res = pickWithLocked(lByT[tierName], byT[tierName], target);
+    picked.push(...res);
+    if (balanceGroups && prefixes.length > 1) {
+      const counts = prefixes.map((g) => `${g}=${res.filter((p) => p._group === g).length}`).join(' ');
+      groupReport.push(`  ${tierName}: ${counts}`);
+    }
+  }
   puzzles = picked.sort(byOrder);
 } else if (evenTiers && limit > 0) {
   const lByT = { Beginner: [], Medium: [], Hard: [] };
@@ -115,11 +161,15 @@ if (tierShares) {
   const per = Math.floor(limit / 3);
   const rem = limit - per * 3;
   const targets = [per + (rem >= 1 ? 1 : 0), per + (rem >= 2 ? 1 : 0), per];
-  const picked = [
-    ...pickWithLocked(lByT.Beginner, byT.Beginner, targets[0]),
-    ...pickWithLocked(lByT.Medium, byT.Medium, targets[1]),
-    ...pickWithLocked(lByT.Hard, byT.Hard, targets[2]),
-  ];
+  const picked = [];
+  for (const [tierName, target] of [['Beginner', targets[0]], ['Medium', targets[1]], ['Hard', targets[2]]]) {
+    const res = pickWithLocked(lByT[tierName], byT[tierName], target);
+    picked.push(...res);
+    if (balanceGroups && prefixes.length > 1) {
+      const counts = prefixes.map((g) => `${g}=${res.filter((p) => p._group === g).length}`).join(' ');
+      groupReport.push(`  ${tierName}: ${counts}`);
+    }
+  }
   puzzles = picked.sort(byOrder);
 } else if (limit > 0) {
   puzzles = pickWithLocked(locked, puzzles, limit).sort(byOrder);
@@ -164,3 +214,4 @@ fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
 const tc = { Beginner: 0, Medium: 0, Hard: 0, Expert: 0 };
 for (const p of puzzles) tc[p.tier] = (tc[p.tier] || 0) + 1;
 console.log(`Built data/${id}.csv: ${puzzles.length} puzzles (B=${tc.Beginner} M=${tc.Medium} H=${tc.Hard})`);
+for (const line of groupReport) console.log(line);

@@ -54,7 +54,7 @@ const manifest = {
         },
         'Exact symmetry': {
           icon: '🪞',
-          blurb: 'Mirror, diagonal-mirror, 180°, and 90° rotational puzzles where both clues and solution loop are symmetric.',
+          blurb: 'Mirror, diagonal-mirror, and 180° rotational puzzles where both clues and solution loop are symmetric.',
         },
         'Yin-Yang': {
           icon: '☯️',
@@ -187,16 +187,16 @@ const recipes = [
     blurb: '36 extra-tall tower puzzles (6×24, 8×24, and 6×30), easiest first.',
   },
 
-  // ---- Bonus: Exact symmetry
+  // ---- Bonus: Exact symmetry (balanced evenly across 180°, mirror, and diagonal-mirror in every tier)
   {
     id: 'bonus-symmetry-8x8', name: 'Exact symmetry 8×8', label: '8×8', group: 'Bonus', sub: 'Exact symmetry',
-    glob: 'sym_rot180_8x8,sym_mirror_8x8,sym_transpose_8x8,sym_rot90_8x8', limit: 60,
-    blurb: '60 symmetric 8×8 puzzles mixing mirror, diagonal-mirror, 180°, and 90° rotational symmetry.',
+    glob: 'sym_rot180_8x8,sym_mirror_8x8,sym_transpose_8x8', tiers: '20,20,20', balanceGroups: true,
+    blurb: '60 symmetric 8×8 puzzles — evenly balanced across mirror, diagonal-mirror, and 180° rotational symmetry in every tier.',
   },
   {
     id: 'bonus-symmetry-10x10', name: 'Exact symmetry 10×10', label: '10×10', group: 'Bonus', sub: 'Exact symmetry',
-    glob: 'sym_rot180_10x10,sym_mirror_10x10,sym_transpose_10x10,sym_rot90_10x10', limit: 48,
-    blurb: '48 symmetric 10×10 puzzles mixing mirror, diagonal-mirror, 180°, and 90° rotational symmetry.',
+    glob: 'sym_rot180_10x10,sym_mirror_10x10,sym_transpose_10x10', tiers: '15,15,15', balanceGroups: true,
+    blurb: '45 symmetric 10×10 puzzles — 5 each of mirror, diagonal-mirror, and 180° rotational symmetry in every tier.',
   },
 
   // ---- Bonus: Yin-Yang
@@ -268,6 +268,7 @@ for (const r of recipes) {
   if (r.limit) args.push('--limit', String(r.limit));
   if (r.tiers) args.push('--tiers', r.tiers);
   if (r.onlyTier) args.push('--only-tier', r.onlyTier);
+  if (r.balanceGroups) args.push('--balance-groups');
   if (builtFiles.length) args.push('--exclude', builtFiles.join(','));
   execFileSync(process.execPath, args, { stdio: 'inherit' });
   builtFiles.push(`data/${r.id}.csv`);
