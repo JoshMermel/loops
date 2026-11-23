@@ -47,7 +47,7 @@ test('threeWhites fires on three consecutive white circles', () => {
   const st = initialState(P);
   const step = nextSteps(P, st);
   assert.equal(step.rule, 'threeWhites');
-  assert.equal(step.tier, 'Medium');
+  assert.equal(step.tier, 'Beginner');
   // Every firing edge for the three whites must be vertical ON, horizontal OFF
   const s2 = initialState(P);
   applySets(s2, step.firings[0].sets);

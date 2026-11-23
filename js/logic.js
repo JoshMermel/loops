@@ -141,149 +141,151 @@ export function propagate(P, st) {
   const parent = scratchParent, size = scratchSize;
   const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
 
+  let needLoopCheck = true;
   while (changed && ok) {
-    changed = false;
+    // Inner local fixed-point loop (Steps 1-4): avoids re-running the O(N + E) union-find on every local cascade step.
+    // Note: cell/edge consistency (Step 1) is enforced directly inside Step 2 below.
+    while (changed && ok) {
+      changed = false;
 
-    // 1. Edge -> cell consistency
-    for (let x = 0; x < numEdges && ok; x++) {
-      if (e[x] === E_ON) {
-        setCell(edgeA[x], LOOP);
-        setCell(edgeB[x], LOOP);
-      }
-    }
-    if (!ok) break;
-
-    // 2. Cell degree / OFF / LOOP consistency
-    for (let i = 0; i < N && ok; i++) {
-      const s = cell[i];
-      if (s === OFF) {
-        if (clue[i] !== NONE) { ok = false; break; }
+      // 1-2. Cell degree / OFF / LOOP consistency (also enforces ON edge -> LOOP endpoints & OFF -> edges OFF)
+      for (let i = 0; i < N && ok; i++) {
+        const s = cell[i];
+        if (s === OFF) {
+          if (clue[i] !== NONE) { ok = false; break; }
+          for (let d = 0; d < 4; d++) {
+            const x = ed[i * 4 + d];
+            if (x >= 0) setEdge(x, E_OFF);
+          }
+          continue;
+        }
+        let on = 0, unk = 0;
         for (let d = 0; d < 4; d++) {
           const x = ed[i * 4 + d];
-          if (x >= 0) setEdge(x, E_OFF);
+          if (x < 0) continue;
+          const v = e[x];
+          if (v === E_ON) on++;
+          else if (v === E_UNKNOWN) unk++;
         }
-        continue;
-      }
-      let on = 0, unk = 0;
-      for (let d = 0; d < 4; d++) {
-        const x = ed[i * 4 + d];
-        if (x < 0) continue;
-        const v = e[x];
-        if (v === E_ON) on++;
-        else if (v === E_UNKNOWN) unk++;
-      }
-      if (on > 2) { ok = false; break; }
-      if (s === UNKNOWN) {
-        if (on >= 1) setCell(i, LOOP);
-        else if (unk < 2) setCell(i, OFF);
-        continue;
-      }
-      // s === LOOP
-      if (on + unk < 2) { ok = false; break; }
-      if (on === 2 && unk > 0) {
-        for (let d = 0; d < 4; d++) {
-          const x = ed[i * 4 + d];
-          if (x >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
+        if (on > 2) { ok = false; break; }
+        if (s === UNKNOWN) {
+          if (on >= 1) { setCell(i, LOOP); needLoopCheck = true; }
+          else if (unk < 2) setCell(i, OFF);
+          continue;
         }
-      } else if (on + unk === 2 && unk > 0) {
-        for (let d = 0; d < 4; d++) {
-          const x = ed[i * 4 + d];
-          if (x >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_ON);
-        }
-      }
-    }
-    if (!ok) break;
-
-    // 3. White circles: straight through, turn at >= 1 end
-    for (let wi = 0; wi < whites.length && ok; wi++) {
-      const i = whites[wi];
-      const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
-      const u2 = ed2[i * 4 + 0], r2 = ed2[i * 4 + 1], d2 = ed2[i * 4 + 2], l2 = ed2[i * 4 + 3];
-
-      let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
-      let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
-      // Cannot go straight along an axis if both ends already continue straight
-      if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
-      if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
-      // If one perpendicular edge is already ON, the other axis is impossible
-      if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
-      if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
-
-      if (!vOk && !hOk) { ok = false; break; }
-      if (!vOk) {
-        setEdge(r, E_ON); setEdge(l, E_ON);
-        if (u >= 0) setEdge(u, E_OFF);
-        if (dn >= 0) setEdge(dn, E_OFF);
-        // Must turn at least one end along horizontal axis
-        if (r2 >= 0 && e[r2] === E_ON && l2 >= 0) setEdge(l2, E_OFF);
-        if (l2 >= 0 && e[l2] === E_ON && r2 >= 0) setEdge(r2, E_OFF);
-      } else if (!hOk) {
-        setEdge(u, E_ON); setEdge(dn, E_ON);
-        if (r >= 0) setEdge(r, E_OFF);
-        if (l >= 0) setEdge(l, E_OFF);
-        // Must turn at least one end along vertical axis
-        if (u2 >= 0 && e[u2] === E_ON && d2 >= 0) setEdge(d2, E_OFF);
-        if (d2 >= 0 && e[d2] === E_ON && u2 >= 0) setEdge(u2, E_OFF);
-      }
-    }
-    if (!ok) break;
-
-    // 4. Black circles: turn 90° and go straight 2 steps in each chosen direction
-    for (let bi = 0; bi < blacks.length && ok; bi++) {
-      const i = blacks[bi];
-      // Check each of the 4 directions for feasibility
-      let can0 = true, can1 = true, can2 = true, can3 = true;
-      for (let d = 0; d < 4; d++) {
-        const x1 = ed[i * 4 + d];
-        const x2 = ed2[i * 4 + d];
-        const n1 = nb[i * 4 + d];
-        let can = x1 >= 0 && x2 >= 0 && e[x1] !== E_OFF && e[x2] !== E_OFF;
-        if (can) {
-          // n1 cannot be a black circle (loop must go straight through n1)
-          if (clue[n1] === BLACK) can = false;
-          // n1 cannot have a perpendicular edge ON (would force degree >= 3)
-          else {
-            const p1 = ed[n1 * 4 + ((d + 1) & 3)], p2 = ed[n1 * 4 + ((d + 3) & 3)];
-            if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can = false;
+        // s === LOOP
+        if (on + unk < 2) { ok = false; break; }
+        if (on === 2 && unk > 0) {
+          for (let d = 0; d < 4; d++) {
+            const x = ed[i * 4 + d];
+            if (x >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
+          }
+        } else if (on + unk === 2 && unk > 0) {
+          for (let d = 0; d < 4; d++) {
+            const x = ed[i * 4 + d];
+            if (x >= 0 && e[x] === E_UNKNOWN) { setEdge(x, E_ON); needLoopCheck = true; }
           }
         }
-        if (d === 0) can0 = can; else if (d === 1) can1 = can; else if (d === 2) can2 = can; else can3 = can;
-      }
-
-      // Vertical axis: exactly one of U(0), D(2)
-      const eu = ed[i * 4 + 0], edown = ed[i * 4 + 2];
-      if (!can0 && !can2) { ok = false; break; }
-      if (!can0) {
-        if (eu >= 0) setEdge(eu, E_OFF);
-        setEdge(edown, E_ON); setEdge(ed2[i * 4 + 2], E_ON);
-      } else if (!can2) {
-        if (edown >= 0) setEdge(edown, E_OFF);
-        setEdge(eu, E_ON); setEdge(ed2[i * 4 + 0], E_ON);
-      } else if (e[eu] === E_ON) {
-        setEdge(edown, E_OFF); setEdge(ed2[i * 4 + 0], E_ON);
-      } else if (e[edown] === E_ON) {
-        setEdge(eu, E_OFF); setEdge(ed2[i * 4 + 2], E_ON);
       }
       if (!ok) break;
 
-      // Horizontal axis: exactly one of R(1), L(3)
-      const er = ed[i * 4 + 1], el = ed[i * 4 + 3];
-      if (!can1 && !can3) { ok = false; break; }
-      if (!can1) {
-        if (er >= 0) setEdge(er, E_OFF);
-        setEdge(el, E_ON); setEdge(ed2[i * 4 + 3], E_ON);
-      } else if (!can3) {
-        if (el >= 0) setEdge(el, E_OFF);
-        setEdge(er, E_ON); setEdge(ed2[i * 4 + 1], E_ON);
-      } else if (e[er] === E_ON) {
-        setEdge(el, E_OFF); setEdge(ed2[i * 4 + 1], E_ON);
-      } else if (e[el] === E_ON) {
-        setEdge(er, E_OFF); setEdge(ed2[i * 4 + 3], E_ON);
+      // 3. White circles: straight through, turn at >= 1 end
+      for (let wi = 0; wi < whites.length && ok; wi++) {
+        const i = whites[wi];
+        const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+        const u2 = ed2[i * 4 + 0], r2 = ed2[i * 4 + 1], d2 = ed2[i * 4 + 2], l2 = ed2[i * 4 + 3];
+
+        let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
+        let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
+        if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
+        if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
+        if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
+        if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
+
+        if (!vOk && !hOk) { ok = false; break; }
+        if (!vOk) {
+          if (e[r] !== E_ON || e[l] !== E_ON) needLoopCheck = true;
+          setEdge(r, E_ON); setEdge(l, E_ON);
+          if (u >= 0) setEdge(u, E_OFF);
+          if (dn >= 0) setEdge(dn, E_OFF);
+          if (r2 >= 0 && e[r2] === E_ON && l2 >= 0) setEdge(l2, E_OFF);
+          if (l2 >= 0 && e[l2] === E_ON && r2 >= 0) setEdge(r2, E_OFF);
+        } else if (!hOk) {
+          if (e[u] !== E_ON || e[dn] !== E_ON) needLoopCheck = true;
+          setEdge(u, E_ON); setEdge(dn, E_ON);
+          if (r >= 0) setEdge(r, E_OFF);
+          if (l >= 0) setEdge(l, E_OFF);
+          if (u2 >= 0 && e[u2] === E_ON && d2 >= 0) setEdge(d2, E_OFF);
+          if (d2 >= 0 && e[d2] === E_ON && u2 >= 0) setEdge(u2, E_OFF);
+        }
+      }
+      if (!ok) break;
+
+      // 4. Black circles: turn 90° and go straight 2 steps in each chosen direction
+      for (let bi = 0; bi < blacks.length && ok; bi++) {
+        const i = blacks[bi];
+        let can0 = true, can1 = true, can2 = true, can3 = true;
+        for (let d = 0; d < 4; d++) {
+          const x1 = ed[i * 4 + d];
+          const x2 = ed2[i * 4 + d];
+          const n1 = nb[i * 4 + d];
+          let can = x1 >= 0 && x2 >= 0 && e[x1] !== E_OFF && e[x2] !== E_OFF;
+          if (can) {
+            if (clue[n1] === BLACK) can = false;
+            else {
+              const p1 = ed[n1 * 4 + ((d + 1) & 3)], p2 = ed[n1 * 4 + ((d + 3) & 3)];
+              if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can = false;
+            }
+          }
+          if (d === 0) can0 = can; else if (d === 1) can1 = can; else if (d === 2) can2 = can; else can3 = can;
+        }
+
+        const eu = ed[i * 4 + 0], edown = ed[i * 4 + 2];
+        if (!can0 && !can2) { ok = false; break; }
+        if (!can0) {
+          if (eu >= 0) setEdge(eu, E_OFF);
+          if (e[edown] !== E_ON || e[ed2[i * 4 + 2]] !== E_ON) needLoopCheck = true;
+          setEdge(edown, E_ON); setEdge(ed2[i * 4 + 2], E_ON);
+        } else if (!can2) {
+          if (edown >= 0) setEdge(edown, E_OFF);
+          if (e[eu] !== E_ON || e[ed2[i * 4 + 0]] !== E_ON) needLoopCheck = true;
+          setEdge(eu, E_ON); setEdge(ed2[i * 4 + 0], E_ON);
+        } else if (e[eu] === E_ON) {
+          setEdge(edown, E_OFF);
+          if (e[ed2[i * 4 + 0]] !== E_ON) needLoopCheck = true;
+          setEdge(ed2[i * 4 + 0], E_ON);
+        } else if (e[edown] === E_ON) {
+          setEdge(eu, E_OFF);
+          if (e[ed2[i * 4 + 2]] !== E_ON) needLoopCheck = true;
+          setEdge(ed2[i * 4 + 2], E_ON);
+        }
+        if (!ok) break;
+
+        const er = ed[i * 4 + 1], el = ed[i * 4 + 3];
+        if (!can1 && !can3) { ok = false; break; }
+        if (!can1) {
+          if (er >= 0) setEdge(er, E_OFF);
+          if (e[el] !== E_ON || e[ed2[i * 4 + 3]] !== E_ON) needLoopCheck = true;
+          setEdge(el, E_ON); setEdge(ed2[i * 4 + 3], E_ON);
+        } else if (!can3) {
+          if (el >= 0) setEdge(el, E_OFF);
+          if (e[er] !== E_ON || e[ed2[i * 4 + 1]] !== E_ON) needLoopCheck = true;
+          setEdge(er, E_ON); setEdge(ed2[i * 4 + 1], E_ON);
+        } else if (e[er] === E_ON) {
+          setEdge(el, E_OFF);
+          if (e[ed2[i * 4 + 1]] !== E_ON) needLoopCheck = true;
+          setEdge(ed2[i * 4 + 1], E_ON);
+        } else if (e[el] === E_ON) {
+          setEdge(er, E_OFF);
+          if (e[ed2[i * 4 + 3]] !== E_ON) needLoopCheck = true;
+          setEdge(ed2[i * 4 + 3], E_ON);
+        }
       }
     }
-    if (!ok) break;
+    if (!ok || !needLoopCheck) break;
+    needLoopCheck = false;
 
-    // 5. Single closed loop constraint
+    // 5. Single closed loop constraint (runs once per local fixed point, only when ON/LOOP changed)
     for (let i = 0; i < N; i++) parent[i] = i;
     let cycleRoot = -1, cycleCount = 0;
     for (let x = 0; x < numEdges; x++) {

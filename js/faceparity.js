@@ -39,11 +39,18 @@ export function edgeDualFaces(P, x) {
   return [faceAt(r, c - 1), faceAt(r, c)];
 }
 
+let fpParent = new Int32Array(0);
+let fpDiff = new Uint8Array(0);
+let fpStack = new Int32Array(0);
+let bfsPrev = new Int32Array(0);
+let bfsDist = new Int32Array(0);
+let bfsQueue = new Int32Array(0);
+
 /**
- * Build the complete Inside/Outside parity union-find and proof graph for state `st`.
- * Returns { EXT, F, find, relate, adj, conflict }.
+ * Build the complete Inside/Outside parity union-find (and optionally proof graph) for state `st`.
+ * Returns { EXT, F, findRoot, findPar, relate, adj, conflict }.
  */
-export function buildFaceParity(P, st) {
+export function buildFaceParity(P, st, { buildGraph = true } = {}) {
   const { rows, cols } = P;
   const fr = rows - 1, fc = cols - 1;
   if (fr <= 0 || fc <= 0) {
@@ -52,29 +59,44 @@ export function buildFaceParity(P, st) {
   const F = fr * fc;
   const EXT = F;
   const V = F + 1;
-  const faceAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : EXT);
 
-  const parent = new Int32Array(V);
-  const diff = new Uint8Array(V); // parity relative to parent (0 same, 1 opposite)
-  for (let i = 0; i < V; i++) parent[i] = i;
+  const parent = buildGraph ? new Int32Array(V) : (fpParent.length >= V ? fpParent : (fpParent = new Int32Array(V)));
+  const diff = buildGraph ? new Uint8Array(V) : (fpDiff.length >= V ? fpDiff : (fpDiff = new Uint8Array(V)));
+  if (fpStack.length < V) fpStack = new Int32Array(V);
+  for (let i = 0; i < V; i++) { parent[i] = i; diff[i] = 0; }
+
+  // Iterative path-compressing find: compresses u -> root and sets diff[u] = parity(u, root)
+  const compress = (u) => {
+    let cur = u, sp = 0;
+    while (parent[cur] !== cur) {
+      fpStack[sp++] = cur;
+      cur = parent[cur];
+    }
+    const root = cur;
+    let par = 0;
+    for (let i = sp - 1; i >= 0; i--) {
+      const node = fpStack[i];
+      par ^= diff[node];
+      parent[node] = root;
+      diff[node] = par;
+    }
+    return root;
+  };
 
   const find = (u) => {
-    if (parent[u] === u) return [u, 0];
-    const [r, p] = find(parent[u]);
-    parent[u] = r;
-    diff[u] ^= p;
+    const r = compress(u);
     return [r, diff[u]];
   };
 
   const relate = (u, v) => {
-    const [ru, pu] = find(u);
-    const [rv, pv] = find(v);
+    const ru = compress(u);
+    const rv = compress(v);
     if (ru !== rv) return -1;
-    return pu ^ pv;
+    return diff[u] ^ diff[v];
   };
 
-  const adj = Array.from({ length: V }, () => []);
-  const edgeSeen = new Set();
+  const adj = buildGraph ? Array.from({ length: V }, () => []) : null;
+  const edgeSeen = buildGraph ? new Set() : null;
   let conflict = false;
 
   const link = (u, v, xor, reason) => {
@@ -83,16 +105,19 @@ export function buildFaceParity(P, st) {
       if (xor === 1) conflict = true;
       return false;
     }
-    const [ru, pu] = find(u);
-    const [rv, pv] = find(v);
-    const key = u < v ? `${u}:${v}` : `${v}:${u}`;
+    const ru = compress(u);
+    const pu = diff[u];
+    const rv = compress(v);
+    const pv = diff[v];
     if (ru === rv) {
       if ((pu ^ pv) !== xor) { conflict = true; return false; }
-      // Still allow recording direct (board-visible) links for shorter proof paths
-      if (!edgeSeen.has(key) && (reason.kind === 'edgeOn' || reason.kind === 'edgeOff' || reason.kind === 'whiteDiag')) {
-        edgeSeen.add(key);
-        adj[u].push({ to: v, xor, reason });
-        adj[v].push({ to: u, xor, reason });
+      if (buildGraph && (reason.kind === 'edgeOn' || reason.kind === 'edgeOff' || reason.kind === 'whiteDiag')) {
+        const key = u < v ? u * V + v : v * V + u;
+        if (!edgeSeen.has(key)) {
+          edgeSeen.add(key);
+          adj[u].push({ to: v, xor, reason });
+          adj[v].push({ to: u, xor, reason });
+        }
       }
       return false;
     }
@@ -104,12 +129,27 @@ export function buildFaceParity(P, st) {
       parent[rv] = ru;
       diff[rv] = pu ^ pv ^ xor;
     }
-    if (!edgeSeen.has(key)) {
-      edgeSeen.add(key);
-      adj[u].push({ to: v, xor, reason });
-      adj[v].push({ to: u, xor, reason });
+    if (buildGraph) {
+      const key = u < v ? u * V + v : v * V + u;
+      if (!edgeSeen.has(key)) {
+        edgeSeen.add(key);
+        adj[u].push({ to: v, xor, reason });
+        adj[v].push({ to: u, xor, reason });
+      }
     }
     return true;
+  };
+
+  const edgeFaceA = (x) => {
+    const cell = x >> 1;
+    const r = (cell / cols) | 0, c = cell % cols;
+    if ((x & 1) === 0) return r > 0 && c < fc ? (r - 1) * fc + c : EXT;
+    return r < fr && c > 0 ? r * fc + (c - 1) : EXT;
+  };
+  const edgeFaceB = (x) => {
+    const cell = x >> 1;
+    const r = (cell / cols) | 0, c = cell % cols;
+    return r < fr && c < fc ? r * fc + c : EXT;
   };
 
   // 1. Known loop segments (E_ON -> opposite) and crosses (E_OFF -> same)
@@ -117,19 +157,21 @@ export function buildFaceParity(P, st) {
     if (P.edgeA[x] < 0) continue;
     const ev = st.e[x];
     if (ev !== E_ON && ev !== E_OFF) continue;
-    const [a, b] = edgeDualFaces(P, x);
-    link(a, b, ev === E_ON ? 1 : 0, { kind: ev === E_ON ? 'edgeOn' : 'edgeOff', edge: x });
+    const a = edgeFaceA(x), b = edgeFaceB(x);
+    link(a, b, ev === E_ON ? 1 : 0, buildGraph ? { kind: ev === E_ON ? 'edgeOn' : 'edgeOff', edge: x } : null);
   }
 
   // 2. White circles: both diagonal corner pairs have opposite parity
-  for (const wi of P.whites) {
-    const wr = (wi / cols) | 0, wc = wi % cols;
-    const nw = faceAt(wr - 1, wc - 1);
-    const ne = faceAt(wr - 1, wc);
-    const sw = faceAt(wr, wc - 1);
-    const se = faceAt(wr, wc);
-    link(nw, se, 1, { kind: 'whiteDiag', cell: wi });
-    link(ne, sw, 1, { kind: 'whiteDiag', cell: wi });
+  for (let wi = 0; wi < P.whites.length; wi++) {
+    const cell = P.whites[wi];
+    const wr = (cell / cols) | 0, wc = cell % cols;
+    const nw = wr > 0 && wc > 0 ? (wr - 1) * fc + (wc - 1) : EXT;
+    const ne = wr > 0 && wc < fc ? (wr - 1) * fc + wc : EXT;
+    const sw = wr < fr && wc > 0 ? wr * fc + (wc - 1) : EXT;
+    const se = wr < fr && wc < fc ? wr * fc + wc : EXT;
+    const reason = buildGraph ? { kind: 'whiteDiag', cell } : null;
+    link(nw, se, 1, reason);
+    link(ne, sw, 1, reason);
   }
 
   // 3. Black circles: iterate 3-to-1 diagonal law and forced 2-step straight legs to fixed point
@@ -137,45 +179,36 @@ export function buildFaceParity(P, st) {
     let changed = false;
     const e1 = P.ed[bi * 4 + d], e2 = P.ed2[bi * 4 + d], n1 = P.nb[bi * 4 + d];
     if (e1 < 0 || e2 < 0 || n1 < 0) { conflict = true; return false; }
-    const reason = { kind: 'blackLeg', cell: bi, dir: d };
-    const [a1, b1] = edgeDualFaces(P, e1);
-    if (link(a1, b1, 1, reason)) changed = true;
-    const [a2, b2] = edgeDualFaces(P, e2);
-    if (link(a2, b2, 1, reason)) changed = true;
-    // Opposite exit at bi is OFF
+    const reason = buildGraph ? { kind: 'blackLeg', cell: bi, dir: d } : null;
+    if (link(edgeFaceA(e1), edgeFaceB(e1), 1, reason)) changed = true;
+    if (link(edgeFaceA(e2), edgeFaceB(e2), 1, reason)) changed = true;
     const opp = P.ed[bi * 4 + (d ^ 2)];
-    if (opp >= 0) {
-      const [ao, bo] = edgeDualFaces(P, opp);
-      if (link(ao, bo, 0, reason)) changed = true;
-    }
-    // Perpendicular exits at n1 are OFF (black leg must go straight through n1)
-    for (const pd of [(d + 1) & 3, (d + 3) & 3]) {
-      const ep = P.ed[n1 * 4 + pd];
-      if (ep >= 0) {
-        const [ap, bp] = edgeDualFaces(P, ep);
-        if (link(ap, bp, 0, reason)) changed = true;
-      }
-    }
+    if (opp >= 0 && link(edgeFaceA(opp), edgeFaceB(opp), 0, reason)) changed = true;
+    const ep1 = P.ed[n1 * 4 + ((d + 1) & 3)];
+    if (ep1 >= 0 && link(edgeFaceA(ep1), edgeFaceB(ep1), 0, reason)) changed = true;
+    const ep2 = P.ed[n1 * 4 + ((d + 3) & 3)];
+    if (ep2 >= 0 && link(edgeFaceA(ep2), edgeFaceB(ep2), 0, reason)) changed = true;
     return changed;
   };
 
   let progress = true;
   while (progress && !conflict) {
     progress = false;
-    for (const bi of P.blacks) {
+    for (let k = 0; k < P.blacks.length; k++) {
+      const bi = P.blacks[k];
       const br = (bi / cols) | 0, bc = bi % cols;
-      const nw = faceAt(br - 1, bc - 1);
-      const ne = faceAt(br - 1, bc);
-      const sw = faceAt(br, bc - 1);
-      const se = faceAt(br, bc);
+      const nw = br > 0 && bc > 0 ? (br - 1) * fc + (bc - 1) : EXT;
+      const ne = br > 0 && bc < fc ? (br - 1) * fc + bc : EXT;
+      const sw = br < fr && bc > 0 ? br * fc + (bc - 1) : EXT;
+      const se = br < fr && bc < fc ? br * fc + bc : EXT;
 
       // 3a. 3-to-1 diagonal law: relate(nw, se) ^ relate(ne, sw) === 1
       const d1 = relate(nw, se);
       const d2 = relate(ne, sw);
       if (d1 !== -1 && d2 === -1) {
-        if (link(ne, sw, d1 ^ 1, { kind: 'blackDiag', cell: bi, sameKnown: d1 === 0, from: [nw, se] })) progress = true;
+        if (link(ne, sw, d1 ^ 1, buildGraph ? { kind: 'blackDiag', cell: bi, sameKnown: d1 === 0, from: [nw, se] } : null)) progress = true;
       } else if (d2 !== -1 && d1 === -1) {
-        if (link(nw, se, d2 ^ 1, { kind: 'blackDiag', cell: bi, sameKnown: d2 === 0, from: [ne, sw] })) progress = true;
+        if (link(nw, se, d2 ^ 1, buildGraph ? { kind: 'blackDiag', cell: bi, sameKnown: d2 === 0, from: [ne, sw] } : null)) progress = true;
       } else if (d1 !== -1 && d2 !== -1 && (d1 ^ d2) !== 1) {
         conflict = true;
         break;
@@ -188,74 +221,141 @@ export function buildFaceParity(P, st) {
           if (forceBlackLeg(bi, d ^ 2)) progress = true;
           continue;
         }
-        const [a1, b1] = edgeDualFaces(P, e1);
-        const rel1 = relate(a1, b1);
+        const rel1 = relate(edgeFaceA(e1), edgeFaceB(e1));
         if (rel1 === 1) {
           if (forceBlackLeg(bi, d)) progress = true;
         } else if (rel1 === 0) {
           if (forceBlackLeg(bi, d ^ 2)) progress = true;
-        } else {
-          const [a2, b2] = edgeDualFaces(P, e2);
-          if (relate(a2, b2) === 0) {
-            if (forceBlackLeg(bi, d ^ 2)) progress = true;
-          }
+        } else if (relate(edgeFaceA(e2), edgeFaceB(e2)) === 0) {
+          if (forceBlackLeg(bi, d ^ 2)) progress = true;
         }
       }
       if (conflict) break;
     }
   }
 
-  return { EXT, F, find, relate, adj, conflict };
+  return { EXT, F, find, compress, diff, relate, adj, conflict, edgeFaceA, edgeFaceB };
 }
 
-/** Shortest path in `adj` from `src` to `dst`, returning array of { from, to, xor, reason } or null. */
-function shortestPath(adj, src, dst) {
-  if (src === dst) return [];
+/** Build a single BFS shortest-path tree from `src`. */
+function bfsTree(adj, src) {
   const V = adj.length;
   const prev = new Int32Array(V).fill(-1);
   const prevStep = new Array(V);
   prev[src] = src;
-  const q = [src];
-  let head = 0;
-  while (head < q.length) {
+  const q = new Int32Array(V);
+  let head = 0, tail = 0;
+  q[tail++] = src;
+  while (head < tail) {
     const u = q[head++];
-    if (u === dst) break;
-    for (const step of adj[u]) {
+    const list = adj[u];
+    for (let i = 0; i < list.length; i++) {
+      const step = list[i];
       const v = step.to;
       if (prev[v] !== -1) continue;
       prev[v] = u;
       prevStep[v] = { from: u, to: v, xor: step.xor, reason: step.reason };
-      q.push(v);
+      q[tail++] = v;
     }
   }
-  if (prev[dst] === -1) return null;
+  return { prev, prevStep };
+}
+
+function extractPath(tree, src, dst) {
+  if (src === dst) return [];
+  if (tree.prev[dst] === -1) return null;
   const path = [];
-  for (let cur = dst; cur !== src; cur = prev[cur]) path.push(prevStep[cur]);
+  for (let cur = dst; cur !== src; cur = tree.prev[cur]) path.push(tree.prevStep[cur]);
+  path.reverse();
+  return path;
+}
+
+/** Shortest path in `adj` from `src` to `dst` with optional `maxDepth` cutoff. */
+function shortestPath(adj, src, dst, maxDepth = Infinity) {
+  if (src === dst) return [];
+  if (maxDepth < 1) return null;
+  const V = adj.length;
+  if (bfsPrev.length < V) {
+    bfsPrev = new Int32Array(V);
+    bfsDist = new Int32Array(V);
+    bfsQueue = new Int32Array(V);
+  }
+  bfsPrev.fill(-1, 0, V);
+  const prevStep = new Array(V);
+  bfsPrev[src] = src;
+  bfsDist[src] = 0;
+  let head = 0, tail = 0;
+  bfsQueue[tail++] = src;
+  while (head < tail) {
+    const u = bfsQueue[head++];
+    if (u === dst) break;
+    const du = bfsDist[u];
+    if (du >= maxDepth) continue;
+    const list = adj[u];
+    for (let i = 0; i < list.length; i++) {
+      const step = list[i];
+      const v = step.to;
+      if (bfsPrev[v] !== -1) continue;
+      bfsPrev[v] = u;
+      bfsDist[v] = du + 1;
+      prevStep[v] = { from: u, to: v, xor: step.xor, reason: step.reason };
+      if (v === dst) { head = tail; break; }
+      bfsQueue[tail++] = v;
+    }
+  }
+  if (bfsPrev[dst] === -1) return null;
+  const path = [];
+  for (let cur = dst; cur !== src; cur = bfsPrev[cur]) path.push(prevStep[cur]);
   path.reverse();
   return path;
 }
 
 /**
  * Find all undecided edges forced by Inside/Outside dual-face parity.
- * Returns firings sorted by shortest proof chain (and anchored to EXT first on ties).
+ * When `opts.fast` is true (e.g. inside `closure()`), skips proof-graph construction and BFS.
+ * Otherwise returns firings sorted by shortest proof chain (and anchored to EXT first on ties).
  */
-export function findFaceParity(P, st) {
-  const fp = buildFaceParity(P, st);
+export function findFaceParity(P, st, opts = null) {
+  const fast = !!(opts && opts.fast);
+  const fp = buildFaceParity(P, st, { buildGraph: !fast });
   if (fp.conflict || fp.F === 0) return [];
-  const { EXT, find, relate, adj } = fp;
-  const out = [];
+  const { EXT, compress, diff, relate, adj, edgeFaceA, edgeFaceB } = fp;
 
+  if (fast) {
+    const out = [];
+    for (let x = 0; x < P.numEdges; x++) {
+      if (P.edgeA[x] < 0 || st.e[x] !== E_UNKNOWN) continue;
+      const rel = relate(edgeFaceA(x), edgeFaceB(x));
+      if (rel === -1) continue;
+      out.push({ sets: [['e', x, rel === 1 ? E_ON : E_OFF]], info: { edge: x, val: rel === 1 ? E_ON : E_OFF } });
+    }
+    return out;
+  }
+
+  // First collect forced edges so we skip BFS completely when nothing is forced
+  const hits = [];
+  let anyAnchored = false;
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0 || st.e[x] !== E_UNKNOWN) continue;
-    const [fA, fB] = edgeDualFaces(P, x);
+    const fA = edgeFaceA(x), fB = edgeFaceB(x);
     const rel = relate(fA, fB);
     if (rel === -1) continue;
+    const rootA = compress(fA);
+    const parA = diff[fA];
+    const anchored = rootA === EXT;
+    if (anchored) anyAnchored = true;
+    hits.push({ x, fA, fB, rel, anchored, parA });
+  }
+  if (!hits.length) return [];
+
+  // One single BFS from EXT serves ALL anchored edges
+  const extTree = anyAnchored ? bfsTree(adj, EXT) : null;
+  const out = [];
+
+  for (let hi = 0; hi < hits.length; hi++) {
+    const { x, fA, fB, rel, anchored, parA } = hits[hi];
     const val = rel === 1 ? E_ON : E_OFF;
 
-    const [rootA, parA] = find(fA);
-    const anchored = rootA === EXT;
-
-    // Build concise proof steps & involved faces with their 2-coloring for board visualization
     let chains;
     const facesIn = [];
     const facesOut = [];
@@ -268,11 +368,11 @@ export function findFaceParity(P, st) {
     };
 
     if (anchored) {
-      const pA = shortestPath(adj, EXT, fA) || [];
-      const pB = shortestPath(adj, EXT, fB) || [];
-      const direct = shortestPath(adj, fA, fB) || [];
-      // If a direct link between fA and fB is much shorter than going through EXT twice, we still show EXT colors
-      chains = (pA.length + pB.length <= direct.length + 2) ? [pA, pB] : [pA, direct];
+      const pA = extractPath(extTree, EXT, fA) || [];
+      const pB = extractPath(extTree, EXT, fB) || [];
+      const maxDirect = pA.length + pB.length - 3;
+      const direct = maxDirect >= 1 ? shortestPath(adj, fA, fB, maxDirect) : null;
+      chains = direct ? [pA, direct] : [pA, pB];
       let curP = 0;
       for (const s of pA) { curP ^= s.xor; recordFace(s.to, curP); }
       curP = 0;
@@ -288,7 +388,6 @@ export function findFaceParity(P, st) {
     }
 
     const hops = chains.reduce((acc, c) => acc + c.length, 0);
-    // Collect clue cells cited in the proof chains (for highlighting & explanation)
     const clues = [];
     const seenClue = new Set();
     for (const ch of chains) {

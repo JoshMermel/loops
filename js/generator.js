@@ -309,7 +309,7 @@ export function tightLoop(rows, cols, rng, {
   const fillRatio = minFill ?? (N >= 25 ? 0.55 : 0.48);
   const minLoop = Math.max(8, Math.floor(N * fillRatio));
   const filterClues = clueFilterFor(layout, rows, cols);
-  const stepsLimit = maxSteps ?? Math.max(500, Math.min(2000, F * 5 + (layout !== 'none' ? 300 : 0) + (minFill >= 0.95 ? 700 : 0)));
+  const stepsLimit = maxSteps ?? Math.max(500, Math.min(6000, F * 5 + (layout !== 'none' ? 300 : 0) + (minFill >= 0.95 ? 700 : 0)));
 
   const evaluate = () => {
     const { edges, loopCells, minR, maxR, minC, maxC, emptyBorders } = toEdges();
@@ -493,8 +493,10 @@ export function generatePuzzle({
   style = 'balanced',
   layout = 'none',
   minFill = null,
-  maxTier = 'Hard',
+  maxTier = 'Expert',
   targetTier = null,
+  stripMode = null,
+  allowUnsolved = false,
   keepFrac = null,
   budgetMs = 15000,
   verifyMaxNodes = 500000,
@@ -505,15 +507,22 @@ export function generatePuzzle({
   const N = rows * cols;
   const fillRatio = minFill ?? (N >= 25 ? 0.55 : 0.48);
   const minLoopCells = Math.max(8, Math.floor(N * fillRatio));
-  const maxTierIdx = TIERS.indexOf(maxTier);
+  const wantUnsolved = targetTier === 'Expert+';
+  const maxTierIdx = wantUnsolved ? TIERS.length - 1 : TIERS.indexOf(maxTier);
   if (layout === 'lattice') {
     return generateLatticePuzzle({
-      rows, cols, rand, deadline, maxTierIdx, targetTier, verifyMaxNodes, name, minLoopCells,
+      rows, cols, rand, deadline, maxTierIdx, targetTier: wantUnsolved ? null : targetTier, verifyMaxNodes, name, minLoopCells,
     });
   }
-  const effectiveMaxTier = targetTier ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
-  const beginnerOnly = effectiveMaxTier === 0;
-  const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
+  const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
+  const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
+  const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : N <= 400 ? 40000 : 6000;
+  const solvedByPropagate = (P) => {
+    const st = initialState(P);
+    if (!propagate(P, st)) return false;
+    for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
+    return isSolved(P, st.e);
+  };
   const pairedStrip = layout === 'rot180' || layout === 'mirror' || layout === 'transpose' || layout === 'rot90' || layout === 'yinyang';
 
   while (Date.now() < deadline) {
@@ -527,6 +536,7 @@ export function generatePuzzle({
 
     // Check uniqueness of the full clue pool
     if (base.unk > 0) {
+      if (N >= 400 && style === 'balanced' && layout === 'none') continue;
       if (base.unk > 48) continue;
       const checkFull = solve(base.P, { limit: 2, maxNodes: pruneNodeCap });
       if (checkFull.exceeded || checkFull.count !== 1) continue;
@@ -562,12 +572,34 @@ export function generatePuzzle({
       }
     }
 
-    // Pass 1: fast sound-rule pruning (instant, no search needed!)
-    const fastUpto = beginnerOnly ? BEGINNER_UPTO : FIRST_LOOKAHEAD;
+    // Pass 0: ultra-fast propagation-only pruning (sub-millisecond per clue, Beginner-sound).
+    // Strips the bulk of redundant clues cheaply before running full human-rule or exact-search passes.
     const keepSet = new Set(current.map((c) => c.r * cols + c.c));
-    for (const u of units) {
-      if (Date.now() >= deadline || current.length - u.keys.length < minKeep) break;
+    if (base.unk === 0) {
+      for (const u of units) {
+        if (Date.now() >= deadline || current.length - u.keys.length < minKeep) break;
+        if (u.keys.some((k) => !keepSet.has(k))) continue;
+        const drop = new Set(u.keys);
+        const trial = current.filter((x) => !drop.has(x.r * cols + x.c));
+        const P = compile({ name, rows, cols, clues: trial });
+        if (solvedByPropagate(P)) {
+          current = trial;
+          for (const k of u.keys) keepSet.delete(k);
+        }
+      }
+    }
+
+    // Pass 1: sound human-rule pruning (no search needed) on remaining clues.
+    // On giant boards (N >= 400), Pass 0 already stripped propagation-redundant clues cheaply;
+    // skip Pass 1 when Pass 2 will strip directly with exact search, and cap it for beginnerOnly.
+    const fastUpto = beginnerOnly ? BEGINNER_UPTO : FIRST_LOOKAHEAD;
+    const remPass1 = (N >= 400 && !beginnerOnly && base.unk === 0) ? [] : shuffle(buildUnits(current), rand);
+    const pass1Cap = N >= 400 ? 15 : remPass1.length;
+    let pass1Tried = 0;
+    for (const u of remPass1) {
+      if (Date.now() >= deadline || current.length - u.keys.length < minKeep || pass1Tried >= pass1Cap) break;
       if (u.keys.some((k) => !keepSet.has(k))) continue;
+      pass1Tried++;
       const drop = new Set(u.keys);
       const trial = current.filter((x) => !drop.has(x.r * cols + x.c));
       const P = compile({ name, rows, cols, clues: trial });
@@ -577,19 +609,24 @@ export function generatePuzzle({
       }
     }
 
-    // Pass 2: for Medium/Hard/sparse, strip further using fast exact uniqueness checks,
-    // remembering removed units so we can restore one if we accidentally step into Expert.
+    // Pass 2: for Medium/Hard/Expert/sparse, strip further using fast exact uniqueness checks,
+    // remembering removed units so we can binary-search back if we accidentally step past maxTier.
+    let cachedRated = null;
     if (!beginnerOnly && Date.now() < deadline) {
       const remUnits = shuffle(buildUnits(current), rand);
+      const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
       const maxStrips = style === 'sparse' ? remUnits.length
-        : targetTier === 'Hard' ? remUnits.length
-        : targetTier === 'Medium' ? Math.max(2, Math.min(8, Math.ceil(remUnits.length * 0.28)))
+        : N >= 400 ? (stripMode === 'medium' || targetTier === 'Medium' ? 2 : (stripMode === 'deep' || wantUnsolved || targetTier === 'Expert') ? 7 : targetTier === 'Hard' ? 4 : 3)
+        : deepStrip ? remUnits.length
+        : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(2, Math.min(8, Math.ceil(remUnits.length * 0.28)))
         : Math.max(3, Math.min(12, Math.ceil(remUnits.length * 0.45)));
+      const maxPass2Tries = N >= 400 && style !== 'sparse' ? 60 : remUnits.length;
 
-      let stripped = 0;
+      let stripped = 0, tried = 0;
       const removed = [];
       for (const u of remUnits) {
-        if (Date.now() >= deadline || current.length - u.keys.length < minKeep || stripped >= maxStrips) break;
+        if (Date.now() >= deadline || current.length - u.keys.length < minKeep || stripped >= maxStrips || tried >= maxPass2Tries) break;
+        tried++;
         const drop = new Set(u.keys);
         const trial = current.filter((x) => !drop.has(x.r * cols + x.c));
         const P = compile({ name, rows, cols, clues: trial });
@@ -600,12 +637,31 @@ export function generatePuzzle({
         stripped++;
       }
 
-      // If rating gets stuck (Expert) or exceeds maxTier, restore units from `removed` (last removed first)
-      // until human rules solve it cleanly within maxTier!
+      // If rating gets stuck (Expert+) or exceeds maxTier, restore removed units via binary search
+      // (O(log k) rate() calls instead of O(k)) unless Expert+ / allowUnsolved wants unsolved puzzles!
+      const isWithin = (r) => (allowUnsolved && !r.solved) || (r.solved && TIERS.indexOf(r.tier) <= effectiveMaxTier);
       let rated = rate(compile({ name, rows, cols, clues: current }));
-      while ((!rated.solved || TIERS.indexOf(rated.tier) > effectiveMaxTier) && removed.length > 0 && Date.now() < deadline) {
-        current.push(...removed.pop());
-        rated = rate(compile({ name, rows, cols, clues: current }));
+      if (wantUnsolved || isWithin(rated)) {
+        cachedRated = rated;
+      } else if (removed.length > 0 && Date.now() < deadline) {
+        const strippedBase = current;
+        let lo = 0, hi = removed.length;
+        let bestClues = strippedBase.concat(...removed);
+        let bestRated = null;
+        while (lo + 1 < hi && Date.now() < deadline) {
+          const mid = (lo + hi) >> 1;
+          const cand = strippedBase.concat(...removed.slice(mid));
+          const r = rate(compile({ name, rows, cols, clues: cand }));
+          if (isWithin(r)) {
+            lo = mid;
+            bestClues = cand;
+            bestRated = r;
+          } else {
+            hi = mid;
+          }
+        }
+        current = bestClues;
+        cachedRated = bestRated;
       }
     }
 
@@ -627,10 +683,15 @@ export function generatePuzzle({
     if (!isSolved(P, sol.e)) continue;
 
     // Human-style rating
-    const rated = rate(P);
-    if (!rated.solved) continue;
-    if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
-    if (targetTier && rated.tier !== targetTier) continue;
+    const rated = cachedRated || rate(P);
+    if (wantUnsolved) {
+      if (rated.solved) continue;
+    } else if (!rated.solved) {
+      if (!allowUnsolved) continue;
+    } else {
+      if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+      if (targetTier && rated.tier !== targetTier) continue;
+    }
 
     P.solution = encodeSolution(P, sol);
     P.rules = rated.rules;
