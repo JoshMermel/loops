@@ -13,10 +13,10 @@ A browser game and puzzle toolkit for **Masyu**, built in the same puzzle-toolki
 | Part | State |
 | --- | --- |
 | Exact solver / uniqueness counter (`js/logic.js`) | done, cross-checked against a brute-force reference (`tests/reference_solver.mjs`) |
-| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 30 rules across Beginner, Medium, Hard (stuck = Expert), including dual-face Inside/Outside parity; soundness fuzz-tested against exact solutions |
+| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 31 rules across Beginner, Medium, Hard, and Expert (trial-and-error `tryEdge` or beyond hints), including dual-face Inside/Outside parity; soundness fuzz-tested against exact solutions |
 | Hint button (`js/explain.js`, `js/hintstep.js`) | done: replays the scorer's next step, explains imagined chains step by step, draws ghost marks and dashed chains, cycles firings; tested end-to-end on Beginner/Medium puzzles |
 | Generator (`js/generator.js`, `tools/generate.mjs`, `tools/fill_pools.mjs`, `tools/overnight.mjs`) | done: dual-face `tightLoop` (all-4-border full-coverage + two-pass clue stripping) + guided `W↔B` lattice hill-climber, verified by complete search; supports `--size`, `--seed`, `--budget`, `--style` (`balanced`, `white`, `black`, `sparse`), `--layout` (`interior`, `frame`, `stripes`, `rot180`, `mirror`, `transpose`, `rot90`, `yinyang`, `lattice`), `--min-fill`, `--tier`, `--max-tier`, `--keep` |
-| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/audit_books.mjs`) | 30 visible books (**1,569 audited puzzles**): Gentle intro (60); Default `6×6` (120), `8×8` (120), `10×10` (90), `12×12` (75), `14×14` (45), `16×16` (36), `18×18` (24), `12×20` (24); Bonus All white, All black, Sparse, Skyscraper & Tall Skyscraper (`6×24–6×30`), Exact symmetry (balanced mirror / diagonal-mirror / 180° per tier), Yin-Yang (180° opposite-color), No edge clues, Lattice (full even-row/even-col dot grid: all 22 unique 9×9 + 9×11 & 13×13), and Full board (100% fill), plus hidden `armory` (19) |
+| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/audit_books.mjs`) | 21 visible books (**8,620 audited puzzles**): Gentle intro (100: 50 `5×5` + 50 `6×6`); Default `8×8` & `12×12` (4 score-banded difficulty books each × 500 + 10 `Expert+` beyond hints in Expert) and Giants (`16×16` 200, `12×20` 100, `24×30 Full Page` 60); Bonus (8 fixed-size 500-puzzle books split 10% B / 40% M / 40% H / 10% E + 10 oversized bonus puzzles each: All white `8×8`+`12×12`, All black `10×10`+`12×12`, Sparse `10×10`+`12×12`, Skyscraper `6×20`+`6×30`, Exact symmetry `10×10`+`12×12` balanced across mirror / diagonal / 180°, Yin-Yang `10×10`+`12×12`, No edge clues `10×10`+`12×12`, Full board `10×10`+`10×12`; plus the 60-puzzle Lattice showcase across `9×9` / `9×11` / `13×13`) and hidden `armory` (20) |
 | Browser GUI (`index.html`, `style.css`, `js/board.js`, `js/main.js`) | playable: intersection-grid edge controls (tap segment to cycle empty/line/✕, drag to draw/erase loop, right-click/drag for ✕, tap/right-click square center to shade Inside/Outside), undo/redo, localStorage saves by puzzle hash, "Correct so far?", Hint, Book picker modal, Browse grid, dark mode, line-color palettes, Auto-X and Auto-Shade modes, `?book=<id>&puzzle=N` deep links |
 | Printing (`js/print.js`, Settings → Print puzzles) | done: fixed black-and-white SVG booklet for any range (`1-10, 15`), optional answer key, laid out by cell size for A4 and Letter, every page header linking to the site |
 | Docs (`docs/how_to_solve.md`) | generated from `js/rating.js` with illustrations from the hidden `armory` book |
@@ -31,7 +31,7 @@ Plain static HTML/CSS/ES modules, no build step:
 python3 -m http.server 8766
 ```
 
-Then open <http://localhost:8766> (deep-link example: `http://localhost:8766/index.html?book=8x8&puzzle=1`).
+Then open <http://localhost:8766> (deep-link example: `http://localhost:8766/index.html?book=8x8-beginner&puzzle=1`).
 
 Run the full test suite:
 
@@ -108,30 +108,31 @@ The human-style solver (`js/rating.js`) always applies the cheapest applicable r
 | 1 | `edgesOffCellOff` | bookkeeping: edges touching an off-loop cell are off | Beginner | 1 |
 | 2 | `edgeEnds` | bookkeeping: a loop segment puts both its cells on the loop | Beginner | 1 |
 | 3 | `fullCell` | bookkeeping: a cell with two segments takes no more | Beginner | 1 |
-| 4 | `closedLoopRestOff` | bookkeeping: once the single loop is closed, remaining cells/edges are off | Beginner | 1 |
-| 5 | `whiteStraight` | a white circle blocked on one axis goes straight along the other | Beginner | 2 |
-| 6 | `blackExtend` | a black circle with a segment goes straight two cells and turns away from the opposite side | Beginner | 2 |
-| 7 | `blackWall` | a black circle blocked within two cells of a wall or cross goes two cells the opposite way | Beginner | 2 |
-| 8 | `blackAdjacent` | two touching black circles cannot join, so each goes two cells away from the other | Beginner | 3 |
-| 9 | `whiteMustTurn` | a white circle going straight at one end must turn at the other | Beginner | 3 |
-| 10 | `deadEnd` | an empty cell with fewer than two exits left cannot be on the loop | Beginner | 4 |
-| 11 | `forcedExits` | a loop cell with only two exits left must use both | Beginner | 4 |
-| 12 | `blackPerp` | a black circle cannot enter a neighbor that already has a perpendicular segment | Beginner | 5 |
-| 13 | `whiteBothStraight` | a white circle cannot use an axis where both neighbors already continue straight | Beginner | 5 |
-| 14 | `noEarlyClose` | a segment joining the two ends of one path would close the loop early | Beginner | 6 |
-| 15 | `samePathExits` | a loop cell with three exits where two meet one path must use the third | Beginner | 7 |
-| 16 | `closingCell` | an empty cell whose only two exits meet one path cannot be on the loop | Beginner | 7 |
-| 17 | `threeWhites` | three white circles in a row must all cross perpendicular to the row | Medium | 10 |
-| 18 | `twoWhitesStraight` | two touching white circles with a straight segment entering one cannot connect | Medium | 11 |
-| 19 | `whiteNoTurnAxis` | a white circle cannot use an axis whose two neighbors are both unable to turn | Medium | 12 |
-| 20 | `blackBlockedTarget` | a black circle cannot extend toward a circle two cells away that cannot accept a straight segment | Medium | 13 |
-| 21 | `faceParity` | inside/outside square coloring (lines, crosses, white diagonals, black 3-to-1 corners & 2-step legs) forces an edge | Medium | 16+ |
-| 22 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Medium | 20 |
-| 23 | `chokepoint` | blocking a segment would disconnect loop cells or leave a single chokepoint cell (≤ 12 cells) | Medium | 22 |
-| 24 | `parityPocket` | the other choice would seal off a small pocket (≤ 3 open ends, ≤ 9 cells) with an odd number of open ends | Medium | 26 |
-| 25 | `imagine` | imagine a segment on or off and follow the easy rules: short pruned chain to a contradiction (dynamic cost ≤ 30) | Medium | ≤30 |
-| 26 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 55 |
-| 27 | `chokepointArea` | `chokepoint` for a cut-off area larger than 12 cells | Hard | 60 |
-| 28 | `imagineLong` | `imagine` when the pruned chain costs above 30 (dynamic cost) | Hard | >30 |
-| 29 | `parityForces` | `parityPocket` for a larger area (+2 per open end past 3) | Hard | 65 |
-| 30 | `tryEdge` | trial and error: assume a segment on/off and follow all rules above to a contradiction (+2 per step) | Hard | 120 |
+| 4 | `isolatedCellOff` | bookkeeping: a cell with all its edges off is not on the loop | Beginner | 1 |
+| 5 | `closedLoopRestOff` | bookkeeping: once the single loop is closed, remaining cells/edges are off | Beginner | 1 |
+| 6 | `whiteStraight` | a white circle blocked on one axis goes straight along the other | Beginner | 2 |
+| 7 | `blackExtend` | a black circle with a segment goes straight two cells and turns away from the opposite side | Beginner | 2 |
+| 8 | `blackWall` | a black circle blocked within two cells of a wall or cross goes two cells the opposite way | Beginner | 2 |
+| 9 | `blackAdjacent` | two touching black circles cannot join, so each goes two cells away from the other | Beginner | 3 |
+| 10 | `whiteMustTurn` | a white circle going straight at one end must turn at the other | Beginner | 3 |
+| 11 | `deadEnd` | an empty cell with fewer than two exits left cannot be on the loop | Beginner | 4 |
+| 12 | `forcedExits` | a loop cell with only two exits left must use both | Beginner | 4 |
+| 13 | `blackPerp` | a black circle cannot enter a neighbor that already has a perpendicular segment | Beginner | 5 |
+| 14 | `whiteBothStraight` | a white circle cannot use an axis where both neighbors already continue straight | Beginner | 5 |
+| 15 | `noEarlyClose` | a segment joining the two ends of one path would close the loop early | Beginner | 6 |
+| 16 | `samePathExits` | a loop cell with three exits where two meet one path must use the third | Beginner | 7 |
+| 17 | `closingCell` | an empty cell whose only two exits meet one path cannot be on the loop | Beginner | 7 |
+| 18 | `threeWhites` | three white circles in a row must all cross perpendicular to the row | Beginner | 8 |
+| 19 | `twoWhitesStraight` | two touching white circles with a straight segment entering one cannot connect | Beginner | 9 |
+| 20 | `whiteNoTurnAxis` | a white circle cannot use an axis whose two neighbors are both unable to turn | Medium | 12 |
+| 21 | `blackBlockedTarget` | a black circle cannot extend toward a circle two cells away that cannot accept a straight segment | Medium | 13 |
+| 22 | `faceParity` | inside/outside square coloring (lines, crosses, white diagonals, black 3-to-1 corners & 2-step legs) forces an edge | Medium | 16+ |
+| 23 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Medium | 20 |
+| 24 | `chokepoint` | blocking a segment would disconnect loop cells or leave a single chokepoint cell (≤ 12 cells) | Medium | 22 |
+| 25 | `parityPocket` | the other choice would seal off a small pocket (≤ 3 open ends, ≤ 9 cells) with an odd number of open ends | Medium | 26 |
+| 26 | `imagine` | imagine a segment on or off and follow the easy rules: 0–2 step pruned chain to a contradiction (dynamic cost ≤ 26) | Medium | ≤26 |
+| 27 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 55 |
+| 28 | `chokepointArea` | `chokepoint` for a cut-off area larger than 12 cells | Hard | 60 |
+| 29 | `imagineLong` | `imagine` when the pruned chain takes 3+ easy steps or an area check (dynamic cost ≥ 33) | Hard | ≥33 |
+| 30 | `parityForces` | `parityPocket` for a larger area (+2 per open end past 3) | Hard | 65 |
+| 31 | `tryEdge` | trial and error: assume a segment on/off and follow all rules above to a contradiction (+2 per step) | Expert | 120 |

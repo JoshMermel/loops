@@ -14,7 +14,7 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 
 ## Next: calibration & rule refinement
 
-- [ ] **Private calibration:** collect a private set of real published Masyu puzzles (in git-ignored `tools/calibration/`) to check rule coverage and calibrate tier boundaries and step costs with Josh.
+- [x] **External difficulty calibration & 4-tier split:** checked 176 published Masyu puzzles from multiple external sources, moved `threeWhites` / `twoWhitesStraight` into Beginner, fixed 0-step `imagine` area preemption, priced 3+ step `imagine` into Hard, and promoted full multi-rule trial-and-error (`tryEdge`) to **Expert** (keeping Hard strictly pure logic).
 - [x] **Inside / Outside dual-face coloring inference (`faceParity`):** added dual-face parity union-find (lines, crosses, outer border, white-circle diagonals, black-circle 3-to-1 + forced 2-step legs) into `js/faceparity.js`, `js/rating.js`, `js/explain.js` (with tinted square Hint overlays), and rescored all books.
 - [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (for example:
   - diagonally adjacent black and white circles near a wall,
@@ -22,11 +22,11 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
   - black circle forcing a white circle two cells away to turn at its far end,
   - paired open ends with 4 or 6 ends (`pairedEnds`),
   - uniqueness-assuming shortcuts (`uniqueRoute`) if desired for Hint only).
-- [ ] **Rescore after cost tweaks:** run `node tools/rescore.mjs`, `node tools/audit_books.mjs --rate`, and regenerate `docs/how_to_solve.md`.
+- [x] **Rescore & regenerate books after tier/cost updates:** rescored all pools, topped up Hard/Expert pools, rebuilt all 31 visible books + `armory`, regenerated `docs/how_to_solve.md`, and audited with `audit_books.mjs --rate --all`.
 
 ## Books & scaling
 
-- [x] **Larger board sizes & grown starter books:** expanded `intro`–`12×12` (60–120 puzzles each), added `14×14`, `16×16`, `18×18`, and `12×20` to Default, added `10×10` All white / All black / Sparse, and added Tall Skyscraper (`6×24`, `8×24`, `6×30`) — **1,569 audited puzzles across 30 visible books**.
+- [x] **Larger board sizes & per-difficulty Default + Bonus books:** `Gentle intro` (100), 4 separate score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert) for `8×8` and `12×12`, score-banded Giants (`16×16` 200, `12×20` 100, `24×30 Full Page` 60), 8 fixed-size 500+10 Bonus books (10/40/40/10 split + 10 oversized bonus puzzles at the end), and the 60-puzzle Lattice showcase — **8,620 audited puzzles across 21 visible books**.
 - [x] **New themed Bonus corpuses:** Exact symmetry (`rot180`, `mirror`, `transpose`, balanced per tier), Yin-Yang (180° opposite-color symmetry), No edge clues (`interior`), Lattice (full even-row/even-col dot grid), and Full board (`100%` loop fill).
 - [ ] **Grow further with `tools/fill_pools.mjs` / `tools/overnight.mjs`:** scale Default books toward 250–1000 puzzles each, or try `20×20` / `20×36` mega boards.
 - [ ] **More themed Bonus ideas to explore:**
