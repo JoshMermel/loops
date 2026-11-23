@@ -164,8 +164,8 @@ button.ghost { background: transparent; }
 .axis-label { fill: var(--axis); font-size: 11px; text-anchor: middle; dominant-baseline: auto; pointer-events: none; }
 .axis-label.side { text-anchor: end; dominant-baseline: central; }
 .axis-label.here { fill: var(--axis-here); font-weight: 700; }
-.line-end { fill: none; stroke: var(--primary-blue); stroke-width: 2.5; stroke-linejoin: round; pointer-events: none; }
-.line-end-halo { fill: none; stroke: var(--cell-bg); stroke-width: 5.5; stroke-linejoin: round; pointer-events: none; }
+.line-end { fill: none; stroke: var(--primary-blue); stroke-width: 2.2; stroke-linejoin: round; pointer-events: none; }
+.line-end-halo { fill: none; stroke: var(--cell-bg); stroke-width: 4.5; stroke-linejoin: round; pointer-events: none; }
 
 /* ---- Hint overlays ---- */
 .hint-face-in { fill: var(--face-in); stroke: rgba(38, 166, 154, 0.7); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }

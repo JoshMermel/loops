@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile } from '../js/logic.js';
-import { hitTestCoords, advanceDrag, CELL_SIZE } from '../js/board.js';
+import { hitTestCoords, advanceDrag, advanceFaceDrag, CELL_SIZE } from '../js/board.js';
 import { clueStates, earlyLoopEdges } from '../js/clues.js';
 import { otherEnd } from '../js/lineends.js';
 import { makeColorKeeper, assignPathColors } from '../js/pathcolors.js';
@@ -249,6 +249,39 @@ test('advanceDrag avoids accidental 90° turns on wobbly straight drags, ignores
   ]);
   assert.deepEqual(b2.active, []);
   assert.equal(b2.g.curCell, cell(1, 0));
+});
+
+test('advanceFaceDrag paints squares across fast swipes, avoids diagonal corner grazing, and fires once per square', () => {
+  const P = compile({ name: 'fdrag', rows: 5, cols: 5, clues: [] }); // 4x4 dual squares
+  const runFaceDrag = (coords) => {
+    const startHit = hitTestCoords(P, coords[0][0] * S, coords[0][1] * S);
+    assert.equal(startHit.kind, 'face');
+    const g = {
+      startHit,
+      lastGx: coords[0][0] * S,
+      lastGy: coords[0][1] * S,
+      paintedFaces: new Set([startHit.face]),
+      dragged: false,
+    };
+    const painted = [startHit.face];
+    for (let i = 1; i < coords.length; i++) {
+      advanceFaceDrag(P, g, coords[i][0] * S, coords[i][1] * S, (f) => painted.push(f));
+    }
+    return { g, painted };
+  };
+
+  // Fast horizontal swipe across row 0 from (0.5, 0.5) straight to (3.5, 0.5) paints faces 0, 1, 2, 3 in order
+  const h = runFaceDrag([[0.5, 0.5], [3.5, 0.5]]);
+  assert.deepEqual(h.painted, [0, 1, 2, 3]);
+  assert.equal(h.g.dragged, true);
+
+  // Moving back over already-painted squares does not fire duplicates
+  const back = runFaceDrag([[0.5, 0.5], [1.5, 0.5], [0.5, 0.5]]);
+  assert.deepEqual(back.painted, [0, 1]);
+
+  // Diagonal drag from (0.5, 0.5) to (1.5, 1.5) hits only faces 0 and 5 (never grazes off-diagonal 1 or 4)
+  const diag = runFaceDrag([[0.5, 0.5], [1.5, 1.5]]);
+  assert.deepEqual(diag.painted, [0, 5]);
 });
 
 test('otherEnd finds far endpoint of an open path and ignores closed loops or branches', () => {

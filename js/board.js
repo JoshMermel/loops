@@ -229,6 +229,44 @@ export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = nul
   }
 }
 
+const FACE_DRAG_INSET = 0.08; // 8% inset from grid lines so diagonal drags across corners don't graze off-diagonal squares
+
+/**
+ * Pure face-painting drag stepper for dual squares.
+ * Interpolates from (g.lastGx, g.lastGy) to (gx, gy) so fast swipes never skip intermediate squares,
+ * and invokes `onFace(faceIdx)` at most once per square per drag.
+ */
+export function advanceFaceDrag(P, g, gx, gy, onFace) {
+  if (!P || !g || g.startHit.kind !== 'face') return;
+  const frMax = P.rows - 1, fcMax = P.cols - 1;
+  if (frMax <= 0 || fcMax <= 0) return;
+
+  const prevX = g.lastGx ?? gx;
+  const prevY = g.lastGy ?? gy;
+  const dist = Math.hypot(gx - prevX, gy - prevY);
+  const steps = Math.max(1, Math.ceil(dist / (S * 0.25)));
+
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const x = prevX + (gx - prevX) * t;
+    const y = prevY + (gy - prevY) * t;
+    const fc = Math.floor(x / S);
+    const fr = Math.floor(y / S);
+    if (fc < 0 || fc >= fcMax || fr < 0 || fr >= frMax) continue;
+    const fx = x / S - fc;
+    const fy = y / S - fr;
+    if (fx < FACE_DRAG_INSET || fx > 1 - FACE_DRAG_INSET || fy < FACE_DRAG_INSET || fy > 1 - FACE_DRAG_INSET) continue;
+    const f = fr * fcMax + fc;
+    if (!g.paintedFaces.has(f)) {
+      g.paintedFaces.add(f);
+      g.dragged = true;
+      onFace(f);
+    }
+  }
+  g.lastGx = gx;
+  g.lastGy = gy;
+}
+
 /**
  * Pure hit-testing in lattice coordinates where intersection (r, c) is at (c*S, r*S).
  * Returns:
@@ -535,9 +573,9 @@ export class Board {
           const strokeStyle = this.opts.colorLines && pc
             ? ` style="stroke:${pc[colorOf.get(find(this.hoverCell)) % pc.length]}"`
             : '';
-          const d = S * 0.35;
           for (const i of [this.hoverCell, far]) {
             const x = ix(i), y = iy(i);
+            const d = P.clue[i] ? S * 0.28 : S * 0.20;
             const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
             g += `<path class="line-end-halo" d="${path}"/>`;
             g += `<path class="line-end"${strokeStyle} d="${path}"/>`;
@@ -588,7 +626,8 @@ export class Board {
 
   down(e) {
     if (!this.P || e.button === 1) return;
-    const hit = this.hitFromEvent(e);
+    const c = this.coordsFromEvent(e);
+    const hit = c ? hitTestCoords(this.P, c.gx, c.gy) : null;
     if (!hit) return;
     e.preventDefault();
     try { this.el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -599,6 +638,9 @@ export class Board {
       startHit: hit,
       startX: e.clientX,
       startY: e.clientY,
+      lastGx: c.gx,
+      lastGy: c.gy,
+      paintedFaces: hit.kind === 'face' ? new Set([hit.face]) : null,
       curCell: hit.cell,
       dragged: false,
       firstStep: true,
@@ -606,7 +648,8 @@ export class Board {
       trail: [],
     };
     // Apply edge and square clicks immediately on pointerdown for instant feedback
-    // (if an edge press transitions into a drag, onBeginDrag restores pre-click state before stepping)
+    // (if an edge press transitions into a drag, onBeginDrag restores pre-click state before stepping;
+    //  if a square press transitions into a drag, it keeps painting the color just applied on pointerdown)
     if (hit.kind === 'edge') {
       if (e.button === 2) this.h.onEdgeRight(hit.edge);
       else this.h.onEdgeTap(hit.edge);
@@ -628,6 +671,10 @@ export class Board {
     }
     if (e.pointerId !== this.gesture.id || !c) return;
     if (!this.gesture.dragged && Math.hypot(e.clientX - this.gesture.startX, e.clientY - this.gesture.startY) < DRAG_SLOP_PX) {
+      return;
+    }
+    if (this.gesture.startHit.kind === 'face') {
+      advanceFaceDrag(this.P, this.gesture, c.gx, c.gy, (f) => this.h.onFaceDrag?.(f));
       return;
     }
     const step = this.gesture.right

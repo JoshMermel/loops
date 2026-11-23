@@ -59,6 +59,7 @@ const board = new Board($('board'), {
   onEdgeRight: (edge) => toggleEdge(edge),
   onFaceTap: (face) => cycleFace(face, false),
   onFaceRight: (face) => cycleFace(face, true),
+  onFaceDrag: (face) => paintFaceStep(face),
   onStep: (a, b, first) => dragStep(a, b, first),
   onCrossStep: (a, b, first) => crossStep(a, b, first),
   onUndoStep: () => undoDragStep(),
@@ -135,7 +136,21 @@ function cycleFace(f, reverse = false) {
   const P = state.P, m = state.marks;
   if (f < 0 || f >= m.faces.length) return;
   const prev = snapshot();
-  m.faces[f] = reverse ? cycleFaceMarkReverse(m.faces[f]) : cycleFaceMark(m.faces[f]);
+  const next = reverse ? cycleFaceMarkReverse(m.faces[f]) : cycleFaceMark(m.faces[f]);
+  m.faces[f] = next;
+  m.autoF[f] = 0;
+  state.facePaintVal = next;
+  reconcileAutoShade(P, prev, m, settings.autoShade);
+  refresh();
+}
+
+function paintFaceStep(f) {
+  const P = state.P, m = state.marks;
+  if (f < 0 || f >= m.faces.length) return;
+  const val = state.facePaintVal;
+  if (m.faces[f] === val && !m.autoF[f]) return;
+  const prev = snapshot();
+  m.faces[f] = val;
   m.autoF[f] = 0;
   reconcileAutoShade(P, prev, m, settings.autoShade);
   refresh();
