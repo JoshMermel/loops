@@ -1,0 +1,360 @@
+{
+  "default": "intro",
+  "groups": [
+    {
+      "name": "Start here",
+      "icon": "🌱",
+      "blurb": "Small Beginner puzzles (5×5 and 6×6) that introduce the core white and black circle rules."
+    },
+    {
+      "name": "Default",
+      "icon": "📚",
+      "blurb": "Standard Masyu boards by size — from quick 6×6 warm-ups up to giant 18×18 and 12×20 grids, easiest first."
+    },
+    {
+      "name": "Bonus",
+      "icon": "🎁",
+      "blurb": "Themed variations using the exact same rules with a distinct feel.",
+      "subs": {
+        "All white": {
+          "icon": "⚪",
+          "blurb": "Every circle is white: straight lines and forced turns everywhere."
+        },
+        "All black": {
+          "icon": "⚫",
+          "blurb": "Every circle is black: sharp corners and long two-step legs."
+        },
+        "Sparse": {
+          "icon": "🔹",
+          "blurb": "Stripped down to as few circles as uniqueness allows."
+        },
+        "Skyscraper": {
+          "icon": "🏙️",
+          "blurb": "Tall, narrow towers (up to 6×30) where the loop snakes up and down."
+        },
+        "Exact symmetry": {
+          "icon": "🪞",
+          "blurb": "Mirror, diagonal-mirror, 180°, and 90° rotational puzzles where both clues and solution loop are symmetric."
+        },
+        "Yin-Yang": {
+          "icon": "☯️",
+          "blurb": "180° opposite-color symmetry: turn the board upside down and every white circle lands on a black circle."
+        },
+        "No edge clues": {
+          "icon": "🎯",
+          "blurb": "Zero circles on the outer border — no free wall openings, work outward from the interior."
+        },
+        "Lattice": {
+          "icon": "💠",
+          "blurb": "Every even row and even column holds a circle — all dots present, and none anywhere else."
+        },
+        "Full board": {
+          "icon": "🧱",
+          "blurb": "Every single intersection on the grid is visited by the loop (100% fill, standard Masyu rules)."
+        }
+      }
+    }
+  ],
+  "books": [
+    {
+      "id": "intro",
+      "name": "Gentle intro",
+      "label": "Gentle intro",
+      "file": "data/intro.csv",
+      "count": 60,
+      "group": "Start here",
+      "blurb": "60 small Beginner puzzles (5×5 and 6×6), easiest first."
+    },
+    {
+      "id": "6x6",
+      "name": "6×6",
+      "label": "6×6",
+      "file": "data/6x6.csv",
+      "count": 120,
+      "group": "Default",
+      "blurb": "120 puzzles on 6×6 boards — 40 each of Beginner, Medium, and Hard."
+    },
+    {
+      "id": "8x8",
+      "name": "8×8",
+      "label": "8×8",
+      "file": "data/8x8.csv",
+      "count": 120,
+      "group": "Default",
+      "blurb": "120 puzzles on 8×8 boards — 40 each of Beginner, Medium, and Hard."
+    },
+    {
+      "id": "10x10",
+      "name": "10×10",
+      "label": "10×10",
+      "file": "data/10x10.csv",
+      "count": 90,
+      "group": "Default",
+      "blurb": "90 puzzles on 10×10 boards — 30 each of Beginner, Medium, and Hard."
+    },
+    {
+      "id": "12x12",
+      "name": "12×12",
+      "label": "12×12",
+      "file": "data/12x12.csv",
+      "count": 75,
+      "group": "Default",
+      "blurb": "75 puzzles on 12×12 boards — 25 each of Beginner, Medium, and Hard."
+    },
+    {
+      "id": "14x14",
+      "name": "14×14",
+      "label": "14×14",
+      "file": "data/14x14.csv",
+      "count": 45,
+      "group": "Default",
+      "blurb": "45 large puzzles on 14×14 boards — 15 each of Beginner, Medium, and Hard."
+    },
+    {
+      "id": "16x16",
+      "name": "16×16",
+      "label": "16×16",
+      "file": "data/16x16.csv",
+      "count": 36,
+      "group": "Default",
+      "blurb": "36 big puzzles on 16×16 boards — 12 each of Beginner, Medium, and Hard."
+    },
+    {
+      "id": "18x18",
+      "name": "18×18",
+      "label": "18×18",
+      "file": "data/18x18.csv",
+      "count": 24,
+      "group": "Default",
+      "blurb": "24 giant 18×18 square boards for long, deep solves."
+    },
+    {
+      "id": "12x20",
+      "name": "12×20 Giant",
+      "label": "12×20 Giant",
+      "file": "data/12x20.csv",
+      "count": 24,
+      "group": "Default",
+      "blurb": "24 tall giant 12×20 boards (classic magazine-page proportions)."
+    },
+    {
+      "id": "bonus-white-6x6",
+      "name": "All white 6×6",
+      "label": "6×6",
+      "file": "data/bonus-white-6x6.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "All white",
+      "blurb": "60 all-white Masyu puzzles on 6×6 boards, easiest first."
+    },
+    {
+      "id": "bonus-white-8x8",
+      "name": "All white 8×8",
+      "label": "8×8",
+      "file": "data/bonus-white-8x8.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "All white",
+      "blurb": "60 all-white Masyu puzzles on 8×8 boards, easiest first."
+    },
+    {
+      "id": "bonus-white-10x10",
+      "name": "All white 10×10",
+      "label": "10×10",
+      "file": "data/bonus-white-10x10.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "All white",
+      "blurb": "45 all-white Masyu puzzles on 10×10 boards, easiest first."
+    },
+    {
+      "id": "bonus-black-6x6",
+      "name": "All black 6×6",
+      "label": "6×6",
+      "file": "data/bonus-black-6x6.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "All black",
+      "blurb": "60 all-black Masyu puzzles on 6×6 boards, easiest first."
+    },
+    {
+      "id": "bonus-black-8x8",
+      "name": "All black 8×8",
+      "label": "8×8",
+      "file": "data/bonus-black-8x8.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "All black",
+      "blurb": "60 all-black Masyu puzzles on 8×8 boards, easiest first."
+    },
+    {
+      "id": "bonus-black-10x10",
+      "name": "All black 10×10",
+      "label": "10×10",
+      "file": "data/bonus-black-10x10.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "All black",
+      "blurb": "45 all-black Masyu puzzles on 10×10 boards, easiest first."
+    },
+    {
+      "id": "bonus-sparse-8x8",
+      "name": "Sparse 8×8",
+      "label": "8×8",
+      "file": "data/bonus-sparse-8x8.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "Sparse",
+      "blurb": "60 minimal-clue 8×8 puzzles stripped as far as uniqueness allows."
+    },
+    {
+      "id": "bonus-sparse-10x10",
+      "name": "Sparse 10×10",
+      "label": "10×10",
+      "file": "data/bonus-sparse-10x10.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "Sparse",
+      "blurb": "45 minimal-clue 10×10 puzzles stripped as far as uniqueness allows."
+    },
+    {
+      "id": "bonus-skyscraper",
+      "name": "Skyscraper",
+      "label": "Standard (5×14 – 6×20)",
+      "file": "data/bonus-skyscraper.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "Skyscraper",
+      "blurb": "60 tall, narrow puzzles (5×14, 6×16, and 6×20), easiest first."
+    },
+    {
+      "id": "bonus-skyscraper-tall",
+      "name": "Tall Skyscraper",
+      "label": "Mega (6×24 – 6×30)",
+      "file": "data/bonus-skyscraper-tall.csv",
+      "count": 36,
+      "group": "Bonus",
+      "sub": "Skyscraper",
+      "blurb": "36 extra-tall tower puzzles (6×24, 8×24, and 6×30), easiest first."
+    },
+    {
+      "id": "bonus-symmetry-8x8",
+      "name": "Exact symmetry 8×8",
+      "label": "8×8",
+      "file": "data/bonus-symmetry-8x8.csv",
+      "count": 60,
+      "group": "Bonus",
+      "sub": "Exact symmetry",
+      "blurb": "60 symmetric 8×8 puzzles mixing mirror, diagonal-mirror, 180°, and 90° rotational symmetry."
+    },
+    {
+      "id": "bonus-symmetry-10x10",
+      "name": "Exact symmetry 10×10",
+      "label": "10×10",
+      "file": "data/bonus-symmetry-10x10.csv",
+      "count": 48,
+      "group": "Bonus",
+      "sub": "Exact symmetry",
+      "blurb": "48 symmetric 10×10 puzzles mixing mirror, diagonal-mirror, 180°, and 90° rotational symmetry."
+    },
+    {
+      "id": "bonus-yinyang-8x8",
+      "name": "Yin-Yang 8×8",
+      "label": "8×8",
+      "file": "data/bonus-yinyang-8x8.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "Yin-Yang",
+      "blurb": "45 opposite-color 180° symmetric puzzles on 8×8 boards."
+    },
+    {
+      "id": "bonus-yinyang-10x10",
+      "name": "Yin-Yang 10×10",
+      "label": "10×10",
+      "file": "data/bonus-yinyang-10x10.csv",
+      "count": 30,
+      "group": "Bonus",
+      "sub": "Yin-Yang",
+      "blurb": "30 opposite-color 180° symmetric puzzles on 10×10 boards."
+    },
+    {
+      "id": "bonus-interior-8x8",
+      "name": "No edge clues 8×8",
+      "label": "8×8",
+      "file": "data/bonus-interior-8x8.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "No edge clues",
+      "blurb": "45 puzzles on 8×8 boards with zero circles on the outer border."
+    },
+    {
+      "id": "bonus-interior-10x10",
+      "name": "No edge clues 10×10",
+      "label": "10×10",
+      "file": "data/bonus-interior-10x10.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "No edge clues",
+      "blurb": "45 puzzles on 10×10 boards with zero circles on the outer border."
+    },
+    {
+      "id": "bonus-lattice-9x9",
+      "name": "Lattice 9×9",
+      "label": "9×9 (all 22)",
+      "file": "data/bonus-lattice-9x9.csv",
+      "count": 22,
+      "group": "Bonus",
+      "sub": "Lattice",
+      "blurb": "All 22 unique 9×9 full-lattice puzzles (up to symmetry) with every even-row, even-column circle present."
+    },
+    {
+      "id": "bonus-lattice-big",
+      "name": "Lattice big",
+      "label": "9×11 & 13×13",
+      "file": "data/bonus-lattice-big.csv",
+      "count": 32,
+      "group": "Bonus",
+      "sub": "Lattice",
+      "blurb": "32 larger full-lattice puzzles on 9×11 (20 dots) and 13×13 (36 dots) boards."
+    },
+    {
+      "id": "bonus-full-6x6",
+      "name": "Full board 6×6",
+      "label": "6×6",
+      "file": "data/bonus-full-6x6.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "Full board",
+      "blurb": "45 full-fill 6×6 puzzles where the loop visits every intersection."
+    },
+    {
+      "id": "bonus-full-8x8",
+      "name": "Full board 8×8",
+      "label": "8×8",
+      "file": "data/bonus-full-8x8.csv",
+      "count": 45,
+      "group": "Bonus",
+      "sub": "Full board",
+      "blurb": "45 full-fill 8×8 puzzles where the loop visits every intersection."
+    },
+    {
+      "id": "bonus-full-10x10",
+      "name": "Full board 10×10",
+      "label": "10×10",
+      "file": "data/bonus-full-10x10.csv",
+      "count": 30,
+      "group": "Bonus",
+      "sub": "Full board",
+      "blurb": "30 full-fill 10×10 puzzles where the loop visits every intersection."
+    },
+    {
+      "id": "armory",
+      "name": "Armory (How-to-solve examples)",
+      "label": "Armory",
+      "group": "Hidden",
+      "file": "data/armory.csv",
+      "count": 19,
+      "hidden": true
+    }
+  ]
+}

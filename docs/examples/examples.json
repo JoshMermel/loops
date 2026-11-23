@@ -1,0 +1,774 @@
+[
+  {
+    "rule": "whiteStraight",
+    "tier": "Beginner",
+    "weight": 2,
+    "puzzle": 1,
+    "name": "ARMORY-01",
+    "rows": 5,
+    "cols": 5,
+    "hints": 0,
+    "edges": "00000000000000000000000000000000000000000000000000",
+    "text": "The white circle at C1 cannot go vertically, so the loop must go straight horizontally through it.",
+    "roles": {
+      "clue": [
+        2
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        4,
+        2
+      ],
+      "segOff": [
+        5
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "blackExtend",
+    "tier": "Beginner",
+    "weight": 2,
+    "puzzle": 2,
+    "name": "ARMORY-02",
+    "rows": 5,
+    "cols": 5,
+    "hints": 2,
+    "edges": "00000000000000000000201010000000101200000000000000",
+    "text": "The black circle at D3 leaves left, so it must go straight two cells left and cannot exit right.",
+    "roles": {
+      "clue": [
+        13
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        26
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "blackWall",
+    "tier": "Beginner",
+    "weight": 2,
+    "puzzle": 3,
+    "name": "ARMORY-03",
+    "rows": 5,
+    "cols": 5,
+    "hints": 0,
+    "edges": "00000000000000000000000000000000000000000000000000",
+    "text": "The black circle at B1 is too close to the up edge to go two straight cells up, so it must go two cells down.",
+    "roles": {
+      "clue": [
+        1
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        3,
+        13
+      ],
+      "segOff": []
+    },
+    "chain": []
+  },
+  {
+    "rule": "blackAdjacent",
+    "tier": "Beginner",
+    "weight": 3,
+    "puzzle": 4,
+    "name": "ARMORY-04",
+    "rows": 6,
+    "cols": 6,
+    "hints": 4,
+    "edges": "000000000002000000101001201010000001000001000000000001000000000000000000",
+    "text": "The touching black circles at C4 and D4 cannot connect (each must go straight through its neighbor), so C4 goes two cells left.",
+    "roles": {
+      "clue": [
+        20,
+        21
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        38,
+        36
+      ],
+      "segOff": [
+        40
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "whiteMustTurn",
+    "tier": "Beginner",
+    "weight": 3,
+    "puzzle": 5,
+    "name": "ARMORY-05",
+    "rows": 5,
+    "cols": 5,
+    "hints": 5,
+    "edges": "00000202000010101200211010120021000000000000000000",
+    "text": "The white circle at C2 goes straight through D2, so the loop must turn at B2 (cross out A2–B2).",
+    "roles": {
+      "clue": [
+        7
+      ],
+      "area": [],
+      "focus": [
+        6
+      ],
+      "problem": [],
+      "exit": [],
+      "path": [
+        8
+      ]
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        10
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "deadEnd",
+    "tier": "Beginner",
+    "weight": 4,
+    "puzzle": 6,
+    "name": "ARMORY-06",
+    "rows": 5,
+    "cols": 5,
+    "hints": 5,
+    "edges": "01000200022120111001000001000100000200000010100000",
+    "text": "E1 has only one available exit left, so the loop cannot pass through it (cross out D1–E1).",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [
+        4
+      ],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        6
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "forcedExits",
+    "tier": "Beginner",
+    "weight": 4,
+    "puzzle": 5,
+    "name": "ARMORY-05",
+    "rows": 5,
+    "cols": 5,
+    "hints": 6,
+    "edges": "00000202002010101200211010120021000000000000000000",
+    "text": "A3 is on the loop and has only two exits left, so it must use A2–A3.",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [
+        10
+      ],
+      "problem": [],
+      "exit": [
+        5
+      ],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        11
+      ],
+      "segOff": []
+    },
+    "chain": []
+  },
+  {
+    "rule": "blackPerp",
+    "tier": "Beginner",
+    "weight": 5,
+    "puzzle": 7,
+    "name": "ARMORY-07",
+    "rows": 5,
+    "cols": 5,
+    "hints": 9,
+    "edges": "11000210012110102001011010200101000000001010000000",
+    "text": "The black circle at D3 cannot enter D2 (which already has a perpendicular segment), so it must go two cells down.",
+    "roles": {
+      "clue": [
+        13
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [
+        8
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        27,
+        37
+      ],
+      "segOff": [
+        17
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "whiteBothStraight",
+    "tier": "Beginner",
+    "weight": 5,
+    "puzzle": 8,
+    "name": "ARMORY-08",
+    "rows": 6,
+    "cols": 6,
+    "hints": 9,
+    "edges": "000000001001000000002001000000000001000200002001111200001002101000002000",
+    "text": "If the white circle at D5 went horizontally, both ends would go straight without turning; so it must go straight vertically.",
+    "roles": {
+      "clue": [
+        27
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        43,
+        55
+      ],
+      "segOff": [
+        54,
+        52
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "noEarlyClose",
+    "tier": "Beginner",
+    "weight": 6,
+    "puzzle": 6,
+    "name": "ARMORY-06",
+    "rows": 5,
+    "cols": 5,
+    "hints": 12,
+    "edges": "11212220022121111001000001020100000200000010100000",
+    "text": "A3 and B3 are the two ends of the same open path while other loop cells lie outside it, so A3–B3 cannot connect them.",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": [
+        10,
+        11
+      ]
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        20
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "closingCell",
+    "tier": "Beginner",
+    "weight": 7,
+    "puzzle": 9,
+    "name": "ARMORY-09",
+    "rows": 6,
+    "cols": 6,
+    "hints": 8,
+    "edges": "000102010000000100010000201010000000101001111000000001010000000000000000",
+    "text": "C1 has only two exits left, and both lead to the ends of one path (D1 and B1): using it would close the loop early, so cross out C1–D1 and B1–C1.",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [
+        2
+      ],
+      "problem": [],
+      "exit": [],
+      "path": [
+        3,
+        1
+      ]
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        4,
+        2
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "threeWhites",
+    "tier": "Medium",
+    "weight": 10,
+    "puzzle": 10,
+    "name": "ARMORY-10",
+    "rows": 6,
+    "cols": 6,
+    "hints": 1,
+    "edges": "000000000000000000000001000000002001000000000000000000000000000000000000",
+    "text": "Three white circles in a row (E4, D4, and C4) cannot go along the row because the middle circle would fail to turn at either end; all three must cross vertically.",
+    "roles": {
+      "clue": [
+        22,
+        21,
+        20
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        33,
+        45,
+        31,
+        43,
+        29,
+        41
+      ],
+      "segOff": [
+        44,
+        42,
+        42,
+        40,
+        40,
+        38
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "twoWhitesStraight",
+    "tier": "Medium",
+    "weight": 11,
+    "puzzle": 10,
+    "name": "ARMORY-10",
+    "rows": 6,
+    "cols": 6,
+    "hints": 6,
+    "edges": "000000002002000000001001000001012101002021212101000000000000000000000000",
+    "text": "The touching white circles at D2 and C2 cannot join because E2–F2 already continues straight past D2; both must go vertically.",
+    "roles": {
+      "clue": [
+        9,
+        8
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        7,
+        19,
+        5,
+        17
+      ],
+      "segOff": [
+        16,
+        18,
+        14,
+        16
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "whiteNoTurnAxis",
+    "tier": "Medium",
+    "weight": 12,
+    "puzzle": 11,
+    "name": "ARMORY-11",
+    "rows": 8,
+    "cols": 8,
+    "hints": 22,
+    "edges": "22111000000100000201220000010000021012102000020200000000001012010100000000002001210001000002000100000120101210020000000020202000",
+    "text": "Neither D5 and D7 can turn if entered from D6, so the white circle at D6 must go horizontally.",
+    "roles": {
+      "clue": [
+        43
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [
+        35,
+        51
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        86,
+        84
+      ],
+      "segOff": [
+        71,
+        87
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "faceParity",
+    "tier": "Medium",
+    "weight": 16,
+    "puzzle": 12,
+    "name": "ARMORY-12",
+    "rows": 6,
+    "cols": 6,
+    "hints": 2,
+    "edges": "000000000000000000000000000000000000000000101000000000020000000010100000",
+    "text": "Inside/outside parity: flipping diagonally across white circle E2 makes D1–E2 Side B; flipping diagonally across white circle D2 makes C2–D3 Side A; flipping diagonally across white circle D3 makes D3–E4 Side B; crossing ✕ at E3–E4 keeps E3–F4 Side B. That puts opposite sides (Side A and Side B) across E3–F3, so draw E3–F3.",
+    "roles": {
+      "clue": [
+        10,
+        9,
+        15
+      ],
+      "area": [],
+      "focus": [
+        16,
+        17
+      ],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        32
+      ],
+      "segOff": []
+    },
+    "chain": []
+  },
+  {
+    "rule": "twoEndsJoin",
+    "tier": "Medium",
+    "weight": 20,
+    "puzzle": 13,
+    "name": "ARMORY-13",
+    "rows": 6,
+    "cols": 6,
+    "hints": 20,
+    "edges": "221112101001000202000001010101002001212121111000002021210000002010200000",
+    "text": "The highlighted area has only two open ends (A5 and B5), so they must connect inside it; that makes A3 and B3 ends of one path, so A3–B3 cannot close them early.",
+    "roles": {
+      "clue": [],
+      "area": [
+        24,
+        30,
+        31,
+        25
+      ],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": [
+        24,
+        25,
+        12,
+        13
+      ]
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        24
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "chokepoint",
+    "tier": "Medium",
+    "weight": 22,
+    "puzzle": 14,
+    "name": "ARMORY-14",
+    "rows": 6,
+    "cols": 6,
+    "hints": 6,
+    "edges": "000000111201000000010000000000020000000000101000010200000000101000000000",
+    "text": "Without C3–D3, F3 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so C3–D3 must be drawn.",
+    "roles": {
+      "clue": [],
+      "area": [
+        11,
+        10,
+        16,
+        15,
+        9,
+        3,
+        4,
+        5
+      ],
+      "focus": [
+        14,
+        15
+      ],
+      "problem": [
+        17
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        28
+      ],
+      "segOff": []
+    },
+    "chain": []
+  },
+  {
+    "rule": "parityPocket",
+    "tier": "Medium",
+    "weight": 26,
+    "puzzle": 15,
+    "name": "ARMORY-15",
+    "rows": 20,
+    "cols": 6,
+    "hints": 84,
+    "edges": "111000202002011120101001012100200001011000101002121000202002111002121001012022110101211121211200122221211101222021122001111000202001011112101000011010000000211110000000210120000000211010000002120122001201020100112101221210222101202020001000",
+    "text": "If you tried drawing C4–D4, the highlighted area would be sealed off with 3 open ends (odd, so they can't all pair up); therefore cross out C4–D4.",
+    "roles": {
+      "clue": [],
+      "area": [
+        26,
+        32,
+        33,
+        27
+      ],
+      "focus": [
+        20,
+        21
+      ],
+      "problem": [],
+      "exit": [],
+      "path": [
+        26,
+        32,
+        33
+      ]
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        40
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "chokepointArea",
+    "tier": "Hard",
+    "weight": 60,
+    "puzzle": 16,
+    "name": "ARMORY-16",
+    "rows": 6,
+    "cols": 6,
+    "hints": 13,
+    "edges": "000000010200000000010002000000211001101010222001000002002001001010001000",
+    "text": "Without D1–E1, A4 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so D1–E1 must be drawn.",
+    "roles": {
+      "clue": [],
+      "area": [
+        12,
+        13,
+        14,
+        8,
+        2,
+        1,
+        0,
+        3,
+        9,
+        15,
+        21,
+        20,
+        19,
+        7,
+        6
+      ],
+      "focus": [
+        3,
+        4
+      ],
+      "problem": [
+        18
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        6
+      ],
+      "segOff": []
+    },
+    "chain": []
+  },
+  {
+    "rule": "tryEdge",
+    "tier": "Hard",
+    "weight": 120,
+    "puzzle": 17,
+    "name": "ARMORY-17",
+    "rows": 6,
+    "cols": 6,
+    "hints": 10,
+    "edges": "111212000000121000000000111000000000010000000000010000000000101000000000",
+    "text": "Imagine a segment at C3–C4 and follow the forced deductions (starting with: the black circle at D3 is blocked left and goes two cells right; then C2 must use C2–D2; then the black circle at D3 cannot enter D2 and goes two cells down; reaching a contradiction after 3 steps). So cross out C3–C4.",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [
+        14,
+        20
+      ],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        29
+      ]
+    },
+    "chain": []
+  },
+  {
+    "rule": "imagine",
+    "tier": "Medium",
+    "weight": 23,
+    "puzzle": 18,
+    "name": "ARMORY-18",
+    "rows": 6,
+    "cols": 6,
+    "hints": 5,
+    "edges": "000000000000000200000000101200000001101200000001101200101002000000202000",
+    "text": "Imagine a segment at C2–C3: then the black circle at D3 is blocked left and goes two cells right; then the white circle at E2 must go horizontally; then the black circle at D3 cannot enter 1 and goes two cells down; and finally the loop closes early while C2 is still outside it. So cross out C2–C3.",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [
+        8,
+        14
+      ],
+      "problem": [
+        8
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        17
+      ]
+    },
+    "chain": [
+      17,
+      18,
+      20,
+      30,
+      31,
+      32,
+      43
+    ]
+  },
+  {
+    "rule": "imagineLong",
+    "tier": "Hard",
+    "weight": 38,
+    "puzzle": 19,
+    "name": "ARMORY-19",
+    "rows": 6,
+    "cols": 6,
+    "hints": 7,
+    "edges": "111200101001000000000001101000000000000000000000000000000201000000101000",
+    "text": "Imagine a segment at D4–E4: then the black circle at D4 must go two cells right; then the white circle at E3 must go horizontally; then the black circle at D4 cannot enter 1 and goes two cells down; then F4–F5 cannot close the loop early; and finally F4 is left with only one way out. So cross out D4–E4.",
+    "roles": {
+      "clue": [],
+      "area": [],
+      "focus": [
+        21,
+        22
+      ],
+      "problem": [
+        23
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        42
+      ]
+    },
+    "chain": [
+      42,
+      30,
+      32,
+      43,
+      44,
+      55
+    ]
+  }
+]
