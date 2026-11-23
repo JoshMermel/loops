@@ -424,7 +424,7 @@ export class Board {
     const boardW = (P.cols - 1) * S + 2 * PAD;
     const boardH = (P.rows - 1) * S + 2 * PAD;
 
-    let g = `<rect class="board-bg" x="1" y="1" width="${boardW - 2}" height="${boardH - 2}" rx="8"/>`;
+    let g = `<rect class="board-bg" x="1.5" y="1.5" width="${boardW - 3}" height="${boardH - 3}" rx="8"/>`;
 
     // Dual-face Inside / Outside shading (under grid lines and hint overlays)
     const fr = P.rows - 1, fc = P.cols - 1;

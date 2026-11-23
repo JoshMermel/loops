@@ -129,8 +129,8 @@ button.ghost { background: transparent; }
 .board-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 #board { margin: 0 auto; touch-action: none; user-select: none; -webkit-user-select: none; }
 #board svg { width: 100%; height: auto; display: block; }
-#board.solved svg { filter: drop-shadow(0 0 6px var(--color-solved)); }
 .board-bg { fill: var(--cell-bg); stroke: var(--border-light); stroke-width: 1.5; }
+#board.solved .board-bg { stroke: var(--color-solved); stroke-width: 2.5; }
 .face-in { fill: var(--face-in); pointer-events: none; }
 .face-out { fill: var(--face-out); pointer-events: none; }
 .face-in.auto, .face-out.auto { opacity: 0.72; }
