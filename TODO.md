@@ -26,7 +26,7 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 
 ## Books & scaling
 
-- [x] **Larger board sizes & per-difficulty Default + Bonus books:** `Gentle intro` (100), 4 separate score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert) for `8×8` and `12×12`, score-banded Giants (`16×16` 200, `12×20` 100, `24×30 Full Page` 60), 8 fixed-size 500+10 Bonus books (10/40/40/10 split + 10 oversized bonus puzzles at the end), and the 60-puzzle Lattice showcase — **8,620 audited puzzles across 21 visible books**.
+- [x] **Larger board sizes & per-difficulty Default + Bonus books:** `Gentle intro` (100), 4 separate score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert) for `8×8` and `12×12`, score-banded Giants (`16×16` 200, `12×20` 100, `24×30 Full Page` 60), 6 fixed-size 500+10 Bonus books (10/40/40/10 split + 10 oversized bonus puzzles at the end), and the 60-puzzle Lattice showcase — **7,600 audited puzzles across 19 visible books**.
 - [x] **New themed Bonus corpuses:** Exact symmetry (`rot180`, `mirror`, `transpose`, balanced per tier), Yin-Yang (180° opposite-color symmetry), No edge clues (`interior`), Lattice (full even-row/even-col dot grid), and Full board (`100%` loop fill).
 - [ ] **Grow further with `tools/fill_pools.mjs` / `tools/overnight.mjs`:** scale Default books toward 250–1000 puzzles each, or try `20×20` / `20×36` mega boards.
 - [ ] **More themed Bonus ideas to explore:**

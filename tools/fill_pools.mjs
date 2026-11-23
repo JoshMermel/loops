@@ -238,16 +238,6 @@ if (!isMainThread) {
       budgetSec: 600, perPuzzleMs: 20000,
     },
     {
-      group: 'bonus', pool: 'sparse_10x10', cols: 10, rows: 10, style: 'sparse',
-      buckets: {
-        Beginner: { need: 52, maxScore: 390 },
-        Medium: { need: 204, minScore: 375, maxScore: 480 },
-        Hard: { need: 204, minScore: 475, maxScore: 820 },
-        Expert: { need: 52, minScore: 820 },
-      },
-      budgetSec: 480, perPuzzleMs: 20000,
-    },
-    {
       group: 'bonus', pool: 'sky_6x20', cols: 6, rows: 20,
       buckets: {
         Beginner: { need: 52, maxScore: 480 },
@@ -298,16 +288,6 @@ if (!isMainThread) {
       budgetSec: 720, perPuzzleMs: 25000,
     },
     {
-      group: 'bonus', pool: 'interior_10x10', cols: 10, rows: 10, layout: 'interior',
-      buckets: {
-        Beginner: { need: 52, maxScore: 385 },
-        Medium: { need: 204, minScore: 370, maxScore: 445 },
-        Hard: { need: 204, minScore: 445, maxScore: 720 },
-        Expert: { need: 52, minScore: 720 },
-      },
-      budgetSec: 480, perPuzzleMs: 20000,
-    },
-    {
       group: 'bonus', pool: 'full_10x10', cols: 10, rows: 10, minFill: 1.0,
       buckets: {
         Beginner: { need: 52, maxScore: 425 },
@@ -321,13 +301,11 @@ if (!isMainThread) {
     // ---- Oversized bonus tails (10 per bonus book) + Lattice showcase
     { group: 'bonus-oversized', pool: 'white_12x12', cols: 12, rows: 12, style: 'white', total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'black_12x12', cols: 12, rows: 12, style: 'black', total: 12, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'sparse_12x12', cols: 12, rows: 12, style: 'sparse', total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'tallsky_6x30', cols: 6, rows: 30, total: 14, budgetSec: 90, perPuzzleMs: 30000 },
     { group: 'bonus-oversized', pool: 'sym_rot180_12x12', cols: 12, rows: 12, layout: 'rot180', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'sym_mirror_12x12', cols: 12, rows: 12, layout: 'mirror', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'sym_transpose_12x12', cols: 12, rows: 12, layout: 'transpose', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'yinyang_12x12', cols: 12, rows: 12, layout: 'yinyang', total: 12, budgetSec: 120, perPuzzleMs: 30000 },
-    { group: 'bonus-oversized', pool: 'interior_12x12', cols: 12, rows: 12, layout: 'interior', total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'full_10x12', cols: 10, rows: 12, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'lattice_13x13', cols: 13, rows: 13, layout: 'lattice', total: 14, budgetSec: 180, perPuzzleMs: 35000 },
   ];

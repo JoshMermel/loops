@@ -170,15 +170,6 @@
       "blurb": "500 all-black 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles."
     },
     {
-      "id": "bonus-sparse",
-      "name": "Sparse",
-      "label": "🔹 Sparse (10×10)",
-      "file": "data/bonus-sparse.csv",
-      "count": 510,
-      "group": "Bonus",
-      "blurb": "500 minimal-clue 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles."
-    },
-    {
       "id": "bonus-skyscraper",
       "name": "Skyscraper",
       "label": "🏙️ Skyscraper (6×20)",
@@ -204,15 +195,6 @@
       "count": 510,
       "group": "Bonus",
       "blurb": "500 opposite-color 180° symmetric 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles."
-    },
-    {
-      "id": "bonus-interior",
-      "name": "No edge clues",
-      "label": "🎯 No edge clues (10×10)",
-      "file": "data/bonus-interior.csv",
-      "count": 510,
-      "group": "Bonus",
-      "blurb": "500 borderless-clue 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles."
     },
     {
       "id": "bonus-full",

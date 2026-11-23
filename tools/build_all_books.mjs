@@ -138,12 +138,6 @@ const recipes = [
     blurb: '500 all-black 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
-    id: 'bonus-sparse', name: 'Sparse', label: '🔹 Sparse (10×10)', group: 'Bonus',
-    glob: 'sparse_10x10', tiers: '50,200,200,50', tierBands: '0:390,375:480,475:820,820:',
-    bonusGlob: 'sparse_12x12', bonusCount: 10,
-    blurb: '500 minimal-clue 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
-  },
-  {
     id: 'bonus-skyscraper', name: 'Skyscraper', label: '🏙️ Skyscraper (6×20)', group: 'Bonus',
     glob: 'sky_6x20', tiers: '50,200,200,50', tierBands: '0:480,430:550,550:900,880:',
     bonusGlob: 'tallsky_6x30', bonusCount: 10,
@@ -161,12 +155,6 @@ const recipes = [
     glob: 'yinyang_10x10', tiers: '50,200,200,50', tierBands: '0:355,340:460,460:780,780:',
     bonusGlob: 'yinyang_12x12', bonusCount: 10,
     blurb: '500 opposite-color 180° symmetric 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
-  },
-  {
-    id: 'bonus-interior', name: 'No edge clues', label: '🎯 No edge clues (10×10)', group: 'Bonus',
-    glob: 'interior_10x10', tiers: '50,200,200,50', tierBands: '0:385,370:445,445:720,720:',
-    bonusGlob: 'interior_12x12', bonusCount: 10,
-    blurb: '500 borderless-clue 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
     id: 'bonus-full', name: 'Full board', label: '🧱 Full board (10×10)', group: 'Bonus',
