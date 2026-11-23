@@ -86,4 +86,133 @@ for (const tier of TIERS.filter((t) => RULES.some((r) => r.tier === t && !r.free
 }
 
 fs.writeFileSync(path.join(root, 'docs', 'how_to_solve.md'), out.join('\n').replace(/\n---\n\n$/, '\n'), 'utf8');
-console.log(`Generated docs/how_to_solve.md (${examples.length} illustrated rules).`);
+
+// Also generate a clean, standalone docs/how_to_solve.html for GitHub Pages (since .nojekyll serves raw .md).
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const activeTiers = TIERS.filter((t) => RULES.some((r) => r.tier === t && !r.free));
+
+const htmlParts = [];
+htmlParts.push(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to solve Masyu</title>
+  <meta name="description" content="Every solving technique the Masyu Hint button knows, ordered from Beginner to Expert, with interactive examples.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <script>
+    (function () {
+      var dark;
+      try { var s = localStorage.getItem('ms_dark'); dark = s === null ? null : s === '1'; } catch (e) { dark = null; }
+      if (dark === null) dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    })();
+  </script>
+  <style>
+    :root {
+      --bg: #f6f8fa; --card: #ffffff; --text: #1c2128; --muted: #57606a;
+      --border: #d8dee4; --accent: #1976d2; --code-bg: #eef2f6; --quote-bg: #f0f6fc;
+    }
+    :root[data-theme="dark"] {
+      --bg: #0f1318; --card: #161b22; --text: #e6edf3; --muted: #9aa4b2;
+      --border: #2c3440; --accent: #6cb4ff; --code-bg: #1f2630; --quote-bg: #1a2433;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px 16px 64px; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.55;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    .back { display: inline-block; margin-bottom: 12px; color: var(--accent); text-decoration: none; font-weight: 600; }
+    .back:hover { text-decoration: underline; }
+    h1 { margin: 0 0 8px; font-size: 1.9rem; }
+    h2 { margin: 36px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); font-size: 1.35rem; }
+    h3 { margin: 0 0 4px; font-size: 1.1rem; }
+    p { margin: 0 0 12px; }
+    ul { margin: 0 0 14px; padding-left: 22px; }
+    li { margin: 4px 0; }
+    code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+    .lead { color: var(--muted); font-size: 1.02rem; }
+    .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+    .toc a {
+      padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--card); color: var(--accent); text-decoration: none; font-size: 0.88rem; font-weight: 600;
+    }
+    .toc a:hover { border-color: var(--accent); }
+    .rule-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px 18px; margin: 14px 0;
+    }
+    .rule-meta { color: var(--muted); font-size: 0.86rem; font-style: italic; margin-bottom: 8px; }
+    .rule-img { display: block; margin: 12px 0 8px; }
+    .rule-img img { max-width: 100%; width: 460px; height: auto; border-radius: 8px; border: 1px solid var(--border); background: #fff; }
+    .caption { color: var(--muted); font-size: 0.85rem; margin-bottom: 10px; }
+    blockquote {
+      margin: 8px 0 0; padding: 10px 14px; border-left: 3px solid var(--accent);
+      background: var(--quote-bg); border-radius: 0 6px 6px 0; font-size: 0.95rem;
+    }
+    .none { color: var(--muted); font-style: italic; margin: 8px 0 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="../index.html">← Back to Masyu</a>
+    <h1>How to solve Masyu</h1>
+    <p class="lead">Every solving technique the Hint button knows, ordered from easiest to hardest. Click any diagram to open that exact puzzle in the app.</p>
+    <nav class="toc" aria-label="Jump to section">
+      <a href="#rules">Rules</a>
+      <a href="#bookkeeping">Bookkeeping</a>
+      ${activeTiers.map((t) => `<a href="#${t.toLowerCase()}">${esc(t)}</a>`).join('\n      ')}
+    </nav>
+
+    <h2 id="rules">Rules of Masyu</h2>
+    <ul>
+      <li>Draw <b>one single closed loop</b> along the grid lines passing through every circle (white and black), with no crossings or branches.</li>
+      <li>Empty intersections may or may not be visited by the loop.</li>
+      <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
+      <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
+    </ul>
+
+    <h2 id="bookkeeping">Bookkeeping</h2>
+    <p>Five bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:</p>
+    <ul>
+      ${RULES.filter((x) => x.free).map((r) => `<li><code>${esc(r.id)}</code> (cost ${r.cost}): ${esc(cap(r.label))}.</li>`).join('\n      ')}
+    </ul>`);
+
+for (const tier of activeTiers) {
+  const info = TIER_INFO[tier];
+  htmlParts.push(`
+    <h2 id="${tier.toLowerCase()}">${esc(tier)}</h2>
+    ${info && info.blurb ? `<p>A puzzle is rated <b>${esc(tier)}</b> when its hardest required step is in this tier: ${esc(info.blurb)}.</p>` : ''}`);
+  for (const r of orderedForTier(tier)) {
+    const costLabel = r.id === 'imagine' ? `cost ≤ ${MEDIUM_MAX} (dynamic)` : r.id === 'imagineLong' ? `cost > ${MEDIUM_MAX} (dynamic)` : `cost ${r.cost}`;
+    const e = byRule.get(r.id);
+    let body;
+    if (e) {
+      const link = `../index.html?book=armory&puzzle=${e.puzzle}`;
+      const presses = e.hints === 0 ? 'the empty board' : `after ${e.hints} earlier hint${e.hints === 1 ? '' : 's'}`;
+      body = `
+      <a class="rule-img" href="${esc(link)}"><img src="${esc(imgFor(r.id))}" alt="${esc(r.id)} hint example" loading="lazy"></a>
+      <p class="caption">${esc(e.name)} (${e.cols}×${e.rows}, ${presses}). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "${esc(e.text)}"</blockquote>`;
+    } else {
+      body = `
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>`;
+    }
+    htmlParts.push(`
+    <section class="rule-card" id="${esc(r.id)}">
+      <h3><code>${esc(r.id)}</code></h3>
+      <div class="rule-meta">${esc(tier)}, ${esc(costLabel)}</div>
+      <p>${esc(cap(r.label))}.</p>${body}
+    </section>`);
+  }
+}
+
+htmlParts.push(`
+  </main>
+</body>
+</html>
+`);
+
+fs.writeFileSync(path.join(root, 'docs', 'how_to_solve.html'), htmlParts.join('\n'), 'utf8');
+console.log(`Generated docs/how_to_solve.md and docs/how_to_solve.html (${examples.length} illustrated rules).`);

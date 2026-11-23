@@ -672,6 +672,8 @@ function renderBrowse() {
   );
 
   let current = null;
+  const sectionNodes = [];
+  const tileNodes = [];
   book.puzzles.forEach((P, i) => {
     const sec = section(P);
     if (sec && sec !== current) {
@@ -681,6 +683,7 @@ function renderBrowse() {
       head.innerHTML = '<span class="browse-section-name"></span>';
       head.firstChild.textContent = sec;
       grid.append(head);
+      sectionNodes.push({ label: sec, el: head });
     }
     const done = isDone(P), started = !done && hasSave(P);
     const b = document.createElement('button');
@@ -692,7 +695,29 @@ function renderBrowse() {
     b.setAttribute('aria-label', `Puzzle ${i + 1}, ${what}${done ? ' (solved)' : started ? ' (in progress)' : ''}`);
     b.addEventListener('click', () => { browseModal.close(); openPuzzle(i); });
     grid.append(b);
+    tileNodes.push(b);
   });
+
+  const jumps = $('browse-jumps');
+  jumps.textContent = '';
+  const jumpTargets = [];
+  if (sectionNodes.length > 1 && book.puzzles.length > 60) {
+    for (const s of sectionNodes) jumpTargets.push({ label: s.label.replace(' (beyond hints)', ''), el: s.el });
+  } else if (book.puzzles.length > 100) {
+    const step = book.puzzles.length > 600 ? 200 : 100;
+    for (let k = 0; k < book.puzzles.length; k += step) {
+      jumpTargets.push({ label: `${k + 1}–${Math.min(book.puzzles.length, k + step)}`, el: tileNodes[k] });
+    }
+  }
+  jumps.hidden = jumpTargets.length < 2;
+  for (const jt of jumpTargets) {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'browse-jump-pill';
+    pill.textContent = jt.label;
+    pill.addEventListener('click', () => jt.el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    jumps.append(pill);
+  }
   requestAnimationFrame(() => grid.querySelector('.bt-current')?.scrollIntoView({ block: 'nearest' }));
 }
 
@@ -1038,20 +1063,22 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Expose a small test/screenshot hook on localhost (used by tools/capture_how_to_images.py)
-window.__masyu = {
-  get state() { return state; },
-  applyHint() {
-    if (!state.hint || state.hint.kind !== 'step') return false;
-    const item = state.hint.hints[state.hint.index];
-    const prev = snapshot();
-    for (const x of item.targets.segOn) { state.marks.edges[x] = 1; state.marks.autoE[x] = 0; }
-    for (const x of item.targets.segOff) { state.marks.edges[x] = 2; state.marks.autoE[x] = 0; }
-    reconcileAutoX(state.P, prev, state.marks, settings.autoX);
-    reconcileAutoShade(state.P, prev, state.marks, settings.autoShade);
-    refresh();
-    return true;
-  },
-  showHint: hint,
-};
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  window.__masyu = {
+    get state() { return state; },
+    applyHint() {
+      if (!state.hint || state.hint.kind !== 'step') return false;
+      const item = state.hint.hints[state.hint.index];
+      const prev = snapshot();
+      for (const x of item.targets.segOn) { state.marks.edges[x] = 1; state.marks.autoE[x] = 0; }
+      for (const x of item.targets.segOff) { state.marks.edges[x] = 2; state.marks.autoE[x] = 0; }
+      reconcileAutoX(state.P, prev, state.marks, settings.autoX);
+      reconcileAutoShade(state.P, prev, state.marks, settings.autoShade);
+      refresh();
+      return true;
+    },
+    showHint: hint,
+  };
+}
 
 init();

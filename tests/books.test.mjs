@@ -49,9 +49,14 @@ test('following hints from an empty board solves shipped Beginner and Medium puz
   }
 });
 
-test('docs/how_to_solve.md exists and all referenced images exist', () => {
+test('docs/how_to_solve.md and docs/how_to_solve.html exist with all referenced images and launch assets', () => {
   const mdPath = path.join(root, 'docs', 'how_to_solve.md');
+  const htmlPath = path.join(root, 'docs', 'how_to_solve.html');
   assert.ok(fs.existsSync(mdPath));
+  assert.ok(fs.existsSync(htmlPath));
+  assert.ok(fs.existsSync(path.join(root, 'LICENSE')));
+  assert.ok(fs.existsSync(path.join(root, 'og-image.png')));
+  assert.ok(fs.existsSync(path.join(root, 'apple-touch-icon.png')));
   const md = fs.readFileSync(mdPath, 'utf8');
   const imgs = [...md.matchAll(/src="(images\/[^"]+)"/g)].map((m) => m[1]);
   assert.ok(imgs.length >= 18, `expected >= 18 rule illustrations, got ${imgs.length}`);

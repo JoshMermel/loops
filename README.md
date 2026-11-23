@@ -1,5 +1,7 @@
 # Masyu
 
+**Play online:** <https://joshmermelstein.com/masyu/> · **[How to solve (illustrated guide)](https://joshmermelstein.com/masyu/docs/how_to_solve.html)**
+
 A browser game and puzzle toolkit for **Masyu**, built in the same puzzle-toolkit pattern as `yajilin`, `polyomino-panel`, and `multiverse-star-battle`: an exact uniqueness solver cross-checked against a brute-force reference, a human-style rule scorer, self-explaining hints, a solution-first generator, verified books, and a zero-build static HTML/CSS/ES-modules GUI.
 
 **Rules:** draw **one single closed loop** through cell centres orthogonally, passing through every circle (white and black) with no crossings or branches.
@@ -136,3 +138,7 @@ The human-style solver (`js/rating.js`) always applies the cheapest applicable r
 | 29 | `imagineLong` | `imagine` when the pruned chain takes 3+ easy steps or an area check (dynamic cost ≥ 33) | Hard | ≥33 |
 | 30 | `parityForces` | `parityPocket` for a larger area (+2 per open end past 3) | Hard | 65 |
 | 31 | `tryEdge` | trial and error: assume a segment on/off and follow all rules above to a contradiction (+2 per step) | Expert | 120 |
+
+## License
+
+MIT — see [LICENSE](LICENSE).
