@@ -6,6 +6,7 @@ import {
   cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
   reconcileAutoX, applyAutoX,
   autoShadeCompute, reconcileAutoShade, applyAutoShade, shadeConflicts,
+  facesFromSolvedLoop,
 } from '../js/marks.js';
 import { checkMarksAgainstSolution } from '../js/hintstep.js';
 import { makeGrace } from '../js/grace.js';
@@ -412,4 +413,52 @@ test('Auto-Shade propagates from manual faces across lines and X-es, never overw
   assert.equal(m.faces[f(0, 0)], FACE_IN, 'manual face stays when Auto-Shade is turned OFF');
   assert.equal(m.faces[f(0, 1)], FACE_BLANK, 'auto face clears when Auto-Shade is turned OFF');
   assert.equal(m.faces[f(0, 2)], FACE_BLANK, 'auto face clears when Auto-Shade is turned OFF');
+});
+
+test('facesFromSolvedLoop computes exact Inside/Outside shading for all dual squares', () => {
+  // 4x4 board with a 2x2 loop in the top-left corner ((0,0)-(0,2)-(2,2)-(2,0)):
+  // dual grid is 3x3; the 2x2 top-left faces are Inside, and the right/bottom border faces are Outside.
+  const P = compile({ name: 'f4', rows: 4, cols: 4, clues: [] });
+  const edges = new Uint8Array(P.numEdges);
+  // Top (0,0)-(0,1)-(0,2)
+  edges[P.ed[0 * 4 + 1]] = 1;
+  edges[P.ed[1 * 4 + 1]] = 1;
+  // Right (0,2)-(1,2)-(2,2)
+  edges[P.ed[2 * 4 + 2]] = 1;
+  edges[P.ed[(1 * 4 + 2) * 4 + 2]] = 1;
+  // Bottom (2,2)-(2,1)-(2,0)
+  edges[P.ed[(2 * 4 + 1) * 4 + 1]] = 1;
+  edges[P.ed[(2 * 4 + 0) * 4 + 1]] = 1;
+  // Left (2,0)-(1,0)-(0,0)
+  edges[P.ed[(1 * 4 + 0) * 4 + 2]] = 1;
+  edges[P.ed[(0 * 4 + 0) * 4 + 2]] = 1;
+
+  const faces = facesFromSolvedLoop(P, edges);
+  assert.deepEqual(Array.from(faces), [
+    FACE_IN, FACE_IN, FACE_OUT,
+    FACE_IN, FACE_IN, FACE_OUT,
+    FACE_OUT, FACE_OUT, FACE_OUT,
+  ]);
+});
+
+test('shadeConflicts with checkBorder=false allows inverted manual color schemes while still catching interior conflicts', () => {
+  const P = compile({ name: 'inv', rows: 3, cols: 3, clues: [] });
+  const m = blank(P);
+  // Top border edge (0,0)-(0,1) is drawn, interior vertical edge (0,1)-(1,1) is drawn
+  m.edges[P.ed[0 * 4 + 1]] = 1;
+  m.edges[P.ed[1 * 4 + 2]] = 1;
+  // Player uses inverted convention: amber (FACE_OUT) for Inside on face (0,0), teal (FACE_IN) for Outside on face (0,1)
+  m.faces[0] = FACE_OUT;
+  m.faces[1] = FACE_IN;
+
+  // With checkBorder=true (Auto-Shade ON), border contradicts face (0,0) = OUT
+  assert.equal(shadeConflicts(P, m, true).has(0), true);
+  // With checkBorder=false (Auto-Shade OFF), inverted convention has zero conflicts
+  assert.equal(shadeConflicts(P, m, false).size, 0);
+
+  // An actual interior contradiction (both sides of interior drawn line have the same color) is still flagged
+  m.faces[1] = FACE_OUT;
+  const bad = shadeConflicts(P, m, false);
+  assert.equal(bad.has(0), true);
+  assert.equal(bad.has(1), true);
 });

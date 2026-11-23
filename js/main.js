@@ -8,6 +8,7 @@ import { ROLES, describeMarks } from './explain.js';
 import {
   cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
+  facesFromSolvedLoop,
 } from './marks.js';
 import { clueStates, earlyLoopEdges } from './clues.js';
 import { Board } from './board.js';
@@ -35,6 +36,7 @@ const state = {
   undo: [],
   redo: [],
   pending: null,
+  dragStack: [],
   drawMode: 1,
   solved: false,
   hint: null, // { sig, kind, index, hints, ... }
@@ -51,13 +53,15 @@ const settings = {
 };
 
 const board = new Board($('board'), {
-  onStart: () => { state.pending = snapshot(); },
+  onStart: () => { state.pending = snapshot(); state.dragStack = []; },
+  onBeginDrag: () => { if (state.pending) state.marks = cloneMarks(state.pending); state.dragStack = []; },
   onEdgeTap: (edge) => cycleEdge(edge),
   onEdgeRight: (edge) => toggleEdge(edge),
   onFaceTap: (face) => cycleFace(face, false),
   onFaceRight: (face) => cycleFace(face, true),
   onStep: (a, b, first) => dragStep(a, b, first),
   onCrossStep: (a, b, first) => crossStep(a, b, first),
+  onUndoStep: () => undoDragStep(),
   onEnd: (cancelled) => endGesture(cancelled),
 });
 
@@ -82,12 +86,13 @@ const freshMarks = (P) => {
   if (settings.autoShade) reconcileAutoShade(P, null, m, true);
   return m;
 };
-const snapshot = () => ({
-  edges: state.marks.edges.slice(),
-  autoE: state.marks.autoE.slice(),
-  faces: state.marks.faces.slice(),
-  autoF: state.marks.autoF.slice(),
+const cloneMarks = (m) => ({
+  edges: m.edges.slice(),
+  autoE: m.autoE.slice(),
+  faces: m.faces.slice(),
+  autoF: m.autoF.slice(),
 });
+const snapshot = () => cloneMarks(state.marks);
 const sameMarks = (a, b) => (
   a.edges.every((v, i) => v === b.edges[i])
   && a.autoE.every((v, i) => v === b.autoE[i])
@@ -138,10 +143,11 @@ function cycleFace(f, reverse = false) {
 
 function dragStep(a, b, first) {
   const P = state.P, m = state.marks;
+  const prev = snapshot();
+  state.dragStack.push(prev);
   const x = edgeBetween(P, a, b);
   if (x < 0) return;
   if (first) state.drawMode = m.edges[x] === 1 ? 0 : 1;
-  const prev = snapshot();
   if (state.drawMode === 1) {
     // Don't draw across crossed-out edges
     if (m.edges[x] === 2) return;
@@ -160,10 +166,11 @@ function dragStep(a, b, first) {
 
 function crossStep(a, b, first) {
   const P = state.P, m = state.marks;
+  const prev = snapshot();
+  state.dragStack.push(prev);
   const x = edgeBetween(P, a, b);
   if (x < 0) return;
   if (first) state.drawMode = m.edges[x] === 2 ? 0 : 2;
-  const prev = snapshot();
   if (state.drawMode === 2) {
     // Don't overwrite drawn loop segments during a right-drag cross swipe
     if (m.edges[x] === 1) return;
@@ -180,9 +187,16 @@ function crossStep(a, b, first) {
   refresh();
 }
 
+function undoDragStep() {
+  if (!state.dragStack.length) return;
+  state.marks = state.dragStack.pop();
+  refresh();
+}
+
 function endGesture(cancelled) {
   const before = state.pending;
   state.pending = null;
+  state.dragStack = [];
   if (!before) return;
   if (cancelled) { state.marks = before; refresh(); return; }
   if (!sameMarks(before, state.marks)) {
@@ -220,7 +234,7 @@ function reset() {
 function analyse() {
   return {
     clueState: clueStates(state.P, state.marks),
-    badFaces: shadeConflicts(state.P, state.marks),
+    badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
   };
 }
@@ -239,10 +253,22 @@ window.addEventListener('resize', fitBoard);
 function refresh() {
   state.hint = null;
   hideToast();
-  board.render(state.marks, analyse());
   const solved = isSolved(state.P, state.marks.edges);
-  if (solved && !state.solved) markSolved();
+  if (solved && !state.solved) {
+    // Only auto-paint on win when Auto-Shade is ON (so manual/inverted color schemes are never touched)
+    if (settings.autoShade) {
+      const exactFaces = facesFromSolvedLoop(state.P, state.marks.edges);
+      for (let f = 0; f < exactFaces.length; f++) {
+        if (state.marks.faces[f] !== exactFaces[f] || state.marks.autoF[f]) {
+          state.marks.faces[f] = exactFaces[f];
+          state.marks.autoF[f] = 1;
+        }
+      }
+    }
+    markSolved();
+  }
   state.solved = solved;
+  board.render(state.marks, analyse());
   $('board').classList.toggle('solved', solved);
   $('status').textContent = solved ? 'Solved!' : '';
   $('status').classList.toggle('solved', solved);

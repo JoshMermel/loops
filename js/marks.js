@@ -361,14 +361,15 @@ export function applyAutoShade(P, m, on) {
 
 /**
  * Return a Set of dual face indices whose current shading directly contradicts a drawn line,
- * an X edge, or the outer boundary (used for gentle visual warning).
+ * an X edge, or (when `checkBorder` is true) the outer boundary (used for gentle visual warning).
+ * Passing `checkBorder = false` lets manual players invert Inside/Outside colors without false border warnings.
  */
-export function shadeConflicts(P, m) {
+export function shadeConflicts(P, m, checkBorder = true) {
   const bad = new Set();
   const fr = P.rows - 1, fc = P.cols - 1, F = Math.max(0, fr * fc);
   if (!m.faces || F === 0) return bad;
   const faceAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : -1);
-  const valAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? m.faces[r * fc + c] : FACE_OUT);
+  const valAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? m.faces[r * fc + c] : (checkBorder ? FACE_OUT : FACE_BLANK));
 
   // Check every horizontal edge (r, c)-(r, c+1) separating face (r-1, c) and face (r, c)
   for (let r = 0; r < P.rows; r++) {
@@ -399,4 +400,47 @@ export function shadeConflicts(P, m) {
     }
   }
   return bad;
+}
+
+/**
+ * Compute exact Inside (1) / Outside (2) shading for every dual square from a closed loop `edges`.
+ * Uses BFS from the exterior (always Outside), flipping color whenever crossing a loop segment.
+ */
+export function facesFromSolvedLoop(P, edges) {
+  const fr = P.rows - 1, fc = P.cols - 1, F = Math.max(0, fr * fc);
+  const out = new Uint8Array(F);
+  if (F === 0) return out;
+  const faceAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : -1);
+  const q = [];
+  const seed = (f, col) => {
+    if (f < 0 || out[f]) return;
+    out[f] = col;
+    q.push(f);
+  };
+  for (let c = 0; c < fc; c++) {
+    seed(faceAt(0, c), edges[2 * c] === 1 ? FACE_IN : FACE_OUT);
+    seed(faceAt(fr - 1, c), edges[2 * ((P.rows - 1) * P.cols + c)] === 1 ? FACE_IN : FACE_OUT);
+  }
+  for (let r = 0; r < fr; r++) {
+    seed(faceAt(r, 0), edges[2 * (r * P.cols) + 1] === 1 ? FACE_IN : FACE_OUT);
+    seed(faceAt(r, fc - 1), edges[2 * (r * P.cols + P.cols - 1) + 1] === 1 ? FACE_IN : FACE_OUT);
+  }
+  let head = 0;
+  while (head < q.length) {
+    const f = q[head++];
+    const col = out[f];
+    const r = (f / fc) | 0, c = f % fc;
+    const nbrs = [
+      [r - 1, c, 2 * (r * P.cols + c)],
+      [r + 1, c, 2 * ((r + 1) * P.cols + c)],
+      [r, c - 1, 2 * (r * P.cols + c) + 1],
+      [r, c + 1, 2 * (r * P.cols + c + 1) + 1],
+    ];
+    for (const [nr, nc, x] of nbrs) {
+      const g = faceAt(nr, nc);
+      if (g < 0 || out[g]) continue;
+      seed(g, edges[x] === 1 ? flipColor(col) : col);
+    }
+  }
+  return out;
 }

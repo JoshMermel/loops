@@ -22,10 +22,20 @@ export const CELL_SIZE = 44;
 const S = CELL_SIZE;
 const PAD = 24;        // breathing room around outer intersections for circles, rings, and highlights
 export const LABEL = 16;
-const EDGE_TOL = 0.26; // perpendicular hit tolerance around a grid track (fraction of S)
-const END_DEAD = 0.13; // small neutral pivot right at an intersection crossroad (for clean drags out of a vertex)
+const EDGE_TOL = 0.26; // perpendicular hit tolerance around a grid track for taps/hover (fraction of S)
+const END_DEAD = 0.13; // neutral vertex pivot for taps/hover (leaves 74% of each segment clickable)
+const DRAG_STRAIGHT_MIN = 0.30; // travel past intersection to continue straight during a drag
+const DRAG_FIRST_MIN = 0.34;    // travel out of a vertex to commit the first segment of a drag
+const DRAG_TURN_MIN = 0.40;     // deeper travel required to commit a 90° turn (prevents accidental turns across white dots)
+const DRAG_STRAIGHT_TOL = 0.22; // perpendicular drag tolerance when continuing straight
+const DRAG_FIRST_TOL = 0.20;    // perpendicular drag tolerance on the first segment
+const DRAG_TURN_TOL = 0.18;     // tighter perpendicular drag tolerance for a 90° turn
+const DRAG_BACKTRACK_T = 0.20;  // pull back within 20% of the previous vertex to undo the last dragged segment
+const DRAG_BACKTRACK_TOL = 0.28;
+const DRAG_VERTEX_RAD = 0.24;   // vertex snap radius for fast multi-cell swipes
 const DRAG_SLOP_PX = 6; // ignore sub-6px pointer jitter before starting a drag
 const BAD_DELAY_MS = 300;
+const EPS = 1e-6;
 
 const cellDist = (P, a, b) => (
   Math.abs(((a / P.cols) | 0) - ((b / P.cols) | 0))
@@ -33,18 +43,69 @@ const cellDist = (P, a, b) => (
 );
 
 /**
- * Pure drag-gesture progression helper.
- * Supports both intersection-to-intersection drags and edge-to-edge swipes (e.g. pressing on A4-A5
- * and dragging to A5-A6 applies BOTH A4-A5 and A5-A6). Calls `step(fromCell, toCell, isFirst)`.
+ * Pure drag-gesture progression helper using raw lattice coordinates (gx, gy).
+ * Features:
+ *   1. Tighter mid-drag edge targets than tap targets, ignoring dual square centers mid-drag.
+ *   2. Straight-line hysteresis (deeper travel + narrower band required for 90° turns than continuing straight).
+ *   3. Drag-to-backtrack: pulling back along the most recently drawn segment undoes it cleanly.
+ *   4. Edge-to-edge swipes: pressing on A4-A5 and dragging to A5-A6 (or around a corner) applies both segments.
  */
-export function advanceDrag(P, g, hit, step) {
-  if (!hit) return;
+export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = null) {
+  if (!P || !g) return;
+  if (!g.trail) g.trail = [];
+  if (g.startHit && g.startHit.kind === 'face') return;
 
-  const fireEdge = (a, b, edgeIdx) => {
+  const px = gx / S, py = gy / S;
+  const maxX = P.cols - 1, maxY = P.rows - 1;
+  if (px < -0.52 || py < -0.52 || px > maxX + 0.52 || py > maxY + 0.52) return;
+
+  const edgeBetween = (a, b) => {
+    for (let d = 0; d < 4; d++) if (P.nb[a * 4 + d] === b) return P.ed[a * 4 + d];
+    return -1;
+  };
+
+  const fireEdge = (a, b, edgeIdx = edgeBetween(a, b)) => {
+    if (edgeIdx < 0) return;
     g.dragged = true;
     step(a, b, g.firstStep);
     g.firstStep = false;
     g.lastEdge = edgeIdx;
+    g.curCell = b;
+    g.trail.push({ a, b, edge: edgeIdx });
+  };
+
+  const lastDir = () => {
+    if (!g.trail.length) return null;
+    const { a, b } = g.trail[g.trail.length - 1];
+    return { dr: ((b / P.cols) | 0) - ((a / P.cols) | 0), dc: (b % P.cols) - (a % P.cols) };
+  };
+
+  const pickNeighborFrom = (from, dirHint, skipCell = -1) => {
+    const cr = (from / P.cols) | 0, cc = from % P.cols;
+    const rx = px - cc, ry = py - cr;
+    let best = null, bestScore = -Infinity;
+    for (let d = 0; d < 4; d++) {
+      const nxt = P.nb[from * 4 + d];
+      if (nxt < 0 || nxt === skipCell) continue;
+      const dr = ((nxt / P.cols) | 0) - cr;
+      const dc = (nxt % P.cols) - cc;
+      if (dirHint && dr === -dirHint.dr && dc === -dirHint.dc) continue; // reverse is handled by backtrack
+      const along = rx * dc + ry * dr;
+      const perp = Math.abs(rx * (-dr) + ry * dc);
+      const isStraight = !!(dirHint && dr === dirHint.dr && dc === dirHint.dc);
+      const isTurn = !!(dirHint && !isStraight);
+      const minT = isStraight ? DRAG_STRAIGHT_MIN : isTurn ? DRAG_TURN_MIN : DRAG_FIRST_MIN;
+      const maxPerp = isStraight ? DRAG_STRAIGHT_TOL : isTurn ? DRAG_TURN_TOL : DRAG_FIRST_TOL;
+      const ratio = isStraight ? 1.0 : isTurn ? 1.4 : 1.2;
+      if (along >= minT - EPS && perp <= maxPerp + EPS && along > perp * ratio - EPS) {
+        const score = along - perp;
+        if (score > bestScore) {
+          bestScore = score;
+          best = { nxt, edge: P.ed[from * 4 + d] };
+        }
+      }
+    }
+    return best;
   };
 
   const walkCells = (from, to) => {
@@ -53,64 +114,119 @@ export function advanceDrag(P, g, hit, step) {
       const cr = (cur / P.cols) | 0, cc = cur % P.cols;
       const tr = (to / P.cols) | 0, tc = to % P.cols;
       const dr = tr - cr, dc = tc - cc;
-      const nxt = Math.abs(dr) >= Math.abs(dc)
-        ? (cr + Math.sign(dr)) * P.cols + cc
-        : cr * P.cols + (cc + Math.sign(dc));
-      let eIdx = -1;
-      for (let d = 0; d < 4; d++) if (P.nb[cur * 4 + d] === nxt) { eIdx = P.ed[cur * 4 + d]; break; }
-      fireEdge(cur, nxt, eIdx);
+      const dir = lastDir();
+      let nxt;
+      if (dir && ((dir.dr && Math.sign(dr) === dir.dr) || (dir.dc && Math.sign(dc) === dir.dc))) {
+        nxt = (cr + dir.dr) * P.cols + (cc + dir.dc);
+      } else {
+        nxt = Math.abs(dr) >= Math.abs(dc)
+          ? (cr + Math.sign(dr)) * P.cols + cc
+          : cr * P.cols + (cc + Math.sign(dc));
+      }
+      fireEdge(cur, nxt);
       cur = nxt;
     }
-    g.curCell = cur;
   };
 
-  if (!g.dragged) {
-    if (g.startHit.kind === 'edge' && hit.kind === 'edge' && hit.edge === g.startHit.edge) return;
-    if (g.startHit.kind === 'face' && hit.kind === 'face' && hit.face === g.startHit.face) return;
+  // 1. Backtrack: pulling back along the most recently drawn segment undoes it
+  let backSafety = 0;
+  while (g.trail.length > 0 && backSafety++ < 20) {
+    const top = g.trail[g.trail.length - 1];
+    const ar = (top.a / P.cols) | 0, ac = top.a % P.cols;
+    const br = (top.b / P.cols) | 0, bc = top.b % P.cols;
+    const ux = bc - ac, uy = br - ar;
+    const t = (px - ac) * ux + (py - ar) * uy;
+    const perp = Math.abs((px - ac) * (-uy) + (py - ar) * ux);
+    if (t <= DRAG_BACKTRACK_T + EPS && perp <= DRAG_BACKTRACK_TOL + EPS) {
+      g.trail.pop();
+      g.curCell = top.a;
+      g.lastEdge = g.trail.length ? g.trail[g.trail.length - 1].edge : -1;
+      if (!g.trail.length) g.firstStep = true;
+      undoStep?.(top.a, top.b, top.edge);
+    } else {
+      break;
+    }
   }
 
-  if (hit.kind === 'edge') {
-    const e = hit.edge;
-    if (g.dragged && e === g.lastEdge) return;
-    const [a, b] = edgeCells(P, e);
-
-    if (!g.dragged && g.startHit.kind === 'edge') {
-      const [sa, sb] = edgeCells(P, g.startHit.edge);
-      const dSa = Math.min(cellDist(P, sa, a), cellDist(P, sa, b));
-      const dSb = Math.min(cellDist(P, sb, a), cellDist(P, sb, b));
-      if (dSa < dSb) {
-        fireEdge(sb, sa, g.startHit.edge);
-        g.curCell = sa;
-      } else {
-        fireEdge(sa, sb, g.startHit.edge);
-        g.curCell = sb;
+  // 2. Starting a drag directly on a grid track: commit the starting track once the pointer advances past either endpoint
+  if (!g.dragged && g.startHit && g.startHit.kind === 'edge') {
+    const [sa, sb] = edgeCells(P, g.startHit.edge);
+    const dirAB = { dr: ((sb / P.cols) | 0) - ((sa / P.cols) | 0), dc: (sb % P.cols) - (sa % P.cols) };
+    const dirBA = { dr: -dirAB.dr, dc: -dirAB.dc };
+    const hitB = pickNeighborFrom(sb, dirAB, sa);
+    const hitA = pickNeighborFrom(sa, dirBA, sb);
+    if (hitB) {
+      beginDrag?.();
+      fireEdge(sa, sb, g.startHit.edge);
+      fireEdge(sb, hitB.nxt, hitB.edge);
+    } else if (hitA) {
+      beginDrag?.();
+      fireEdge(sb, sa, g.startHit.edge);
+      fireEdge(sa, hitA.nxt, hitA.edge);
+    } else {
+      // Check fast swipe straight to a vertex beyond sa or sb
+      const nc = Math.max(0, Math.min(P.cols - 1, Math.round(px)));
+      const nr = Math.max(0, Math.min(P.rows - 1, Math.round(py)));
+      const v = nr * P.cols + nc;
+      if (v !== sa && v !== sb && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
+        beginDrag?.();
+        if (cellDist(P, sa, v) < cellDist(P, sb, v)) {
+          fireEdge(sb, sa, g.startHit.edge);
+          walkCells(sa, v);
+        } else {
+          fireEdge(sa, sb, g.startHit.edge);
+          walkCells(sb, v);
+        }
       }
+      return;
     }
+  }
 
-    const near = cellDist(P, g.curCell, a) <= cellDist(P, g.curCell, b) ? a : b;
-    const far = near === a ? b : a;
-    if (g.curCell !== near) walkCells(g.curCell, near);
-    fireEdge(near, far, e);
-    g.curCell = far;
+  // 3. Step along immediate neighbors using direction-aware hysteresis
+  let safety = 0;
+  while (safety++ < 20) {
+    const pick = pickNeighborFrom(g.curCell, lastDir());
+    if (!pick) break;
+    fireEdge(g.curCell, pick.nxt, pick.edge);
+  }
+
+  // 4. Fast-swipe fallback: only snap if pointer landed squarely on a distant vertex or tight non-adjacent track
+  const nc = Math.max(0, Math.min(P.cols - 1, Math.round(px)));
+  const nr = Math.max(0, Math.min(P.rows - 1, Math.round(py)));
+  const v = nr * P.cols + nc;
+  if (v !== g.curCell && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
+    // Don't let vertex snap bypass 90° turn hysteresis for an immediate neighbor unless very close to that vertex
+    walkCells(g.curCell, v);
     return;
   }
 
-  const targetCell = hit.cell;
-  if (targetCell === g.curCell) return;
-
-  if (!g.dragged && g.startHit.kind === 'edge') {
-    const [sa, sb] = edgeCells(P, g.startHit.edge);
-    if (cellDist(P, sa, targetCell) < cellDist(P, sb, targetCell)) {
-      fireEdge(sb, sa, g.startHit.edge);
-      g.curCell = sa;
-    } else {
-      fireEdge(sa, sb, g.startHit.edge);
-      g.curCell = sb;
+  // Tight track fallback for fast corner swipes (strictly away from intersections, ignoring face centers)
+  let farEdge = -1, farDist = DRAG_TURN_TOL;
+  const fc = Math.floor(px);
+  if (fc >= 0 && fc + 1 < P.cols) {
+    const t = px - fc, dist = Math.abs(py - nr);
+    if (t >= DRAG_TURN_MIN - EPS && t <= 1 - DRAG_TURN_MIN + EPS && dist <= farDist + EPS) {
+      farDist = dist;
+      farEdge = 2 * (nr * P.cols + fc);
     }
-    if (g.curCell === targetCell) return;
   }
-
-  walkCells(g.curCell, targetCell);
+  const fr = Math.floor(py);
+  if (fr >= 0 && fr + 1 < P.rows) {
+    const t = py - fr, dist = Math.abs(px - nc);
+    if (t >= DRAG_TURN_MIN - EPS && t <= 1 - DRAG_TURN_MIN + EPS && dist <= farDist + EPS) {
+      farDist = dist;
+      farEdge = 2 * (fr * P.cols + nc) + 1;
+    }
+  }
+  if (farEdge >= 0 && farEdge !== g.lastEdge) {
+    const [a, b] = edgeCells(P, farEdge);
+    if (a !== g.curCell && b !== g.curCell) {
+      const near = cellDist(P, g.curCell, a) <= cellDist(P, g.curCell, b) ? a : b;
+      const far = near === a ? b : a;
+      walkCells(g.curCell, near);
+      fireEdge(near, far, farEdge);
+    }
+  }
 }
 
 /**
@@ -416,9 +532,15 @@ export class Board {
       } else if (this.hoverCell >= 0 && deg[this.hoverCell] === 1) {
         const far = otherEnd(P, marks.edges, this.hoverCell);
         if (far >= 0) {
+          const strokeStyle = this.opts.colorLines && pc
+            ? ` style="stroke:${pc[colorOf.get(find(this.hoverCell)) % pc.length]}"`
+            : '';
+          const d = S * 0.35;
           for (const i of [this.hoverCell, far]) {
-            g += `<circle class="line-end-halo" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.18}"/>`;
-            g += `<circle class="line-end" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.18}"/>`;
+            const x = ix(i), y = iy(i);
+            const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
+            g += `<path class="line-end-halo" d="${path}"/>`;
+            g += `<path class="line-end"${strokeStyle} d="${path}"/>`;
           }
         }
       }
@@ -441,14 +563,19 @@ export class Board {
 
   // ---- pointer handling
 
-  hitFromEvent(e) {
+  coordsFromEvent(e) {
     const svg = this.el.querySelector('svg');
     if (!svg || !this.P) return null;
     const rect = svg.getBoundingClientRect();
     const { W, H } = this.size();
     const sx = ((e.clientX - rect.left) / rect.width) * W;
     const sy = ((e.clientY - rect.top) / rect.height) * H;
-    return hitTestCoords(this.P, sx - LABEL - PAD, sy - LABEL - PAD);
+    return { gx: sx - LABEL - PAD, gy: sy - LABEL - PAD };
+  }
+
+  hitFromEvent(e) {
+    const c = this.coordsFromEvent(e);
+    return c ? hitTestCoords(this.P, c.gx, c.gy) : null;
   }
 
   setHover(cell, edge, face = -1) {
@@ -476,43 +603,47 @@ export class Board {
       dragged: false,
       firstStep: true,
       lastEdge: -1,
+      trail: [],
     };
+    // Apply edge and square clicks immediately on pointerdown for instant feedback
+    // (if an edge press transitions into a drag, onBeginDrag restores pre-click state before stepping)
+    if (hit.kind === 'edge') {
+      if (e.button === 2) this.h.onEdgeRight(hit.edge);
+      else this.h.onEdgeTap(hit.edge);
+    } else if (hit.kind === 'face') {
+      if (e.button === 2) this.h.onFaceRight?.(hit.face);
+      else this.h.onFaceTap?.(hit.face);
+    }
   }
 
   move(e) {
     if (!this.P) return;
-    const hit = this.hitFromEvent(e);
+    const c = this.coordsFromEvent(e);
     if (!this.gesture) {
+      const hit = c ? hitTestCoords(this.P, c.gx, c.gy) : null;
       if (!hit) this.setHover(-1, -1, -1);
       else if (hit.kind === 'face') this.setHover(-1, -1, hit.face);
       else this.setHover(hit.cell, hit.kind === 'edge' ? hit.edge : -1, -1);
       return;
     }
-    if (e.pointerId !== this.gesture.id || !hit) return;
+    if (e.pointerId !== this.gesture.id || !c) return;
     if (!this.gesture.dragged && Math.hypot(e.clientX - this.gesture.startX, e.clientY - this.gesture.startY) < DRAG_SLOP_PX) {
       return;
     }
     const step = this.gesture.right
       ? (a, b, first) => this.h.onCrossStep(a, b, first)
       : (a, b, first) => this.h.onStep(a, b, first);
-    advanceDrag(this.P, this.gesture, hit, step);
+    const undoStep = this.h.onUndoStep ? () => this.h.onUndoStep() : null;
+    const beginDrag = this.h.onBeginDrag ? () => this.h.onBeginDrag() : null;
+    advanceDrag(this.P, this.gesture, c.gx, c.gy, step, undoStep, beginDrag);
   }
 
   up(e) {
     if (!this.gesture || e.pointerId !== this.gesture.id) return;
-    const g = this.gesture;
     this.gesture = null;
     try { this.el.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    if (!g.dragged) {
-      if (g.startHit.kind === 'edge') {
-        if (g.right) this.h.onEdgeRight(g.startHit.edge);
-        else this.h.onEdgeTap(g.startHit.edge);
-      } else if (g.startHit.kind === 'face') {
-        if (g.right) this.h.onFaceRight?.(g.startHit.face);
-        else this.h.onFaceTap?.(g.startHit.face);
-      }
-    }
     this.h.onEnd(false);
+    if (this.marks) this.render(this.marks, this.info, this.hint);
   }
 
   cancel() {

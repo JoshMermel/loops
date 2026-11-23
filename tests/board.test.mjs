@@ -137,21 +137,27 @@ test('advanceDrag includes the starting segment when dragging from A4-A5 to A5-A
   };
   const runDrag = (coords) => {
     const startHit = hitTestCoords(P, coords[0][0] * S, coords[0][1] * S);
-    const g = { startHit, curCell: startHit.cell, dragged: false, firstStep: true, lastEdge: -1 };
+    const g = { startHit, curCell: startHit.cell, dragged: false, firstStep: true, lastEdge: -1, trail: [] };
     const steps = [];
+    let begins = 0;
     for (let i = 1; i < coords.length; i++) {
-      const h = hitTestCoords(P, coords[i][0] * S, coords[i][1] * S);
-      advanceDrag(P, g, h, (a, b, first) => steps.push({ e: edgeBetween(a, b), first }));
+      advanceDrag(
+        P, g, coords[i][0] * S, coords[i][1] * S,
+        (a, b, first) => steps.push({ e: edgeBetween(a, b), first }),
+        () => steps.pop(),
+        () => { begins++; },
+      );
     }
-    return { g, steps };
+    return { g, steps, begins };
   };
 
   const eA4A5 = edgeBetween(cell(3, 0), cell(4, 0));
   const eA5A6 = edgeBetween(cell(4, 0), cell(5, 0));
   const eA5B5 = edgeBetween(cell(4, 0), cell(4, 1));
 
-  // Click lower half of A4-A5 (y=3.6), drag to A5-A6 (y=4.4) -> BOTH A4-A5 and A5-A6 applied
+  // Click lower half of A4-A5 (y=3.6), drag to A5-A6 (y=4.4) -> beginDrag fires once, BOTH A4-A5 and A5-A6 applied
   const r1 = runDrag([[0, 3.6], [0, 4.0], [0, 4.4]]);
+  assert.equal(r1.begins, 1);
   assert.deepEqual(r1.steps, [{ e: eA4A5, first: true }, { e: eA5A6, first: false }]);
 
   // Click upper half of A4-A5 (y=3.4), drag to A5-A6 (y=4.4) -> BOTH A4-A5 and A5-A6 applied
@@ -175,6 +181,74 @@ test('advanceDrag includes the starting segment when dragging from A4-A5 to A5-A
   const r6 = runDrag([[1.48, 1.5], [1.52, 1.5]]);
   assert.equal(r6.g.dragged, false);
   assert.equal(r6.steps.length, 0);
+
+  // Dragging from a dual square center across the board never draws stray lines
+  const r7 = runDrag([[1.5, 1.5], [2.5, 1.5], [2.0, 2.0]]);
+  assert.equal(r7.g.dragged, false);
+  assert.equal(r7.steps.length, 0);
+});
+
+test('advanceDrag avoids accidental 90° turns on wobbly straight drags, ignores face drift, and supports backtrack', () => {
+  const P = compile({ name: 'wobble', rows: 6, cols: 6, clues: [] });
+  const cell = (r, c) => r * 6 + c;
+  const edgeBetween = (a, b) => {
+    for (let d = 0; d < 4; d++) if (P.nb[a * 4 + d] === b) return P.ed[a * 4 + d];
+    return -1;
+  };
+  const runDrag = (coords) => {
+    const startHit = hitTestCoords(P, coords[0][0] * S, coords[0][1] * S);
+    const g = { startHit, curCell: startHit.cell, dragged: false, firstStep: true, lastEdge: -1, trail: [] };
+    const active = [];
+    for (let i = 1; i < coords.length; i++) {
+      advanceDrag(
+        P, g, coords[i][0] * S, coords[i][1] * S,
+        (a, b) => active.push(edgeBetween(a, b)),
+        () => active.pop(),
+      );
+    }
+    return { g, active };
+  };
+
+  const e10_11 = edgeBetween(cell(1, 0), cell(1, 1));
+  const e11_12 = edgeBetween(cell(1, 1), cell(1, 2));
+  const e11_01 = edgeBetween(cell(1, 1), cell(0, 1));
+
+  // Wobbly horizontal drag across (1,1) drifting 0.20 S (9 px) high right at the intersection -> stays straight!
+  const w1 = runDrag([
+    [0.0, 1.0], [0.4, 0.9], [0.85, 0.82], [0.95, 0.80], [1.05, 0.80], [1.20, 0.82], [1.35, 0.85], [1.80, 0.95],
+  ]);
+  assert.deepEqual(w1.active, [e10_11, e11_12]);
+
+  // Even a brief 0.35 S upward wobble right over (1,1) does NOT trigger a 90° turn
+  const w2 = runDrag([
+    [0.0, 1.0], [0.5, 1.0], [1.0, 0.65], [1.4, 1.0],
+  ]);
+  assert.deepEqual(w2.active, [e10_11, e11_12]);
+
+  // Drifting into the middle of a dual square (1.5, 1.5) mid-drag pauses cleanly without snapping to a corner
+  const w3 = runDrag([
+    [0.0, 1.0], [0.5, 1.0], [1.5, 1.5], [1.4, 1.05],
+  ]);
+  assert.deepEqual(w3.active, [e10_11, e11_12]);
+
+  // Intentional 90° turn upward (0.45 S past (1,1)) commits cleanly
+  const t1 = runDrag([
+    [0.0, 1.0], [0.5, 1.0], [1.0, 0.55],
+  ]);
+  assert.deepEqual(t1.active, [e10_11, e11_01]);
+
+  // Backtrack: draw (1,0)->(1,1)->(1,2), pull back past (1,1) to undo (1,1)-(1,2), then turn up to (0,1)
+  const b1 = runDrag([
+    [0.0, 1.0], [0.5, 1.0], [1.5, 1.0], [1.15, 1.0], [1.0, 0.55],
+  ]);
+  assert.deepEqual(b1.active, [e10_11, e11_01]);
+
+  // Pulling all the way back to (1,0) undoes both segments cleanly
+  const b2 = runDrag([
+    [0.0, 1.0], [0.5, 1.0], [1.5, 1.0], [0.8, 1.0], [0.1, 1.0],
+  ]);
+  assert.deepEqual(b2.active, []);
+  assert.equal(b2.g.curCell, cell(1, 0));
 });
 
 test('otherEnd finds far endpoint of an open path and ignores closed loops or branches', () => {
