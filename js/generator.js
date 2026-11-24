@@ -516,17 +516,6 @@ export function maskPoints(layout, rows, cols) {
   switch (layout) {
     case 'lattice':
       return collect((r, c) => (r & 1) === 1 && (c & 1) === 1);
-    case 'concentric-sq': // 9x9: dotted outer ring (d=1) + inner diamond (d=2 midpoints) + center
-      return collect((r, c) => {
-        const d = Math.min(r, rows - 1 - r, c, cols - 1 - c);
-        const mr = (rows - 1) / 2, mc = (cols - 1) / 2;
-        return (d === 1 && ((r + c) & 1) === 0) || (d === 2 && (r === mr || c === mc)) || (r === mr && c === mc);
-      });
-    case 'twin-sq': // 10x10: two concentric dotted square rings (d=1 and d=3)
-      return collect((r, c) => {
-        const d = Math.min(r, rows - 1 - r, c, cols - 1 - c);
-        return (d === 1 || d === 3) && ((r + c) & 1) === 0;
-      });
     case 'blocks2x2': // 9x9: four inset 2x2 squares + center diamond
       return collect((r, c) => (
         ((r === 1 || r === 2 || r === rows - 3 || r === rows - 2) && (c === 1 || c === 2 || c === cols - 3 || c === cols - 2))
@@ -542,21 +531,12 @@ export function maskPoints(layout, rows, cols) {
         [4, 4], [4, 5], [5, 4], [5, 5],
         [1, 4], [4, 8], [8, 5], [5, 1],
       ];
-    case 'honeycomb': // 9x9 or 10x10: staggered brickwork / hexagonal lattice strictly interior
+    case 'honeycomb': // 10x10: 3 symmetric staggered columns (1-2, 4-5, 7-8)
       return collect((r, c) => (
         r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
         && (((r & 1) === 1 && c % 3 === 1) || ((r & 1) === 0 && c % 3 === 2))
       ));
-    case 'galaxy': // 10x10: 4-arm swirling spiral radiating from a central 2x2 core
-      if (rows !== 10 || cols !== 10) return [];
-      return [
-        [4, 4], [4, 5], [5, 4], [5, 5],
-        [2, 4], [1, 5], [1, 7], [3, 8],
-        [4, 7], [5, 8], [7, 8], [8, 6],
-        [7, 5], [8, 4], [8, 2], [6, 1],
-        [5, 2], [4, 1], [2, 1], [1, 3],
-      ];
-    case 'circle-ring': // 10x10: outer circular ring + central 2x2 core
+    case 'circle-ring': // 10x10: outer circular ring + central 2x2 bullseye
       if (rows !== 10 || cols !== 10) return [];
       return [
         [1, 3], [1, 4], [1, 5], [1, 6],
@@ -566,8 +546,103 @@ export function maskPoints(layout, rows, cols) {
         [8, 3], [8, 4], [8, 5], [8, 6],
         [4, 4], [4, 5], [5, 4], [5, 5],
       ];
-    case 'diag-stripes': // 9x9: parallel diagonal bands strictly interior
-      return collect((r, c) => r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2 && (r + c) % 3 === 1);
+    case 'pillars': // 9x9: three bold solid vertical columns
+      return collect((r, c) => r >= 1 && r <= rows - 2 && (c === 1 || c === 4 || c === 7));
+    case 'hourglass': // 10x10: top & bottom solid bars + X diagonals
+      return collect((r, c) => (
+        r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
+        && (r === 1 || r === rows - 2 || r === c || r + c === rows - 1)
+      ));
+    case 'brackets': // 10x10: four corner viewfinder brackets + 2x2 center reticle
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => (
+        (r >= 1 && r <= 8 && c >= 1 && c <= 8 && (r === 1 || r === 8 || c === 1 || c === 8) && !(r === 4 || r === 5 || c === 4 || c === 5))
+        || ((r === 4 || r === 5) && (c === 4 || c === 5))
+      ));
+    case 'x-bracket': // 9x9: giant diagonal X with heavy 2x2 corner anchors
+      if (rows !== 9 || cols !== 9) return [];
+      return collect((r, c) => (
+        r >= 1 && r <= 7 && c >= 1 && c <= 7 && (
+          r === c || r + c === 8
+          || ((r === 1 || r === 7) && (c === 2 || c === 6))
+          || ((c === 1 || c === 7) && (r === 2 || r === 6))
+        )
+      ));
+    case 'spiral': // 10x10: continuous solid square spiral
+      if (rows !== 10 || cols !== 10) return [];
+      return [
+        [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8],
+        [2, 8], [3, 8], [4, 8], [5, 8], [6, 8], [7, 8], [8, 8],
+        [8, 7], [8, 6], [8, 5], [8, 4], [8, 3], [8, 2], [8, 1],
+        [7, 1], [6, 1], [5, 1], [4, 1],
+        [4, 2], [4, 3], [4, 4], [4, 5], [5, 5],
+      ];
+    case 'stairs': // 9x9: parallel stepped diagonal staircases
+      return collect((r, c) => (
+        r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
+        && (r - c === 0 || r - c === 1 || r - c === -4 || r - c === -3 || r - c === 4 || r - c === 5)
+      ));
+    case 'small-x': // 9x9: four 5-pearl X motifs
+      if (rows !== 9 || cols !== 9) return [];
+      return [
+        [1, 1], [1, 3], [2, 2], [3, 1], [3, 3],
+        [1, 5], [1, 7], [2, 6], [3, 5], [3, 7],
+        [5, 1], [5, 3], [6, 2], [7, 1], [7, 3],
+        [5, 5], [5, 7], [6, 6], [7, 5], [7, 7],
+      ];
+    case 'bricks': // 10x10: symmetric running-bond horizontal domino brickwork
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => (
+        r >= 1 && r <= 8 && c >= 1 && c <= 8 && (
+          ((r & 1) === 1 && (c === 1 || c === 2 || c === 5 || c === 6))
+          || ((r & 1) === 0 && (c === 3 || c === 4 || c === 7 || c === 8))
+        )
+      ));
+    case 'dominoes': // 10x10: symmetric 4x3 wallpaper of horizontal 2-pearl dominoes
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => (
+        (r === 1 || r === 3 || r === 6 || r === 8)
+        && (c === 1 || c === 2 || c === 4 || c === 5 || c === 7 || c === 8)
+      ));
+    case 'ltiles': // 10x10: 3x3 wallpaper of identical L-trominoes
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => {
+        if (r < 1 || r > 8 || c < 1 || c > 8) return false;
+        const lr = (r - 1) % 3, lc = (c - 1) % 3;
+        return (lr === 0 && (lc === 0 || lc === 1)) || (lr === 1 && lc === 0);
+      });
+    case 'mirror-ltiles': // 10x10: 3x3 checkerboard of alternating ┌ and ┘ L-trominoes
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => {
+        if (r < 1 || r > 8 || c < 1 || c > 8) return false;
+        const tr = ((r - 1) / 3) | 0, tc = ((c - 1) / 3) | 0;
+        const lr = (r - 1) % 3, lc = (c - 1) % 3;
+        if (((tr + tc) & 1) === 0) return (lr === 0 && (lc === 0 || lc === 1)) || (lr === 1 && lc === 0);
+        return (lr === 1 && (lc === 0 || lc === 1)) || (lr === 0 && lc === 1);
+      });
+    case 'herringbone': // 10x10: 3x3 wallpaper of alternating \ and / diagonal pairs
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => {
+        if (r < 1 || r > 8 || c < 1 || c > 8) return false;
+        const tr = ((r - 1) / 3) | 0, tc = ((c - 1) / 3) | 0;
+        const lr = (r - 1) % 3, lc = (c - 1) % 3;
+        if (((tr + tc) & 1) === 0) return (lr === 0 && lc === 0) || (lr === 1 && lc === 1);
+        return (lr === 0 && lc === 1) || (lr === 1 && lc === 0);
+      });
+    case 'slashes': // 10x10: 3x3 wallpaper of parallel \ diagonal pairs
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => {
+        if (r < 1 || r > 8 || c < 1 || c > 8) return false;
+        const lr = (r - 1) % 3, lc = (c - 1) % 3;
+        return (lr === 0 && lc === 0) || (lr === 1 && lc === 1);
+      });
+    case 'zigzags': // 10x10: three vertical stepped zigzag columns
+      if (rows !== 10 || cols !== 10) return [];
+      return collect((r, c) => {
+        if (r < 1 || r > 8 || c < 1 || c > 8) return false;
+        const shift = ((r - 1) >> 1) & 1;
+        return (c - 1) % 3 === shift;
+      });
     default:
       return null;
   }

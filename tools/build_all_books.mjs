@@ -161,9 +161,9 @@ const recipes = [
   },
   {
     id: 'bonus-patterns', name: 'Patterns', label: '💠 Patterns (9×9 – 13×13)', group: 'Bonus',
-    glob: 'lattice_9x9,lattice_9x11,lattice_13x13,pat_concentric_9x9,pat_twin_10x10,pat_blocks2x2_9x9,pat_quilt2x2_10x10,pat_honeycomb_9x9,pat_honeycomb_10x10,pat_galaxy_10x10,pat_circle_10x10,pat_stripes_9x9',
+    glob: 'lattice_9x9,lattice_13x13,pat_blocks2x2_9x9,pat_quilt2x2_10x10,pat_circle_10x10,pat_honeycomb_10x10,pat_pillars_9x9,pat_hourglass_10x10,pat_brackets_10x10,pat_xbracket_9x9,pat_spiral_10x10,pat_stairs_9x9,pat_smallx_9x9,pat_bricks_10x10,pat_dominoes_10x10,pat_ltiles_10x10,pat_mirrorltiles_10x10,pat_herringbone_10x10,pat_slashes_10x10,pat_zigzags_10x10',
     tierBands: '0:,0:,0:,0:1300', interleaveGroups: true, maxRun: 2,
-    blurb: 'Lattice, concentric rings, spirals, spaced squares, and more.',
+    blurb: 'Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more.',
   },
 ];
 

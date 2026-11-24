@@ -143,12 +143,12 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
     return c.t === 'W' ? lhs < 45 : lhs > 45;
   }));
 
-  const pcs = generatePuzzle({ rows: 9, cols: 9, seed: 113, layout: 'concentric-sq', budgetMs: 8000 });
-  assert.ok(pcs, 'failed to generate concentric-sq geometric pattern puzzle');
-  const expectedPts = maskPoints('concentric-sq', 9, 9);
-  assert.equal(pcs.clues.length, expectedPts.length);
+  const pp = generatePuzzle({ rows: 9, cols: 9, seed: 113, layout: 'pillars', budgetMs: 8000 });
+  assert.ok(pp, 'failed to generate pillars geometric pattern puzzle');
+  const expectedPts = maskPoints('pillars', 9, 9);
+  assert.equal(pp.clues.length, expectedPts.length);
   const ptSet = new Set(expectedPts.map(([r, c]) => r * 9 + c));
-  assert.ok(pcs.clues.every((c) => ptSet.has(c.r * 9 + c.c)));
+  assert.ok(pp.clues.every((c) => ptSet.has(c.r * 9 + c.c)));
 });
 
 test('generatePuzzle enforces balanced four-quadrant loop and clue coverage on large boards', () => {
