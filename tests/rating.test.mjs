@@ -4,7 +4,7 @@ import {
   compile, solve, initialState, isSolved, encodeSolution, E_ON, E_OFF, OFF, LOOP,
 } from '../js/logic.js';
 import { RULES, rate, solvedByRules, nextSteps, applySets, TIERS } from '../js/rating.js';
-import { findFaceParity } from '../js/faceparity.js';
+import { findFaceShade, findFaceCircle } from '../js/faceparity.js';
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -170,7 +170,7 @@ test('stuck puzzle scores Expert with UNDETERMINED penalty', () => {
   assert.ok(r.score >= 100);
 });
 
-test('faceParity deduces edges from white-circle diagonals and black-circle 3-to-1 corner parity', () => {
+test('faceShade only uses border-anchored lines/X while faceCircle adds white diagonals and black 3-to-1 corners', () => {
   // 5x5 board: border white at (0,2) forces faces (0,1) & (0,2) = IN; interior white at (1,1) flips (0,1)=IN -> (1,0)=OUT;
   // that puts OUT on both sides of left border edge (1,0)-(2,0) -> MUST be E_OFF!
   const P1 = compile({
@@ -178,12 +178,26 @@ test('faceParity deduces edges from white-circle diagonals and black-circle 3-to
     clues: [{ r: 0, c: 2, t: 'W' }, { r: 1, c: 1, t: 'W' }],
   });
   const st1 = initialState(P1);
-  const f1 = findFaceParity(P1, st1);
+  // With no edges marked yet, faceShade (plain line/X shading) must find nothing
+  assert.equal(findFaceShade(P1, st1).length, 0);
+  const f1 = findFaceCircle(P1, st1);
   const eLeft12 = P1.ed[(1 * 5 + 0) * 4 + 2]; // (1,0)-(2,0)
   const hit1 = f1.find((x) => x.info.edge === eLeft12);
   assert.ok(hit1, 'expected white-circle diagonal parity to deduce left border edge (1,0)-(2,0)');
   assert.deepEqual(hit1.sets, [['e', eLeft12, E_OFF]]);
   assert.equal(hit1.info.anchored, true);
+
+  // Plain border shading test: top border (0,1)-(0,2) ON -> face(0,1)=IN; top border (0,2)-(0,3) OFF -> face(0,2)=OUT;
+  // so vertical edge (0,2)-(1,2) separates IN and OUT -> faceShade must force it E_ON!
+  const Pshade = compile({ name: 'fp_shade', rows: 5, cols: 5, clues: [] });
+  const stShade = initialState(Pshade);
+  stShade.e[Pshade.ed[(0 * 5 + 1) * 4 + 1]] = E_ON;
+  stShade.e[Pshade.ed[(0 * 5 + 2) * 4 + 1]] = E_OFF;
+  const fShade = findFaceShade(Pshade, stShade);
+  const eMid = Pshade.ed[(0 * 5 + 2) * 4 + 2]; // (0,2)-(1,2)
+  const hitShade = fShade.find((x) => x.info.edge === eMid);
+  assert.ok(hitShade, 'expected faceShade to force vertical edge between IN and OUT border squares');
+  assert.deepEqual(hitShade.sets, [['e', eMid, E_ON]]);
 
   // Black-circle 3-to-1 law: 5x5 board with black circle at (2,2), surrounding faces NW=(1,1), NE=(1,2), SW=(2,1), SE=(2,2).
   // Suppose border lines/X's make NW=IN, SE=IN, NE=OUT -> 3-to-1 law forces SW=IN, so edge (2,1)-(2,2) between NW(IN) and SW(IN) MUST be E_OFF!
@@ -202,9 +216,28 @@ test('faceParity deduces edges from white-circle diagonals and black-circle 3-to
   st2.e[P2.ed[(1 * 5 + 2) * 4 + 1]] = E_OFF;
   st2.e[P2.ed[(2 * 5 + 4) * 4 + 2]] = E_ON;
   st2.e[P2.ed[(2 * 5 + 3) * 4 + 2]] = E_OFF;
-  const f2 = findFaceParity(P2, st2);
+  const f2 = findFaceCircle(P2, st2);
   const eLeftB = P2.ed[(2 * 5 + 2) * 4 + 3]; // (2,1)-(2,2)
   const hit2 = f2.find((x) => x.info.edge === eLeftB);
   assert.ok(hit2, 'expected black-circle 3-to-1 rule to force SW=IN and cross out (2,1)-(2,2)');
   assert.deepEqual(hit2.sets, [['e', eLeftB, E_OFF]]);
+});
+
+test('difficulty tier assignments match the calibrated rule ladder', () => {
+  const tier = (id) => RULES.find((r) => r.id === id)?.tier;
+  assert.equal(tier('threeWhites'), 'Beginner');
+  assert.equal(tier('whiteBothStraight'), 'Medium');
+  assert.equal(tier('closingCell'), 'Medium');
+  assert.equal(tier('samePathExits'), 'Medium');
+  assert.equal(tier('twoWhitesStraight'), 'Medium');
+  assert.equal(tier('whiteNoTurnAxis'), 'Medium');
+  assert.equal(tier('faceShade'), 'Medium');
+  assert.equal(tier('imagineLocal'), 'Medium');
+  assert.equal(tier('faceCircle'), 'Hard');
+  assert.equal(tier('twoEndsJoin'), 'Hard');
+  assert.equal(tier('chokepoint'), 'Hard');
+  assert.equal(tier('parityPocket'), 'Hard');
+  assert.equal(tier('imagineTrace'), 'Hard');
+  assert.equal(tier('imagineChain'), 'Expert');
+  assert.equal(tier('tryEdge'), 'Expert');
 });

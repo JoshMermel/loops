@@ -47,10 +47,12 @@ let bfsDist = new Int32Array(0);
 let bfsQueue = new Int32Array(0);
 
 /**
- * Build the complete Inside/Outside parity union-find (and optionally proof graph) for state `st`.
- * Returns { EXT, F, findRoot, findPar, relate, adj, conflict }.
+ * Build the Inside/Outside parity union-find (and optionally proof graph) for state `st`.
+ * When `useCircles` is false, only links adjacent faces across known E_ON / E_OFF edges (matching Auto-Shade).
+ * When `useCircles` is true, also applies white-circle diagonal flips and black-circle 3-to-1 / forced-leg rules.
+ * Returns { EXT, F, find, compress, diff, relate, adj, conflict, edgeFaceA, edgeFaceB }.
  */
-export function buildFaceParity(P, st, { buildGraph = true } = {}) {
+export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } = {}) {
   const { rows, cols } = P;
   const fr = rows - 1, fc = cols - 1;
   if (fr <= 0 || fc <= 0) {
@@ -161,76 +163,78 @@ export function buildFaceParity(P, st, { buildGraph = true } = {}) {
     link(a, b, ev === E_ON ? 1 : 0, buildGraph ? { kind: ev === E_ON ? 'edgeOn' : 'edgeOff', edge: x } : null);
   }
 
-  // 2. White circles: both diagonal corner pairs have opposite parity
-  for (let wi = 0; wi < P.whites.length; wi++) {
-    const cell = P.whites[wi];
-    const wr = (cell / cols) | 0, wc = cell % cols;
-    const nw = wr > 0 && wc > 0 ? (wr - 1) * fc + (wc - 1) : EXT;
-    const ne = wr > 0 && wc < fc ? (wr - 1) * fc + wc : EXT;
-    const sw = wr < fr && wc > 0 ? wr * fc + (wc - 1) : EXT;
-    const se = wr < fr && wc < fc ? wr * fc + wc : EXT;
-    const reason = buildGraph ? { kind: 'whiteDiag', cell } : null;
-    link(nw, se, 1, reason);
-    link(ne, sw, 1, reason);
-  }
+  if (useCircles) {
+    // 2. White circles: both diagonal corner pairs have opposite parity
+    for (let wi = 0; wi < P.whites.length; wi++) {
+      const cell = P.whites[wi];
+      const wr = (cell / cols) | 0, wc = cell % cols;
+      const nw = wr > 0 && wc > 0 ? (wr - 1) * fc + (wc - 1) : EXT;
+      const ne = wr > 0 && wc < fc ? (wr - 1) * fc + wc : EXT;
+      const sw = wr < fr && wc > 0 ? wr * fc + (wc - 1) : EXT;
+      const se = wr < fr && wc < fc ? wr * fc + wc : EXT;
+      const reason = buildGraph ? { kind: 'whiteDiag', cell } : null;
+      link(nw, se, 1, reason);
+      link(ne, sw, 1, reason);
+    }
 
-  // 3. Black circles: iterate 3-to-1 diagonal law and forced 2-step straight legs to fixed point
-  const forceBlackLeg = (bi, d) => {
-    let changed = false;
-    const e1 = P.ed[bi * 4 + d], e2 = P.ed2[bi * 4 + d], n1 = P.nb[bi * 4 + d];
-    if (e1 < 0 || e2 < 0 || n1 < 0) { conflict = true; return false; }
-    const reason = buildGraph ? { kind: 'blackLeg', cell: bi, dir: d } : null;
-    if (link(edgeFaceA(e1), edgeFaceB(e1), 1, reason)) changed = true;
-    if (link(edgeFaceA(e2), edgeFaceB(e2), 1, reason)) changed = true;
-    const opp = P.ed[bi * 4 + (d ^ 2)];
-    if (opp >= 0 && link(edgeFaceA(opp), edgeFaceB(opp), 0, reason)) changed = true;
-    const ep1 = P.ed[n1 * 4 + ((d + 1) & 3)];
-    if (ep1 >= 0 && link(edgeFaceA(ep1), edgeFaceB(ep1), 0, reason)) changed = true;
-    const ep2 = P.ed[n1 * 4 + ((d + 3) & 3)];
-    if (ep2 >= 0 && link(edgeFaceA(ep2), edgeFaceB(ep2), 0, reason)) changed = true;
-    return changed;
-  };
+    // 3. Black circles: iterate 3-to-1 diagonal law and forced 2-step straight legs to fixed point
+    const forceBlackLeg = (bi, d) => {
+      let changed = false;
+      const e1 = P.ed[bi * 4 + d], e2 = P.ed2[bi * 4 + d], n1 = P.nb[bi * 4 + d];
+      if (e1 < 0 || e2 < 0 || n1 < 0) { conflict = true; return false; }
+      const reason = buildGraph ? { kind: 'blackLeg', cell: bi, dir: d } : null;
+      if (link(edgeFaceA(e1), edgeFaceB(e1), 1, reason)) changed = true;
+      if (link(edgeFaceA(e2), edgeFaceB(e2), 1, reason)) changed = true;
+      const opp = P.ed[bi * 4 + (d ^ 2)];
+      if (opp >= 0 && link(edgeFaceA(opp), edgeFaceB(opp), 0, reason)) changed = true;
+      const ep1 = P.ed[n1 * 4 + ((d + 1) & 3)];
+      if (ep1 >= 0 && link(edgeFaceA(ep1), edgeFaceB(ep1), 0, reason)) changed = true;
+      const ep2 = P.ed[n1 * 4 + ((d + 3) & 3)];
+      if (ep2 >= 0 && link(edgeFaceA(ep2), edgeFaceB(ep2), 0, reason)) changed = true;
+      return changed;
+    };
 
-  let progress = true;
-  while (progress && !conflict) {
-    progress = false;
-    for (let k = 0; k < P.blacks.length; k++) {
-      const bi = P.blacks[k];
-      const br = (bi / cols) | 0, bc = bi % cols;
-      const nw = br > 0 && bc > 0 ? (br - 1) * fc + (bc - 1) : EXT;
-      const ne = br > 0 && bc < fc ? (br - 1) * fc + bc : EXT;
-      const sw = br < fr && bc > 0 ? br * fc + (bc - 1) : EXT;
-      const se = br < fr && bc < fc ? br * fc + bc : EXT;
+    let progress = true;
+    while (progress && !conflict) {
+      progress = false;
+      for (let k = 0; k < P.blacks.length; k++) {
+        const bi = P.blacks[k];
+        const br = (bi / cols) | 0, bc = bi % cols;
+        const nw = br > 0 && bc > 0 ? (br - 1) * fc + (bc - 1) : EXT;
+        const ne = br > 0 && bc < fc ? (br - 1) * fc + bc : EXT;
+        const sw = br < fr && bc > 0 ? br * fc + (bc - 1) : EXT;
+        const se = br < fr && bc < fc ? br * fc + bc : EXT;
 
-      // 3a. 3-to-1 diagonal law: relate(nw, se) ^ relate(ne, sw) === 1
-      const d1 = relate(nw, se);
-      const d2 = relate(ne, sw);
-      if (d1 !== -1 && d2 === -1) {
-        if (link(ne, sw, d1 ^ 1, buildGraph ? { kind: 'blackDiag', cell: bi, sameKnown: d1 === 0, from: [nw, se] } : null)) progress = true;
-      } else if (d2 !== -1 && d1 === -1) {
-        if (link(nw, se, d2 ^ 1, buildGraph ? { kind: 'blackDiag', cell: bi, sameKnown: d2 === 0, from: [ne, sw] } : null)) progress = true;
-      } else if (d1 !== -1 && d2 !== -1 && (d1 ^ d2) !== 1) {
-        conflict = true;
-        break;
-      }
-
-      // 3b. Forced 2-step straight legs from proven ON or OFF exits around bi
-      for (let d = 0; d < 4; d++) {
-        const e1 = P.ed[bi * 4 + d], e2 = P.ed2[bi * 4 + d];
-        if (e1 < 0 || e2 < 0) {
-          if (forceBlackLeg(bi, d ^ 2)) progress = true;
-          continue;
+        // 3a. 3-to-1 diagonal law: relate(nw, se) ^ relate(ne, sw) === 1
+        const d1 = relate(nw, se);
+        const d2 = relate(ne, sw);
+        if (d1 !== -1 && d2 === -1) {
+          if (link(ne, sw, d1 ^ 1, buildGraph ? { kind: 'blackDiag', cell: bi, sameKnown: d1 === 0, from: [nw, se] } : null)) progress = true;
+        } else if (d2 !== -1 && d1 === -1) {
+          if (link(nw, se, d2 ^ 1, buildGraph ? { kind: 'blackDiag', cell: bi, sameKnown: d2 === 0, from: [ne, sw] } : null)) progress = true;
+        } else if (d1 !== -1 && d2 !== -1 && (d1 ^ d2) !== 1) {
+          conflict = true;
+          break;
         }
-        const rel1 = relate(edgeFaceA(e1), edgeFaceB(e1));
-        if (rel1 === 1) {
-          if (forceBlackLeg(bi, d)) progress = true;
-        } else if (rel1 === 0) {
-          if (forceBlackLeg(bi, d ^ 2)) progress = true;
-        } else if (relate(edgeFaceA(e2), edgeFaceB(e2)) === 0) {
-          if (forceBlackLeg(bi, d ^ 2)) progress = true;
+
+        // 3b. Forced 2-step straight legs from proven ON or OFF exits around bi
+        for (let d = 0; d < 4; d++) {
+          const e1 = P.ed[bi * 4 + d], e2 = P.ed2[bi * 4 + d];
+          if (e1 < 0 || e2 < 0) {
+            if (forceBlackLeg(bi, d ^ 2)) progress = true;
+            continue;
+          }
+          const rel1 = relate(edgeFaceA(e1), edgeFaceB(e1));
+          if (rel1 === 1) {
+            if (forceBlackLeg(bi, d)) progress = true;
+          } else if (rel1 === 0) {
+            if (forceBlackLeg(bi, d ^ 2)) progress = true;
+          } else if (relate(edgeFaceA(e2), edgeFaceB(e2)) === 0) {
+            if (forceBlackLeg(bi, d ^ 2)) progress = true;
+          }
         }
+        if (conflict) break;
       }
-      if (conflict) break;
     }
   }
 
@@ -311,13 +315,13 @@ function shortestPath(adj, src, dst, maxDepth = Infinity) {
 }
 
 /**
- * Find all undecided edges forced by Inside/Outside dual-face parity.
- * When `opts.fast` is true (e.g. inside `closure()`), skips proof-graph construction and BFS.
- * Otherwise returns firings sorted by shortest proof chain (and anchored to EXT first on ties).
+ * Shared finder for Inside/Outside dual-face parity.
+ * - `useCircles: false, anchoredOnly: true` -> `findFaceShade` (exact match to Auto-Shade: border-anchored lines & X's only)
+ * - `useCircles: true, anchoredOnly: false` -> `findFaceCircle` (full white-diagonal, black 3-to-1, and relative Side A/B parity)
  */
-export function findFaceParity(P, st, opts = null) {
+function findFaceParityCore(P, st, opts, { useCircles, anchoredOnly }) {
   const fast = !!(opts && opts.fast);
-  const fp = buildFaceParity(P, st, { buildGraph: !fast });
+  const fp = buildFaceParity(P, st, { buildGraph: !fast, useCircles });
   if (fp.conflict || fp.F === 0) return [];
   const { EXT, compress, diff, relate, adj, edgeFaceA, edgeFaceB } = fp;
 
@@ -325,8 +329,10 @@ export function findFaceParity(P, st, opts = null) {
     const out = [];
     for (let x = 0; x < P.numEdges; x++) {
       if (P.edgeA[x] < 0 || st.e[x] !== E_UNKNOWN) continue;
-      const rel = relate(edgeFaceA(x), edgeFaceB(x));
+      const fA = edgeFaceA(x), fB = edgeFaceB(x);
+      const rel = relate(fA, fB);
       if (rel === -1) continue;
+      if (anchoredOnly && compress(fA) !== EXT) continue;
       out.push({ sets: [['e', x, rel === 1 ? E_ON : E_OFF]], info: { edge: x, val: rel === 1 ? E_ON : E_OFF } });
     }
     return out;
@@ -343,6 +349,7 @@ export function findFaceParity(P, st, opts = null) {
     const rootA = compress(fA);
     const parA = diff[fA];
     const anchored = rootA === EXT;
+    if (anchoredOnly && !anchored) continue;
     if (anchored) anyAnchored = true;
     hits.push({ x, fA, fB, rel, anchored, parA });
   }
@@ -415,6 +422,7 @@ export function findFaceParity(P, st, opts = null) {
         clues,
         facesIn,
         facesOut,
+        shadeOnly: !useCircles,
       },
     });
   }
@@ -426,3 +434,16 @@ export function findFaceParity(P, st, opts = null) {
   ));
   return out;
 }
+
+/** Basic Auto-Shade parity: edges flanked by two border-anchored squares already shaded via lines & X's. */
+export function findFaceShade(P, st, opts = null) {
+  return findFaceParityCore(P, st, opts, { useCircles: false, anchoredOnly: true });
+}
+
+/** Advanced circle/relative Inside/Outside parity: includes white diagonals, black 3-to-1 corners, and unanchored chains. */
+export function findFaceCircle(P, st, opts = null) {
+  return findFaceParityCore(P, st, opts, { useCircles: true, anchoredOnly: false });
+}
+
+/** Backwards-compatible alias for full dual-face parity. */
+export const findFaceParity = findFaceCircle;

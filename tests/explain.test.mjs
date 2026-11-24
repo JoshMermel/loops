@@ -100,7 +100,7 @@ test('following hints from an empty board solves every Beginner and Medium puzzl
       assert.equal(h.kind, 'step', `Hint got ${h.kind} on ${r.tier} puzzle ${P.name} after ${steps} steps`);
       const first = h.hints[0];
       assert.ok(first.text && first.text.length > 10, `empty hint text for ${h.rule}`);
-      if (h.rule === 'imagine' || h.rule === 'imagineLong') {
+      if (h.rule === 'imagineLocal' || h.rule === 'imagineTrace' || h.rule === 'imagineChain') {
         sawImagine = true;
         assert.ok(first.text.includes('Imagine'), `imagine hint should explain hypothesis: ${first.text}`);
         assert.ok(first.text.includes('So '), `imagine hint should state verdict: ${first.text}`);
@@ -132,7 +132,7 @@ test('imagine explanation describes the chain of consequences, not just the verd
   for (const i of P.clueCells) st.cell[i] = 2;
   // Advance past Beginner steps until imagine fires (or check rate steps)
   const r = rate(P);
-  const imgStep = r.steps.find((s) => s.rule === 'imagine' || s.rule === 'imagineLong');
+  const imgStep = r.steps.find((s) => s.rule === 'imagineLocal' || s.rule === 'imagineTrace' || s.rule === 'imagineChain');
   if (imgStep) {
     const exp = explainStep(P, imgStep);
     assert.ok(exp.text.startsWith('Imagine '));
@@ -145,7 +145,7 @@ test('imagine explanation describes the chain of consequences, not just the verd
   assert.ok(txt.includes('cross out '));
 });
 
-test('faceParity explanation includes chain reasoning and Inside/Outside face overlays', () => {
+test('faceCircle and faceShade explanations include shading text and Inside/Outside face overlays', () => {
   const P = compile({
     name: 'fp_exp', rows: 5, cols: 5,
     clues: [{ r: 0, c: 2, t: 'W' }, { r: 1, c: 1, t: 'W' }],
@@ -156,8 +156,22 @@ test('faceParity explanation includes chain reasoning and Inside/Outside face ov
   st.e[P.ed[(0 * 5 + 2) * 4 + 1]] = E_ON;
   st.e[P.ed[(0 * 5 + 2) * 4 + 3]] = E_ON;
   const step = nextSteps(P, st);
-  assert.equal(step.rule, 'faceParity');
+  assert.equal(step.rule, 'faceCircle');
   const exp = explainStep(P, { rule: step.rule, tier: step.tier, weight: step.weight, sets: step.firings[0].sets, info: step.firings[0].info }, st);
-  assert.ok(exp.text.includes('Inside/outside parity'), `unexpected text: ${exp.text}`);
+  assert.ok(exp.text.includes('Circle shading'), `unexpected text: ${exp.text}`);
   assert.ok(exp.faces && (exp.faces.in.length > 0 || exp.faces.out.length > 0));
+
+  // Basic Auto-Shade border shading -> faceShade
+  const P2 = compile({ name: 'fs_exp', rows: 5, cols: 5, clues: [] });
+  const st2 = { cell: new Int8Array(P2.N), e: new Int8Array(P2.numEdges), cycle: false };
+  st2.e[P2.ed[(0 * 5 + 1) * 4 + 1]] = E_ON;
+  st2.e[P2.ed[(0 * 5 + 2) * 4 + 1]] = E_OFF;
+  // Note: mark (0,2) and (0,1) as LOOP via bookkeeping, then faceShade should fire if no cheaper rule fires
+  const exp2 = explainStep(P2, {
+    rule: 'faceShade', tier: 'Medium', weight: 18,
+    sets: [['e', P2.ed[(0 * 5 + 2) * 4 + 2], E_ON]],
+    info: { edge: P2.ed[(0 * 5 + 2) * 4 + 2], val: E_ON, parA: 1, parB: 0, facesIn: [1], facesOut: [2] },
+  }, st2);
+  assert.ok(exp2.text.includes('Inside/outside shading'), `unexpected text: ${exp2.text}`);
+  assert.ok(exp2.faces && exp2.faces.in.length === 1 && exp2.faces.out.length === 1);
 });

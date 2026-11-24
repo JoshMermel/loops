@@ -8,16 +8,16 @@ import {
   NONE, WHITE, BLACK, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   initialState, cloneState, isSolved,
 } from './logic.js';
-import { bestImagine, setFullContradiction, easyContradiction, MEDIUM_MAX } from './imagine.js';
-import { findFaceParity } from './faceparity.js';
+import { bestImagine, setFullContradiction, easyContradiction, MEDIUM_MAX, HARD_MAX } from './imagine.js';
+import { findFaceShade, findFaceCircle } from './faceparity.js';
 
 export const TIERS = ['Beginner', 'Medium', 'Hard', 'Expert'];
 
 export const TIER_INFO = {
-  Beginner: { name: 'Beginner', blurb: 'straight white circles, black circles turning and going two straight, rows of adjacent white circles, dead ends, forced exits, and not closing the loop early' },
-  Medium: { name: 'Medium', blurb: 'blocked turns, inside/outside parity, small pockets and chokepoints, and short 1–2 step imagined chains' },
-  Hard: { name: 'Hard', blurb: 'rectangle parity, large-area parity and chokepoints, and 3+ step imagined chains (pure logic, no trial and error)' },
-  Expert: { name: 'Expert', blurb: 'full multi-rule trial and error (trying an edge and following all rules to a contradiction), or beyond what Hint can explain' },
+  Beginner: { name: 'Beginner', blurb: 'basic circle rules, rows of three white circles, dead ends, forced exits, and not closing the loop early' },
+  Medium: { name: 'Medium', blurb: 'local multi-segment inferences, basic inside/outside shading, and 1-step local lookahead' },
+  Hard: { name: 'Hard', blurb: 'circle-diagonal shading, global topology (pockets, chokepoints, paired ends), and short single-thread lookahead' },
+  Expert: { name: 'Expert', blurb: 'long or multi-front lookahead chains, full multi-rule trial and error, or beyond what Hint can explain' },
 };
 
 export const beyondHints = (puzzle) => puzzle.rules === 'unsolved';
@@ -656,17 +656,17 @@ function findTwoWhitesStraight(P, st) {
   return out;
 }
 
-/** Can cell `n` turn 90° if entered from direction `d` (moving along `d`)? False if forced straight! */
-function forcedStraightAt(P, st, i, d) {
+/** Why cell `n` cannot turn 90° if entered from direction `d` (moving along `d`), or null if it can turn. */
+function forcedStraightReason(P, st, i, d) {
   const n = P.nb[i * 4 + d];
-  if (n < 0) return false;
+  if (n < 0) return null;
   const ext = P.ed[n * 4 + d];
-  if (ext >= 0 && st.e[ext] === E_ON) return true;
-  if (P.clue[n] === WHITE) return true;
+  if (ext >= 0 && st.e[ext] === E_ON) return 'straight';
+  if (P.clue[n] === WHITE) return 'white';
   const p1 = P.ed[n * 4 + ((d + 1) & 3)], p2 = P.ed[n * 4 + ((d + 3) & 3)];
   const can1 = p1 >= 0 && st.e[p1] !== E_OFF && st.cell[P.nb[n * 4 + ((d + 1) & 3)]] !== OFF;
   const can2 = p2 >= 0 && st.e[p2] !== E_OFF && st.cell[P.nb[n * 4 + ((d + 3) & 3)]] !== OFF;
-  return !can1 && !can2;
+  return !can1 && !can2 ? 'blocked' : null;
 }
 
 function findWhiteNoTurnAxis(P, st) {
@@ -675,7 +675,9 @@ function findWhiteNoTurnAxis(P, st) {
     for (const [d1, d2, p1, p2] of [[0, 2, 1, 3], [1, 3, 0, 2]]) {
       const e1 = P.ed[i * 4 + d1], e2 = P.ed[i * 4 + d2];
       if (e1 < 0 || e2 < 0 || st.e[e1] === E_OFF || st.e[e2] === E_OFF) continue;
-      if (forcedStraightAt(P, st, i, d1) && forcedStraightAt(P, st, i, d2)) {
+      const r1 = forcedStraightReason(P, st, i, d1);
+      const r2 = r1 ? forcedStraightReason(P, st, i, d2) : null;
+      if (r1 && r2) {
         const ep1 = P.ed[i * 4 + p1], ep2 = P.ed[i * 4 + p2];
         if (ep1 < 0 || ep2 < 0) continue;
         const sets = [];
@@ -684,7 +686,16 @@ function findWhiteNoTurnAxis(P, st) {
         if (st.e[e1] === E_UNKNOWN) sets.push(['e', e1, E_OFF]);
         if (st.e[e2] === E_UNKNOWN) sets.push(['e', e2, E_OFF]);
         if (sets.length) {
-          out.push({ sets, info: { cell: i, ends: [P.nb[i * 4 + d1], P.nb[i * 4 + d2]], axis: p1 === 0 ? 'v' : 'h' } });
+          out.push({
+            sets,
+            info: {
+              cell: i,
+              ends: [P.nb[i * 4 + d1], P.nb[i * 4 + d2]],
+              reasons: [r1, r2],
+              axis: p1 === 0 ? 'v' : 'h',
+              blockedAxis: p1 === 0 ? 'h' : 'v',
+            },
+          });
         }
       }
     }
@@ -941,7 +952,7 @@ function findTryEdge(P, st, { upto }) {
 
 // ------------------------------------------------------------ rule table
 
-const extraFaceParity = (P, st, f) => Math.max(0, (f.info.hops || 1) - 3) * 2;
+const extraFaceCircle = (P, st, f) => Math.max(0, (f.info.hops || 1) - 3) * 2;
 const extraParity = (P, st, f) => Math.max(0, (f.info.ends ? f.info.ends.length : 0) - 3) * 2;
 const extraTrial = (P, st, f) => (f.info.steps || 0) * 2;
 
@@ -958,6 +969,8 @@ function imagineFiring(f) {
       hyp: f.hyp,
       deduce: f.deduce,
       cost: f.cost,
+      maxDist: f.maxDist,
+      pureThread: f.pureThread,
       area: f.area,
       steps: f.steps,
       broke: f.broke,
@@ -967,8 +980,7 @@ function imagineFiring(f) {
 }
 
 function imagineStep(f) {
-  const tier = f.cost <= MEDIUM_MAX ? 'Medium' : 'Hard';
-  return { rule: tier === 'Medium' ? 'imagine' : 'imagineLong', tier, weight: f.cost, firings: [imagineFiring(f)] };
+  return { rule: f.rule, tier: f.tier, weight: f.cost, firings: [imagineFiring(f)] };
 }
 
 function defRule(r) {
@@ -989,7 +1001,7 @@ export const RULES = [
   defRule({ id: 'isolatedCellOff', tier: 'Beginner', weight: 1, free: true, find: findIsolatedCellOff, label: 'a cell with all its edges off is not on the loop' }),
   defRule({ id: 'closedLoopRestOff', tier: 'Beginner', weight: 1, free: true, find: findClosedLoopRestOff, label: 'once the single loop is closed, all remaining cells are off the loop' }),
 
-  // Beginner
+  // Beginner (single-segment / direct rule violations + iconic three-whites)
   defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
   defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
   defRule({ id: 'blackWall', tier: 'Beginner', weight: 2, find: findBlackWall, label: 'a black circle blocked within two cells of a wall or cross must extend two cells the opposite way' }),
@@ -998,31 +1010,34 @@ export const RULES = [
   defRule({ id: 'deadEnd', tier: 'Beginner', weight: 4, find: findDeadEnd, label: 'an empty cell with fewer than two exits left cannot be on the loop' }),
   defRule({ id: 'forcedExits', tier: 'Beginner', weight: 4, find: findForcedExits, label: 'a loop cell with only two exits left must use both' }),
   defRule({ id: 'blackPerp', tier: 'Beginner', weight: 5, find: findBlackPerp, label: 'a black circle cannot enter a neighbor that already has a perpendicular segment' }),
-  defRule({ id: 'whiteBothStraight', tier: 'Beginner', weight: 5, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
   defRule({ id: 'noEarlyClose', tier: 'Beginner', weight: 6, find: findNoEarlyClose, label: 'a segment joining the two ends of one path would close the loop early' }),
-  defRule({ id: 'samePathExits', tier: 'Beginner', weight: 7, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
-  defRule({ id: 'closingCell', tier: 'Beginner', weight: 7, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
   defRule({ id: 'threeWhites', tier: 'Beginner', weight: 8, find: findThreeWhites, label: 'three white circles in a row must all cross perpendicular to the row' }),
-  defRule({ id: 'twoWhitesStraight', tier: 'Beginner', weight: 9, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
 
-  // Medium
-  defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 12, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
-  defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 13, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
-  defRule({ id: 'faceParity', tier: 'Medium', weight: 16, find: findFaceParity, extra: extraFaceParity, label: 'inside/outside square coloring (across lines, crosses, white diagonals, and black 3-to-1 corners) forces an edge' }),
-  defRule({ id: 'twoEndsJoin', tier: 'Medium', weight: 20, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
-  defRule({ id: 'chokepoint', tier: 'Medium', weight: 22, costly: true, find: findChokepoint(true), label: 'blocking this segment would cut off a small area or leave a single chokepoint cell' }),
-  defRule({ id: 'parityPocket', tier: 'Medium', weight: 26, costly: true, find: findParity(true), label: 'the other choice would seal off a small pocket with an odd number of open ends' }),
+  // Medium (local multi-segment inferences, Auto-Shade border parity, and 1-step local lookahead)
+  defRule({ id: 'whiteBothStraight', tier: 'Medium', weight: 10, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
+  defRule({ id: 'closingCell', tier: 'Medium', weight: 11, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
+  defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
+  defRule({ id: 'twoWhitesStraight', tier: 'Medium', weight: 12, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
+  defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 14, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
+  defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
+  defRule({ id: 'faceShade', tier: 'Medium', weight: 18, find: findFaceShade, label: 'basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge' }),
 
-  // Hard
-  defRule({ id: 'crossingParity', tier: 'Hard', weight: 55, find: findCrossingParity, label: 'the loop crosses the border of any rectangle or band an even number of times' }),
-  defRule({ id: 'chokepointArea', tier: 'Hard', weight: 60, costly: true, find: findChokepoint(false), label: 'blocking this segment would cut off a large area or leave a single chokepoint cell' }),
-  defRule({ id: 'parityForces', tier: 'Hard', weight: 65, costly: true, find: findParity(false), extra: extraParity, label: 'the other choice would seal off an area with an odd number of open ends' }),
-  // Expert
+  // Hard (circle-diagonal shading, global topology, and short single-thread lookahead)
+  defRule({ id: 'faceCircle', tier: 'Hard', weight: 38, find: findFaceCircle, extra: extraFaceCircle, label: 'advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge' }),
+  defRule({ id: 'twoEndsJoin', tier: 'Hard', weight: 44, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
+  defRule({ id: 'chokepoint', tier: 'Hard', weight: 48, costly: true, find: findChokepoint(true), label: 'blocking this segment would cut off a small area or leave a single chokepoint cell' }),
+  defRule({ id: 'parityPocket', tier: 'Hard', weight: 52, costly: true, find: findParity(true), label: 'the other choice would seal off a small pocket with an odd number of open ends' }),
+  defRule({ id: 'crossingParity', tier: 'Hard', weight: 58, find: findCrossingParity, label: 'the loop crosses the border of any rectangle or band an even number of times' }),
+  defRule({ id: 'chokepointArea', tier: 'Hard', weight: 64, costly: true, find: findChokepoint(false), label: 'blocking this segment would cut off a large area or leave a single chokepoint cell' }),
+  defRule({ id: 'parityForces', tier: 'Hard', weight: 68, costly: true, find: findParity(false), extra: extraParity, label: 'the other choice would seal off an area with an odd number of open ends' }),
+
+  // Expert (long/multi-front lookahead chains and full trial-and-error)
   defRule({ id: 'tryEdge', tier: 'Expert', weight: 120, lookahead: true, find: findTryEdge, extra: extraTrial, label: 'trying a segment one way leads to a contradiction' }),
 
-  // Unified imagine rule (priced dynamically per pruned chain, slotted into HUMAN_ORDER by cost)
-  defRule({ id: 'imagine', tier: 'Medium', weight: MEDIUM_MAX, virtual: true, costly: true, find: imagineFind, label: 'imagine a segment on or off and follow the easy rules: within a few steps something breaks' }),
-  defRule({ id: 'imagineLong', tier: 'Hard', weight: 64, virtual: true, costly: true, find: imagineFind, label: 'imagine a segment on or off and follow the easy rules through a long chain until something breaks' }),
+  // Unified imagine rules (priced dynamically by cognitive load and slotted into HUMAN_ORDER by cost)
+  defRule({ id: 'imagineLocal', tier: 'Medium', weight: MEDIUM_MAX, virtual: true, costly: true, find: imagineFind, label: 'imagine a segment on or off at a circle or open end: one local step immediately breaks a rule' }),
+  defRule({ id: 'imagineTrace', tier: 'Hard', weight: 54, virtual: true, costly: true, find: imagineFind, label: 'imagine a segment on or off and trace one single thread 2–3 steps ahead until something breaks' }),
+  defRule({ id: 'imagineChain', tier: 'Expert', weight: 90, virtual: true, costly: true, find: imagineFind, label: 'imagine a segment on or off and follow a long, multi-front, or area-parity chain until something breaks' }),
 ];
 
 export const HUMAN_ORDER = RULES
@@ -1038,7 +1053,7 @@ export const ruleLabel = (id) => (id === 'unsolved' ? 'none of the current rules
 
 // ------------------------------------------------------------ closure / stepping / rating
 
-const IMAGINE_AFTER = 13; // rules priced <= 13 run before searching imagined chains
+const IMAGINE_AFTER = 18; // Beginner + local Medium + faceShade (<= 18) always run before searching imagined chains
 
 /** Apply all non-costly rules below `upto` until fixed point or contradiction. Mutates `st`. */
 export function closure(P, st, upto = FIRST_LOOKAHEAD) {
@@ -1085,7 +1100,10 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
     }
     if (!any) break;
   }
-  const noImagine = !!without && (without.includes('imagine') || without.includes('imagineLong'));
+  const noImagine = !!without && (
+    without.includes('imagineLocal') || without.includes('imagineTrace') || without.includes('imagineChain')
+    || without.includes('imagine') || without.includes('imagineLong')
+  );
   let found;
   let foundCap = 0;
   const imagined = (costCap = Infinity) => {
@@ -1099,12 +1117,14 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
 
   for (const rule of HUMAN_ORDER) {
     if (without && without.includes(rule.id)) continue;
-    // For costly / lookahead rules (weight > 20), run imagine FIRST so a cheaper imagine skips them entirely.
-    // For cheap Medium rules (faceParity [16], twoEndsJoin [20]), check the cheap rule first so when it fires
-    // we can pass its exact `ruleCost` as `costCap` to bestImagine (skipping expensive area/long-chain search!).
-    if (rule.weight > 20) {
-      const f = imagined(Infinity);
-      if (f && rule.weight > f.cost) return imagineStep(f);
+    // Before costly or lookahead rules, search imagine up to the current tier ceiling so cheaper imagine
+    // skips expensive Tarjan/parity scans (while Hard ceiling HARD_MAX+1 skips non-frontier & area scans).
+    if (rule.costly || rule.lookahead) {
+      const cap = rule.weight <= HARD_MAX ? HARD_MAX + 1 : Infinity;
+      const f = imagined(cap);
+      if (f && f.cost < rule.weight) return imagineStep(f);
+    } else if (found && found.cost < rule.weight) {
+      return imagineStep(found);
     }
     const firings = rule.find(P, st, { upto: FIRST_LOOKAHEAD });
     if (firings.length) {

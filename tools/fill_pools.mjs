@@ -52,11 +52,12 @@ if (!isMainThread) {
       const dP = Math.max(0, deficits['Expert+'] || 0);
       const tot = dB + dM + dH + dE + dP;
       if (tot === 0) return null;
-      if (dP > 0 && dB + dM + dH + dE === 0) return { targetTier: 'Expert+', stripMode: 'deep', allowUnsolved: true };
+      const maxTier = (dP > 0 || dE > 0) ? 'Expert' : dH > 0 ? 'Hard' : dM > 0 ? 'Medium' : 'Beginner';
+      if (dP > 0 && dB + dM + dH + dE === 0) return { targetTier: 'Expert+', maxTier: 'Expert', stripMode: 'deep', allowUnsolved: true };
       const r = rng() * tot;
-      if (r < dB) return { targetTier: null, stripMode: 'beginner', allowUnsolved: false };
-      if (r < dB + dM) return { targetTier: null, stripMode: 'medium', allowUnsolved: false };
-      return { targetTier: null, stripMode: 'deep', allowUnsolved: dP > 0 };
+      if (r < dB) return { targetTier: null, maxTier: 'Beginner', stripMode: 'beginner', allowUnsolved: false };
+      if (r < dB + dM) return { targetTier: null, maxTier: dH + dE + dP === 0 ? 'Medium' : maxTier, stripMode: 'medium', allowUnsolved: false };
+      return { targetTier: null, maxTier, stripMode: 'deep', allowUnsolved: dP > 0 };
     };
 
     const run = async () => {
@@ -74,7 +75,7 @@ if (!isMainThread) {
           style: job.style || 'balanced',
           layout: job.layout || 'none',
           minFill: job.minFill ?? null,
-          maxTier: 'Expert',
+          maxTier: mode.maxTier || 'Expert',
           targetTier: mode.targetTier,
           stripMode: mode.stripMode,
           allowUnsolved: mode.allowUnsolved,
@@ -165,157 +166,154 @@ if (!isMainThread) {
       group: 'core', pool: 'balanced_8x8', cols: 8, rows: 8,
       buckets: {
         Beginner: { need: 505, maxScore: 235 },
-        Medium: { need: 505, minScore: 235, maxScore: 310 },
-        Hard: { need: 505, minScore: 310, maxScore: 520 },
-        Expert: { need: 505, minScore: 520 },
+        Medium: { need: 505, minScore: 215, maxScore: 270 },
+        Hard: { need: 505, minScore: 265, maxScore: 420 },
+        Expert: { need: 505, minScore: 420 },
         'Expert+': { need: 12 },
       },
-      budgetSec: 480, perPuzzleMs: 12000,
+      budgetSec: 360, perPuzzleMs: 12000,
     },
     {
       group: 'core', pool: 'balanced_12x12', cols: 12, rows: 12,
       buckets: {
         Beginner: { need: 505, maxScore: 535 },
-        Medium: { need: 505, minScore: 535, maxScore: 660 },
-        Hard: { need: 505, minScore: 660, maxScore: 1050 },
-        Expert: { need: 505, minScore: 1050 },
+        Medium: { need: 505, minScore: 495, maxScore: 585 },
+        Hard: { need: 505, minScore: 575, maxScore: 820 },
+        Expert: { need: 505, minScore: 820 },
         'Expert+': { need: 12 },
       },
-      budgetSec: 1200, perPuzzleMs: 25000,
+      budgetSec: 600, perPuzzleMs: 25000,
     },
 
-    // ---- Giants: 16x16 (200), 12x20 (100), 24x30 Full Page (60)
+    // ---- Giants: 16x16 (200: 60 M / 70 H / 70 E) and 12x20 (100: 30 M / 35 H / 35 E) — no Beginner on Giants
     {
       group: 'giants', pool: 'balanced_16x16', cols: 16, rows: 16,
       buckets: {
-        Beginner: { need: 52, maxScore: 940 },
-        Medium: { need: 52, minScore: 940, maxScore: 1100 },
-        Hard: { need: 52, minScore: 1100, maxScore: 1650 },
-        Expert: { need: 52, minScore: 1650 },
+        Medium: { need: 62, maxScore: 1020 },
+        Hard: { need: 72, minScore: 990, maxScore: 1380 },
+        Expert: { need: 72, minScore: 1350 },
       },
-      budgetSec: 600, perPuzzleMs: 30000,
+      budgetSec: 300, perPuzzleMs: 30000,
     },
     {
       group: 'giants', pool: 'balanced_12x20', cols: 12, rows: 20,
       buckets: {
-        Beginner: { need: 26, maxScore: 900 },
-        Medium: { need: 26, minScore: 900, maxScore: 1050 },
-        Hard: { need: 26, minScore: 1050, maxScore: 1650 },
-        Expert: { need: 26, minScore: 1650 },
+        Medium: { need: 32, maxScore: 970 },
+        Hard: { need: 36, minScore: 950, maxScore: 1260 },
+        Expert: { need: 36, minScore: 1240 },
       },
-      budgetSec: 600, perPuzzleMs: 35000,
+      budgetSec: 300, perPuzzleMs: 35000,
     },
     {
-      group: 'giants', pool: 'balanced_24x30', cols: 24, rows: 30,
+      group: 'giants-24x30', pool: 'balanced_24x30', cols: 24, rows: 30,
       buckets: {
-        Beginner: { need: 16, maxScore: 2580 },
-        Medium: { need: 16, minScore: 2520, maxScore: 2750 },
-        Hard: { need: 16, minScore: 2750, maxScore: 3300 },
-        Expert: { need: 16, minScore: 3300 },
+        Medium: { need: 22, maxScore: 2700 },
+        Hard: { need: 22, minScore: 2650, maxScore: 3300 },
+        Expert: { need: 22, minScore: 3250 },
       },
-      budgetSec: 900, perPuzzleMs: 45000,
+      budgetSec: 600, perPuzzleMs: 45000,
     },
 
     // ---- Bonus pools (500 at 10/40/40/10 with score bands + oversized bonus tails + Lattice showcase)
     {
       group: 'bonus', pool: 'white_8x8', cols: 8, rows: 8, style: 'white',
       buckets: {
-        Beginner: { need: 52, maxScore: 275 },
-        Medium: { need: 204, minScore: 265, maxScore: 345 },
-        Hard: { need: 204, minScore: 345, maxScore: 650 },
-        Expert: { need: 52, minScore: 650 },
+        Beginner: { need: 52, maxScore: 265 },
+        Medium: { need: 204, minScore: 240, maxScore: 305 },
+        Hard: { need: 204, minScore: 300, maxScore: 485 },
+        Expert: { need: 52, minScore: 470 },
       },
-      budgetSec: 420, perPuzzleMs: 15000,
+      budgetSec: 240, perPuzzleMs: 15000,
     },
     {
       group: 'bonus', pool: 'black_10x10', cols: 10, rows: 10, style: 'black',
       buckets: {
-        Beginner: { need: 52, maxScore: 350 },
-        Medium: { need: 204, minScore: 335, maxScore: 405 },
-        Hard: { need: 204, minScore: 390, maxScore: 680 },
-        Expert: { need: 52, minScore: 680 },
+        Beginner: { need: 52, maxScore: 345 },
+        Medium: { need: 204, minScore: 315, maxScore: 380 },
+        Hard: { need: 204, minScore: 365, maxScore: 510 },
+        Expert: { need: 52, minScore: 500 },
       },
-      budgetSec: 600, perPuzzleMs: 20000,
+      budgetSec: 300, perPuzzleMs: 20000,
     },
     {
       group: 'bonus', pool: 'sky_6x20', cols: 6, rows: 20,
       buckets: {
-        Beginner: { need: 52, maxScore: 480 },
-        Medium: { need: 204, minScore: 430, maxScore: 550 },
-        Hard: { need: 204, minScore: 550, maxScore: 900 },
-        Expert: { need: 52, minScore: 880 },
+        Beginner: { need: 52, maxScore: 455 },
+        Medium: { need: 204, minScore: 415, maxScore: 505 },
+        Hard: { need: 204, minScore: 480, maxScore: 730 },
+        Expert: { need: 52, minScore: 700 },
       },
-      budgetSec: 480, perPuzzleMs: 20000,
+      budgetSec: 300, perPuzzleMs: 20000,
     },
     {
       group: 'bonus', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180',
       buckets: {
-        Beginner: { need: 18, maxScore: 360 },
-        Medium: { need: 68, minScore: 340, maxScore: 440 },
-        Hard: { need: 68, minScore: 440, maxScore: 760 },
-        Expert: { need: 18, minScore: 760 },
+        Beginner: { need: 18, maxScore: 365 },
+        Medium: { need: 68, minScore: 315, maxScore: 420 },
+        Hard: { need: 68, minScore: 375, maxScore: 600 },
+        Expert: { need: 18, minScore: 570 },
       },
-      budgetSec: 360, perPuzzleMs: 20000,
+      budgetSec: 240, perPuzzleMs: 20000,
     },
     {
       group: 'bonus', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror',
       buckets: {
-        Beginner: { need: 18, maxScore: 360 },
-        Medium: { need: 68, minScore: 340, maxScore: 440 },
-        Hard: { need: 68, minScore: 440, maxScore: 760 },
-        Expert: { need: 18, minScore: 760 },
+        Beginner: { need: 18, maxScore: 365 },
+        Medium: { need: 68, minScore: 315, maxScore: 420 },
+        Hard: { need: 68, minScore: 375, maxScore: 600 },
+        Expert: { need: 18, minScore: 570 },
       },
-      budgetSec: 360, perPuzzleMs: 20000,
+      budgetSec: 240, perPuzzleMs: 20000,
     },
     {
       group: 'bonus', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose',
       buckets: {
-        Beginner: { need: 18, maxScore: 360 },
-        Medium: { need: 68, minScore: 340, maxScore: 440 },
-        Hard: { need: 68, minScore: 440, maxScore: 760 },
-        Expert: { need: 18, minScore: 760 },
+        Beginner: { need: 18, maxScore: 365 },
+        Medium: { need: 68, minScore: 315, maxScore: 420 },
+        Hard: { need: 68, minScore: 375, maxScore: 600 },
+        Expert: { need: 18, minScore: 570 },
       },
-      budgetSec: 360, perPuzzleMs: 20000,
+      budgetSec: 240, perPuzzleMs: 20000,
     },
     {
       group: 'bonus-yinyang', pool: 'yinyang_10x10', cols: 10, rows: 10, layout: 'yinyang',
       buckets: {
-        Beginner: { need: 18, maxScore: 355 },
-        Medium: { need: 68, minScore: 340, maxScore: 460 },
-        Hard: { need: 68, minScore: 460, maxScore: 780 },
-        Expert: { need: 18, minScore: 780 },
+        Beginner: { need: 18, maxScore: 350 },
+        Medium: { need: 68, minScore: 325, maxScore: 410 },
+        Hard: { need: 68, minScore: 390, maxScore: 610 },
+        Expert: { need: 18, minScore: 575 },
       },
-      budgetSec: 480, perPuzzleMs: 25000,
+      budgetSec: 240, perPuzzleMs: 25000,
     },
     {
       group: 'bonus-yinyang', pool: 'yinyang_mirror_10x10', cols: 10, rows: 10, layout: 'yinyang-mirror',
       buckets: {
-        Beginner: { need: 18, maxScore: 355 },
-        Medium: { need: 68, minScore: 340, maxScore: 460 },
-        Hard: { need: 68, minScore: 460, maxScore: 780 },
-        Expert: { need: 18, minScore: 780 },
+        Beginner: { need: 18, maxScore: 350 },
+        Medium: { need: 68, minScore: 325, maxScore: 410 },
+        Hard: { need: 68, minScore: 390, maxScore: 610 },
+        Expert: { need: 18, minScore: 575 },
       },
-      budgetSec: 600, perPuzzleMs: 25000,
+      budgetSec: 240, perPuzzleMs: 25000,
     },
     {
       group: 'bonus-yinyang', pool: 'yinyang_transpose_10x10', cols: 10, rows: 10, layout: 'yinyang-transpose',
       buckets: {
-        Beginner: { need: 18, maxScore: 355 },
-        Medium: { need: 68, minScore: 340, maxScore: 460 },
-        Hard: { need: 68, minScore: 460, maxScore: 780 },
-        Expert: { need: 18, minScore: 780 },
+        Beginner: { need: 18, maxScore: 350 },
+        Medium: { need: 68, minScore: 325, maxScore: 410 },
+        Hard: { need: 68, minScore: 390, maxScore: 610 },
+        Expert: { need: 18, minScore: 575 },
       },
-      budgetSec: 720, perPuzzleMs: 25000,
+      budgetSec: 240, perPuzzleMs: 25000,
     },
     {
       group: 'bonus', pool: 'full_10x10', cols: 10, rows: 10, minFill: 1.0,
       buckets: {
-        Beginner: { need: 52, maxScore: 425 },
-        Medium: { need: 204, minScore: 400, maxScore: 485 },
-        Hard: { need: 204, minScore: 480, maxScore: 850 },
-        Expert: { need: 52, minScore: 820 },
+        Beginner: { need: 52, maxScore: 420 },
+        Medium: { need: 204, minScore: 390, maxScore: 465 },
+        Hard: { need: 204, minScore: 450, maxScore: 640 },
+        Expert: { need: 52, minScore: 610 },
       },
-      budgetSec: 720, perPuzzleMs: 25000,
+      budgetSec: 360, perPuzzleMs: 25000,
     },
 
     // ---- Oversized bonus tails (10 per bonus book) + Lattice showcase
@@ -333,31 +331,31 @@ if (!isMainThread) {
       group: 'bonus-cookie', pool: 'cookie_vert_10x10', cols: 10, rows: 10, layout: 'cookie',
       buckets: {
         Beginner: { need: 18, maxScore: 375 },
-        Medium: { need: 68, minScore: 355, maxScore: 470 },
-        Hard: { need: 68, minScore: 470, maxScore: 800 },
-        Expert: { need: 18, minScore: 780 },
+        Medium: { need: 68, minScore: 345, maxScore: 430 },
+        Hard: { need: 68, minScore: 415, maxScore: 625 },
+        Expert: { need: 18, minScore: 600 },
       },
-      budgetSec: 300, perPuzzleMs: 20000,
+      budgetSec: 240, perPuzzleMs: 20000,
     },
     {
       group: 'bonus-cookie', pool: 'cookie_horiz_10x10', cols: 10, rows: 10, layout: 'cookie-horiz',
       buckets: {
         Beginner: { need: 18, maxScore: 375 },
-        Medium: { need: 68, minScore: 355, maxScore: 470 },
-        Hard: { need: 68, minScore: 470, maxScore: 800 },
-        Expert: { need: 18, minScore: 780 },
+        Medium: { need: 68, minScore: 345, maxScore: 430 },
+        Hard: { need: 68, minScore: 415, maxScore: 625 },
+        Expert: { need: 18, minScore: 600 },
       },
-      budgetSec: 300, perPuzzleMs: 20000,
+      budgetSec: 240, perPuzzleMs: 20000,
     },
     {
       group: 'bonus-cookie', pool: 'cookie_diag_10x10', cols: 10, rows: 10, layout: 'cookie-diag',
       buckets: {
         Beginner: { need: 18, maxScore: 375 },
-        Medium: { need: 68, minScore: 355, maxScore: 470 },
-        Hard: { need: 68, minScore: 470, maxScore: 800 },
-        Expert: { need: 18, minScore: 780 },
+        Medium: { need: 68, minScore: 345, maxScore: 430 },
+        Hard: { need: 68, minScore: 415, maxScore: 625 },
+        Expert: { need: 18, minScore: 600 },
       },
-      budgetSec: 300, perPuzzleMs: 20000,
+      budgetSec: 240, perPuzzleMs: 20000,
     },
     { group: 'bonus-cookie', pool: 'cookie_vert_12x12', cols: 12, rows: 12, layout: 'cookie', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-cookie', pool: 'cookie_horiz_12x12', cols: 12, rows: 12, layout: 'cookie-horiz', total: 5, budgetSec: 90, perPuzzleMs: 25000 },

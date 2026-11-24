@@ -44,6 +44,28 @@ if (fs.existsSync(libDir)) {
 
 candidates.sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols) || (a.score ?? 0) - (b.score ?? 0));
 
+// Prioritize up to 12 smallest puzzles per rule ID (matching p.rules), plus up to 600 smallest boards overall,
+// so rare rules are found immediately without replaying all 15,000+ large boards single-threaded.
+const prioritized = [];
+const pickedKey = new Set();
+const perRule = new Map();
+for (const p of candidates) {
+  const n = perRule.get(p.rules) || 0;
+  if (targetRules.has(p.rules) && n < 12) {
+    perRule.set(p.rules, n + 1);
+    const sk = symmetryKey(p);
+    pickedKey.add(sk);
+    prioritized.push(p);
+  }
+}
+for (const p of candidates) {
+  if (prioritized.length >= 900) break;
+  const sk = symmetryKey(p);
+  if (pickedKey.has(sk)) continue;
+  pickedKey.add(sk);
+  prioritized.push(p);
+}
+
 const prefer = (prev, cand) => {
   if (!prev) return true;
   // Prefer smaller board (prefer 6x6 or 8x8), and fewer earlier hints so the board isn't cluttered
@@ -51,7 +73,7 @@ const prefer = (prev, cand) => {
   return score(cand) < score(prev);
 };
 
-for (const raw of candidates) {
+for (const raw of prioritized) {
   if (best.size === targetRules.size) break;
   const P = compile({ ...raw });
   const marks = { edges: new Uint8Array(P.numEdges) };
@@ -72,6 +94,7 @@ for (const raw of candidates) {
         roles: item.roles,
         targets: item.targets,
         chain: item.chain,
+        faces: item.faces || null,
       };
       if (prefer(best.get(h.rule), cand)) best.set(h.rule, cand);
     }
@@ -113,6 +136,7 @@ for (const r of RULES) {
     roles: ex.roles,
     targets: ex.targets,
     chain: ex.chain,
+    faces: ex.faces || null,
   });
 }
 

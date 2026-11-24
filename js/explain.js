@@ -252,7 +252,17 @@ export function explainStep(P, step, st = null) {
     case 'whiteNoTurnAxis': {
       roles.clue.push(info.cell);
       roles.problem.push(...(info.ends || []));
-      text = `Neither ${joinList((info.ends || []).map((i) => cellName(P, i)))} can turn if entered from ${cellName(P, info.cell)}, so the white circle at ${cellName(P, info.cell)} must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}.`;
+      const reasonText = (cell, r) => {
+        const nm = cellName(P, cell);
+        if (r === 'white') return `${nm} is a white circle`;
+        if (r === 'straight') return `${nm} already goes straight`;
+        return `${nm} has both turns blocked`;
+      };
+      const blocked = info.blockedAxis === 'v' ? 'vertically' : info.blockedAxis === 'h' ? 'horizontally' : (info.axis === 'v' ? 'horizontally' : 'vertically');
+      const why = info.ends && info.reasons && info.ends.length === 2
+        ? ` (${reasonText(info.ends[0], info.reasons[0])} and ${reasonText(info.ends[1], info.reasons[1])})`
+        : '';
+      text = `The white circle at ${cellName(P, info.cell)} must turn at one of its two ends, so it cannot go ${blocked}${why}; it must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}.`;
       break;
     }
     case 'blackBlockedTarget': {
@@ -263,6 +273,17 @@ export function explainStep(P, step, st = null) {
       text = `The black circle at ${cellName(P, info.cell)} cannot extend toward ${cellName(P, info.target)} because ${why}; so it must go two cells ${DIR_WORD[info.dir]}.`;
       break;
     }
+    case 'faceShade': {
+      const [a, b] = edgeCells(P, info.edge);
+      roles.focus.push(a, b);
+      faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: true };
+      const colName = (par) => (par === 1 ? 'Inside' : 'Outside');
+      text = info.val === E_ON
+        ? `Inside/outside shading puts opposite sides (${colName(info.parA)} and ${colName(info.parB)}) across ${edgeName(P, info.edge)}, so the loop must cross between them (draw ${edgeName(P, info.edge)}).`
+        : `Inside/outside shading puts ${colName(info.parA)} on both sides of ${edgeName(P, info.edge)}, so the loop cannot pass between them (cross out ${edgeName(P, info.edge)}).`;
+      break;
+    }
+    case 'faceCircle':
     case 'faceParity': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
@@ -304,8 +325,8 @@ export function explainStep(P, step, st = null) {
         ? `puts opposite sides (${label(info.parA)} and ${label(info.parB)}) across ${edgeName(P, info.edge)}, so draw ${edgeName(P, info.edge)}`
         : `puts ${label(info.parA)} on both sides of ${edgeName(P, info.edge)}, so cross out ${edgeName(P, info.edge)}`;
       text = chainDesc
-        ? `Inside/outside parity: ${chainDesc}. That ${sideStr}.`
-        : `Inside/outside parity ${sideStr}.`;
+        ? `Circle shading: ${chainDesc}. That ${sideStr}.`
+        : `Circle shading ${sideStr}.`;
       break;
     }
     case 'twoEndsJoin': {
@@ -344,6 +365,9 @@ export function explainStep(P, step, st = null) {
       text = `The loop must cross the border of the highlighted rectangle an even number of times (${info.on} crossings so far, 1 undecided), so ${edgeName(P, info.edge)} ${act}.`;
       break;
     }
+    case 'imagineLocal':
+    case 'imagineTrace':
+    case 'imagineChain':
     case 'imagine':
     case 'imagineLong': {
       const [a, b] = edgeCells(P, info.edge);

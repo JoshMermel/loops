@@ -384,6 +384,7 @@ export function tightLoop(rows, cols, rng, {
 }
 
 const BEGINNER_UPTO = RULES.findIndex((r) => r.tier !== 'Beginner');
+const MEDIUM_UPTO = RULES.findIndex((r) => r.tier !== 'Beginner' && r.tier !== 'Medium');
 
 /**
  * Generate one verified, rated Masyu puzzle.
@@ -529,6 +530,7 @@ export function generatePuzzle({
   }
   const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
   const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
+  const mediumOnly = stripMode === 'medium' || (stripMode === null && effectiveMaxTier === 1);
   const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : N <= 400 ? 40000 : 6000;
   const solvedByPropagate = (P) => {
     const st = initialState(P);
@@ -605,9 +607,9 @@ export function generatePuzzle({
 
     // Pass 1: sound human-rule pruning (no search needed) on remaining clues.
     // On giant boards (N >= 400), Pass 0 already stripped propagation-redundant clues cheaply;
-    // skip Pass 1 when Pass 2 will strip directly with exact search, and cap it for beginnerOnly.
-    const fastUpto = beginnerOnly ? BEGINNER_UPTO : FIRST_LOOKAHEAD;
-    const remPass1 = (N >= 400 && !beginnerOnly && base.unk === 0) ? [] : shuffle(buildUnits(current), rand);
+    // skip Pass 1 when Pass 2 will strip directly with exact search, and cap it for beginnerOnly/mediumOnly.
+    const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
+    const remPass1 = (N >= 400 && !beginnerOnly && !mediumOnly && base.unk === 0) ? [] : shuffle(buildUnits(current), rand);
     const pass1Cap = N >= 400 ? 15 : remPass1.length;
     let pass1Tried = 0;
     for (const u of remPass1) {
@@ -623,10 +625,19 @@ export function generatePuzzle({
       }
     }
 
-    // Pass 2: for Medium/Hard/Expert/sparse, strip further using fast exact uniqueness checks,
-    // remembering removed units so we can binary-search back if we accidentally step past maxTier.
+    // Pass 2: for Medium (if Pass 1 stayed Beginner) / Hard / Expert / sparse, strip further using fast exact
+    // uniqueness checks, remembering removed units so we can binary-search back if we step past maxTier.
     let cachedRated = null;
-    if (!beginnerOnly && Date.now() < deadline) {
+    let skipPass2 = beginnerOnly;
+    if (!skipPass2 && mediumOnly && Date.now() < deadline) {
+      const P1 = compile({ name, rows, cols, clues: current });
+      const r1 = rate(P1);
+      if (r1.solved && r1.tier === 'Medium') {
+        cachedRated = r1;
+        skipPass2 = true;
+      }
+    }
+    if (!skipPass2 && Date.now() < deadline) {
       const remUnits = shuffle(buildUnits(current), rand);
       const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
       const maxStrips = style === 'sparse' ? remUnits.length

@@ -9,9 +9,91 @@ import {
   cloneState, propagate,
 } from './logic.js';
 
-export const AREA_PENALTY = 20;
-export const MEDIUM_MAX = 26; // aligns with highest Medium rule (parityPocket=26); n<=2 easy <=18 (Medium), n>=3 or area >=33 (Hard)
-export const IMAGINE_COST = (nSteps, area) => 8 + 5 * nSteps + (nSteps > 2 ? 10 * (nSteps - 2) : 0) + (area ? AREA_PENALTY : 0);
+export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
+export const HARD_MAX = 75;   // imagineTrace (46..60) sits in Hard; imagineChain (>= 80) sits in Expert
+export const AREA_MIN_COST = 98; // minimum possible cost for an area contradiction (1+ step: 80 + 4 + 14)
+
+/** Sound lower bound on classifyImagine() cost given kept step count, area flag, and frontier flag. */
+export function minImagineCost(nSteps, area, isFrontier) {
+  if (area) return 94 + 4 * nSteps;
+  if (!isFrontier) return 84 + 4 * nSteps;
+  if (nSteps >= 4) return 80 + 4 * nSteps;
+  if (nSteps >= 2) return 36 + 6 * nSteps;
+  return 22 + 2 * nSteps;
+}
+
+/**
+ * Classify a pruned imagined chain by human cognitive load into:
+ *   - imagineLocal (Medium, 22..26): 1-step tight local breakage from a circle/open end
+ *   - imagineTrace (Hard, 42..60): single connected thread, <= 2 steps (dist <= 4) or 3 steps (dist <= 3), no area
+ *   - imagineChain (Expert, >= 80): long (4+ steps), multi-front/branching, non-frontier, or area contradiction
+ */
+export function classifyImagine(P, baseState, edge, steps, broke, area) {
+  const a = P.edgeA[edge], b = P.edgeB[edge];
+  const cols = P.cols;
+  const dist = (c1, c2) => Math.abs(((c1 / cols) | 0) - ((c2 / cols) | 0)) + Math.abs((c1 % cols) - (c2 % cols));
+  const distToEdge = (c) => Math.min(dist(c, a), dist(c, b));
+
+  const isFrontier = baseState.cell[a] === LOOP || baseState.cell[b] === LOOP;
+  const nSteps = steps.length;
+  const earlyClose = !!(broke && (broke.kind === 'earlyClose' || broke.kind === 'twoLoops'));
+
+  let usesEarlyCloseRule = false;
+  let maxDist = 0;
+  let disjointJumps = 0;
+  let tipSwitches = 0;
+  const cluster = new Set([a, b]);
+  let prevCells = new Set([a, b]);
+
+  for (let i = 0; i < nSteps; i++) {
+    const s = steps[i];
+    if (s.rule === 'noEarlyClose') usesEarlyCloseRule = true;
+    const curCells = new Set();
+    if (s.info && s.info.cell !== undefined && s.info.cell >= 0) curCells.add(s.info.cell);
+    for (let k = 0; k < s.sets.length; k++) {
+      const [kind, idx] = s.sets[k];
+      if (kind === 'c') curCells.add(idx);
+      else { curCells.add(P.edgeA[idx]); curCells.add(P.edgeB[idx]); }
+    }
+    let touchesCluster = false;
+    let touchesPrev = false;
+    for (const c of curCells) {
+      const d = distToEdge(c);
+      if (d > maxDist) maxDist = d;
+      if (!touchesCluster) for (const p of cluster) if (dist(c, p) <= 1) { touchesCluster = true; break; }
+      if (!touchesPrev) for (const p of prevCells) if (dist(c, p) <= 1) { touchesPrev = true; break; }
+    }
+    if (curCells.size > 0) {
+      if (!touchesCluster) disjointJumps++;
+      if (!touchesPrev) tipSwitches++;
+      for (const c of curCells) cluster.add(c);
+      prevCells = curCells;
+    }
+  }
+
+  // Only measure breakage cell for local breakages (earlyClose.cell is an unrelated loop cell outside the cycle)
+  if (broke && !earlyClose && broke.cell !== undefined && broke.cell >= 0) {
+    const d = distToEdge(broke.cell);
+    if (d > maxDist) maxDist = d;
+    let touchesCluster = false;
+    for (const p of cluster) if (dist(broke.cell, p) <= 1) { touchesCluster = true; break; }
+    if (!touchesCluster) disjointJumps++;
+  }
+
+  const contiguous = disjointJumps === 0 && !usesEarlyCloseRule;
+  const pureThread = contiguous && tipSwitches === 0;
+
+  if (!area && !earlyClose && isFrontier && contiguous && nSteps <= 1 && maxDist <= 2) {
+    const cost = 22 + 2 * nSteps + maxDist;
+    return { rule: 'imagineLocal', tier: 'Medium', cost, maxDist, pureThread, isFrontier };
+  }
+  if (!area && isFrontier && pureThread && ((nSteps <= 2 && maxDist <= 4) || (nSteps === 3 && maxDist <= 3))) {
+    const cost = 36 + 6 * nSteps + 2 * maxDist;
+    return { rule: 'imagineTrace', tier: 'Hard', cost, maxDist, pureThread, isFrontier };
+  }
+  const cost = 80 + 4 * nSteps + (area ? 14 : 0) + (pureThread ? 0 : 6) + (isFrontier ? 0 : 4);
+  return { rule: 'imagineChain', tier: 'Expert', cost, maxDist, pureThread, isFrontier };
+}
 
 const MAX_CAND = 10;
 const MAX_STEPS = 24;
@@ -551,6 +633,8 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
  * if the contradiction still occurs without a step, drop it.
  */
 function pruneChain(P, baseState, edge, val, rawSteps, area, costCap) {
+  const isFrontier = baseState.cell[P.edgeA[edge]] === LOOP || baseState.cell[P.edgeB[edge]] === LOOP;
+  if (minImagineCost(0, area, isFrontier) >= costCap) return null;
   const forbid = new Set();
   const kept = [];
   for (let k = rawSteps.length - 1; k >= 0; k--) {
@@ -565,7 +649,7 @@ function pruneChain(P, baseState, edge, val, rawSteps, area, costCap) {
       // Needed!
       forbid.delete(sig);
       kept.push(rawSteps[k]);
-      if (IMAGINE_COST(kept.length, area) >= costCap) return null;
+      if (minImagineCost(kept.length, area, isFrontier) >= costCap) return null;
     }
   }
   // Replay once with final `forbid` to get the exact clean chronological trace and final contradiction
@@ -575,14 +659,34 @@ function pruneChain(P, baseState, edge, val, rawSteps, area, costCap) {
     forbid,
   });
   if (!clean.broke) return null;
-  const cost = IMAGINE_COST(clean.steps.length, clean.area);
-  return { steps: clean.steps, broke: clean.broke, area: clean.area, cost, forbid: [...forbid], state: clean.state };
+  const cls = classifyImagine(P, baseState, edge, clean.steps, clean.broke, clean.area);
+  return {
+    steps: clean.steps,
+    broke: clean.broke,
+    area: clean.area,
+    rule: cls.rule,
+    tier: cls.tier,
+    cost: cls.cost,
+    maxDist: cls.maxDist,
+    pureThread: cls.pureThread,
+    forbid: [...forbid],
+    state: clean.state,
+  };
 }
 
 /** Frontier edges worth hypothesizing on: undecided edges near a LOOP cell or circle. */
-function candidateEdges(P, st) {
+function candidateEdges(P, st, frontierOnly = false) {
   const { numEdges, edgeA, edgeB, clue, nb } = P;
   const { cell, e } = st;
+  const primary = [];
+  if (frontierOnly) {
+    for (let x = 0; x < numEdges; x++) {
+      if (e[x] !== E_UNKNOWN) continue;
+      const a = edgeA[x], b = edgeB[x];
+      if (a >= 0 && (cell[a] === LOOP || cell[b] === LOOP)) primary.push(x);
+    }
+    return primary;
+  }
   const near = new Uint8Array(P.N);
   for (let i = 0; i < P.N; i++) {
     if (cell[i] === LOOP || clue[i] !== NONE) {
@@ -593,7 +697,7 @@ function candidateEdges(P, st) {
       }
     }
   }
-  const primary = [], secondary = [];
+  const secondary = [];
   for (let x = 0; x < numEdges; x++) {
     if (e[x] !== E_UNKNOWN) continue;
     const a = edgeA[x], b = edgeB[x];
@@ -613,7 +717,8 @@ function candidateEdges(P, st) {
  * Optional `costCap`: skip candidates that cannot beat `costCap` (strictly `< costCap`).
  */
 export function bestImagine(P, st, { costCap = Infinity } = {}) {
-  const edges = candidateEdges(P, st);
+  const frontierOnly = costCap <= 84;
+  const edges = candidateEdges(P, st, frontierOnly);
   if (!edges.length) return null;
   if (propCellBuf.length < P.N) propCellBuf = new Int8Array(P.N);
   if (propEdgeBuf.length < P.numEdges) propEdgeBuf = new Int8Array(P.numEdges);
@@ -628,6 +733,7 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
 
   for (let ei = 0; ei < edges.length; ei++) {
     const x = edges[ei];
+    const isFront = st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP;
     for (let vi = 0; vi < 2; vi++) {
       const val = vi === 0 ? E_ON : E_OFF;
       stProp.cell.set(st.cell);
@@ -637,16 +743,16 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
       if (!propagate(P, stProp)) {
         const r = runHypothesis(P, st, x, val, { maxSteps: MAX_STEPS, checkArea: false });
         if (r.broke) {
-          easyHits.push({ edge: x, hyp: val, rawSteps: r.steps, area: false });
+          easyHits.push({ edge: x, hyp: val, rawSteps: r.steps, area: false, isFront });
           easyHitSet.add((x << 2) | val);
         }
       }
     }
   }
 
-  // Prune easy hits FIRST: if an easy hit already achieves cost <= 20, no area hit can ever beat it,
-  // letting us skip the entire O(edges) Tarjan/parity area scan!
-  easyHits.sort((a, b) => a.rawSteps.length - b.rawSteps.length);
+  // Prune easy hits FIRST (frontier candidates first, then shortest raw chain):
+  // if an easy hit already achieves cost <= AREA_MIN_COST, we skip the O(edges) Tarjan/parity area scan!
+  easyHits.sort((a, b) => (b.isFront ? 1 : 0) - (a.isFront ? 1 : 0) || a.rawSteps.length - b.rawSteps.length);
   let best = null;
   const evalCandidates = (list) => {
     for (const c of list) {
@@ -658,7 +764,11 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
           edge: c.edge,
           hyp: c.hyp,
           deduce: c.hyp === E_ON ? E_OFF : E_ON,
+          rule: pr.rule,
+          tier: pr.tier,
           cost: pr.cost,
+          maxDist: pr.maxDist,
+          pureThread: pr.pureThread,
           area: pr.area,
           steps: pr.steps,
           broke: pr.broke,
@@ -669,9 +779,9 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
   };
   evalCandidates(easyHits.slice(0, MAX_CAND));
 
-  // Area contradictions require >= 1 easy step (min cost IMAGINE_COST(1, true) = 33); skip whenever effectiveCap <= 33
+  // Area contradictions require >= 1 easy step (min cost AREA_MIN_COST = 98); skip whenever effectiveCap <= AREA_MIN_COST
   const effectiveCap = best ? Math.min(costCap, best.cost) : costCap;
-  if (easyHits.length < MAX_CAND && effectiveCap > IMAGINE_COST(1, true)) {
+  if (easyHits.length < MAX_CAND && effectiveCap > AREA_MIN_COST) {
     const areaHits = [];
     for (let ei = 0; ei < edges.length; ei++) {
       const x = edges[ei];
