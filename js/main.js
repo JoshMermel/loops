@@ -134,7 +134,10 @@ function toggleEdge(x) {
 
 function cycleFace(f, reverse = false) {
   const P = state.P, m = state.marks;
-  if (f < 0 || f >= m.faces.length) return;
+  if (f < 0 || f >= m.faces.length || (m.faces[f] && m.autoF[f])) {
+    state.facePaintVal = null;
+    return;
+  }
   const prev = snapshot();
   const next = reverse ? cycleFaceMarkReverse(m.faces[f]) : cycleFaceMark(m.faces[f]);
   m.faces[f] = next;
@@ -146,9 +149,10 @@ function cycleFace(f, reverse = false) {
 
 function paintFaceStep(f) {
   const P = state.P, m = state.marks;
-  if (f < 0 || f >= m.faces.length) return;
   const val = state.facePaintVal;
-  if (m.faces[f] === val && !m.autoF[f]) return;
+  if (val === null || val === undefined || f < 0 || f >= m.faces.length) return;
+  if (m.faces[f] && m.autoF[f]) return;
+  if (m.faces[f] === val) return;
   const prev = snapshot();
   m.faces[f] = val;
   m.autoF[f] = 0;
@@ -212,6 +216,7 @@ function endGesture(cancelled) {
   const before = state.pending;
   state.pending = null;
   state.dragStack = [];
+  state.facePaintVal = null;
   if (!before) return;
   if (cancelled) { state.marks = before; refresh(); return; }
   if (!sameMarks(before, state.marks)) {

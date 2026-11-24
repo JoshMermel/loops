@@ -440,7 +440,8 @@ export class Board {
         }
       }
     }
-    if (!this.gesture && this.hoverFace >= 0 && fr > 0 && fc > 0) {
+    const hoverAutoFace = this.hoverFace >= 0 && marks.faces && marks.faces[this.hoverFace] && marks.autoF && marks.autoF[this.hoverFace];
+    if (!this.gesture && this.hoverFace >= 0 && !hoverAutoFace && fr > 0 && fc > 0) {
       const r = (this.hoverFace / fc) | 0, c = this.hoverFace % fc;
       g += `<rect class="face-hover" x="${vx(c) + 3}" y="${vy(r) + 3}" width="${S - 6}" height="${S - 6}" rx="4"/>`;
     }
