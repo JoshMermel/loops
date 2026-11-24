@@ -78,24 +78,31 @@ function onComponents(P, st) {
 let scratchOnc = new Int8Array(0);
 let scratchSeen = new Uint8Array(0);
 let scratchIsLoop = new Uint8Array(0);
+let scratchCanOpen = new Uint8Array(0);
 let scratchTin = new Int32Array(0);
 let scratchLow = new Int32Array(0);
 let scratchSubLoop = new Int32Array(0);
 let scratchSubSize = new Int32Array(0);
 let scratchSeen2 = new Uint8Array(0);
 let scratchStack = new Int32Array(0);
+let scratchBridge = new Uint8Array(0);
 
-function ensureRatingScratch(N) {
-  if (scratchOnc.length >= N) return;
-  scratchOnc = new Int8Array(N);
-  scratchSeen = new Uint8Array(N);
-  scratchIsLoop = new Uint8Array(N);
-  scratchTin = new Int32Array(N);
-  scratchLow = new Int32Array(N);
-  scratchSubLoop = new Int32Array(N);
-  scratchSubSize = new Int32Array(N);
-  scratchSeen2 = new Uint8Array(N);
-  scratchStack = new Int32Array(N);
+function ensureRatingScratch(N, numEdges = 0) {
+  if (scratchOnc.length < N) {
+    scratchOnc = new Int8Array(N);
+    scratchSeen = new Uint8Array(N);
+    scratchIsLoop = new Uint8Array(N);
+    scratchCanOpen = new Uint8Array(N);
+    scratchTin = new Int32Array(N);
+    scratchLow = new Int32Array(N);
+    scratchSubLoop = new Int32Array(N);
+    scratchSubSize = new Int32Array(N);
+    scratchSeen2 = new Uint8Array(N);
+    scratchStack = new Int32Array(N);
+  }
+  if (numEdges > 0 && scratchBridge.length < numEdges) {
+    scratchBridge = new Uint8Array(numEdges);
+  }
 }
 
 /**
@@ -153,57 +160,69 @@ export function oddOpenEnds(P, st) {
  * (edges that are E_ON or E_UNKNOWN, skipping edges incident to OFF cells or full cells except their E_ON edges).
  * Returns null if OK, or { kind: 'disconnected'|'cutVertex', cut?, area: [cells] }.
  */
-export function chokepointCheck(P, st, boolOnly = false) {
+export function chokepointCheck(P, st, boolOnly = false, precomp = null) {
   const { N, ed, nb } = P;
+  const e = st.e, cell = st.cell;
   ensureRatingScratch(N);
-  const onc = scratchOnc;
-  const isLoop = scratchIsLoop;
-  onc.fill(0, 0, N);
-  isLoop.fill(0, 0, N);
-  for (let x = 0; x < P.numEdges; x++) if (st.e[x] === E_ON) { onc[P.edgeA[x]]++; onc[P.edgeB[x]]++; }
-
-  let firstLoop = -1, totalLoops = 0;
-  for (let i = 0; i < N; i++) if (st.cell[i] === LOOP) { if (firstLoop < 0) firstLoop = i; totalLoops++; isLoop[i] = 1; }
-  if (totalLoops < 2) return null;
-
-  const activeEdge = (u, d) => {
-    const x = ed[u * 4 + d];
-    if (x < 0 || st.e[x] === E_OFF) return false;
-    if (st.e[x] === E_ON) return true;
-    const v = nb[u * 4 + d];
-    return st.cell[u] !== OFF && st.cell[v] !== OFF && onc[u] < 2 && onc[v] < 2;
-  };
-
-  // 1. Connectivity of all LOOP cells
-  const vis = scratchSeen;
-  const stack = scratchStack;
-  vis.fill(0, 0, N);
-  let sp = 0;
-  stack[sp++] = firstLoop;
-  vis[firstLoop] = 1;
-  let seenLoops = 1;
-  let comp0Size = 1;
-  while (sp > 0) {
-    const u = stack[--sp];
-    for (let d = 0; d < 4; d++) {
-      if (!activeEdge(u, d)) continue;
-      const v = nb[u * 4 + d];
-      if (!vis[v]) {
-        vis[v] = 1;
-        stack[sp++] = v;
-        comp0Size++;
-        if (isLoop[v]) seenLoops++;
-      }
+  let isLoop, canOpen, firstLoop, totalLoops;
+  if (precomp) {
+    isLoop = precomp.isLoop;
+    canOpen = precomp.canOpen;
+    firstLoop = precomp.firstLoop;
+    totalLoops = precomp.totalLoops;
+  } else {
+    const onc = scratchOnc;
+    isLoop = scratchIsLoop;
+    canOpen = scratchCanOpen;
+    onc.fill(0, 0, N);
+    isLoop.fill(0, 0, N);
+    for (let x = 0; x < P.numEdges; x++) if (e[x] === E_ON) { onc[P.edgeA[x]]++; onc[P.edgeB[x]]++; }
+    firstLoop = -1; totalLoops = 0;
+    for (let i = 0; i < N; i++) {
+      const s = cell[i];
+      if (s === LOOP) { if (firstLoop < 0) firstLoop = i; totalLoops++; isLoop[i] = 1; }
+      canOpen[i] = (s !== OFF && onc[i] < 2) ? 1 : 0;
     }
   }
-  if (seenLoops < totalLoops) {
-    if (boolOnly) return { kind: 'disconnected', area: [] };
-    const comp0 = [], other = [];
-    for (let i = 0; i < N; i++) {
-      if (vis[i]) comp0.push(i);
-      else if (st.cell[i] !== OFF) other.push(i);
+  if (totalLoops < 2) return null;
+
+  const stack = scratchStack;
+  let comp0Size = 0;
+  if (!boolOnly) {
+    // 1. Connectivity of all LOOP cells (also computes comp0Size for smaller-side area sizing)
+    const vis = scratchSeen;
+    vis.fill(0, 0, N);
+    let sp = 0;
+    stack[sp++] = firstLoop;
+    vis[firstLoop] = 1;
+    let seenLoops = 1;
+    comp0Size = 1;
+    while (sp > 0) {
+      const u = stack[--sp];
+      const u4 = u * 4, uOpen = canOpen[u];
+      for (let d = 0; d < 4; d++) {
+        const x = ed[u4 + d];
+        if (x < 0) continue;
+        const ev = e[x];
+        if (ev === E_OFF) continue;
+        const v = nb[u4 + d];
+        if (ev !== E_ON && (!uOpen || !canOpen[v])) continue;
+        if (!vis[v]) {
+          vis[v] = 1;
+          stack[sp++] = v;
+          comp0Size++;
+          if (isLoop[v]) seenLoops++;
+        }
+      }
     }
-    return { kind: 'disconnected', area: comp0.length <= other.length ? comp0 : other };
+    if (seenLoops < totalLoops) {
+      const comp0 = [], other = [];
+      for (let i = 0; i < N; i++) {
+        if (vis[i]) comp0.push(i);
+        else if (cell[i] !== OFF) other.push(i);
+      }
+      return { kind: 'disconnected', area: comp0.length <= other.length ? comp0 : other };
+    }
   }
 
   // 2. Tarjan's articulation points + subtree loop counts on the connected component of firstLoop
@@ -221,9 +240,14 @@ export function chokepointCheck(P, st, boolOnly = false) {
     subSize[u] = 1;
     let childWithLoop = 0;
     let smallAreaSize = N;
+    const u4 = u * 4, uOpen = canOpen[u];
     for (let d = 0; d < 4; d++) {
-      if (!activeEdge(u, d)) continue;
-      const v = nb[u * 4 + d];
+      const x = ed[u4 + d];
+      if (x < 0) continue;
+      const ev = e[x];
+      if (ev === E_OFF) continue;
+      const v = nb[u4 + d];
+      if (ev !== E_ON && (!uOpen || !canOpen[v])) continue;
       if (v === p) continue;
       if (tin[v] >= 0) {
         if (tin[v] < low[u]) low[u] = tin[v];
@@ -241,10 +265,13 @@ export function chokepointCheck(P, st, boolOnly = false) {
         } else if (low[v] >= tin[u] && subLoop[v] > 0) {
           const outsideLoops = totalLoops - subLoop[v] - isLoop[u];
           if (outsideLoops > 0) {
+            if (boolOnly) {
+              bestCut = { kind: 'cutVertex', cut: u, seed: v, areaSize: 0 };
+              return;
+            }
             const sideSize = Math.min(subSize[v], comp0Size - 1 - subSize[v]);
             if (!bestCut || sideSize < bestCut.areaSize) {
               bestCut = { kind: 'cutVertex', cut: u, seed: v, areaSize: sideSize };
-              if (boolOnly) return;
             }
           }
         }
@@ -257,8 +284,12 @@ export function chokepointCheck(P, st, boolOnly = false) {
     }
   };
   dfs(firstLoop, -1);
+  if (boolOnly) {
+    if (bestCut) return { kind: 'cutVertex', cut: bestCut.cut, area: [] };
+    if (subLoop[firstLoop] < totalLoops) return { kind: 'disconnected', area: [] };
+    return null;
+  }
   if (!bestCut) return null;
-  if (boolOnly) return { kind: 'cutVertex', cut: bestCut.cut, area: [] };
 
   // Collect the smaller separated area cells (excluding cut)
   const cut = bestCut.cut;
@@ -266,9 +297,14 @@ export function chokepointCheck(P, st, boolOnly = false) {
   seen2.fill(0, 0, N);
   seen2[cut] = 1;
   let smallestArea = null;
+  const cut4 = cut * 4, cutOpen = canOpen[cut];
   for (let d = 0; d < 4; d++) {
-    if (!activeEdge(cut, d)) continue;
-    const start = nb[cut * 4 + d];
+    const cx = ed[cut4 + d];
+    if (cx < 0) continue;
+    const cev = e[cx];
+    if (cev === E_OFF) continue;
+    const start = nb[cut4 + d];
+    if (cev !== E_ON && (!cutOpen || !canOpen[start])) continue;
     if (seen2[start]) continue;
     seen2[start] = 1;
     let qsp = 0;
@@ -279,9 +315,14 @@ export function chokepointCheck(P, st, boolOnly = false) {
       const u = stack[--qsp];
       area.push(u);
       if (isLoop[u]) hasL = true;
+      const u4 = u * 4, uOpen = canOpen[u];
       for (let dd = 0; dd < 4; dd++) {
-        if (!activeEdge(u, dd)) continue;
-        const v = nb[u * 4 + dd];
+        const x = ed[u4 + dd];
+        if (x < 0) continue;
+        const ev = e[x];
+        if (ev === E_OFF) continue;
+        const v = nb[u4 + dd];
+        if (ev !== E_ON && (!uOpen || !canOpen[v])) continue;
         if (!seen2[v]) { seen2[v] = 1; stack[qsp++] = v; }
       }
     }
@@ -766,56 +807,130 @@ function findTwoEndsJoin(P, st) {
   return out;
 }
 
-function findChokepoint(smallOnly) {
-  return (P, st) => {
-    const out = [];
-    const onc = new Int8Array(P.N);
-    for (let x = 0; x < P.numEdges; x++) if (st.e[x] === E_ON) { onc[P.edgeA[x]]++; onc[P.edgeB[x]]++; }
-    const s2 = cloneState(st);
-    for (let x = 0; x < P.numEdges; x++) {
-      if (st.e[x] !== E_UNKNOWN) continue;
-      const a = P.edgeA[x], b = P.edgeB[x];
-      if (a < 0) continue;
-      // Inactive edges don't participate in chokepointCheck's active graph
-      if (st.cell[a] === OFF || st.cell[b] === OFF || onc[a] >= 2 || onc[b] >= 2) continue;
-      s2.e[x] = E_OFF;
-      const ck = chokepointCheck(P, s2);
-      s2.e[x] = E_UNKNOWN;
-      if (!ck) continue;
-      const small = ck.area.length <= 12;
-      if (small !== smallOnly) continue;
-      out.push({ sets: [['e', x, E_ON]], info: { edge: x, kind: ck.kind, cut: ck.cut, area: ck.area } });
+function computeAllChokepoints(P, st) {
+  const { N, numEdges, edgeA, edgeB } = P;
+  const out = [];
+  const onc = new Int8Array(N);
+  const isLoop = new Uint8Array(N);
+  const canOpen = new Uint8Array(N);
+  for (let x = 0; x < numEdges; x++) if (st.e[x] === E_ON) { onc[edgeA[x]]++; onc[edgeB[x]]++; }
+  let firstLoop = -1, totalLoops = 0;
+  for (let i = 0; i < N; i++) {
+    const s = st.cell[i];
+    if (s === LOOP) { if (firstLoop < 0) firstLoop = i; totalLoops++; isLoop[i] = 1; }
+    canOpen[i] = (s !== OFF && onc[i] < 2) ? 1 : 0;
+  }
+  if (totalLoops < 2) return out;
+  const precomp = { isLoop, canOpen, firstLoop, totalLoops };
+  const s2 = cloneState(st);
+  for (let x = 0; x < numEdges; x++) {
+    if (st.e[x] !== E_UNKNOWN) continue;
+    const a = edgeA[x];
+    if (a < 0) continue;
+    const b = edgeB[x];
+    if (!canOpen[a] || !canOpen[b]) continue;
+    s2.e[x] = E_OFF;
+    const hit = chokepointCheck(P, s2, true, precomp);
+    if (hit) {
+      const ck = chokepointCheck(P, s2, false, precomp);
+      if (ck) out.push({ sets: [['e', x, E_ON]], info: { edge: x, kind: ck.kind, cut: ck.cut, area: ck.area } });
     }
-    out.sort((p, q) => p.info.area.length - q.info.area.length);
-    return out;
+    s2.e[x] = E_UNKNOWN;
+  }
+  out.sort((p, q) => p.info.area.length - q.info.area.length);
+  return out;
+}
+
+function findChokepoint(smallOnly) {
+  return (P, st, opts) => {
+    const cache = opts && opts.stepCache;
+    const all = cache ? (cache.chokepoints || (cache.chokepoints = computeAllChokepoints(P, st))) : computeAllChokepoints(P, st);
+    return all.filter((f) => (f.info.area.length <= 12) === smallOnly);
   };
 }
 
-function findParity(smallOnly) {
-  return (P, st) => {
-    const out = [];
-    const s2 = cloneState(st);
-    for (let x = 0; x < P.numEdges; x++) {
-      if (st.e[x] !== E_UNKNOWN) continue;
-      const a = P.edgeA[x], b = P.edgeB[x];
-      if (a < 0) continue;
-      if (st.cell[a] === OFF || st.cell[b] === OFF) continue;
-      for (const tryVal of [E_ON, E_OFF]) {
-        s2.e[x] = tryVal;
-        const easy = easyContradiction(P, s2);
-        const odd = easy ? null : oddOpenEnds(P, s2);
-        s2.e[x] = E_UNKNOWN;
-        if (!odd) continue;
-        const small = odd.ends.length <= 3 && odd.cells.length <= 9;
-        if (small !== smallOnly) continue;
-        out.push({
-          sets: [['e', x, tryVal === E_ON ? E_OFF : E_ON]],
-          info: { edge: x, hyp: tryVal, ends: odd.ends, area: odd.cells },
-        });
+/**
+ * Mark bridges of the needy-cell unknown-edge graph G_unk(st) in `scratchBridge` (single O(N) Tarjan DFS).
+ * When st has no existing odd open-end component:
+ *   - Setting E_OFF on a non-bridge edge cannot disconnect any component or change any open-end parity.
+ *   - Setting E_ON on a non-bridge edge whose endpoints both have onc===0 keeps both endpoints needy
+ *     and adds +2 open ends to the same component, so parity cannot change.
+ */
+function markUnknownBridges(P, st, onc) {
+  const { N, numEdges, ed, nb } = P;
+  ensureRatingScratch(N, numEdges);
+  const tin = scratchTin, low = scratchLow, bridge = scratchBridge;
+  tin.fill(-1, 0, N);
+  bridge.fill(0, 0, numEdges);
+  let timer = 0;
+  const dfs = (u, parentEdge) => {
+    tin[u] = low[u] = timer++;
+    const u4 = u * 4;
+    for (let d = 0; d < 4; d++) {
+      const x = ed[u4 + d];
+      if (x < 0 || x === parentEdge || st.e[x] !== E_UNKNOWN) continue;
+      const v = nb[u4 + d];
+      if (st.cell[v] === OFF || onc[v] >= 2) continue;
+      if (tin[v] >= 0) {
+        if (tin[v] < low[u]) low[u] = tin[v];
+      } else {
+        dfs(v, x);
+        if (low[v] < low[u]) low[u] = low[v];
+        if (low[v] > tin[u]) bridge[x] = 1;
       }
     }
-    out.sort((p, q) => p.info.area.length - q.info.area.length);
-    return out;
+  };
+  for (let i = 0; i < N; i++) {
+    if (tin[i] < 0 && st.cell[i] !== OFF && onc[i] < 2) dfs(i, -1);
+  }
+  return bridge;
+}
+
+function computeAllParities(P, st) {
+  const { N, numEdges, edgeA, edgeB } = P;
+  const out = [];
+  const onc = new Int8Array(N);
+  for (let x = 0; x < numEdges; x++) if (st.e[x] === E_ON) { onc[edgeA[x]]++; onc[edgeB[x]]++; }
+  const baseOdd = oddOpenEnds(P, st) !== null;
+  const bridge = baseOdd ? null : markUnknownBridges(P, st, onc);
+  const s2 = cloneState(st);
+  for (let x = 0; x < numEdges; x++) {
+    if (st.e[x] !== E_UNKNOWN) continue;
+    const a = edgeA[x];
+    if (a < 0) continue;
+    const b = edgeB[x];
+    if (st.cell[a] === OFF || st.cell[b] === OFF) continue;
+    const isB = !bridge || bridge[x] === 1;
+    const tryOn = isB || onc[a] >= 1 || onc[b] >= 1;
+    const tryOff = isB;
+    if (tryOn) {
+      s2.e[x] = E_ON;
+      const easy = easyContradiction(P, s2);
+      const odd = easy ? null : oddOpenEnds(P, s2);
+      s2.e[x] = E_UNKNOWN;
+      if (odd) {
+        out.push({ sets: [['e', x, E_OFF]], info: { edge: x, hyp: E_ON, ends: odd.ends, area: odd.cells } });
+      }
+    }
+    if (tryOff) {
+      s2.e[x] = E_OFF;
+      const easy = easyContradiction(P, s2);
+      const odd = easy ? null : oddOpenEnds(P, s2);
+      s2.e[x] = E_UNKNOWN;
+      if (odd) {
+        out.push({ sets: [['e', x, E_ON]], info: { edge: x, hyp: E_OFF, ends: odd.ends, area: odd.cells } });
+      }
+    }
+  }
+  out.sort((p, q) => p.info.area.length - q.info.area.length);
+  return out;
+}
+
+function findParity(smallOnly) {
+  return (P, st, opts) => {
+    const cache = opts && opts.stepCache;
+    const all = cache ? (cache.parities || (cache.parities = computeAllParities(P, st))) : computeAllParities(P, st);
+    return all.filter((f) => (f.info.ends.length <= 3 && f.info.area.length <= 9) === smallOnly);
   };
 }
 
@@ -1115,6 +1230,7 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
     return found;
   };
 
+  const stepCache = {};
   for (const rule of HUMAN_ORDER) {
     if (without && without.includes(rule.id)) continue;
     // Before costly or lookahead rules, search imagine up to the current tier ceiling so cheaper imagine
@@ -1126,7 +1242,7 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
     } else if (found && found.cost < rule.weight) {
       return imagineStep(found);
     }
-    const firings = rule.find(P, st, { upto: FIRST_LOOKAHEAD });
+    const firings = rule.find(P, st, { upto: FIRST_LOOKAHEAD, stepCache });
     if (firings.length) {
       if (rule.weight > IMAGINE_AFTER) {
         const ruleCost = rule.weight + (rule.extra ? rule.extra(P, st, firings[0]) : 0);

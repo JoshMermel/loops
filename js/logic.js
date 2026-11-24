@@ -106,179 +106,264 @@ export function edgeCells(P, x) {
   return [P.edgeA[x], P.edgeB[x]];
 }
 
-// Reusable union-find scratch buffers for propagate() (never called recursively)
+// Reusable scratch buffers for propagate() (never called recursively)
 let scratchParent = new Int16Array(0);
 let scratchSize = new Int32Array(0);
+let scratchCellQ = new Int16Array(0);
+let scratchInCellQ = new Uint8Array(0);
+let scratchClueQ = new Int16Array(0);
+let scratchInClueQ = new Uint8Array(0);
+let scratchQCap = 0;
+
+function ensurePropScratch(N) {
+  if (scratchParent.length < N) {
+    scratchParent = new Int16Array(N);
+    scratchSize = new Int32Array(N);
+    scratchInCellQ = new Uint8Array(N);
+    scratchInClueQ = new Uint8Array(N);
+  }
+  if (scratchQCap <= N) {
+    let cap = 64;
+    while (cap <= N) cap <<= 1;
+    scratchQCap = cap;
+    scratchCellQ = new Int16Array(cap);
+    scratchClueQ = new Int16Array(cap);
+  }
+}
 
 /**
  * Sound constraint propagation for the exact solver. Returns false on a contradiction.
  * Does not model a human; human-style rules live in js/rating.js.
+ * Optional `seedEdge` / `seedCell` restricts the initial worklist to the local neighborhood
+ * of a single newly assigned edge/cell (used by `solve()` after a prior fixed point).
  */
-export function propagate(P, st) {
-  const { N, numEdges, nb, ed, ed2, step2, edgeA, edgeB, clue, whites, blacks } = P;
+export function propagate(P, st, seedEdge = -1, seedCell = -1) {
+  const { N, numEdges, nb, ed, ed2, edgeA, edgeB, clue, whites, blacks } = P;
   const cell = st.cell, e = st.e;
-  let changed = true;
+
+  ensurePropScratch(N);
+  const parent = scratchParent, size = scratchSize;
+  const qCell = scratchCellQ, inCellQ = scratchInCellQ;
+  const qClue = scratchClueQ, inClueQ = scratchInClueQ;
+  const qMask = scratchQCap - 1;
+  let cHead = 0, cTail = 0;
+  let kHead = 0, kTail = 0;
   let ok = true;
+  let needLoopCheck = false;
+
+  const pushCell = (i) => {
+    if (!inCellQ[i]) {
+      inCellQ[i] = 1;
+      qCell[cTail] = i;
+      cTail = (cTail + 1) & qMask;
+    }
+  };
+  const pushClue = (i) => {
+    if (!inClueQ[i]) {
+      inClueQ[i] = 1;
+      qClue[kTail] = i;
+      kTail = (kTail + 1) & qMask;
+    }
+  };
+  const wakeEdge = (x) => {
+    const a = edgeA[x], b = edgeB[x];
+    if (a < 0) return;
+    pushCell(a);
+    pushCell(b);
+    if (clue[a] !== NONE) pushClue(a);
+    if (clue[b] !== NONE) pushClue(b);
+    const a4 = a * 4, b4 = b * 4;
+    let j = nb[a4]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[a4 + 1]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[a4 + 2]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[a4 + 3]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[b4]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[b4 + 1]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[b4 + 2]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    j = nb[b4 + 3]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+  };
 
   const setCell = (i, v) => {
-    if (cell[i] === v) return;
-    if (cell[i] !== UNKNOWN) { ok = false; return; }
+    const cur = cell[i];
+    if (cur === v) return;
+    if (cur !== UNKNOWN) { ok = false; return; }
     cell[i] = v;
-    changed = true;
+    if (v === LOOP) needLoopCheck = true;
+    pushCell(i);
   };
   const setEdge = (x, v) => {
     if (x < 0) { if (v === E_ON) ok = false; return; }
-    if (e[x] === v) return;
-    if (e[x] !== E_UNKNOWN) { ok = false; return; }
+    const cur = e[x];
+    if (cur === v) return;
+    if (cur !== E_UNKNOWN) { ok = false; return; }
     e[x] = v;
-    changed = true;
+    if (v === E_ON) needLoopCheck = true;
+    wakeEdge(x);
   };
 
-  if (scratchParent.length < N) {
-    scratchParent = new Int16Array(N);
-    scratchSize = new Int32Array(N);
+  if (seedEdge >= 0) {
+    if (e[seedEdge] === E_ON) needLoopCheck = true;
+    wakeEdge(seedEdge);
+  } else if (seedCell >= 0) {
+    if (cell[seedCell] === LOOP) needLoopCheck = true;
+    pushCell(seedCell);
+  } else {
+    needLoopCheck = true;
+    for (let i = 0; i < N; i++) pushCell(i);
+    for (let wi = 0; wi < whites.length; wi++) pushClue(whites[wi]);
+    for (let bi = 0; bi < blacks.length; bi++) pushClue(blacks[bi]);
   }
-  const parent = scratchParent, size = scratchSize;
+
   const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
 
-  let needLoopCheck = true;
-  while (changed && ok) {
-    // Inner local fixed-point loop (Steps 1-4): avoids re-running the O(N + E) union-find on every local cascade step.
-    // Note: cell/edge consistency (Step 1) is enforced directly inside Step 2 below.
-    while (changed && ok) {
-      changed = false;
+  while (ok) {
+    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues whose neighborhood changed.
+    while (ok && (cHead !== cTail || kHead !== kTail)) {
+      while (ok && cHead !== cTail) {
+        const i = qCell[cHead];
+        cHead = (cHead + 1) & qMask;
+        inCellQ[i] = 0;
 
-      // 1-2. Cell degree / OFF / LOOP consistency (also enforces ON edge -> LOOP endpoints & OFF -> edges OFF)
-      for (let i = 0; i < N && ok; i++) {
         const s = cell[i];
+        const i4 = i * 4;
         if (s === OFF) {
           if (clue[i] !== NONE) { ok = false; break; }
-          for (let d = 0; d < 4; d++) {
-            const x = ed[i * 4 + d];
-            if (x >= 0) setEdge(x, E_OFF);
-          }
+          const x0 = ed[i4], x1 = ed[i4 + 1], x2 = ed[i4 + 2], x3 = ed[i4 + 3];
+          if (x0 >= 0 && e[x0] !== E_OFF) setEdge(x0, E_OFF);
+          if (x1 >= 0 && e[x1] !== E_OFF) setEdge(x1, E_OFF);
+          if (x2 >= 0 && e[x2] !== E_OFF) setEdge(x2, E_OFF);
+          if (x3 >= 0 && e[x3] !== E_OFF) setEdge(x3, E_OFF);
           continue;
         }
         let on = 0, unk = 0;
-        for (let d = 0; d < 4; d++) {
-          const x = ed[i * 4 + d];
-          if (x < 0) continue;
-          const v = e[x];
-          if (v === E_ON) on++;
-          else if (v === E_UNKNOWN) unk++;
-        }
+        const x0 = ed[i4], x1 = ed[i4 + 1], x2 = ed[i4 + 2], x3 = ed[i4 + 3];
+        if (x0 >= 0) { const v = e[x0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+        if (x1 >= 0) { const v = e[x1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+        if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+        if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
         if (on > 2) { ok = false; break; }
         if (s === UNKNOWN) {
-          if (on >= 1) { setCell(i, LOOP); needLoopCheck = true; }
+          if (on >= 1) setCell(i, LOOP);
           else if (unk < 2) setCell(i, OFF);
           continue;
         }
         // s === LOOP
         if (on + unk < 2) { ok = false; break; }
-        if (on === 2 && unk > 0) {
-          for (let d = 0; d < 4; d++) {
-            const x = ed[i * 4 + d];
-            if (x >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
-          }
-        } else if (on + unk === 2 && unk > 0) {
-          for (let d = 0; d < 4; d++) {
-            const x = ed[i * 4 + d];
-            if (x >= 0 && e[x] === E_UNKNOWN) { setEdge(x, E_ON); needLoopCheck = true; }
+        if (unk > 0) {
+          if (on === 2) {
+            if (x0 >= 0 && e[x0] === E_UNKNOWN) setEdge(x0, E_OFF);
+            if (x1 >= 0 && e[x1] === E_UNKNOWN) setEdge(x1, E_OFF);
+            if (x2 >= 0 && e[x2] === E_UNKNOWN) setEdge(x2, E_OFF);
+            if (x3 >= 0 && e[x3] === E_UNKNOWN) setEdge(x3, E_OFF);
+          } else if (on + unk === 2) {
+            if (x0 >= 0 && e[x0] === E_UNKNOWN) setEdge(x0, E_ON);
+            if (x1 >= 0 && e[x1] === E_UNKNOWN) setEdge(x1, E_ON);
+            if (x2 >= 0 && e[x2] === E_UNKNOWN) setEdge(x2, E_ON);
+            if (x3 >= 0 && e[x3] === E_UNKNOWN) setEdge(x3, E_ON);
           }
         }
       }
       if (!ok) break;
 
-      // 3. White circles: straight through, turn at >= 1 end
-      for (let wi = 0; wi < whites.length && ok; wi++) {
-        const i = whites[wi];
-        const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
-        const u2 = ed2[i * 4 + 0], r2 = ed2[i * 4 + 1], d2 = ed2[i * 4 + 2], l2 = ed2[i * 4 + 3];
+      while (ok && kHead !== kTail) {
+        const i = qClue[kHead];
+        kHead = (kHead + 1) & qMask;
+        inClueQ[i] = 0;
 
-        let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
-        let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
-        if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
-        if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
-        if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
-        if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
+        const i4 = i * 4;
+        if (clue[i] === WHITE) {
+          // 3. White circles: straight through, turn at >= 1 end
+          const u = ed[i4], r = ed[i4 + 1], dn = ed[i4 + 2], l = ed[i4 + 3];
+          const u2 = ed2[i4], r2 = ed2[i4 + 1], d2 = ed2[i4 + 2], l2 = ed2[i4 + 3];
 
-        if (!vOk && !hOk) { ok = false; break; }
-        if (!vOk) {
-          if (e[r] !== E_ON || e[l] !== E_ON) needLoopCheck = true;
-          setEdge(r, E_ON); setEdge(l, E_ON);
-          if (u >= 0) setEdge(u, E_OFF);
-          if (dn >= 0) setEdge(dn, E_OFF);
-          if (r2 >= 0 && e[r2] === E_ON && l2 >= 0) setEdge(l2, E_OFF);
-          if (l2 >= 0 && e[l2] === E_ON && r2 >= 0) setEdge(r2, E_OFF);
-        } else if (!hOk) {
-          if (e[u] !== E_ON || e[dn] !== E_ON) needLoopCheck = true;
-          setEdge(u, E_ON); setEdge(dn, E_ON);
-          if (r >= 0) setEdge(r, E_OFF);
-          if (l >= 0) setEdge(l, E_OFF);
-          if (u2 >= 0 && e[u2] === E_ON && d2 >= 0) setEdge(d2, E_OFF);
-          if (d2 >= 0 && e[d2] === E_ON && u2 >= 0) setEdge(u2, E_OFF);
-        }
-      }
-      if (!ok) break;
+          let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
+          let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
+          if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
+          if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
+          if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
+          if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
 
-      // 4. Black circles: turn 90° and go straight 2 steps in each chosen direction
-      for (let bi = 0; bi < blacks.length && ok; bi++) {
-        const i = blacks[bi];
-        let can0 = true, can1 = true, can2 = true, can3 = true;
-        for (let d = 0; d < 4; d++) {
-          const x1 = ed[i * 4 + d];
-          const x2 = ed2[i * 4 + d];
-          const n1 = nb[i * 4 + d];
-          let can = x1 >= 0 && x2 >= 0 && e[x1] !== E_OFF && e[x2] !== E_OFF;
-          if (can) {
-            if (clue[n1] === BLACK) can = false;
+          if (!vOk && !hOk) { ok = false; break; }
+          if (!vOk) {
+            setEdge(r, E_ON); setEdge(l, E_ON);
+            if (u >= 0) setEdge(u, E_OFF);
+            if (dn >= 0) setEdge(dn, E_OFF);
+            if (r2 >= 0 && e[r2] === E_ON && l2 >= 0) setEdge(l2, E_OFF);
+            if (l2 >= 0 && e[l2] === E_ON && r2 >= 0) setEdge(r2, E_OFF);
+          } else if (!hOk) {
+            setEdge(u, E_ON); setEdge(dn, E_ON);
+            if (r >= 0) setEdge(r, E_OFF);
+            if (l >= 0) setEdge(l, E_OFF);
+            if (u2 >= 0 && e[u2] === E_ON && d2 >= 0) setEdge(d2, E_OFF);
+            if (d2 >= 0 && e[d2] === E_ON && u2 >= 0) setEdge(u2, E_OFF);
+          }
+        } else {
+          // 4. Black circles: turn 90° and go straight 2 steps in each chosen direction
+          const eu = ed[i4], er = ed[i4 + 1], edown = ed[i4 + 2], el = ed[i4 + 3];
+          const eu2 = ed2[i4], er2 = ed2[i4 + 1], ed2v = ed2[i4 + 2], el2 = ed2[i4 + 3];
+
+          let can0 = eu >= 0 && eu2 >= 0 && e[eu] !== E_OFF && e[eu2] !== E_OFF;
+          if (can0) {
+            const n1 = nb[i4];
+            if (clue[n1] === BLACK) can0 = false;
             else {
-              const p1 = ed[n1 * 4 + ((d + 1) & 3)], p2 = ed[n1 * 4 + ((d + 3) & 3)];
-              if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can = false;
+              const p1 = ed[n1 * 4 + 1], p2 = ed[n1 * 4 + 3];
+              if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can0 = false;
             }
           }
-          if (d === 0) can0 = can; else if (d === 1) can1 = can; else if (d === 2) can2 = can; else can3 = can;
-        }
+          let can2 = edown >= 0 && ed2v >= 0 && e[edown] !== E_OFF && e[ed2v] !== E_OFF;
+          if (can2) {
+            const n1 = nb[i4 + 2];
+            if (clue[n1] === BLACK) can2 = false;
+            else {
+              const p1 = ed[n1 * 4 + 3], p2 = ed[n1 * 4 + 1];
+              if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can2 = false;
+            }
+          }
+          if (!can0 && !can2) { ok = false; break; }
+          if (!can0) {
+            if (eu >= 0) setEdge(eu, E_OFF);
+            setEdge(edown, E_ON); setEdge(ed2v, E_ON);
+          } else if (!can2) {
+            if (edown >= 0) setEdge(edown, E_OFF);
+            setEdge(eu, E_ON); setEdge(eu2, E_ON);
+          } else if (e[eu] === E_ON) {
+            setEdge(edown, E_OFF); setEdge(eu2, E_ON);
+          } else if (e[edown] === E_ON) {
+            setEdge(eu, E_OFF); setEdge(ed2v, E_ON);
+          }
+          if (!ok) break;
 
-        const eu = ed[i * 4 + 0], edown = ed[i * 4 + 2];
-        if (!can0 && !can2) { ok = false; break; }
-        if (!can0) {
-          if (eu >= 0) setEdge(eu, E_OFF);
-          if (e[edown] !== E_ON || e[ed2[i * 4 + 2]] !== E_ON) needLoopCheck = true;
-          setEdge(edown, E_ON); setEdge(ed2[i * 4 + 2], E_ON);
-        } else if (!can2) {
-          if (edown >= 0) setEdge(edown, E_OFF);
-          if (e[eu] !== E_ON || e[ed2[i * 4 + 0]] !== E_ON) needLoopCheck = true;
-          setEdge(eu, E_ON); setEdge(ed2[i * 4 + 0], E_ON);
-        } else if (e[eu] === E_ON) {
-          setEdge(edown, E_OFF);
-          if (e[ed2[i * 4 + 0]] !== E_ON) needLoopCheck = true;
-          setEdge(ed2[i * 4 + 0], E_ON);
-        } else if (e[edown] === E_ON) {
-          setEdge(eu, E_OFF);
-          if (e[ed2[i * 4 + 2]] !== E_ON) needLoopCheck = true;
-          setEdge(ed2[i * 4 + 2], E_ON);
-        }
-        if (!ok) break;
-
-        const er = ed[i * 4 + 1], el = ed[i * 4 + 3];
-        if (!can1 && !can3) { ok = false; break; }
-        if (!can1) {
-          if (er >= 0) setEdge(er, E_OFF);
-          if (e[el] !== E_ON || e[ed2[i * 4 + 3]] !== E_ON) needLoopCheck = true;
-          setEdge(el, E_ON); setEdge(ed2[i * 4 + 3], E_ON);
-        } else if (!can3) {
-          if (el >= 0) setEdge(el, E_OFF);
-          if (e[er] !== E_ON || e[ed2[i * 4 + 1]] !== E_ON) needLoopCheck = true;
-          setEdge(er, E_ON); setEdge(ed2[i * 4 + 1], E_ON);
-        } else if (e[er] === E_ON) {
-          setEdge(el, E_OFF);
-          if (e[ed2[i * 4 + 1]] !== E_ON) needLoopCheck = true;
-          setEdge(ed2[i * 4 + 1], E_ON);
-        } else if (e[el] === E_ON) {
-          setEdge(er, E_OFF);
-          if (e[ed2[i * 4 + 3]] !== E_ON) needLoopCheck = true;
-          setEdge(ed2[i * 4 + 3], E_ON);
+          let can1 = er >= 0 && er2 >= 0 && e[er] !== E_OFF && e[er2] !== E_OFF;
+          if (can1) {
+            const n1 = nb[i4 + 1];
+            if (clue[n1] === BLACK) can1 = false;
+            else {
+              const p1 = ed[n1 * 4 + 2], p2 = ed[n1 * 4 + 0];
+              if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can1 = false;
+            }
+          }
+          let can3 = el >= 0 && el2 >= 0 && e[el] !== E_OFF && e[el2] !== E_OFF;
+          if (can3) {
+            const n1 = nb[i4 + 3];
+            if (clue[n1] === BLACK) can3 = false;
+            else {
+              const p1 = ed[n1 * 4 + 0], p2 = ed[n1 * 4 + 2];
+              if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) can3 = false;
+            }
+          }
+          if (!can1 && !can3) { ok = false; break; }
+          if (!can1) {
+            if (er >= 0) setEdge(er, E_OFF);
+            setEdge(el, E_ON); setEdge(el2, E_ON);
+          } else if (!can3) {
+            if (el >= 0) setEdge(el, E_OFF);
+            setEdge(er, E_ON); setEdge(er2, E_ON);
+          } else if (e[er] === E_ON) {
+            setEdge(el, E_OFF); setEdge(er2, E_ON);
+          } else if (e[el] === E_ON) {
+            setEdge(er, E_OFF); setEdge(el2, E_ON);
+          }
         }
       }
     }
@@ -287,9 +372,10 @@ export function propagate(P, st) {
 
     // 5. Single closed loop constraint (runs once per local fixed point, only when ON/LOOP changed)
     for (let i = 0; i < N; i++) parent[i] = i;
-    let cycleRoot = -1, cycleCount = 0;
+    let cycleRoot = -1, cycleCount = 0, onEdges = 0;
     for (let x = 0; x < numEdges; x++) {
       if (e[x] !== E_ON) continue;
+      onEdges++;
       const ra = find(edgeA[x]), rb = find(edgeB[x]);
       if (ra === rb) { cycleRoot = ra; cycleCount++; }
       else parent[ra] = rb;
@@ -309,17 +395,26 @@ export function propagate(P, st) {
       st.cycle = true;
     } else {
       st.cycle = false;
-      size.fill(0, 0, N);
-      for (let i = 0; i < N; i++) if (cell[i] === LOOP) size[find(i)]++;
-      for (let x = 0; x < numEdges; x++) {
-        if (e[x] !== E_UNKNOWN) continue;
-        const a = edgeA[x], b = edgeB[x];
-        if (a < 0) continue;
-        const ra = find(a);
-        if (ra === find(b) && size[ra] < loopCount) setEdge(x, E_OFF);
+      if (onEdges >= 3) {
+        size.fill(0, 0, N);
+        for (let i = 0; i < N; i++) if (cell[i] === LOOP) size[find(i)]++;
+        for (let x = 0; x < numEdges; x++) {
+          if (e[x] !== E_UNKNOWN) continue;
+          const a = edgeA[x];
+          if (a < 0) continue;
+          const b = edgeB[x];
+          if (cell[a] !== LOOP || cell[b] !== LOOP) continue;
+          const ra = find(a);
+          if (ra === find(b) && size[ra] < loopCount) setEdge(x, E_OFF);
+        }
       }
     }
+    if (cHead === cTail && kHead === kTail) break;
   }
+
+  // O(touched) cleanup of queued flags on early contradiction exit
+  while (cHead !== cTail) { inCellQ[qCell[cHead]] = 0; cHead = (cHead + 1) & qMask; }
+  while (kHead !== kTail) { inClueQ[qClue[kHead]] = 0; kHead = (kHead + 1) & qMask; }
   return ok;
 }
 
@@ -329,55 +424,67 @@ export function propagate(P, st) {
  * An `exceeded` result means `maxNodes` was hit and `count` is only a lower bound — never proof of uniqueness.
  */
 export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = null } = {}) {
+  const { N, ed, clue } = P;
   const solutions = [];
   let nodes = 0, exceeded = false;
 
-  const dfs = (st) => {
+  const dfs = (st, seedEdge, seedCell) => {
     if (solutions.length >= limit || exceeded) return;
     if (++nodes > maxNodes) { exceeded = true; return; }
-    if (!propagate(P, st)) return;
+    if (!propagate(P, st, seedEdge, seedCell)) return;
 
+    const cell = st.cell, e = st.e;
     // Pick a LOOP cell that still has undecided edges:
     // Prefer open ends (on === 1) with fewest choices, then circles with on === 0, then any LOOP cell.
     let bi = -1, bestKey = -1;
-    const ties = [];
-    for (let i = 0; i < P.N; i++) {
-      if (st.cell[i] !== LOOP) continue;
+    const ties = rng ? [] : null;
+    for (let i = 0; i < N; i++) {
+      if (cell[i] !== LOOP) continue;
+      const i4 = i * 4;
       let on = 0, unk = 0;
-      for (let d = 0; d < 4; d++) {
-        const x = P.ed[i * 4 + d];
-        if (x < 0) continue;
-        if (st.e[x] === E_ON) on++;
-        else if (st.e[x] === E_UNKNOWN) unk++;
-      }
+      const x0 = ed[i4], x1 = ed[i4 + 1], x2 = ed[i4 + 2], x3 = ed[i4 + 3];
+      if (x0 >= 0) { const v = e[x0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x1 >= 0) { const v = e[x1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
       if (unk === 0) continue;
-      // Priority score (higher is picked first):
-      // on===1 beats on===0; among same on, circles beat non-circles, fewer unk beats more unk.
-      const isClue = P.clue[i] !== NONE ? 1 : 0;
+      const isClue = clue[i] !== NONE ? 1 : 0;
       const key = on * 100 + isClue * 10 + (4 - unk);
-      if (rng) {
+      if (ties) {
         if (key > bestKey) { bestKey = key; ties.length = 0; }
         if (key === bestKey) ties.push(i);
       } else if (key > bestKey) {
         bestKey = key; bi = i;
+        if (key === 113) break; // maximum possible priority (on=1, isClue=1, unk=1)
       }
     }
-    if (rng && ties.length) bi = ties[(rng() * ties.length) | 0];
+    if (ties && ties.length) bi = ties[(rng() * ties.length) | 0];
 
     if (bi >= 0) {
-      const open = [];
-      for (let d = 0; d < 4; d++) {
-        const y = P.ed[bi * 4 + d];
-        if (y >= 0 && st.e[y] === E_UNKNOWN) open.push(y);
+      let x = -1;
+      const b4 = bi * 4;
+      if (rng) {
+        const open = [];
+        for (let d = 0; d < 4; d++) {
+          const y = ed[b4 + d];
+          if (y >= 0 && e[y] === E_UNKNOWN) open.push(y);
+        }
+        x = open[(rng() * open.length) | 0];
+      } else {
+        for (let d = 0; d < 4; d++) {
+          const y = ed[b4 + d];
+          if (y >= 0 && e[y] === E_UNKNOWN) { x = y; break; }
+        }
       }
-      const x = rng ? open[(rng() * open.length) | 0] : open[0];
       const onFirst = rng ? rng() < 0.5 : true;
-      for (const v of onFirst ? [E_ON, E_OFF] : [E_OFF, E_ON]) {
-        const a = cloneState(st);
-        a.e[x] = v;
-        dfs(a);
-        if (solutions.length >= limit || exceeded) return;
-      }
+      const v0 = onFirst ? E_ON : E_OFF;
+      const v1 = onFirst ? E_OFF : E_ON;
+      const a = cloneState(st);
+      a.e[x] = v0;
+      dfs(a, x, -1);
+      if (solutions.length >= limit || exceeded) return;
+      st.e[x] = v1;
+      dfs(st, x, -1);
       return;
     }
 
@@ -392,23 +499,25 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
     let ci = -1;
     if (rng) {
       const unknown = [];
-      for (let i = 0; i < P.N; i++) if (st.cell[i] === UNKNOWN) unknown.push(i);
+      for (let i = 0; i < N; i++) if (cell[i] === UNKNOWN) unknown.push(i);
       if (unknown.length) ci = unknown[(rng() * unknown.length) | 0];
     } else {
-      for (let i = 0; i < P.N; i++) if (st.cell[i] === UNKNOWN) { ci = i; break; }
+      for (let i = 0; i < N; i++) if (cell[i] === UNKNOWN) { ci = i; break; }
     }
     if (ci >= 0) {
       const loopFirst = rng ? rng() < 0.5 : true;
-      for (const v of loopFirst ? [LOOP, OFF] : [OFF, LOOP]) {
-        const a = cloneState(st);
-        a.cell[ci] = v;
-        dfs(a);
-        if (solutions.length >= limit || exceeded) return;
-      }
+      const v0 = loopFirst ? LOOP : OFF;
+      const v1 = loopFirst ? OFF : LOOP;
+      const a = cloneState(st);
+      a.cell[ci] = v0;
+      dfs(a, -1, ci);
+      if (solutions.length >= limit || exceeded) return;
+      st.cell[ci] = v1;
+      dfs(st, -1, ci);
     }
   };
 
-  dfs(state ? cloneState(state) : initialState(P));
+  dfs(state ? cloneState(state) : initialState(P), -1, -1);
   return { count: solutions.length, solutions, exceeded, nodes };
 }
 
