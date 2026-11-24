@@ -12,6 +12,7 @@ import {
 } from './marks.js';
 import { clueStates, earlyLoopEdges } from './clues.js';
 import { Board } from './board.js';
+import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
 import {
   PRESETS, CUSTOM, MIN_CUSTOM, MAX_CUSTOM, sanitizeCustom, validId,
   lightColors, resolvePalette, eyesOf, alikeMatrix,
@@ -31,6 +32,10 @@ const state = {
   loaded: new Map(),
   book: null,
   idx: 0,
+  baseP: null,
+  rotP: null,
+  rotated: false,
+  rotOverride: null, // null = auto, true = forced rotated, false = forced canonical
   P: null,
   marks: null,
   undo: [],
@@ -259,16 +264,51 @@ function analyse() {
   };
 }
 
-function fitBoard() {
-  const P = state.P;
-  if (!P) return;
-  const avail = Math.min(window.innerWidth - 24, 1500);
-  const px = Math.max(26, Math.min(48, Math.floor(avail / (P.cols + 0.5))));
+function viewportSpace() {
+  const availW = Math.min(window.innerWidth - 24, 1500);
+  const wrap = $('board').parentElement;
+  const top = wrap ? wrap.getBoundingClientRect().top + window.scrollY : 180;
+  const availH = Math.max(0, window.innerHeight - top - 20);
+  return { availW, availH };
+}
+
+function applyBoardSize(px) {
   const width = Math.round((board.size().W * px) / 44);
   $('board').style.width = `${width}px`;
   $('game-container').style.maxWidth = `${Math.max(640, width + 24)}px`;
 }
+
+function fitBoard() {
+  const baseP = state.baseP;
+  if (!baseP) return;
+  const { availW, availH } = viewportSpace();
+  const layout = chooseLayout(baseP.rows, baseP.cols, availW, availH, state.rotOverride);
+  if (layout.rotated !== state.rotated) {
+    const xf = layout.rotated
+      ? (m) => rotateMarksCW(baseP, state.rotP, m)
+      : (m) => unrotateMarksCW(baseP, state.rotP, m);
+    state.marks = xf(state.marks);
+    state.undo = state.undo.map(xf);
+    state.redo = state.redo.map(xf);
+    if (state.pending) state.pending = xf(state.pending);
+    state.rotated = layout.rotated;
+    state.P = state.rotated ? state.rotP : baseP;
+    state.hint = null;
+    hideToast();
+    board.setPuzzle(state.P);
+    showInfo();
+    board.render(state.marks, analyse());
+  }
+  applyBoardSize(layout.px);
+}
 window.addEventListener('resize', fitBoard);
+
+function toggleTurn() {
+  const baseP = state.baseP;
+  if (!baseP || baseP.rows === baseP.cols) return;
+  state.rotOverride = !state.rotated;
+  fitBoard();
+}
 
 function paintSolvedFaces(P, m) {
   const exactFaces = facesFromSolvedLoop(P, m.edges);
@@ -309,13 +349,14 @@ const saveKey = (P) => `ms_save_${puzzleHash(P)}`;
 const hasSave = (P) => store.get(saveKey(P)) !== null;
 
 function save() {
-  const P = state.P, m = state.marks;
-  if (isPristine(m)) { store.del(saveKey(P)); return; }
-  store.set(saveKey(P), JSON.stringify({
-    e: Array.from(m.edges).join(''),
-    ae: Array.from(m.autoE).join(''),
-    f: Array.from(m.faces).join(''),
-    af: Array.from(m.autoF).join(''),
+  const baseP = state.baseP, m = state.marks;
+  if (isPristine(m)) { store.del(saveKey(baseP)); return; }
+  const canon = state.rotated ? unrotateMarksCW(baseP, state.rotP, m) : m;
+  store.set(saveKey(baseP), JSON.stringify({
+    e: Array.from(canon.edges).join(''),
+    ae: Array.from(canon.autoE).join(''),
+    f: Array.from(canon.faces).join(''),
+    af: Array.from(canon.autoF).join(''),
   }));
 }
 
@@ -577,24 +618,32 @@ function openPuzzle(idx) {
   idx = Math.max(0, Math.min(idx, book.puzzles.length - 1));
   state.idx = idx;
   const raw = book.puzzles[idx];
-  const P = raw.N ? raw : compile(raw);
-  book.puzzles[idx] = P;
-  state.P = P;
-  state.marks = load(P);
-  state.undo = [];
-  state.redo = [];
-  state.hint = null;
-  state.solved = isSolved(P, state.marks.edges);
+  const baseP = raw.N ? raw : compile(raw);
+  book.puzzles[idx] = baseP;
+  state.baseP = baseP;
+  state.rotP = baseP.rows !== baseP.cols ? rotatePuzzleCW(baseP) : null;
 
+  $('turn-btn').hidden = baseP.rows === baseP.cols;
   $('puz-num').value = idx + 1;
   $('puz-num').max = book.puzzles.length;
   $('puz-total').textContent = book.puzzles.length;
   $('prev-puz').disabled = idx === 0;
   $('next-puz').disabled = idx === book.puzzles.length - 1;
 
-  board.setPuzzle(P);
   dropToast();
-  fitBoard();
+  const { availW, availH } = viewportSpace();
+  const layout = chooseLayout(baseP.rows, baseP.cols, availW, availH, state.rotOverride);
+  state.rotated = layout.rotated;
+  state.P = state.rotated ? state.rotP : baseP;
+  const canonMarks = load(baseP);
+  state.marks = state.rotated ? rotateMarksCW(baseP, state.rotP, canonMarks) : canonMarks;
+  state.undo = [];
+  state.redo = [];
+  state.hint = null;
+  state.solved = isSolved(state.P, state.marks.edges);
+
+  board.setPuzzle(state.P);
+  applyBoardSize(layout.px);
   showInfo();
   refresh();
   store.set('ms_last', JSON.stringify({ book: book.id, idx }));
@@ -606,6 +655,7 @@ async function openBook(bookId, idx = 0) {
   if (!entry) return;
   const raw = await fetchBook(entry);
   state.book = { id: entry.id, name: entry.name, puzzles: raw };
+  state.rotOverride = null;
   recordBookSolved(state.book);
   syncBookButton();
   openPuzzle(idx);
@@ -647,6 +697,7 @@ $('puz-num').addEventListener('change', (e) => { if (state.book) openPuzzle((+e.
 $('undo-btn').addEventListener('click', undo);
 $('redo-btn').addEventListener('click', redo);
 $('reset-btn').addEventListener('click', reset);
+$('turn-btn').addEventListener('click', toggleTurn);
 $('check-btn').addEventListener('click', checkSoFar);
 $('hint-btn').addEventListener('click', hint);
 
@@ -833,29 +884,29 @@ function renderBookPicker(view = {}) {
   }
   const books = booksOf(group);
   const subs = [...new Set(books.map((b) => b.sub).filter(Boolean))];
-  const hasOther = subs.length > 0 && books.some((b) => !b.sub);
-  if (subs.length < 2 && !(subs.length && hasOther)) {
+  const directBooks = books.filter((b) => !b.sub);
+  if (!subs.length || (subs.length === 1 && !directBooks.length)) {
     header(group.name, group.blurb, '← All books', () => show({}));
     bookList(books);
     return;
   }
-  const subName = view.sub === null ? 'Other' : view.sub;
-  if (view.sub !== undefined && (view.sub === null ? hasOther : subs.includes(view.sub))) {
-    header(`${group.name} · ${subName}`, group.subs?.[view.sub]?.blurb, `← ${group.name}`, () => show({ group: group.name }));
-    bookList(books.filter((b) => (view.sub === null ? !b.sub : b.sub === view.sub)));
+  if (view.sub && subs.includes(view.sub)) {
+    header(`${group.name} · ${view.sub}`, group.subs?.[view.sub]?.blurb, `← ${group.name}`, () => show({ group: group.name }));
+    bookList(books.filter((b) => b.sub === view.sub));
     return;
   }
   header(group.name, group.blurb, '← All books', () => show({}));
   const grid = el('div', 'bp-cards');
-  for (const s of hasOther ? [...subs, null] : subs) {
-    const inSub = books.filter((b) => (s === null ? !b.sub : b.sub === s));
-    const info = (s !== null && group.subs?.[s]) || {};
+  for (const s of subs) {
+    const inSub = books.filter((b) => b.sub === s);
+    const info = group.subs?.[s] || {};
     const only = inSub.length === 1 ? inSub[0] : null;
-    grid.append(card(info.icon || group.icon, s === null ? 'Other' : s, info.blurb || (only && only.blurb),
+    grid.append(card(info.icon || group.icon, s, info.blurb || (only && only.blurb),
       only ? countText(only).text : plural(inSub.length, 'book'),
       inSub.some(isCurrent), () => (only ? pick(only) : show({ group: group.name, sub: s }))));
   }
   body.append(grid);
+  if (directBooks.length) bookList(directBooks);
 }
 const bookModal = setupModal('book-modal', 'book-btn', () => renderBookPicker({}));
 

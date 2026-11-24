@@ -29,7 +29,7 @@ const manifest = {
     {
       name: 'Default',
       icon: '📚',
-      blurb: 'Standard Masyu boards by size, from 8×8 up to full-page 24×30.',
+      blurb: 'Standard Masyu boards by size, from 8×8 up to full-page 16×24.',
       subs: {
         '8×8': {
           icon: '8️⃣',
@@ -38,10 +38,6 @@ const manifest = {
         '12×12': {
           icon: '🔷',
           blurb: 'Classic boards across all four difficulties.',
-        },
-        'Giants': {
-          icon: '🗻',
-          blurb: 'Big and printable full-page boards for long solves.',
         },
       },
     },
@@ -107,21 +103,21 @@ const recipes = [
     blurb: 'Complex lookahead chains, plus 10 Expert+ puzzles beyond hints.',
   },
 
-  // ---- Default: Giants (Medium/Hard/Expert — no Beginner on Giant boards)
+  // ---- Default: larger single-book boards (Medium/Hard/Expert — no Beginner on Giant boards)
   {
-    id: '16x16', name: '16×16', label: '16×16', group: 'Default', sub: 'Giants',
+    id: '16x16', name: '16×16', label: '16×16', group: 'Default',
     glob: 'balanced_16x16', tiers: '0,60,70,70', tierBands: '0:0,0:1020,990:1380,1350:2900',
     blurb: 'Big square boards, easiest first.',
   },
   {
-    id: '12x20', name: '12×20 Giant', label: '12×20 Giant', group: 'Default', sub: 'Giants',
+    id: '12x20', name: '12×20 Giant', label: '12×20 Giant', group: 'Default',
     glob: 'balanced_12x20', tiers: '0,30,35,35', tierBands: '0:0,0:970,950:1260,1240:2700',
     blurb: 'Tall magazine-page boards, easiest first.',
   },
   {
-    id: '24x30', name: '24×30 Full Page', label: '24×30 Full Page', group: 'Default', sub: 'Giants',
-    glob: 'balanced_24x30', tiers: '0,22,13,25', tierBands: '0:0,0:3000,0:4000,0:',
-    blurb: 'Huge boards sized for one full printer page.',
+    id: '16x24', name: '16×24 Full Page', label: '16×24 Full Page', group: 'Default',
+    glob: 'balanced_16x24', tiers: '0,30,35,35', tierBands: '0:0,0:1550,1480:2150,2050:3900',
+    blurb: 'Large 2:3 boards — full printer page and comfortable on laptop screens.',
   },
 
   // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 Expert+ + 10 Mega finale) + Patterns

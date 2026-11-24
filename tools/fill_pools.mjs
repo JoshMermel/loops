@@ -205,13 +205,13 @@ if (!isMainThread) {
       budgetSec: 300, perPuzzleMs: 35000,
     },
     {
-      group: 'giants-24x30', pool: 'balanced_24x30', cols: 24, rows: 30,
+      group: 'giants-16x24', pool: 'balanced_16x24', cols: 16, rows: 24,
       buckets: {
-        Medium: { need: 22, maxScore: 2700 },
-        Hard: { need: 22, minScore: 2650, maxScore: 3300 },
-        Expert: { need: 22, minScore: 3250 },
+        Medium: { need: 34, maxScore: 1550 },
+        Hard: { need: 38, minScore: 1480, maxScore: 2150 },
+        Expert: { need: 38, minScore: 2050, maxScore: 3900 },
       },
-      budgetSec: 600, perPuzzleMs: 45000,
+      budgetSec: 300, perPuzzleMs: 30000,
     },
 
     // ---- Bonus pools (500 at 10/40/40/10 with score bands + oversized bonus tails + Lattice showcase)

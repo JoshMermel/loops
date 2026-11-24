@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
 import { rate } from '../js/rating.js';
-import { randomLoop, allowedClues, generatePuzzle, makeRng, maskPoints } from '../js/generator.js';
+import { randomLoop, allowedClues, generatePuzzle, makeRng, maskPoints, quadrantStats } from '../js/generator.js';
 
 test('randomLoop always produces a single valid closed loop across sizes', () => {
   const rng = makeRng(101);
@@ -142,4 +142,13 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
   assert.equal(pcs.clues.length, expectedPts.length);
   const ptSet = new Set(expectedPts.map(([r, c]) => r * 9 + c));
   assert.ok(pcs.clues.every((c) => ptSet.has(c.r * 9 + c.c)));
+});
+
+test('generatePuzzle enforces balanced four-quadrant loop and clue coverage on large boards', () => {
+  const p12 = generatePuzzle({ rows: 12, cols: 12, seed: 202, budgetMs: 12000 });
+  assert.ok(p12, 'failed to generate 12x12 puzzle');
+  const sol = decodeSolution(p12, p12.solution);
+  const qs = quadrantStats(p12.rows, p12.cols, sol.e, p12.clues);
+  assert.ok(qs.minFill >= 0.45, `expected minQuadFill >= 0.45, got ${qs.minFill} (${qs.fills})`);
+  assert.ok(qs.minClues >= 2, `expected minQuadClues >= 2, got ${qs.minClues} (${qs.clues})`);
 });

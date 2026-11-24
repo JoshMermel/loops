@@ -51,6 +51,8 @@ function makeDualGrid(rows, cols) {
     edges.fill(E_OFF);
     let loopCells = 0;
     let minR = rows, maxR = -1, minC = cols, maxC = -1;
+    const midR = rows >> 1, midC = cols >> 1;
+    const qLoop = [0, 0, 0, 0], qTot = [0, 0, 0, 0];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
@@ -61,6 +63,8 @@ function makeDualGrid(rows, cols) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
+        const q = (r >= midR ? 2 : 0) + (c >= midC ? 1 : 0);
+        qTot[q]++;
         let deg = 0;
         if (c + 1 < cols && edges[2 * i] === E_ON) deg++;
         if (c > 0 && edges[2 * (i - 1)] === E_ON) deg++;
@@ -68,6 +72,7 @@ function makeDualGrid(rows, cols) {
         if (r > 0 && edges[2 * (i - cols) + 1] === E_ON) deg++;
         if (deg === 2) {
           loopCells++;
+          qLoop[q]++;
           if (r < minR) minR = r;
           if (r > maxR) maxR = r;
           if (c < minC) minC = c;
@@ -76,9 +81,38 @@ function makeDualGrid(rows, cols) {
       }
     }
     const emptyBorders = loopCells > 0 ? minR + (rows - 1 - maxR) + minC + (cols - 1 - maxC) : rows + cols;
-    return { edges, loopCells, minR, maxR, minC, maxC, emptyBorders };
+    const quadFills = qTot.map((tot, q) => (tot > 0 ? qLoop[q] / tot : 1));
+    const minQuadFill = Math.min(...quadFills);
+    return { edges, loopCells, minR, maxR, minC, maxC, emptyBorders, quadFills, qTot, minQuadFill };
   };
   return { fr, fc, F, inS, at, canToggle, toEdges };
+}
+
+/**
+ * Compute per-quadrant loop fill and clue counts for a board (top-left, top-right, bottom-left, bottom-right).
+ */
+export function quadrantStats(rows, cols, edges, clues = []) {
+  const midR = rows >> 1, midC = cols >> 1;
+  const qLoop = [0, 0, 0, 0], qTot = [0, 0, 0, 0], qClues = [0, 0, 0, 0];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      const q = (r >= midR ? 2 : 0) + (c >= midC ? 1 : 0);
+      qTot[q]++;
+      let deg = 0;
+      if (c + 1 < cols && edges[2 * i] === E_ON) deg++;
+      if (c > 0 && edges[2 * (i - 1)] === E_ON) deg++;
+      if (r + 1 < rows && edges[2 * i + 1] === E_ON) deg++;
+      if (r > 0 && edges[2 * (i - cols) + 1] === E_ON) deg++;
+      if (deg === 2) qLoop[q]++;
+    }
+  }
+  for (const cl of clues) {
+    const q = (cl.r >= midR ? 2 : 0) + (cl.c >= midC ? 1 : 0);
+    qClues[q]++;
+  }
+  const fills = qTot.map((tot, q) => (tot > 0 ? qLoop[q] / tot : 1));
+  return { fills, minFill: Math.min(...fills), clues: qClues, minClues: Math.min(...qClues) };
 }
 
 /**
@@ -360,11 +394,14 @@ export function tightLoop(rows, cols, rng, {
   const N = rows * cols;
   const fillRatio = minFill ?? (N >= 25 ? 0.55 : 0.48);
   const minLoop = Math.max(8, Math.floor(N * fillRatio));
+  const reqQuadFill = rows >= 12 && cols >= 12 ? Math.min(0.50, fillRatio * 0.85)
+    : rows >= 8 && cols >= 8 ? Math.min(0.35, fillRatio * 0.8)
+    : 0;
   const filterClues = clueFilterFor(layout, rows, cols);
   const stepsLimit = maxSteps ?? Math.max(500, Math.min(6000, F * 5 + (layout !== 'none' ? 300 : 0) + (minFill >= 0.95 ? 700 : 0)));
 
   const evaluate = () => {
-    const { edges, loopCells, minR, maxR, minC, maxC, emptyBorders } = toEdges();
+    const { edges, loopCells, minR, maxR, minC, maxC, emptyBorders, quadFills, qTot, minQuadFill } = toEdges();
     const { whites, blacks } = allowedClues(rows, cols, edges);
     const pool = style === 'white' ? whites : style === 'black' ? blacks : whites.concat(blacks);
     const clues = filterClues(pool);
@@ -375,11 +412,21 @@ export function tightLoop(rows, cols, rng, {
     for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) unkEdges.push(x);
     const sizePenalty = loopCells < minLoop ? (minLoop - loopCells) * (minFill >= 0.95 ? 4 : 2) : 0;
     const borderPenalty = emptyBorders * 6;
+    let quadPenalty = 0, weakestQuad = -1, weakestFill = reqQuadFill;
+    if (reqQuadFill > 0) {
+      for (let q = 0; q < 4; q++) {
+        if (quadFills[q] < reqQuadFill) {
+          quadPenalty += Math.ceil((reqQuadFill - quadFills[q]) * qTot[q]) * 3;
+          if (quadFills[q] < weakestFill) { weakestFill = quadFills[q]; weakestQuad = q; }
+        }
+      }
+    }
     const wOut = clues.filter((c) => c.t === 'W');
     const bOut = clues.filter((c) => c.t === 'B');
     return {
-      score: unkEdges.length + sizePenalty + borderPenalty,
+      score: unkEdges.length + sizePenalty + borderPenalty + quadPenalty,
       unk: unkEdges.length, unkEdges, P, edges, loopCells, emptyBorders, minR, maxR, minC, maxC,
+      quadFills, minQuadFill, weakestQuad,
       clues, whites: wOut, blacks: bOut,
     };
   };
@@ -394,6 +441,7 @@ export function tightLoop(rows, cols, rng, {
     }
     return cur;
   }
+  const fMidR = fr >> 1, fMidC = fc >> 1;
   for (let step = 0; step < stepsLimit && cur.score > 0; step++) {
     let r, c;
     if (cur.emptyBorders > 0 && rng() < 0.35) {
@@ -403,6 +451,11 @@ export function tightLoop(rows, cols, rng, {
       if (cur.minC > 0) pick.push([(rng() * fr) | 0, Math.max(0, cur.minC - 1)]);
       if (cur.maxC < cols - 1) pick.push([(rng() * fr) | 0, Math.min(fc - 1, cur.maxC)]);
       [r, c] = pick[(rng() * pick.length) | 0];
+    } else if (cur.weakestQuad >= 0 && rng() < 0.35) {
+      const qr = cur.weakestQuad >= 2 ? fMidR + ((rng() * (fr - fMidR)) | 0) : ((rng() * Math.max(1, fMidR)) | 0);
+      const qc = (cur.weakestQuad & 1) ? fMidC + ((rng() * (fc - fMidC)) | 0) : ((rng() * Math.max(1, fMidC)) | 0);
+      r = Math.min(fr - 1, qr);
+      c = Math.min(fc - 1, qc);
     } else if (cur.unkEdges.length && rng() < 0.85) {
       const x = cur.unkEdges[(rng() * cur.unkEdges.length) | 0];
       const a = cur.P.edgeA[x], ar = (a / cols) | 0, ac = a % cols;
@@ -652,6 +705,12 @@ export function generatePuzzle({
   const N = rows * cols;
   const fillRatio = minFill ?? (N >= 25 ? 0.55 : 0.48);
   const minLoopCells = Math.max(8, Math.floor(N * fillRatio));
+  const reqQuadFill = rows >= 12 && cols >= 12 ? Math.min(0.50, fillRatio * 0.85)
+    : rows >= 8 && cols >= 8 ? Math.min(0.35, fillRatio * 0.8)
+    : 0;
+  const reqQuadClues = (rows >= 12 && cols >= 12 && layout !== 'frame' && style !== 'sparse')
+    ? Math.max(2, Math.floor((N / 4) * 0.08))
+    : 0;
   const wantUnsolved = targetTier === 'Expert+';
   const maxTierIdx = wantUnsolved ? TIERS.length - 1 : TIERS.indexOf(maxTier);
   const pts = maskPoints(layout, rows, cols);
@@ -663,7 +722,7 @@ export function generatePuzzle({
   const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
   const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
   const mediumOnly = stripMode === 'medium' || (stripMode === null && effectiveMaxTier === 1);
-  const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : N <= 400 ? 40000 : 6000;
+  const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : N < 320 ? 40000 : 6000;
   const solvedByPropagate = (P) => {
     const st = initialState(P);
     if (!propagate(P, st)) return false;
@@ -681,10 +740,11 @@ export function generatePuzzle({
       maxSteps: style === 'black' ? Math.max(700, (rows - 1) * (cols - 1) * 6) : null,
     });
     if (base.loopCells < minLoopCells || base.emptyBorders > 0 || base.clues.length < 4) continue;
+    if (reqQuadFill > 0 && base.minQuadFill < reqQuadFill) continue;
 
     // Check uniqueness of the full clue pool
     if (base.unk > 0) {
-      if (N >= 400 && style === 'balanced' && layout === 'none') continue;
+      if (N >= 320 && style === 'balanced' && layout === 'none') continue;
       if (base.unk > 48) continue;
       const checkFull = solve(base.P, { limit: 2, maxNodes: pruneNodeCap });
       if (checkFull.exceeded || checkFull.count !== 1) continue;
@@ -738,11 +798,11 @@ export function generatePuzzle({
     }
 
     // Pass 1: sound human-rule pruning (no search needed) on remaining clues.
-    // On giant boards (N >= 400), Pass 0 already stripped propagation-redundant clues cheaply;
+    // On giant boards (N >= 320), Pass 0 already stripped propagation-redundant clues cheaply;
     // skip Pass 1 when Pass 2 will strip directly with exact search, and cap it for beginnerOnly/mediumOnly.
     const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
-    const remPass1 = (N >= 400 && !beginnerOnly && !mediumOnly && base.unk === 0) ? [] : shuffle(buildUnits(current), rand);
-    const pass1Cap = N >= 400 ? 15 : remPass1.length;
+    const remPass1 = (N >= 320 && !beginnerOnly && !mediumOnly && base.unk === 0) ? [] : shuffle(buildUnits(current), rand);
+    const pass1Cap = N >= 320 ? 15 : remPass1.length;
     let pass1Tried = 0;
     for (const u of remPass1) {
       if (Date.now() >= deadline || current.length - u.keys.length < minKeep || pass1Tried >= pass1Cap) break;
@@ -773,11 +833,11 @@ export function generatePuzzle({
       const remUnits = shuffle(buildUnits(current), rand);
       const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
       const maxStrips = style === 'sparse' ? remUnits.length
-        : N >= 400 ? (stripMode === 'medium' || targetTier === 'Medium' ? 2 : (stripMode === 'deep' || wantUnsolved || targetTier === 'Expert') ? 7 : targetTier === 'Hard' ? 4 : 3)
+        : N >= 320 ? (stripMode === 'medium' || targetTier === 'Medium' ? 2 : (stripMode === 'deep' || wantUnsolved || targetTier === 'Expert') ? 7 : targetTier === 'Hard' ? 4 : 3)
         : deepStrip ? remUnits.length
         : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(2, Math.min(8, Math.ceil(remUnits.length * 0.28)))
         : Math.max(3, Math.min(12, Math.ceil(remUnits.length * 0.45)));
-      const maxPass2Tries = N >= 400 && style !== 'sparse' ? 60 : remUnits.length;
+      const maxPass2Tries = N >= 320 && style !== 'sparse' ? 60 : remUnits.length;
 
       let stripped = 0, tried = 0;
       const removed = [];
@@ -828,6 +888,10 @@ export function generatePuzzle({
       const hasW = current.some((c) => c.t === 'W');
       const hasB = current.some((c) => c.t === 'B');
       if (!hasW || !hasB) continue;
+    }
+    if (reqQuadClues > 0) {
+      const qs = quadrantStats(rows, cols, base.edges, current);
+      if (qs.minClues < reqQuadClues) continue;
     }
 
     current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));

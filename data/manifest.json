@@ -9,7 +9,7 @@
     {
       "name": "Default",
       "icon": "📚",
-      "blurb": "Standard Masyu boards by size, from 8×8 up to full-page 24×30.",
+      "blurb": "Standard Masyu boards by size, from 8×8 up to full-page 16×24.",
       "subs": {
         "8×8": {
           "icon": "8️⃣",
@@ -18,10 +18,6 @@
         "12×12": {
           "icon": "🔷",
           "blurb": "Classic boards across all four difficulties."
-        },
-        "Giants": {
-          "icon": "🗻",
-          "blurb": "Big and printable full-page boards for long solves."
         }
       }
     },
@@ -128,7 +124,6 @@
       "file": "data/16x16.csv",
       "count": 200,
       "group": "Default",
-      "sub": "Giants",
       "blurb": "Big square boards, easiest first."
     },
     {
@@ -138,18 +133,16 @@
       "file": "data/12x20.csv",
       "count": 100,
       "group": "Default",
-      "sub": "Giants",
       "blurb": "Tall magazine-page boards, easiest first."
     },
     {
-      "id": "24x30",
-      "name": "24×30 Full Page",
-      "label": "24×30 Full Page",
-      "file": "data/24x30.csv",
-      "count": 60,
+      "id": "16x24",
+      "name": "16×24 Full Page",
+      "label": "16×24 Full Page",
+      "file": "data/16x24.csv",
+      "count": 100,
       "group": "Default",
-      "sub": "Giants",
-      "blurb": "Huge boards sized for one full printer page."
+      "blurb": "Large 2:3 boards — full printer page and comfortable on laptop screens."
     },
     {
       "id": "bonus-white",
