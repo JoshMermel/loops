@@ -270,22 +270,24 @@ function fitBoard() {
 }
 window.addEventListener('resize', fitBoard);
 
+function paintSolvedFaces(P, m) {
+  const exactFaces = facesFromSolvedLoop(P, m.edges);
+  for (let f = 0; f < exactFaces.length; f++) {
+    if (m.faces[f] !== exactFaces[f] || m.autoF[f]) {
+      m.faces[f] = exactFaces[f];
+      m.autoF[f] = 1;
+    }
+  }
+}
+
 function refresh() {
   state.hint = null;
   hideToast();
   const solved = isSolved(state.P, state.marks.edges);
-  if (solved && !state.solved) {
-    // Only auto-paint on win when Auto-Shade is ON (so manual/inverted color schemes are never touched)
-    if (settings.autoShade) {
-      const exactFaces = facesFromSolvedLoop(state.P, state.marks.edges);
-      for (let f = 0; f < exactFaces.length; f++) {
-        if (state.marks.faces[f] !== exactFaces[f] || state.marks.autoF[f]) {
-          state.marks.faces[f] = exactFaces[f];
-          state.marks.autoF[f] = 1;
-        }
-      }
-    }
-    markSolved();
+  if (solved) {
+    // Only auto-paint on win/reopen when Auto-Shade is ON (so manual/inverted color schemes are never touched)
+    if (settings.autoShade) paintSolvedFaces(state.P, state.marks);
+    if (!state.solved) markSolved();
   }
   state.solved = solved;
   board.render(state.marks, analyse());
@@ -335,6 +337,7 @@ function load(P) {
       }
       if (!settings.autoX) applyAutoX(P, m, false);
       applyAutoShade(P, m, settings.autoShade);
+      if (settings.autoShade && isSolved(P, m.edges)) paintSolvedFaces(P, m);
       return m;
     }
   } catch { /* corrupt save */ }
@@ -919,7 +922,11 @@ $('setting-auto-shade').addEventListener('change', (e) => {
   if (state.P) {
     const before = snapshot();
     applyAutoShade(state.P, state.marks, settings.autoShade);
-    for (const m of [...state.undo, ...state.redo]) applyAutoShade(state.P, m, settings.autoShade);
+    if (settings.autoShade && isSolved(state.P, state.marks.edges)) paintSolvedFaces(state.P, state.marks);
+    for (const m of [...state.undo, ...state.redo]) {
+      applyAutoShade(state.P, m, settings.autoShade);
+      if (settings.autoShade && isSolved(state.P, m.edges)) paintSolvedFaces(state.P, m);
+    }
     if (!sameMarks(before, state.marks)) { save(); refresh(); }
   }
 });
