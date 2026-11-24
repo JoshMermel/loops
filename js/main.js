@@ -119,9 +119,11 @@ const reconcileAuto = (P, prev, m) => {
   reconcileAutoShade(P, prev, m, settings.autoShade);
 };
 
+const isAutoX = (m, x) => m.edges[x] === 2 && !!m.autoE[x];
+
 function cycleEdge(x) {
   const P = state.P, m = state.marks;
-  if (x < 0 || P.edgeA[x] < 0) return;
+  if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x)) return;
   const prev = snapshot();
   m.edges[x] = cycleEdgeMark(m.edges[x]);
   m.autoE[x] = 0;
@@ -131,7 +133,7 @@ function cycleEdge(x) {
 
 function toggleEdge(x) {
   const P = state.P, m = state.marks;
-  if (x < 0 || P.edgeA[x] < 0) return;
+  if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x)) return;
   const prev = snapshot();
   m.edges[x] = toggleEdgeCross(m.edges[x]);
   m.autoE[x] = 0;
@@ -194,8 +196,12 @@ function crossStep(a, b, first) {
   const prev = snapshot();
   state.dragStack.push(prev);
   const x = edgeBetween(P, a, b);
-  if (x < 0) return;
+  if (x < 0 || isAutoX(m, x)) {
+    if (first) state.drawMode = null;
+    return;
+  }
   if (first) state.drawMode = m.edges[x] === 2 ? 0 : 2;
+  if (state.drawMode === null) return;
   if (state.drawMode === 2) {
     // Don't overwrite drawn loop segments during a right-drag cross swipe
     if (m.edges[x] === 1) return;

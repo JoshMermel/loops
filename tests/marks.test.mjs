@@ -197,7 +197,7 @@ test('Auto-X rule 4 never auto-Xes the last exit of a circle cell', () => {
   assert.equal(m.edges[P.ed[0 * 4 + 2]], 0, 'circle cell must not be treated as a dead-end');
 });
 
-test('Auto-X switch ON/OFF preserves player manual X marks and respects manual dismissal', () => {
+test('Auto-X switch ON/OFF preserves player manual X marks and stays locked while forced', () => {
   const P = compile({ name: 'sw', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'B' }] });
   const m = blank(P);
   const b = 1 * 4 + 1;
@@ -211,22 +211,21 @@ test('Auto-X switch ON/OFF preserves player manual X marks and respects manual d
   assert.equal(m.autoE[P.ed[b * 4 + 3]], 1);
   assert.equal(m.autoE[manualX], 0, 'manual X must never become auto');
 
-  // If player taps an auto-X edge to clear it, reconcile keeps it cleared
+  // Reconcile keeps forced auto-X in place while Auto-X is ON
   const prev = snap(m);
   m.edges[P.ed[b * 4 + 3]] = 0;
   m.autoE[P.ed[b * 4 + 3]] = 0;
   reconcileAutoX(P, prev, m, true);
-  assert.equal(m.edges[P.ed[b * 4 + 3]], 0);
-
-  // Turning Auto-X ON again re-fills it, and turning OFF removes only auto X's
-  applyAutoX(P, m, true);
   assert.equal(m.edges[P.ed[b * 4 + 3]], 2);
+  assert.equal(m.autoE[P.ed[b * 4 + 3]], 1);
+
+  // Turning Auto-X OFF removes only auto X's, preserving manual X's
   applyAutoX(P, m, false);
   assert.equal(m.edges[P.ed[b * 4 + 3]], 0);
   assert.equal(m.edges[manualX], 2, 'manual X stays when Auto-X is turned off');
 });
 
-test('Removing a manual X (or manual shade) reveals an underlying auto-X (or auto-shade), and a second clear dismisses it', () => {
+test('Removing a manual X (or manual shade) reveals an underlying auto-X (or auto-shade), which stays locked while forced', () => {
   const P = compile({ name: 'reveal', rows: 4, cols: 4, clues: [] });
   const m = blank(P);
   const c = 1 * 4 + 1; // (1,1)
@@ -253,11 +252,12 @@ test('Removing a manual X (or manual shade) reveals an underlying auto-X (or aut
   assert.equal(m.edges[eD], 2, 'underlying auto-X should appear when manual X is removed');
   assert.equal(m.autoE[eD], 1);
 
-  // 4. Clearing the auto-X a second time still dismisses it
+  // 4. Auto-X stays locked while the causing segments remain, and unwinds once a causing segment is erased
   prev = snap(m);
-  m.edges[eD] = 0; m.autoE[eD] = 0;
+  m.edges[eU] = 0;
   reconcileAutoX(P, prev, m, true);
-  assert.equal(m.edges[eD], 0, 'clearing auto-X still dismisses it');
+  assert.equal(m.edges[eD], 0, 'auto-X unwinds when its cause is erased');
+  assert.equal(m.autoE[eD], 0);
 
   // Same behavior for manual face shade revealed as auto-shade
   const m2 = blank(P);

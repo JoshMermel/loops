@@ -204,26 +204,17 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
   return reasons;
 }
 
-export function reconcileAutoX(P, prev, cur, enabled = true, opts = undefined) {
+export function reconcileAutoX(P, _prev, cur, enabled = true, opts = undefined) {
   if (!cur.autoE) cur.autoE = new Uint8Array(P.numEdges);
-  const before = prev ? autoXReasons(P, prev, opts) : new Map();
-  const now = autoXReasons(P, cur, opts);
+  const now = enabled ? autoXReasons(P, cur, opts) : null;
 
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
-    const reasons = now.get(x);
+    const forced = !!now && now.has(x);
     if (cur.edges[x] === 2 && cur.autoE[x]) {
-      if (!reasons) { cur.edges[x] = 0; cur.autoE[x] = 0; }
-    } else if (cur.edges[x] === 0 && reasons && enabled) {
-      const old = before.get(x);
-      const wasManual = prev && (prev.edges[x] === 1 || (prev.edges[x] === 2 && !(prev.autoE && prev.autoE[x])));
-      if (wasManual) {
-        cur.edges[x] = 2; cur.autoE[x] = 1;
-      } else {
-        for (const r of reasons) {
-          if (!old || !old.has(r)) { cur.edges[x] = 2; cur.autoE[x] = 1; break; }
-        }
-      }
+      if (!forced) { cur.edges[x] = 0; cur.autoE[x] = 0; }
+    } else if (cur.edges[x] === 0 && forced) {
+      cur.edges[x] = 2; cur.autoE[x] = 1;
     }
   }
 }
@@ -341,32 +332,19 @@ export function autoShadeCompute(P, m) {
  * Reconcile automatic Inside/Outside face shading in `cur` against `prev` (null = fresh board or switch turned on).
  * Manual face marks (`autoF[f] === 0`) are never overwritten.
  */
-export function reconcileAutoShade(P, prev, cur, enabled = true) {
+export function reconcileAutoShade(P, _prev, cur, enabled = true) {
   const F = numFacesOf(P);
   if (!cur.faces) cur.faces = new Uint8Array(F);
   if (!cur.autoF) cur.autoF = new Uint8Array(F);
-  const before = prev ? autoShadeCompute(P, prev) : null;
-  const now = autoShadeCompute(P, cur);
+  const now = enabled ? autoShadeCompute(P, cur) : null;
 
   for (let f = 0; f < F; f++) {
-    const col = now.color[f];
+    const col = now ? now.color[f] : 0;
     if (cur.faces[f] !== 0 && cur.autoF[f]) {
-      if (!col || !enabled) { cur.faces[f] = 0; cur.autoF[f] = 0; }
+      if (!col) { cur.faces[f] = 0; cur.autoF[f] = 0; }
       else cur.faces[f] = col;
-    } else if (cur.faces[f] === 0 && col && enabled) {
-      const wasManual = prev && prev.faces && prev.faces[f] !== 0 && !(prev.autoF && prev.autoF[f]);
-      if (!before || wasManual) {
-        cur.faces[f] = col; cur.autoF[f] = 1;
-      } else {
-        const oldR = before.reasons[f];
-        if (before.color[f] !== col) {
-          cur.faces[f] = col; cur.autoF[f] = 1;
-        } else {
-          for (const r of now.reasons[f]) {
-            if (!oldR.has(r)) { cur.faces[f] = col; cur.autoF[f] = 1; break; }
-          }
-        }
-      }
+    } else if (cur.faces[f] === 0 && col) {
+      cur.faces[f] = col; cur.autoF[f] = 1;
     }
   }
 }
