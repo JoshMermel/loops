@@ -152,9 +152,10 @@ const recipes = [
   },
   {
     id: 'bonus-yinyang', name: 'Yin-Yang', label: '☯️ Yin-Yang (10×10)', group: 'Bonus',
-    glob: 'yinyang_10x10', tiers: '50,200,200,50', tierBands: '0:355,340:460,460:780,780:',
-    bonusGlob: 'yinyang_12x12', bonusCount: 10,
-    blurb: '500 opposite-color 180° symmetric 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
+    glob: 'yinyang_10x10,yinyang_mirror_10x10,yinyang_transpose_10x10',
+    tiers: '50,200,200,50', tierBands: '0:355,340:460,460:780,780:', balanceGroups: true, interleaveGroups: true, maxRun: 3,
+    bonusGlob: 'yinyang_12x12,yinyang_mirror_12x12,yinyang_transpose_12x12', bonusCount: 10,
+    blurb: '500 opposite-color symmetric 10×10 puzzles (balanced across 180°, mirror, and diagonal-mirror W↔B symmetry in every tier) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
     id: 'bonus-full', name: 'Full board', label: '🧱 Full board (10×10)', group: 'Bonus',

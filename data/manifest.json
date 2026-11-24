@@ -194,7 +194,7 @@
       "file": "data/bonus-yinyang.csv",
       "count": 510,
       "group": "Bonus",
-      "blurb": "500 opposite-color 180° symmetric 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles."
+      "blurb": "500 opposite-color symmetric 10×10 puzzles (balanced across 180°, mirror, and diagonal-mirror W↔B symmetry in every tier) plus 10 oversized 12×12 bonus puzzles."
     },
     {
       "id": "bonus-full",

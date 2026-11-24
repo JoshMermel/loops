@@ -98,6 +98,23 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
     return ot && ot !== c.t;
   }));
 
+  const pym = generatePuzzle({ rows: 8, cols: 8, seed: 108, layout: 'yinyang-mirror', budgetMs: 10000 });
+  assert.ok(pym, 'failed to generate yinyang-mirror opposite-symmetry puzzle');
+  const mapYM = new Map(pym.clues.map((c) => [c.r * 8 + c.c, c.t]));
+  assert.ok(pym.clues.every((c) => {
+    const ot = mapYM.get(c.r * 8 + (7 - c.c));
+    return ot && ot !== c.t;
+  }));
+
+  const pyt = generatePuzzle({ rows: 8, cols: 8, seed: 109, layout: 'yinyang-transpose', budgetMs: 10000 });
+  assert.ok(pyt, 'failed to generate yinyang-transpose opposite-symmetry puzzle');
+  const mapYT = new Map(pyt.clues.map((c) => [c.r * 8 + c.c, c.t]));
+  assert.ok(pyt.clues.every((c) => {
+    if (c.r === c.c) return false;
+    const ot = mapYT.get(c.c * 8 + c.r);
+    return ot && ot !== c.t;
+  }));
+
   const pf = generatePuzzle({ rows: 6, cols: 6, seed: 105, minFill: 1.0, budgetMs: 8000 });
   assert.ok(pf, 'failed to generate 100% full-board puzzle');
   assert.equal(pf.solution.includes('#'), false);

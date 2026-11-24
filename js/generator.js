@@ -182,11 +182,14 @@ function clueFilterFor(layout, rows, cols) {
       ));
     };
   }
-  if (layout === 'yinyang') {
+  if (layout === 'yinyang' || layout === 'yinyang-mirror' || layout === 'yinyang-transpose') {
+    if (layout === 'yinyang-transpose' && rows !== cols) throw new Error('yinyang-transpose layout requires a square board');
     return (cs) => {
       const m = new Map(cs.map((c) => [c.r * cols + c.c, c.t]));
       return cs.filter((c) => {
-        const opp = (rows - 1 - c.r) * cols + (cols - 1 - c.c);
+        const opp = layout === 'yinyang' ? (rows - 1 - c.r) * cols + (cols - 1 - c.c)
+          : layout === 'yinyang-mirror' ? c.r * cols + (cols - 1 - c.c)
+          : c.c * cols + c.r;
         if (opp === c.r * cols + c.c) return false;
         const ot = m.get(opp);
         return ot && ot !== c.t;
@@ -200,9 +203,9 @@ function clueOrbitKeys(layout, rows, cols, r, c) {
   let pts;
   if (layout === 'rot180' || layout === 'yinyang') {
     pts = [[r, c], [rows - 1 - r, cols - 1 - c]];
-  } else if (layout === 'mirror') {
+  } else if (layout === 'mirror' || layout === 'yinyang-mirror') {
     pts = [[r, c], [r, cols - 1 - c]];
-  } else if (layout === 'transpose') {
+  } else if (layout === 'transpose' || layout === 'yinyang-transpose') {
     pts = [[r, c], [c, r]];
   } else if (layout === 'rot90') {
     pts = [[r, c], [c, rows - 1 - r], [rows - 1 - r, cols - 1 - c], [cols - 1 - c, r]];
@@ -224,7 +227,7 @@ export function tightLoop(rows, cols, rng, {
 } = {}) {
   const { fr, fc, F, inS, canToggle, toEdges } = makeDualGrid(rows, cols);
   const symFaces = (layout === 'rot180' || layout === 'mirror' || layout === 'transpose' || layout === 'rot90') ? layout : null;
-  if ((layout === 'rot90' || layout === 'transpose') && rows !== cols) throw new Error(`${layout} layout requires a square board`);
+  if ((layout === 'rot90' || layout === 'transpose' || layout === 'yinyang-transpose') && rows !== cols) throw new Error(`${layout} layout requires a square board`);
 
   const orbitOf = (r, c) => {
     if (!symFaces) return [[r, c]];
@@ -523,7 +526,8 @@ export function generatePuzzle({
     for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
     return isSolved(P, st.e);
   };
-  const pairedStrip = layout === 'rot180' || layout === 'mirror' || layout === 'transpose' || layout === 'rot90' || layout === 'yinyang';
+  const pairedStrip = layout === 'rot180' || layout === 'mirror' || layout === 'transpose' || layout === 'rot90'
+    || layout === 'yinyang' || layout === 'yinyang-mirror' || layout === 'yinyang-transpose';
 
   while (Date.now() < deadline) {
     const base = tightLoop(rows, cols, rand, {

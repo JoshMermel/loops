@@ -278,12 +278,32 @@ if (!isMainThread) {
       budgetSec: 360, perPuzzleMs: 20000,
     },
     {
-      group: 'bonus', pool: 'yinyang_10x10', cols: 10, rows: 10, layout: 'yinyang',
+      group: 'bonus-yinyang', pool: 'yinyang_10x10', cols: 10, rows: 10, layout: 'yinyang',
       buckets: {
-        Beginner: { need: 52, maxScore: 355 },
-        Medium: { need: 204, minScore: 340, maxScore: 460 },
-        Hard: { need: 204, minScore: 460, maxScore: 780 },
-        Expert: { need: 52, minScore: 780 },
+        Beginner: { need: 18, maxScore: 355 },
+        Medium: { need: 68, minScore: 340, maxScore: 460 },
+        Hard: { need: 68, minScore: 460, maxScore: 780 },
+        Expert: { need: 18, minScore: 780 },
+      },
+      budgetSec: 480, perPuzzleMs: 25000,
+    },
+    {
+      group: 'bonus-yinyang', pool: 'yinyang_mirror_10x10', cols: 10, rows: 10, layout: 'yinyang-mirror',
+      buckets: {
+        Beginner: { need: 18, maxScore: 355 },
+        Medium: { need: 68, minScore: 340, maxScore: 460 },
+        Hard: { need: 68, minScore: 460, maxScore: 780 },
+        Expert: { need: 18, minScore: 780 },
+      },
+      budgetSec: 600, perPuzzleMs: 25000,
+    },
+    {
+      group: 'bonus-yinyang', pool: 'yinyang_transpose_10x10', cols: 10, rows: 10, layout: 'yinyang-transpose',
+      buckets: {
+        Beginner: { need: 18, maxScore: 355 },
+        Medium: { need: 68, minScore: 340, maxScore: 460 },
+        Hard: { need: 68, minScore: 460, maxScore: 780 },
+        Expert: { need: 18, minScore: 780 },
       },
       budgetSec: 720, perPuzzleMs: 25000,
     },
@@ -305,7 +325,9 @@ if (!isMainThread) {
     { group: 'bonus-oversized', pool: 'sym_rot180_12x12', cols: 12, rows: 12, layout: 'rot180', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'sym_mirror_12x12', cols: 12, rows: 12, layout: 'mirror', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'sym_transpose_12x12', cols: 12, rows: 12, layout: 'transpose', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'yinyang_12x12', cols: 12, rows: 12, layout: 'yinyang', total: 12, budgetSec: 120, perPuzzleMs: 30000 },
+    { group: 'bonus-yinyang', pool: 'yinyang_12x12', cols: 12, rows: 12, layout: 'yinyang', total: 5, budgetSec: 120, perPuzzleMs: 30000 },
+    { group: 'bonus-yinyang', pool: 'yinyang_mirror_12x12', cols: 12, rows: 12, layout: 'yinyang-mirror', total: 5, budgetSec: 180, perPuzzleMs: 30000 },
+    { group: 'bonus-yinyang', pool: 'yinyang_transpose_12x12', cols: 12, rows: 12, layout: 'yinyang-transpose', total: 5, budgetSec: 240, perPuzzleMs: 35000 },
     { group: 'bonus-oversized', pool: 'full_10x12', cols: 10, rows: 12, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'lattice_13x13', cols: 13, rows: 13, layout: 'lattice', total: 14, budgetSec: 180, perPuzzleMs: 35000 },
   ];
