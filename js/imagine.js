@@ -6,7 +6,7 @@
 // the contradiction really depends on, and priced by the pruned chain length.
 import {
   NONE, WHITE, BLACK, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
-  cloneState, propagate,
+  cloneState, propagate, lastPropChanges,
 } from './logic.js';
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
@@ -103,23 +103,49 @@ let fullContradiction = () => false;
 export const setFullContradiction = (fn) => { fullContradiction = fn; };
 
 const onCount = (P, st, i) => {
+  const ed = P.ed, e = st.e, i4 = i * 4;
   let n = 0;
-  for (let d = 0; d < 4; d++) { const x = P.ed[i * 4 + d]; if (x >= 0 && st.e[x] === E_ON) n++; }
+  let x = ed[i4]; if (x >= 0 && e[x] === E_ON) n++;
+  x = ed[i4 + 1]; if (x >= 0 && e[x] === E_ON) n++;
+  x = ed[i4 + 2]; if (x >= 0 && e[x] === E_ON) n++;
+  x = ed[i4 + 3]; if (x >= 0 && e[x] === E_ON) n++;
   return n;
 };
 
 const availCount = (P, st, i) => {
+  const ed = P.ed, nb = P.nb, e = st.e, cell = st.cell, i4 = i * 4;
   let n = 0;
   for (let d = 0; d < 4; d++) {
-    const x = P.ed[i * 4 + d];
+    const x = ed[i4 + d];
     if (x < 0) continue;
-    if (st.e[x] === E_OFF) continue;
-    const j = P.nb[i * 4 + d];
-    if (st.cell[j] === OFF) continue;
-    if (st.e[x] !== E_ON && onCount(P, st, j) >= 2) continue;
+    const ev = e[x];
+    if (ev === E_OFF) continue;
+    const j = nb[i4 + d];
+    if (cell[j] === OFF) continue;
+    if (ev !== E_ON) {
+      const j4 = j * 4;
+      let jon = 0;
+      let y = ed[j4]; if (y >= 0 && e[y] === E_ON) jon++;
+      y = ed[j4 + 1]; if (y >= 0 && e[y] === E_ON) jon++;
+      y = ed[j4 + 2]; if (y >= 0 && e[y] === E_ON) jon++;
+      y = ed[j4 + 3]; if (y >= 0 && e[y] === E_ON) jon++;
+      if (jon >= 2) continue;
+    }
     n++;
   }
   return n;
+};
+
+let scratchOnc = new Int8Array(0);
+let scratchChangedMask = new Uint8Array(0);
+
+const insertSortNum = (arr) => {
+  for (let i = 1; i < arr.length; i++) {
+    const v = arr[i];
+    let j = i - 1;
+    while (j >= 0 && arr[j] > v) { arr[j + 1] = arr[j]; j--; }
+    arr[j + 1] = v;
+  }
 };
 
 const applySets = (st, sets) => {
@@ -174,20 +200,37 @@ export function easyContradiction(P, st, scope = null) {
       }
     }
   } else {
+    if (scratchOnc.length < N) scratchOnc = new Int8Array(N);
+    const onc = scratchOnc;
+    onc.fill(0, 0, N);
+    for (let x = 0; x < numEdges; x++) if (e[x] === E_ON) { onc[edgeA[x]]++; onc[edgeB[x]]++; }
     for (let i = 0; i < N; i++) {
       const s = cell[i];
+      const on = onc[i];
       if (s === OFF) {
         if (clue[i] !== NONE) return { kind: 'clueOff', cell: i };
-        for (let d = 0; d < 4; d++) {
-          const x = ed[i * 4 + d];
-          if (x >= 0 && e[x] === E_ON) return { kind: 'offLine', cell: i, edge: x };
+        if (on > 0) {
+          for (let d = 0; d < 4; d++) {
+            const x = ed[i * 4 + d];
+            if (x >= 0 && e[x] === E_ON) return { kind: 'offLine', cell: i, edge: x };
+          }
         }
         continue;
       }
-      const on = onCount(P, st, i);
       if (on > 2) return { kind: 'threeLines', cell: i };
       if (s === LOOP || on > 0) {
-        const av = availCount(P, st, i);
+        const i4 = i * 4;
+        let av = 0;
+        for (let d = 0; d < 4; d++) {
+          const x = ed[i4 + d];
+          if (x < 0) continue;
+          const ev = e[x];
+          if (ev === E_OFF) continue;
+          const j = nb[i4 + d];
+          if (cell[j] === OFF) continue;
+          if (ev !== E_ON && onc[j] >= 2) continue;
+          av++;
+        }
         if (av < 2) return { kind: 'stranded', cell: i, ways: av };
       }
     }
@@ -521,8 +564,10 @@ function findEasyStep(P, st, forbid, scope = null) {
   for (let i = 0; i < N; i++) if (cell[i] === LOOP) size[find(i)]++;
   for (let x = 0; x < numEdges; x++) {
     if (e[x] !== E_UNKNOWN) continue;
-    const a = edgeA[x], b = edgeB[x];
+    const a = edgeA[x];
     if (a < 0) continue;
+    const b = edgeB[x];
+    if (cell[a] !== LOOP || cell[b] !== LOOP) continue;
     const ra = find(a);
     if (ra === find(b) && size[ra] < loopCount) {
       const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], { edge: x, a, b });
@@ -564,9 +609,9 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
   const sortScope = () => {
     if (!dirtyAdded) return;
     dirtyAdded = false;
-    scope.cells.sort((a, b) => a - b);
-    scope.whites.sort((a, b) => a - b);
-    scope.blacks.sort((a, b) => a - b);
+    insertSortNum(scope.cells);
+    insertSortNum(scope.whites);
+    insertSortNum(scope.blacks);
   };
   const clearDirty = () => {
     if (!scope) return;
@@ -728,6 +773,16 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
     cycle: false,
   };
 
+  // Check once whether `st` is already a propagate() fixed point so trial calls can use O(local) seedEdge
+  stProp.cell.set(st.cell);
+  stProp.e.set(st.e);
+  stProp.cycle = st.cycle;
+  const baseFixed = propagate(P, stProp) && lastPropChanges === 0;
+
+  const needMask = edges.length * 2;
+  if (scratchChangedMask.length < needMask) scratchChangedMask = new Uint8Array(needMask);
+  const changedMask = scratchChangedMask;
+
   const easyHits = [];
   const easyHitSet = new Set();
 
@@ -740,12 +795,15 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
       stProp.e.set(st.e);
       stProp.cycle = st.cycle;
       stProp.e[x] = val;
-      if (!propagate(P, stProp)) {
+      if (!propagate(P, stProp, baseFixed ? x : -1, -1)) {
+        changedMask[ei * 2 + vi] = 1;
         const r = runHypothesis(P, st, x, val, { maxSteps: MAX_STEPS, checkArea: false });
         if (r.broke) {
           easyHits.push({ edge: x, hyp: val, rawSteps: r.steps, area: false, isFront });
           easyHitSet.add((x << 2) | val);
         }
+      } else {
+        changedMask[ei * 2 + vi] = lastPropChanges > 0 ? 1 : 0;
       }
     }
   }
@@ -788,11 +846,13 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
       for (let vi = 0; vi < 2; vi++) {
         const val = vi === 0 ? E_ON : E_OFF;
         if (easyHitSet.has((x << 2) | val)) continue;
+        // If propagate made 0 edge/OFF deductions beyond `x = val`, findEasyStep fires 0 steps -> cannot be an area hit
+        if (baseFixed && !changedMask[ei * 2 + vi]) continue;
         stProp.cell.set(st.cell);
         stProp.e.set(st.e);
         stProp.cycle = st.cycle;
         stProp.e[x] = val;
-        propagate(P, stProp);
+        propagate(P, stProp, baseFixed ? x : -1, -1);
         // skipEasy=true: propagate already guaranteed no easy contradiction
         if (fullContradiction(P, stProp, true)) {
           const r = runHypothesis(P, st, x, val, { maxSteps: AREA_STEPS, checkArea: true });

@@ -107,18 +107,21 @@ export function edgeCells(P, x) {
 }
 
 // Reusable scratch buffers for propagate() (never called recursively)
-let scratchParent = new Int16Array(0);
-let scratchSize = new Int32Array(0);
+let scratchVis = new Uint8Array(0);
+let scratchLoopCells = new Int16Array(0);
 let scratchCellQ = new Int16Array(0);
 let scratchInCellQ = new Uint8Array(0);
 let scratchClueQ = new Int16Array(0);
 let scratchInClueQ = new Uint8Array(0);
 let scratchQCap = 0;
 
+/** Number of edge assignments or cell=OFF deductions made by the most recent propagate() call. */
+export let lastPropChanges = 0;
+
 function ensurePropScratch(N) {
-  if (scratchParent.length < N) {
-    scratchParent = new Int16Array(N);
-    scratchSize = new Int32Array(N);
+  if (scratchVis.length < N) {
+    scratchVis = new Uint8Array(N);
+    scratchLoopCells = new Int16Array(N);
     scratchInCellQ = new Uint8Array(N);
     scratchInClueQ = new Uint8Array(N);
   }
@@ -131,6 +134,36 @@ function ensurePropScratch(N) {
   }
 }
 
+/** Lazily build compact CSR table of clues within distance 1 of each edge's endpoints. */
+function getEdgeClues(P) {
+  if (P._ecData) return P;
+  const { numEdges, edgeA, edgeB, nb, clue } = P;
+  const off = new Int32Array(numEdges + 1);
+  const tmp = [];
+  const seen = new Int16Array(10);
+  for (let x = 0; x < numEdges; x++) {
+    off[x] = tmp.length;
+    const a = edgeA[x];
+    if (a < 0) continue;
+    const b = edgeB[x];
+    let nSeen = 0;
+    const add = (j) => {
+      if (j < 0 || clue[j] === NONE) return;
+      for (let k = 0; k < nSeen; k++) if (seen[k] === j) return;
+      seen[nSeen++] = j;
+      tmp.push(j);
+    };
+    add(a); add(b);
+    const a4 = a * 4, b4 = b * 4;
+    add(nb[a4]); add(nb[a4 + 1]); add(nb[a4 + 2]); add(nb[a4 + 3]);
+    add(nb[b4]); add(nb[b4 + 1]); add(nb[b4 + 2]); add(nb[b4 + 3]);
+  }
+  off[numEdges] = tmp.length;
+  P._ecOff = off;
+  P._ecData = Int16Array.from(tmp);
+  return P;
+}
+
 /**
  * Sound constraint propagation for the exact solver. Returns false on a contradiction.
  * Does not model a human; human-style rules live in js/rating.js.
@@ -138,11 +171,12 @@ function ensurePropScratch(N) {
  * of a single newly assigned edge/cell (used by `solve()` after a prior fixed point).
  */
 export function propagate(P, st, seedEdge = -1, seedCell = -1) {
-  const { N, numEdges, nb, ed, ed2, edgeA, edgeB, clue, whites, blacks } = P;
+  const { N, cols, nb, ed, ed2, edgeA, edgeB, clue, whites, blacks } = P;
   const cell = st.cell, e = st.e;
 
   ensurePropScratch(N);
-  const parent = scratchParent, size = scratchSize;
+  const vis = scratchVis;
+  const loopCells = scratchLoopCells;
   const qCell = scratchCellQ, inCellQ = scratchInCellQ;
   const qClue = scratchClueQ, inClueQ = scratchInClueQ;
   const qMask = scratchQCap - 1;
@@ -150,6 +184,10 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   let kHead = 0, kTail = 0;
   let ok = true;
   let needLoopCheck = false;
+  let changes = 0;
+
+  if (!P._ecData) getEdgeClues(P);
+  const ecOff = P._ecOff, ecData = P._ecData;
 
   const pushCell = (i) => {
     if (!inCellQ[i]) {
@@ -166,21 +204,12 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     }
   };
   const wakeEdge = (x) => {
-    const a = edgeA[x], b = edgeB[x];
+    const a = edgeA[x];
     if (a < 0) return;
     pushCell(a);
-    pushCell(b);
-    if (clue[a] !== NONE) pushClue(a);
-    if (clue[b] !== NONE) pushClue(b);
-    const a4 = a * 4, b4 = b * 4;
-    let j = nb[a4]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[a4 + 1]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[a4 + 2]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[a4 + 3]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[b4]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[b4 + 1]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[b4 + 2]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
-    j = nb[b4 + 3]; if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    pushCell(edgeB[x]);
+    const end = ecOff[x + 1];
+    for (let k = ecOff[x]; k < end; k++) pushClue(ecData[k]);
   };
 
   const setCell = (i, v) => {
@@ -189,6 +218,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (cur !== UNKNOWN) { ok = false; return; }
     cell[i] = v;
     if (v === LOOP) needLoopCheck = true;
+    else changes++;
     pushCell(i);
   };
   const setEdge = (x, v) => {
@@ -197,6 +227,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (cur === v) return;
     if (cur !== E_UNKNOWN) { ok = false; return; }
     e[x] = v;
+    changes++;
     if (v === E_ON) needLoopCheck = true;
     wakeEdge(x);
   };
@@ -213,8 +244,6 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     for (let wi = 0; wi < whites.length; wi++) pushClue(whites[wi]);
     for (let bi = 0; bi < blacks.length; bi++) pushClue(blacks[bi]);
   }
-
-  const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
 
   while (ok) {
     // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues whose neighborhood changed.
@@ -370,44 +399,95 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (!ok || !needLoopCheck) break;
     needLoopCheck = false;
 
-    // 5. Single closed loop constraint (runs once per local fixed point, only when ON/LOOP changed)
-    for (let i = 0; i < N; i++) parent[i] = i;
-    let cycleRoot = -1, cycleCount = 0, onEdges = 0;
-    for (let x = 0; x < numEdges; x++) {
-      if (e[x] !== E_ON) continue;
-      onEdges++;
-      const ra = find(edgeA[x]), rb = find(edgeB[x]);
-      if (ra === rb) { cycleRoot = ra; cycleCount++; }
-      else parent[ra] = rb;
-    }
-    if (cycleCount > 1) { ok = false; break; }
-
+    // 5. Single closed loop constraint via direct path/cycle tracing over LOOP cells (degOn <= 2 everywhere).
+    // Replaces O(N + 2E) union-find + full unknown-edge scan with one trace over LOOP cells.
     let loopCount = 0;
-    for (let i = 0; i < N; i++) if (cell[i] === LOOP) loopCount++;
+    for (let i = 0; i < N; i++) {
+      if (cell[i] === LOOP) {
+        loopCells[loopCount++] = i;
+        vis[i] = 0;
+      }
+    }
 
-    if (cycleRoot >= 0) {
-      cycleRoot = find(cycleRoot);
+    let cycLen = 0, cycCount = 0;
+    for (let li = 0; li < loopCount; li++) {
+      const u = loopCells[li];
+      if (vis[u]) continue;
+      const u4 = u * 4;
+      let next1 = -1, next2 = -1;
+      let x = ed[u4]; if (x >= 0 && e[x] === E_ON) next1 = nb[u4];
+      x = ed[u4 + 1]; if (x >= 0 && e[x] === E_ON) { if (next1 < 0) next1 = nb[u4 + 1]; else next2 = nb[u4 + 1]; }
+      x = ed[u4 + 2]; if (x >= 0 && e[x] === E_ON) { if (next1 < 0) next1 = nb[u4 + 2]; else next2 = nb[u4 + 2]; }
+      x = ed[u4 + 3]; if (x >= 0 && e[x] === E_ON) { if (next1 < 0) next1 = nb[u4 + 3]; else next2 = nb[u4 + 3]; }
+
+      if (next1 < 0) { vis[u] = 1; continue; } // isolated LOOP cell (degOn === 0)
+      if (next2 >= 0) continue; // interior of a path or cycle (wait until second pass for pure cycles)
+
+      // Open path starting at degOn === 1 endpoint `u`: walk to far endpoint `cur`
+      vis[u] = 1;
+      let prev = u, cur = next1, len = 2;
+      for (;;) {
+        vis[cur] = 1;
+        const c4 = cur * 4;
+        let nxt = -1;
+        x = ed[c4]; if (x >= 0 && e[x] === E_ON && nb[c4] !== prev) nxt = nb[c4];
+        else { x = ed[c4 + 1]; if (x >= 0 && e[x] === E_ON && nb[c4 + 1] !== prev) nxt = nb[c4 + 1];
+        else { x = ed[c4 + 2]; if (x >= 0 && e[x] === E_ON && nb[c4 + 2] !== prev) nxt = nb[c4 + 2];
+        else { x = ed[c4 + 3]; if (x >= 0 && e[x] === E_ON && nb[c4 + 3] !== prev) nxt = nb[c4 + 3]; } } }
+        if (nxt < 0) break;
+        prev = cur; cur = nxt; len++;
+      }
+      if (len >= 4 && len < loopCount) {
+        const diff = u > cur ? u - cur : cur - u;
+        if (diff === 1 || diff === cols) {
+          for (let d = 0; d < 4; d++) {
+            if (nb[u4 + d] === cur) {
+              const ex = ed[u4 + d];
+              if (e[ex] === E_UNKNOWN) setEdge(ex, E_OFF);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Any remaining unvisited LOOP cell with degOn === 2 belongs to a closed cycle
+    for (let li = 0; li < loopCount && ok; li++) {
+      const start = loopCells[li];
+      if (vis[start]) continue;
+      cycCount++;
+      if (cycCount > 1) { ok = false; break; }
+      vis[start] = 2;
+      const s4 = start * 4;
+      let cur = -1;
+      let x = ed[s4]; if (x >= 0 && e[x] === E_ON) cur = nb[s4];
+      else { x = ed[s4 + 1]; if (x >= 0 && e[x] === E_ON) cur = nb[s4 + 1];
+      else { x = ed[s4 + 2]; if (x >= 0 && e[x] === E_ON) cur = nb[s4 + 2];
+      else { x = ed[s4 + 3]; if (x >= 0 && e[x] === E_ON) cur = nb[s4 + 3]; } } }
+      let prev = start, len = 1;
+      while (cur >= 0 && cur !== start) {
+        vis[cur] = 2;
+        len++;
+        const c4 = cur * 4;
+        let nxt = -1;
+        x = ed[c4]; if (x >= 0 && e[x] === E_ON && nb[c4] !== prev) nxt = nb[c4];
+        else { x = ed[c4 + 1]; if (x >= 0 && e[x] === E_ON && nb[c4 + 1] !== prev) nxt = nb[c4 + 1];
+        else { x = ed[c4 + 2]; if (x >= 0 && e[x] === E_ON && nb[c4 + 2] !== prev) nxt = nb[c4 + 2];
+        else { x = ed[c4 + 3]; if (x >= 0 && e[x] === E_ON && nb[c4 + 3] !== prev) nxt = nb[c4 + 3]; } } }
+        prev = cur; cur = nxt;
+      }
+      cycLen = len;
+    }
+    if (!ok) break;
+
+    if (cycCount === 1) {
+      if (cycLen < loopCount) { ok = false; break; }
       for (let i = 0; i < N; i++) {
-        if (find(i) === cycleRoot) continue;
-        if (cell[i] === LOOP) { ok = false; break; }
         if (cell[i] === UNKNOWN) setCell(i, OFF);
       }
       st.cycle = true;
     } else {
       st.cycle = false;
-      if (onEdges >= 3) {
-        size.fill(0, 0, N);
-        for (let i = 0; i < N; i++) if (cell[i] === LOOP) size[find(i)]++;
-        for (let x = 0; x < numEdges; x++) {
-          if (e[x] !== E_UNKNOWN) continue;
-          const a = edgeA[x];
-          if (a < 0) continue;
-          const b = edgeB[x];
-          if (cell[a] !== LOOP || cell[b] !== LOOP) continue;
-          const ra = find(a);
-          if (ra === find(b) && size[ra] < loopCount) setEdge(x, E_OFF);
-        }
-      }
     }
     if (cHead === cTail && kHead === kTail) break;
   }
@@ -415,6 +495,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   // O(touched) cleanup of queued flags on early contradiction exit
   while (cHead !== cTail) { inCellQ[qCell[cHead]] = 0; cHead = (cHead + 1) & qMask; }
   while (kHead !== kTail) { inClueQ[qClue[kHead]] = 0; kHead = (kHead + 1) & qMask; }
+  lastPropChanges = changes;
   return ok;
 }
 

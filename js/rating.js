@@ -1051,7 +1051,7 @@ function findTryEdge(P, st, { upto }) {
     for (const val of [E_ON, E_OFF]) {
       const s2 = cloneState(st);
       s2.e[x] = val;
-      const r = closure(P, s2, upto);
+      const r = closure(P, s2, upto, best ? best.info.steps : Infinity);
       if (r.contradiction) {
         const cand = {
           sets: [['e', x, val === E_ON ? E_OFF : E_ON]],
@@ -1170,25 +1170,43 @@ export const ruleLabel = (id) => (id === 'unsolved' ? 'none of the current rules
 
 const IMAGINE_AFTER = 18; // Beginner + local Medium + faceShade (<= 18) always run before searching imagined chains
 
-/** Apply all non-costly rules below `upto` until fixed point or contradiction. Mutates `st`. */
-export function closure(P, st, upto = FIRST_LOOKAHEAD) {
+/** Apply all non-costly rules below `upto` until fixed point, contradiction, or `maxSteps`. Mutates `st`. */
+export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity) {
   const allowed = Array.isArray(upto) ? new Set(upto) : null;
+  const limit = allowed ? RULES.length : upto;
   let steps = 0;
   const trace = [];
   for (let guard = 0; guard < 5000; guard++) {
+    // Drain free bookkeeping rules first (they don't affect `steps` or `trace`, avoiding redundant contradiction scans)
+    for (;;) {
+      let freeFired = false;
+      for (let r = 0; r < limit; r++) {
+        const rule = RULES[r];
+        if (!rule.free) continue;
+        const fs = rule.find(P, st, { upto: r, fast: true });
+        if (!fs.length) continue;
+        for (const f of fs) {
+          if (!applySets(st, f.sets)) return { contradiction: true, steps, trace };
+        }
+        freeFired = true;
+      }
+      if (!freeFired) break;
+    }
     if (contradiction(P, st)) return { contradiction: true, steps, trace };
+    if (steps >= maxSteps) return { contradiction: false, steps, trace };
     let fired = false;
-    for (let r = 0; r < (allowed ? RULES.length : upto); r++) {
+    for (let r = 0; r < limit; r++) {
       const rule = RULES[r];
-      if (allowed && !(rule.free || allowed.has(rule.id))) continue;
+      if (rule.free) continue;
+      if (allowed && !allowed.has(rule.id)) continue;
       if (!allowed && rule.costly) continue;
       const fs = rule.find(P, st, { upto: r, fast: true });
       if (!fs.length) continue;
       for (const f of fs) {
         if (!applySets(st, f.sets)) return { contradiction: true, steps, trace };
-        if (!rule.free && trace.length < 16) trace.push({ rule: rule.id, sets: f.sets, info: f.info });
+        if (trace.length < 16) trace.push({ rule: rule.id, sets: f.sets, info: f.info });
       }
-      if (!rule.free) steps++;
+      steps++;
       fired = true;
       break;
     }
