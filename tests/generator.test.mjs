@@ -123,4 +123,16 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
   assert.ok(pl, 'failed to generate 9x9 full even-row/even-col lattice puzzle');
   assert.equal(pl.clues.length, 16);
   assert.ok(pl.clues.every((c) => c.r % 2 === 1 && c.c % 2 === 1));
+
+  const pcv = generatePuzzle({ rows: 8, cols: 8, seed: 110, layout: 'cookie', budgetMs: 8000 });
+  assert.ok(pcv, 'failed to generate cookie half-split puzzle');
+  assert.ok(pcv.clues.every((c) => (c.t === 'W' ? c.c < 4 : c.c >= 4)));
+
+  const pch = generatePuzzle({ rows: 8, cols: 8, seed: 111, layout: 'cookie-horiz', budgetMs: 8000 });
+  assert.ok(pch, 'failed to generate cookie-horiz half-split puzzle');
+  assert.ok(pch.clues.every((c) => (c.t === 'W' ? c.r < 4 : c.r >= 4)));
+
+  const pcd = generatePuzzle({ rows: 8, cols: 8, seed: 112, layout: 'cookie-diag', budgetMs: 8000 });
+  assert.ok(pcd, 'failed to generate cookie-diag half-split puzzle');
+  assert.ok(pcd.clues.every((c) => (c.t === 'W' ? c.r + c.c < 7 : c.r + c.c > 7)));
 });

@@ -196,6 +196,16 @@ function clueFilterFor(layout, rows, cols) {
       });
     };
   }
+  if (layout === 'cookie') {
+    return (cs) => cs.filter((c) => (c.t === 'W' ? c.c < (cols >> 1) : c.c >= (cols >> 1)));
+  }
+  if (layout === 'cookie-horiz') {
+    return (cs) => cs.filter((c) => (c.t === 'W' ? c.r < (rows >> 1) : c.r >= (rows >> 1)));
+  }
+  if (layout === 'cookie-diag') {
+    if (rows !== cols) throw new Error('cookie-diag layout requires a square board');
+    return (cs) => cs.filter((c) => (c.t === 'W' ? c.r + c.c < rows - 1 : c.r + c.c > rows - 1));
+  }
   throw new Error(`Unknown layout "${layout}"`);
 }
 

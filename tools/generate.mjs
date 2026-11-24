@@ -31,7 +31,7 @@ const seed = +arg('seed', 1);
 const budgetSec = +arg('budget', 120);
 const perPuzzleMs = +arg('per-puzzle-ms', 15000);
 const style = arg('style', 'balanced'); // balanced | white | black | sparse
-const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | lattice
+const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
 const tier = arg('tier', 'any');        // any | Beginner | Medium | Hard
 const maxTier = arg('max-tier', 'Expert');

@@ -328,6 +328,40 @@ if (!isMainThread) {
     { group: 'bonus-yinyang', pool: 'yinyang_12x12', cols: 12, rows: 12, layout: 'yinyang', total: 5, budgetSec: 120, perPuzzleMs: 30000 },
     { group: 'bonus-yinyang', pool: 'yinyang_mirror_12x12', cols: 12, rows: 12, layout: 'yinyang-mirror', total: 5, budgetSec: 180, perPuzzleMs: 30000 },
     { group: 'bonus-yinyang', pool: 'yinyang_transpose_12x12', cols: 12, rows: 12, layout: 'yinyang-transpose', total: 5, budgetSec: 240, perPuzzleMs: 35000 },
+    // ---- Bonus: Black & White Cookie (left/right, top/bottom, and diagonal W/B half-splits)
+    {
+      group: 'bonus-cookie', pool: 'cookie_vert_10x10', cols: 10, rows: 10, layout: 'cookie',
+      buckets: {
+        Beginner: { need: 18, maxScore: 375 },
+        Medium: { need: 68, minScore: 355, maxScore: 470 },
+        Hard: { need: 68, minScore: 470, maxScore: 800 },
+        Expert: { need: 18, minScore: 780 },
+      },
+      budgetSec: 300, perPuzzleMs: 20000,
+    },
+    {
+      group: 'bonus-cookie', pool: 'cookie_horiz_10x10', cols: 10, rows: 10, layout: 'cookie-horiz',
+      buckets: {
+        Beginner: { need: 18, maxScore: 375 },
+        Medium: { need: 68, minScore: 355, maxScore: 470 },
+        Hard: { need: 68, minScore: 470, maxScore: 800 },
+        Expert: { need: 18, minScore: 780 },
+      },
+      budgetSec: 300, perPuzzleMs: 20000,
+    },
+    {
+      group: 'bonus-cookie', pool: 'cookie_diag_10x10', cols: 10, rows: 10, layout: 'cookie-diag',
+      buckets: {
+        Beginner: { need: 18, maxScore: 375 },
+        Medium: { need: 68, minScore: 355, maxScore: 470 },
+        Hard: { need: 68, minScore: 470, maxScore: 800 },
+        Expert: { need: 18, minScore: 780 },
+      },
+      budgetSec: 300, perPuzzleMs: 20000,
+    },
+    { group: 'bonus-cookie', pool: 'cookie_vert_12x12', cols: 12, rows: 12, layout: 'cookie', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
+    { group: 'bonus-cookie', pool: 'cookie_horiz_12x12', cols: 12, rows: 12, layout: 'cookie-horiz', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
+    { group: 'bonus-cookie', pool: 'cookie_diag_12x12', cols: 12, rows: 12, layout: 'cookie-diag', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'full_10x12', cols: 10, rows: 12, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'lattice_13x13', cols: 13, rows: 13, layout: 'lattice', total: 14, budgetSec: 180, perPuzzleMs: 35000 },
   ];

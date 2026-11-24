@@ -138,6 +138,13 @@ const recipes = [
     blurb: '500 all-black 10×10 puzzles (50 B / 200 M / 200 H / 50 E) plus 10 oversized 12×12 bonus puzzles.',
   },
   {
+    id: 'bonus-cookie', name: 'Black & White Cookie', label: '🍪 Black & White Cookie (10×10)', group: 'Bonus',
+    glob: 'cookie_vert_10x10,cookie_horiz_10x10,cookie_diag_10x10',
+    tiers: '50,200,200,50', tierBands: '0:375,355:470,470:800,780:', balanceGroups: true, interleaveGroups: true, maxRun: 3,
+    bonusGlob: 'cookie_vert_12x12,cookie_horiz_12x12,cookie_diag_12x12', bonusCount: 10,
+    blurb: '500 half-white, half-black 10×10 puzzles (balanced across left/right, top/bottom, and diagonal splits in every tier) plus 10 oversized 12×12 bonus puzzles.',
+  },
+  {
     id: 'bonus-skyscraper', name: 'Skyscraper', label: '🏙️ Skyscraper (6×20)', group: 'Bonus',
     glob: 'sky_6x20', tiers: '50,200,200,50', tierBands: '0:480,430:550,550:900,880:',
     bonusGlob: 'tallsky_6x30', bonusCount: 10,
