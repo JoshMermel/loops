@@ -327,6 +327,25 @@ button.ghost { background: transparent; }
 .bp-count-done { color: var(--color-solved); font-weight: 600; }
 @media (max-width: 380px) { .bp-cards { grid-template-columns: 1fr; } }
 
+/* ---- Help modal rule diagrams ---- */
+.help-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 14px; }
+.help-rule-card { background: var(--bg-light); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px 12px; }
+.help-rule-title { font-weight: 700; font-size: 0.94rem; margin-bottom: 3px; }
+.help-rule-desc { margin: 0 0 8px; font-size: 0.84rem; color: var(--text-secondary); line-height: 1.35; }
+.help-diagrams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.help-fig { margin: 0; text-align: center; }
+.help-fig svg { width: 100%; height: auto; display: block; }
+.help-fig figcaption { font-size: 0.74rem; margin-top: 3px; }
+.hr-bg { fill: var(--cell-bg); stroke: var(--border-light); stroke-width: 1.2; }
+.hr-grid { fill: none; stroke: var(--cell-border); stroke-width: 1; stroke-dasharray: 2 3; }
+.hr-dot { fill: var(--grid-dot); }
+.hr-line { fill: none; stroke: var(--loop); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.hr-line-bad { fill: none; stroke: var(--color-error); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.help-controls { margin: 4px 0 12px; padding-left: 20px; }
+.help-controls li { margin: 4px 0; font-size: 0.9rem; }
+.help-foot { margin: 0; font-size: 0.83rem; color: var(--text-secondary); }
+@media (max-width: 520px) { .help-rules { grid-template-columns: 1fr; } }
+
 /* ---- Print dialog & booklet ---- */
 .print-form { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; margin: 8px 0; }
 .print-form input[type="text"], .print-form select { min-width: 0; font: inherit; padding: 6px 8px; }

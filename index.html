@@ -18,9 +18,8 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <script>
     (function () {
-      var dark;
-      try { var s = localStorage.getItem('ms_dark'); dark = s === null ? null : s === '1'; } catch (e) { dark = null; }
-      if (dark === null) dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+      var dark = false;
+      try { dark = localStorage.getItem('ms_dark') === '1'; } catch (e) {}
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     })();
   </script>
@@ -110,27 +109,72 @@
         <button data-close aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p>New here? Start with the <b>Gentle intro</b> book: small Beginner puzzles that teach the rules one at a time. Tap the book name above the board to switch books.</p>
-        <p>Draw <b>one single closed loop</b> along the grid lines passing through every circle (white and black), with no crossings or branches.</p>
-        <ul>
-          <li><b>White circles (○):</b> the loop must go <b>straight through</b> the circle, and must <b>turn 90°</b> at least one step immediately before or after it along the loop.</li>
-          <li><b>Black circles (●):</b> the loop must <b>turn 90°</b> at the circle, and must go <b>straight through</b> both adjacent intersections along the loop (at least two segments straight in each direction).</li>
-          <li>Empty intersections may or may not be visited by the loop.</li>
-        </ul>
+        <p>Draw <b>one single closed loop</b> along the grid lines visiting every circle, with no crossings or branches. Empty intersections are optional.</p>
+        <div class="help-rules">
+          <div class="help-rule-card">
+            <div class="help-rule-title">White circle (○)</div>
+            <p class="help-rule-desc">Go <b>straight through</b>, and <b>turn 90°</b> immediately before or after (or both).</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid white circle: straight through then turns">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M12 22H100M12 44H100M12 66H100M12 22V66M34 22V66M56 22V66M78 22V66M100 22V66"/>
+                  <g class="hr-dot"><circle cx="12" cy="22" r="1.5"/><circle cx="34" cy="22" r="1.5"/><circle cx="56" cy="22" r="1.5"/><circle cx="78" cy="22" r="1.5"/><circle cx="100" cy="22" r="1.5"/><circle cx="12" cy="44" r="1.5"/><circle cx="34" cy="44" r="1.5"/><circle cx="78" cy="44" r="1.5"/><circle cx="100" cy="44" r="1.5"/><circle cx="12" cy="66" r="1.5"/><circle cx="34" cy="66" r="1.5"/><circle cx="56" cy="66" r="1.5"/><circle cx="78" cy="66" r="1.5"/><circle cx="100" cy="66" r="1.5"/></g>
+                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
+                  <path class="hr-line" d="M12 44H78V22"/>
+                  <circle class="pearl-white-ring" cx="56" cy="44" r="7.5"/>
+                </svg>
+                <figcaption class="ok-text">✓ Turns right after</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Invalid white circle: straight on both sides without turning">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M12 22H100M12 44H100M12 66H100M12 22V66M34 22V66M56 22V66M78 22V66M100 22V66"/>
+                  <g class="hr-dot"><circle cx="12" cy="22" r="1.5"/><circle cx="34" cy="22" r="1.5"/><circle cx="56" cy="22" r="1.5"/><circle cx="78" cy="22" r="1.5"/><circle cx="100" cy="22" r="1.5"/><circle cx="12" cy="44" r="1.5"/><circle cx="34" cy="44" r="1.5"/><circle cx="78" cy="44" r="1.5"/><circle cx="100" cy="44" r="1.5"/><circle cx="12" cy="66" r="1.5"/><circle cx="34" cy="66" r="1.5"/><circle cx="56" cy="66" r="1.5"/><circle cx="78" cy="66" r="1.5"/><circle cx="100" cy="66" r="1.5"/></g>
+                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
+                  <path class="hr-line-bad" d="M12 44H100"/>
+                  <circle class="pearl-white-ring bad" cx="56" cy="44" r="7.5"/>
+                </svg>
+                <figcaption class="bad-text">✕ Doesn't turn</figcaption>
+              </figure>
+            </div>
+          </div>
+          <div class="help-rule-card">
+            <div class="help-rule-title">Black circle (●)</div>
+            <p class="help-rule-desc"><b>Turn 90°</b> at the circle, and go straight for at least <b>2 segments</b> both ways.</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid black circle: turns 90 degrees with two straight segments each way">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 11H89M23 33H89M23 55H89M23 77H89M23 11V77M45 11V77M67 11V77M89 11V77"/>
+                  <g class="hr-dot"><circle cx="23" cy="11" r="1.5"/><circle cx="45" cy="11" r="1.5"/><circle cx="67" cy="11" r="1.5"/><circle cx="89" cy="11" r="1.5"/><circle cx="23" cy="33" r="1.5"/><circle cx="45" cy="33" r="1.5"/><circle cx="67" cy="33" r="1.5"/><circle cx="89" cy="33" r="1.5"/><circle cx="45" cy="55" r="1.5"/><circle cx="67" cy="55" r="1.5"/><circle cx="89" cy="55" r="1.5"/><circle cx="23" cy="77" r="1.5"/><circle cx="45" cy="77" r="1.5"/><circle cx="67" cy="77" r="1.5"/><circle cx="89" cy="77" r="1.5"/></g>
+                  <path class="hr-line" d="M23 11V55H67"/>
+                  <circle class="pearl-black" cx="23" cy="55" r="7.5"/>
+                </svg>
+                <figcaption class="ok-text">✓ 2 straight each way</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Invalid black circle: turns after only one segment">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 11H89M23 33H89M23 55H89M23 77H89M23 11V77M45 11V77M67 11V77M89 11V77"/>
+                  <g class="hr-dot"><circle cx="23" cy="11" r="1.5"/><circle cx="45" cy="11" r="1.5"/><circle cx="67" cy="11" r="1.5"/><circle cx="89" cy="11" r="1.5"/><circle cx="23" cy="33" r="1.5"/><circle cx="45" cy="33" r="1.5"/><circle cx="67" cy="33" r="1.5"/><circle cx="89" cy="33" r="1.5"/><circle cx="45" cy="55" r="1.5"/><circle cx="67" cy="55" r="1.5"/><circle cx="89" cy="55" r="1.5"/><circle cx="23" cy="77" r="1.5"/><circle cx="45" cy="77" r="1.5"/><circle cx="67" cy="77" r="1.5"/><circle cx="89" cy="77" r="1.5"/></g>
+                  <path class="hr-line-bad" d="M23 11V55H45V77"/>
+                  <circle class="pearl-black bad" cx="23" cy="55" r="7.5"/>
+                </svg>
+                <figcaption class="bad-text">✕ Turns too soon</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
         <h3>Controls</h3>
-        <ul>
-          <li><b>Tap a grid segment</b> to cycle: empty → line → <b>✕</b> → empty.</li>
-          <li><b>Drag along the grid</b> to draw (or, starting on an existing line, erase) loop segments; retrace backward mid-drag to backtrack.</li>
-          <li><b>Right-click a grid segment</b> to toggle a <b>✕</b> directly, or <b>right-drag</b> to swipe-place/erase <b>✕</b> marks across multiple segments.</li>
-          <li><b>Tap or drag across the centers of squares</b> to shade them as <b>Inside</b> or <b>Outside</b> the loop (left-click cycles blank → Inside → Outside → blank; right-click cycles in reverse; dragging continues painting or erasing the same color).</li>
-          <li><b>Hint</b> shows the next human-style deduction (rule, tier, cost, explanation, and ghost marks). Press it again to cycle through other firings of the same rule; click anywhere to dismiss. See the <a href="docs/how_to_solve.html">illustrated solving guide</a> for examples of every rule Hint knows.</li>
-          <li><b>←</b> / <b>→</b> move between puzzles. Ctrl/⌘-Z undo, Ctrl/⌘-Shift-Z redo. Esc cancels a drag.</li>
-          <li>Circles highlight <span class="bad-text">red</span> when a rule is broken (can be toggled in Settings, along with Auto-X, Auto-Shade, and line colors).</li>
+        <ul class="help-controls">
+          <li><b>Draw / erase lines:</b> drag along grid lines (or tap a segment to cycle line / <b>✕</b> / blank).</li>
+          <li><b>Place ✕ marks:</b> right-click or right-drag along grid lines.</li>
+          <li><b>Shade squares:</b> tap or drag across squares to mark Inside / Outside.</li>
+          <li><b>Need a nudge?</b> Press <b>Hint</b> for the next deduction, or browse the <a href="docs/how_to_solve.html">solving guide</a>.</li>
         </ul>
-        <p>
-          Masyu is a classic puzzle genre published by Nikoli; every puzzle here was generated and verified by this toolkit to have a unique solution.
-          No analytics, no accounts: your progress stays in this browser.
-          Spotted a bug or have feedback? Let Josh know!
+        <p class="help-foot">
+          New here? Start with <b>Gentle intro</b>. Progress stays in your browser (no accounts or tracking). Feedback? Let Josh know!
         </p>
       </div>
     </div>
@@ -183,18 +227,8 @@
           </div>
           <label class="settings-row">
             <div class="settings-row-text">
-              <span class="settings-label">Mark broken circles</span>
-              <span class="settings-desc">Highlight white and black circles red when a rule is broken</span>
-            </div>
-            <div class="toggle-switch">
-              <input type="checkbox" id="setting-mark-circles" role="switch">
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </div>
-          </label>
-          <label class="settings-row">
-            <div class="settings-row-text">
               <span class="settings-label">Auto-X</span>
-              <span class="settings-desc">Automatically place fainter ✕ marks on obvious blocked edges: remaining edges at an intersection with two segments, straight extensions past a white circle that already went straight on the other side, the opposite side of a black circle's segment, and dead-end intersections or pockets. Disappears automatically when its cause is erased; your own ✕ marks are never touched.</span>
+              <span class="settings-desc">Automatically cross out obvious blocked edges and dead ends</span>
             </div>
             <div class="toggle-switch">
               <input type="checkbox" id="setting-auto-x" role="switch">
@@ -204,7 +238,7 @@
           <label class="settings-row">
             <div class="settings-row-text">
               <span class="settings-label">Auto-shade (Inside / Outside)</span>
-              <span class="settings-desc">Automatically propagate Inside / Outside shading across drawn lines (flip color), ✕ marks (keep color), and the board edge, starting from the perimeter and any squares you shade yourself. Never jumps across circles or overwrites manual shading.</span>
+              <span class="settings-desc">Automatically shade squares Inside or Outside from drawn lines and ✕s</span>
             </div>
             <div class="toggle-switch">
               <input type="checkbox" id="setting-auto-shade" role="switch">

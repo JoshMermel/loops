@@ -102,9 +102,8 @@ htmlParts.push(`<!DOCTYPE html>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <script>
     (function () {
-      var dark;
-      try { var s = localStorage.getItem('ms_dark'); dark = s === null ? null : s === '1'; } catch (e) { dark = null; }
-      if (dark === null) dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+      var dark = false;
+      try { dark = localStorage.getItem('ms_dark') === '1'; } catch (e) {}
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     })();
   </script>

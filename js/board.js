@@ -331,7 +331,7 @@ export class Board {
     this.hoverCell = -1;
     this.hoverEdge = -1;
     this.hoverFace = -1;
-    this.opts = { colorLines: false, pathColors: null, pathAlike: null, markCircles: true };
+    this.opts = { colorLines: false, pathColors: null, pathAlike: null };
     this.grace = makeGrace();
     this._badTimer = 0;
     this._graceNow = true;
@@ -492,7 +492,7 @@ export class Board {
     for (let k = 0; k < P.clues.length; k++) {
       const cl = P.clues[k];
       if (cl.t !== 'W') continue;
-      const st = this.opts.markCircles && info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
+      const st = info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
       g += `<circle class="pearl-white-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
     }
 
@@ -517,7 +517,7 @@ export class Board {
     // Circle outlines (white) and solid discs (black) on intersections
     for (let k = 0; k < P.clues.length; k++) {
       const cl = P.clues[k];
-      const st = this.opts.markCircles && info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
+      const st = info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
       if (cl.t === 'W') {
         g += `<circle class="pearl-white-ring ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
       } else {

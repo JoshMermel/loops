@@ -47,9 +47,8 @@ const settings = {
   colorLines: store.get('ms_colorLines') === '1',
   palette: validId(store.get('ms_pathPalette'), savedCustom),
   custom: savedCustom,
-  markCircles: store.get('ms_markCircles') !== '0',
-  autoX: store.get('ms_autoX') === '1',
-  autoShade: store.get('ms_autoShade') === '1',
+  autoX: store.get('ms_autoX') !== '0',
+  autoShade: store.get('ms_autoShade') !== '0',
 };
 
 const board = new Board($('board'), {
@@ -72,7 +71,7 @@ const paletteOptions = () => {
   const list = pathColors();
   return { pathColors: list, pathAlike: alikeMatrix(list, eyesOf(settings.palette)) };
 };
-board.setOptions({ colorLines: settings.colorLines, markCircles: settings.markCircles, ...paletteOptions() });
+board.setOptions({ colorLines: settings.colorLines, ...paletteOptions() });
 
 // ------------------------------------------------------------ marks & undo
 
@@ -886,13 +885,6 @@ $('setting-color-lines').addEventListener('change', (e) => {
   store.set('ms_colorLines', settings.colorLines ? '1' : '0');
   board.setOptions({ colorLines: settings.colorLines });
   renderPaletteUI();
-});
-
-$('setting-mark-circles').checked = settings.markCircles;
-$('setting-mark-circles').addEventListener('change', (e) => {
-  settings.markCircles = e.target.checked;
-  store.set('ms_markCircles', settings.markCircles ? '1' : '0');
-  board.setOptions({ markCircles: settings.markCircles });
 });
 
 $('setting-auto-x').checked = settings.autoX;
