@@ -373,6 +373,35 @@ if (!isMainThread) {
     { group: 'bonus-patterns', pool: 'pat_galaxy_10x10', cols: 10, rows: 10, layout: 'galaxy', total: 35, budgetSec: 45, perPuzzleMs: 15000 },
     { group: 'bonus-patterns', pool: 'pat_circle_10x10', cols: 10, rows: 10, layout: 'circle-ring', total: 25, budgetSec: 60, perPuzzleMs: 15000 },
     { group: 'bonus-patterns', pool: 'pat_stripes_9x9', cols: 9, rows: 9, layout: 'diag-stripes', total: 20, budgetSec: 30, perPuzzleMs: 15000 },
+
+    // ---- Bonus Finales: 10 Expert+ (normal size) + 10 Mega (2x-3x area) per 500-puzzle Bonus book
+    // Expert+ (beyond hints) appended into normal-size bonus pools
+    { group: 'bonus-finales', pool: 'white_8x8', cols: 8, rows: 8, style: 'white', tier: 'Expert+', totalTier: 12, budgetSec: 90, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'black_10x10', cols: 10, rows: 10, style: 'black', tier: 'Expert+', totalTier: 12, budgetSec: 120, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'cookie_vert_10x10', cols: 10, rows: 10, layout: 'cookie', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'cookie_horiz_10x10', cols: 10, rows: 10, layout: 'cookie-horiz', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'cookie_diag_10x10', cols: 10, rows: 10, layout: 'cookie-diag', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'sky_6x20', cols: 6, rows: 20, tier: 'Expert+', totalTier: 12, budgetSec: 120, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'yinyang_10x10', cols: 10, rows: 10, layout: 'yinyang', tier: 'Expert+', totalTier: 6, budgetSec: 90, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'yinyang_mirror_10x10', cols: 10, rows: 10, layout: 'yinyang-mirror', tier: 'Expert+', totalTier: 8, budgetSec: 45, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'full_10x10', cols: 10, rows: 10, minFill: 1.0, tier: 'Expert+', totalTier: 12, budgetSec: 120, perPuzzleMs: 20000 },
+
+    // Mega-sized themed boards (2x-3x normal area)
+    { group: 'bonus-finales', pool: 'white_14x14', cols: 14, rows: 14, style: 'white', total: 12, budgetSec: 90, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'black_12x20', cols: 12, rows: 20, style: 'black', total: 12, budgetSec: 120, perPuzzleMs: 25000 },
+    { group: 'bonus-finales', pool: 'cookie_vert_16x16', cols: 16, rows: 16, layout: 'cookie', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
+    { group: 'bonus-finales', pool: 'cookie_horiz_16x16', cols: 16, rows: 16, layout: 'cookie-horiz', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
+    { group: 'bonus-finales', pool: 'cookie_diag_16x16', cols: 16, rows: 16, layout: 'cookie-diag', total: 5, budgetSec: 120, perPuzzleMs: 25000 },
+    { group: 'bonus-finales', pool: 'tallsky_6x40', cols: 6, rows: 40, total: 12, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-finales', pool: 'sym_rot180_14x14', cols: 14, rows: 14, layout: 'rot180', total: 5, budgetSec: 60, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'sym_mirror_14x14', cols: 14, rows: 14, layout: 'mirror', total: 5, budgetSec: 60, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'sym_transpose_14x14', cols: 14, rows: 14, layout: 'transpose', total: 5, budgetSec: 90, perPuzzleMs: 20000 },
+    { group: 'bonus-finales', pool: 'yinyang_14x14', cols: 14, rows: 14, layout: 'yinyang', total: 6, budgetSec: 120, perPuzzleMs: 30000 },
+    { group: 'bonus-finales', pool: 'yinyang_mirror_14x14', cols: 14, rows: 14, layout: 'yinyang-mirror', total: 6, budgetSec: 120, perPuzzleMs: 30000 },
+    { group: 'bonus-finales', pool: 'full_12x20', cols: 12, rows: 20, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 20000 },
   ];
 
   const groups = onlyGroup === 'all' ? null : new Set(onlyGroup.split(','));

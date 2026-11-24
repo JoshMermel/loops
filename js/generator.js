@@ -283,8 +283,47 @@ export function tightLoop(rows, cols, rng, {
     faceCount += v0 ? -orb.length : orb.length;
   };
 
+  const isExactHamSeed = !symFaces && minFill >= 1.0 && (rows & 1) === 0 && (cols & 1) === 0;
+  const seedExactHam = () => {
+    inS.fill(0);
+    faceCount = 0;
+    const hr = rows >> 1, hc = cols >> 1;
+    for (let r = 0; r < hr; r++) {
+      for (let c = 0; c < hc; c++) {
+        inS[(2 * r) * fc + (2 * c)] = 1;
+        faceCount++;
+      }
+    }
+    const vis = new Uint8Array(hr * hc);
+    const start = (rng() * hr * hc) | 0;
+    vis[start] = 1;
+    const frontier = [];
+    const addNbrs = (u) => {
+      const rr = (u / hc) | 0, cc = u % hc;
+      if (rr > 0 && !vis[(rr - 1) * hc + cc]) frontier.push([rr, cc, rr - 1, cc]);
+      if (rr + 1 < hr && !vis[(rr + 1) * hc + cc]) frontier.push([rr, cc, rr + 1, cc]);
+      if (cc > 0 && !vis[rr * hc + (cc - 1)]) frontier.push([rr, cc, rr, cc - 1]);
+      if (cc + 1 < hc && !vis[rr * hc + (cc + 1)]) frontier.push([rr, cc, rr, cc + 1]);
+    };
+    addNbrs(start);
+    while (frontier.length) {
+      const k = (rng() * frontier.length) | 0;
+      const [rr, cc, nr, nc] = frontier[k];
+      frontier[k] = frontier[frontier.length - 1];
+      frontier.pop();
+      const v = nr * hc + nc;
+      if (vis[v]) continue;
+      vis[v] = 1;
+      inS[(rr + nr) * fc + (cc + nc)] = 1;
+      faceCount++;
+      addNbrs(v);
+    }
+  };
+
   // Seed initial connected dual face region
-  if (symFaces) {
+  if (isExactHamSeed) {
+    seedExactHam();
+  } else if (symFaces) {
     const cr = (fr / 2) | 0, cc = (fc / 2) | 0;
     const seeds = symFaces === 'transpose'
       ? [[cr, cr]]
@@ -310,7 +349,7 @@ export function tightLoop(rows, cols, rng, {
   }
 
   const wantFrac = minFill >= 0.95 ? 0.5 : (0.42 + 0.22 * rng());
-  for (let s = 0; s < Math.max(80, F * 16); s++) {
+  for (let s = 0; !isExactHamSeed && s < Math.max(80, F * 16); s++) {
     const r = (rng() * fr) | 0, c = (rng() * fc) | 0, idx = r * fc + c;
     const frac = faceCount / F;
     if (!inS[idx] && frac > wantFrac + 0.14 && rng() < 0.72) continue;
@@ -346,6 +385,15 @@ export function tightLoop(rows, cols, rng, {
   };
 
   let cur = evaluate();
+  if (isExactHamSeed) {
+    // Re-sample O(N) spanning-tree Hamiltonian cycles until one is 100% tight (usually <10 tries, ~10ms)
+    for (let t = 0; t < 40 && cur.score > 0; t++) {
+      seedExactHam();
+      const nxt = evaluate();
+      if (nxt.score < cur.score) cur = nxt;
+    }
+    return cur;
+  }
   for (let step = 0; step < stepsLimit && cur.score > 0; step++) {
     let r, c;
     if (cur.emptyBorders > 0 && rng() < 0.35) {

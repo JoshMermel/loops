@@ -333,7 +333,12 @@ if (tierShares) {
 }
 
 if (expertPlus > 0) {
-  const pickedPlus = pickEvenly(expertPlusPool, expertPlus);
+  const rawPlus = (balanceGroups && prefixes.length > 1)
+    ? pickBalancedAcrossGroups(expertPlusPool, expertPlus, prefixes).picked
+    : pickEvenly(expertPlusPool, expertPlus);
+  const pickedPlus = (interleaveGroups && prefixes.length > 1)
+    ? interleaveByGroup(rawPlus, prefixes, { limitRun: maxRun, seed: `${id}:expertPlus`, carry: runCarry })
+    : rawPlus.sort(byOrder);
   puzzles = [...puzzles, ...pickedPlus];
   if (!interleaveGroups) puzzles.sort(byOrder);
 }
@@ -361,6 +366,7 @@ if (bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
     : pickEvenly(bonusPool, bonusCount);
   const pickedBonus = (interleaveGroups && bonusPrefixes.length > 1)
     ? interleaveByGroup(rawBonus, bonusPrefixes, { limitRun: maxRun, seed: `${id}:bonus`, carry: runCarry })
+      .sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols))
     : rawBonus.sort(byOrder);
   bonusPickedCount = pickedBonus.length;
   puzzles = [...puzzles, ...pickedBonus];

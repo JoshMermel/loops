@@ -156,7 +156,7 @@
       "name": "All white",
       "label": "⚪ All white (8×8)",
       "file": "data/bonus-white.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "Every circle is white — straight lines and forced turns."
     },
@@ -165,7 +165,7 @@
       "name": "All black",
       "label": "⚫ All black (10×10)",
       "file": "data/bonus-black.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "Every circle is black — sharp corners and long legs."
     },
@@ -174,7 +174,7 @@
       "name": "Black & White Cookie",
       "label": "🍪 Black & White Cookie (10×10)",
       "file": "data/bonus-cookie.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "Half white circles, half black circles."
     },
@@ -183,7 +183,7 @@
       "name": "Skyscraper",
       "label": "🏙️ Skyscraper (6×20)",
       "file": "data/bonus-skyscraper.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "Tall, narrow towers where the loop snakes up and down."
     },
@@ -192,7 +192,7 @@
       "name": "Exact symmetry",
       "label": "🪞 Exact symmetry (10×10)",
       "file": "data/bonus-symmetry.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "Mirror, diagonal, and 180° symmetric clues and loops."
     },
@@ -201,7 +201,7 @@
       "name": "Yin-Yang",
       "label": "☯️ Yin-Yang (10×10)",
       "file": "data/bonus-yinyang.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "Opposite-color symmetry — every white pairs with a black."
     },
@@ -210,7 +210,7 @@
       "name": "Full board",
       "label": "🧱 Full board (10×10)",
       "file": "data/bonus-full.csv",
-      "count": 510,
+      "count": 520,
       "group": "Bonus",
       "blurb": "The loop visits every single intersection."
     },
