@@ -237,8 +237,11 @@ function clueFilterFor(layout, rows, cols) {
     return (cs) => cs.filter((c) => (c.t === 'W' ? c.r < (rows >> 1) : c.r >= (rows >> 1)));
   }
   if (layout === 'cookie-diag') {
-    if (rows !== cols) throw new Error('cookie-diag layout requires a square board');
-    return (cs) => cs.filter((c) => (c.t === 'W' ? c.r + c.c < rows - 1 : c.r + c.c > rows - 1));
+    const diag = (rows - 1) * (cols - 1);
+    return (cs) => cs.filter((c) => {
+      const lhs = c.r * (cols - 1) + c.c * (rows - 1);
+      return c.t === 'W' ? lhs < diag : lhs > diag;
+    });
   }
   throw new Error(`Unknown layout "${layout}"`);
 }

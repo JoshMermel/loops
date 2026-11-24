@@ -136,6 +136,13 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
   assert.ok(pcd, 'failed to generate cookie-diag half-split puzzle');
   assert.ok(pcd.clues.every((c) => (c.t === 'W' ? c.r + c.c < 7 : c.r + c.c > 7)));
 
+  const pcdRect = generatePuzzle({ rows: 10, cols: 6, seed: 114, layout: 'cookie-diag', budgetMs: 8000 });
+  assert.ok(pcdRect, 'failed to generate rectangular cookie-diag half-split puzzle');
+  assert.ok(pcdRect.clues.every((c) => {
+    const lhs = c.r * 5 + c.c * 9;
+    return c.t === 'W' ? lhs < 45 : lhs > 45;
+  }));
+
   const pcs = generatePuzzle({ rows: 9, cols: 9, seed: 113, layout: 'concentric-sq', budgetMs: 8000 });
   assert.ok(pcs, 'failed to generate concentric-sq geometric pattern puzzle');
   const expectedPts = maskPoints('concentric-sq', 9, 9);

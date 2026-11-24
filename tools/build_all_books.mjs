@@ -124,7 +124,7 @@ const recipes = [
   {
     id: 'bonus-white', name: 'All white', label: '⚪ All white (8×8)', group: 'Bonus',
     glob: 'white_8x8', tiers: '50,200,200,50', tierBands: '0:265,240:305,300:485,470:950',
-    expertPlus: 10, bonusGlob: 'white_14x14', bonusCount: 10,
+    expertPlus: 10, bonusGlob: 'white_12x20', bonusCount: 10,
     blurb: 'Every circle is white — straight lines and forced turns.',
   },
   {
@@ -137,7 +137,7 @@ const recipes = [
     id: 'bonus-cookie', name: 'Black & White Cookie', label: '🍪 Black & White Cookie (10×10)', group: 'Bonus',
     glob: 'cookie_vert_10x10,cookie_horiz_10x10,cookie_diag_10x10',
     tiers: '50,200,200,50', tierBands: '0:375,345:430,415:625,600:1200', balanceGroups: true, interleaveGroups: true, maxRun: 3,
-    expertPlus: 10, bonusGlob: 'cookie_vert_16x16,cookie_horiz_16x16,cookie_diag_16x16', bonusCount: 10,
+    expertPlus: 10, bonusGlob: 'cookie_vert_12x20,cookie_horiz_12x20,cookie_diag_12x20', bonusCount: 10,
     blurb: 'Half white circles, half black circles.',
   },
   {
@@ -152,13 +152,6 @@ const recipes = [
     tiers: '50,200,200,50', tierBands: '0:365,315:420,375:600,570:1200', balanceGroups: true, interleaveGroups: true, maxRun: 3,
     expertPlus: 10, bonusGlob: 'sym_rot180_14x14,sym_mirror_14x14,sym_transpose_14x14', bonusCount: 10,
     blurb: 'Mirror, diagonal, and 180° symmetric clues and loops.',
-  },
-  {
-    id: 'bonus-yinyang', name: 'Yin-Yang', label: '☯️ Yin-Yang (10×10)', group: 'Bonus',
-    glob: 'yinyang_10x10,yinyang_mirror_10x10,yinyang_transpose_10x10',
-    tiers: '50,200,200,50', tierBands: '0:350,325:410,390:610,575:1200', balanceGroups: true, interleaveGroups: true, maxRun: 3,
-    expertPlus: 10, bonusGlob: 'yinyang_12x12,yinyang_mirror_12x12,yinyang_14x14,yinyang_mirror_14x14', bonusCount: 10,
-    blurb: 'Opposite-color symmetry — every white pairs with a black.',
   },
   {
     id: 'bonus-full', name: 'Full board', label: '🧱 Full board (10×10)', group: 'Bonus',

@@ -190,15 +190,6 @@
       "blurb": "Mirror, diagonal, and 180° symmetric clues and loops."
     },
     {
-      "id": "bonus-yinyang",
-      "name": "Yin-Yang",
-      "label": "☯️ Yin-Yang (10×10)",
-      "file": "data/bonus-yinyang.csv",
-      "count": 520,
-      "group": "Bonus",
-      "blurb": "Opposite-color symmetry — every white pairs with a black."
-    },
-    {
       "id": "bonus-full",
       "name": "Full board",
       "label": "🧱 Full board (10×10)",
