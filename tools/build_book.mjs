@@ -51,6 +51,8 @@ const blurb = arg('blurb', null);
 const hidden = hasFlag('hidden');
 const preserveExisting = hasFlag('preserve-existing');
 const balanceGroups = hasFlag('balance-groups');
+const interleaveGroups = hasFlag('interleave-groups');
+const maxRun = Math.max(1, +arg('max-run', 3));
 const excludeFiles = arg('exclude', '') ? arg('exclude').split(',').filter(Boolean) : [];
 
 const matchesBand = (p) => {
@@ -173,7 +175,93 @@ const pickWithLocked = (lockedList, poolList, target) => {
   return [...lockedList, ...pickEvenly(poolList, need)];
 };
 
+function makeSeededRng(seedStr) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    h ^= seedStr.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Organically interleave per-group sorted lists within one slice (e.g. one tier):
+ * - Every group stays strictly sorted easiest -> hardest by `byOrder`.
+ * - Keeps groups closely aligned in relative difficulty quantile so all subtypes appear right away.
+ * - Allows natural doubles and occasional triples while capping consecutive runs at `limitRun`.
+ */
+function interleaveByGroup(list, groups, { limitRun = 3, seed = 'interleave', carry = null } = {}) {
+  if (!list.length || groups.length < 2) return list.slice().sort(byOrder);
+  const queues = new Map(groups.map((g) => [g, []]));
+  for (const p of list) {
+    const g = queues.has(p._group) ? p._group : groups[0];
+    queues.get(g).push(p);
+  }
+  for (const q of queues.values()) q.sort(byOrder);
+  const totals = new Map(groups.map((g) => [g, Math.max(1, queues.get(g).length)]));
+  const used = new Map(groups.map((g) => [g, 0]));
+  const rng = makeSeededRng(seed);
+
+  let prevG = carry ? carry.prevG : null;
+  let runLen = carry ? carry.runLen : 0;
+  const out = [];
+
+  while (out.length < list.length) {
+    const active = groups.filter((g) => queues.get(g).length > 0);
+    if (!active.length) break;
+    const ratios = new Map(active.map((g) => [g, used.get(g) / totals.get(g)]));
+    const minRatio = Math.min(...ratios.values());
+    const maxRatio = Math.max(...ratios.values());
+
+    // Keep all groups synchronized in difficulty quantile (within ~12% or 2 puzzles of the lagging group)
+    let eligible = active.filter((g) => ratios.get(g) <= minRatio + Math.max(0.12, 2 / totals.get(g)));
+    if (!eligible.length) eligible = active;
+
+    // Enforce hard maxRun whenever another eligible group exists
+    if (prevG !== null && runLen >= limitRun) {
+      const alt = eligible.filter((g) => g !== prevG);
+      if (alt.length) eligible = alt;
+      else {
+        const anyAlt = active.filter((g) => g !== prevG);
+        if (anyAlt.length) eligible = anyAlt;
+      }
+    }
+
+    const totalRem = eligible.reduce((sum, g) => sum + queues.get(g).length, 0);
+    const weights = eligible.map((g) => {
+      let w = (queues.get(g).length / totalRem) * (1 + Math.max(0, maxRatio - ratios.get(g)) * 6);
+      if (g === prevG) {
+        if (runLen === 1) w *= 0.55;
+        else if (runLen >= 2) w *= 0.18;
+      }
+      return w;
+    });
+    const wSum = weights.reduce((a, b) => a + b, 0);
+    let r = rng() * wSum;
+    let pick = eligible[eligible.length - 1];
+    for (let i = 0; i < eligible.length; i++) {
+      r -= weights[i];
+      if (r <= 0) { pick = eligible[i]; break; }
+    }
+
+    out.push(queues.get(pick).shift());
+    used.set(pick, used.get(pick) + 1);
+    if (pick === prevG) runLen++;
+    else { prevG = pick; runLen = 1; }
+  }
+
+  if (carry) { carry.prevG = prevG; carry.runLen = runLen; }
+  return out;
+}
+
 const groupReport = [];
+const runCarry = { prevG: null, runLen: 0 };
 if (tierShares) {
   const lByT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
   const byT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
@@ -189,13 +277,16 @@ if (tierShares) {
   for (const [tierName, target] of specs) {
     if (target <= 0) continue;
     const res = pickWithLocked(lByT[tierName], byT[tierName], target);
-    picked.push(...res);
+    const ordered = (interleaveGroups && prefixes.length > 1)
+      ? interleaveByGroup(res, prefixes, { limitRun: maxRun, seed: `${id}:${tierName}`, carry: runCarry })
+      : res.sort(byOrder);
+    picked.push(...ordered);
     if (balanceGroups && prefixes.length > 1) {
       const counts = prefixes.map((g) => `${g}=${res.filter((p) => p._group === g).length}`).join(' ');
       groupReport.push(`  ${tierName}: ${counts}`);
     }
   }
-  puzzles = picked.sort(byOrder);
+  puzzles = interleaveGroups ? picked : picked.sort(byOrder);
 } else if (evenTiers && limit > 0) {
   const lByT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
   const byT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
@@ -208,22 +299,32 @@ if (tierShares) {
   activeTiers.forEach((tierName, idx) => {
     const target = per + (idx < rem ? 1 : 0);
     const res = pickWithLocked(lByT[tierName], byT[tierName], target);
-    picked.push(...res);
+    const ordered = (interleaveGroups && prefixes.length > 1)
+      ? interleaveByGroup(res, prefixes, { limitRun: maxRun, seed: `${id}:${tierName}`, carry: runCarry })
+      : res.sort(byOrder);
+    picked.push(...ordered);
     if (balanceGroups && prefixes.length > 1) {
       const counts = prefixes.map((g) => `${g}=${res.filter((p) => p._group === g).length}`).join(' ');
       groupReport.push(`  ${tierName}: ${counts}`);
     }
   });
-  puzzles = picked.sort(byOrder);
+  puzzles = interleaveGroups ? picked : picked.sort(byOrder);
 } else if (limit > 0) {
-  puzzles = pickWithLocked(locked, puzzles, limit).sort(byOrder);
+  const res = pickWithLocked(locked, puzzles, limit);
+  puzzles = (interleaveGroups && prefixes.length > 1)
+    ? interleaveByGroup(res, prefixes, { limitRun: maxRun, seed: id, carry: runCarry })
+    : res.sort(byOrder);
 } else {
-  puzzles = [...locked, ...puzzles].sort(byOrder);
+  const res = [...locked, ...puzzles];
+  puzzles = (interleaveGroups && prefixes.length > 1)
+    ? interleaveByGroup(res, prefixes, { limitRun: maxRun, seed: id, carry: runCarry })
+    : res.sort(byOrder);
 }
 
 if (expertPlus > 0) {
   const pickedPlus = pickEvenly(expertPlusPool, expertPlus);
-  puzzles = [...puzzles, ...pickedPlus].sort(byOrder);
+  puzzles = [...puzzles, ...pickedPlus];
+  if (!interleaveGroups) puzzles.sort(byOrder);
 }
 
 let bonusPickedCount = 0;
@@ -244,9 +345,12 @@ if (bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
     }
   }
   bonusPool.sort(byOrder);
-  const pickedBonus = (balanceGroups && bonusPrefixes.length > 1)
-    ? pickBalancedAcrossGroups(bonusPool, bonusCount, bonusPrefixes).picked.sort(byOrder)
-    : pickEvenly(bonusPool, bonusCount).sort(byOrder);
+  const rawBonus = (balanceGroups && bonusPrefixes.length > 1)
+    ? pickBalancedAcrossGroups(bonusPool, bonusCount, bonusPrefixes).picked
+    : pickEvenly(bonusPool, bonusCount);
+  const pickedBonus = (interleaveGroups && bonusPrefixes.length > 1)
+    ? interleaveByGroup(rawBonus, bonusPrefixes, { limitRun: maxRun, seed: `${id}:bonus`, carry: runCarry })
+    : rawBonus.sort(byOrder);
   bonusPickedCount = pickedBonus.length;
   puzzles = [...puzzles, ...pickedBonus];
 }

@@ -146,7 +146,7 @@ const recipes = [
   {
     id: 'bonus-symmetry', name: 'Exact symmetry', label: '🪞 Exact symmetry (10×10)', group: 'Bonus',
     glob: 'sym_rot180_10x10,sym_mirror_10x10,sym_transpose_10x10',
-    tiers: '50,200,200,50', tierBands: '0:360,340:440,440:760,760:', balanceGroups: true,
+    tiers: '50,200,200,50', tierBands: '0:360,340:440,440:760,760:', balanceGroups: true, interleaveGroups: true, maxRun: 3,
     bonusGlob: 'sym_rot180_12x12,sym_mirror_12x12,sym_transpose_12x12', bonusCount: 10,
     blurb: '500 symmetric 10×10 puzzles (balanced across mirror, diagonal-mirror, and 180° in every tier) plus 10 oversized 12×12 bonus puzzles.',
   },
@@ -191,6 +191,8 @@ for (const r of recipes) {
   if (r.bonusGlob) args.push('--bonus-glob', r.bonusGlob);
   if (r.bonusCount) args.push('--bonus-count', String(r.bonusCount));
   if (r.balanceGroups) args.push('--balance-groups');
+  if (r.interleaveGroups) args.push('--interleave-groups');
+  if (r.maxRun) args.push('--max-run', String(r.maxRun));
   if (builtFiles.length) args.push('--exclude', builtFiles.join(','));
   execFileSync(process.execPath, args, { stdio: 'inherit' });
   builtFiles.push(`data/${r.id}.csv`);
