@@ -109,14 +109,18 @@ function edgeBetween(P, a, b) {
   return -1;
 }
 
+const reconcileAuto = (P, prev, m) => {
+  reconcileAutoX(P, prev, m, settings.autoX, { useShade: settings.autoShade });
+  reconcileAutoShade(P, prev, m, settings.autoShade);
+};
+
 function cycleEdge(x) {
   const P = state.P, m = state.marks;
   if (x < 0 || P.edgeA[x] < 0) return;
   const prev = snapshot();
   m.edges[x] = cycleEdgeMark(m.edges[x]);
   m.autoE[x] = 0;
-  reconcileAutoX(P, prev, m, settings.autoX);
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+  reconcileAuto(P, prev, m);
   refresh();
 }
 
@@ -126,8 +130,7 @@ function toggleEdge(x) {
   const prev = snapshot();
   m.edges[x] = toggleEdgeCross(m.edges[x]);
   m.autoE[x] = 0;
-  reconcileAutoX(P, prev, m, settings.autoX);
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+  reconcileAuto(P, prev, m);
   refresh();
 }
 
@@ -142,7 +145,7 @@ function cycleFace(f, reverse = false) {
   m.faces[f] = next;
   m.autoF[f] = 0;
   state.facePaintVal = next;
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+  reconcileAuto(P, prev, m);
   refresh();
 }
 
@@ -155,7 +158,7 @@ function paintFaceStep(f) {
   const prev = snapshot();
   m.faces[f] = val;
   m.autoF[f] = 0;
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+  reconcileAuto(P, prev, m);
   refresh();
 }
 
@@ -177,8 +180,7 @@ function dragStep(a, b, first) {
   } else {
     return;
   }
-  reconcileAutoX(P, prev, m, settings.autoX);
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+  reconcileAuto(P, prev, m);
   refresh();
 }
 
@@ -200,8 +202,7 @@ function crossStep(a, b, first) {
   } else {
     return;
   }
-  reconcileAutoX(P, prev, m, settings.autoX);
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+  reconcileAuto(P, prev, m);
   refresh();
 }
 
@@ -893,14 +894,15 @@ $('setting-auto-x').addEventListener('change', (e) => {
   store.set('ms_autoX', settings.autoX ? '1' : '0');
   if (state.P) {
     const before = snapshot();
-    applyAutoX(state.P, state.marks, settings.autoX);
+    const xOpts = { useShade: settings.autoShade };
+    applyAutoX(state.P, state.marks, settings.autoX, xOpts);
     if (settings.autoShade) reconcileAutoShade(state.P, before, state.marks, true);
     for (const m of [...state.undo, ...state.redo]) {
       const mPrev = {
         edges: m.edges.slice(), autoE: m.autoE.slice(),
         faces: m.faces.slice(), autoF: m.autoF.slice(),
       };
-      applyAutoX(state.P, m, settings.autoX);
+      applyAutoX(state.P, m, settings.autoX, xOpts);
       if (settings.autoShade) reconcileAutoShade(state.P, mPrev, m, true);
     }
     if (!sameMarks(before, state.marks)) { save(); refresh(); }
@@ -912,13 +914,21 @@ $('setting-auto-shade').addEventListener('change', (e) => {
   settings.autoShade = e.target.checked;
   store.set('ms_autoShade', settings.autoShade ? '1' : '0');
   if (state.P) {
-    const before = snapshot();
-    applyAutoShade(state.P, state.marks, settings.autoShade);
-    if (settings.autoShade && isSolved(state.P, state.marks.edges)) paintSolvedFaces(state.P, state.marks);
-    for (const m of [...state.undo, ...state.redo]) {
+    const syncOne = (m) => {
+      const mPrev = {
+        edges: m.edges.slice(), autoE: m.autoE.slice(),
+        faces: m.faces.slice(), autoF: m.autoF.slice(),
+      };
+      if (settings.autoX) {
+        if (settings.autoShade) applyAutoX(state.P, m, true, { useShade: true });
+        else reconcileAutoX(state.P, mPrev, m, true, { useShade: false });
+      }
       applyAutoShade(state.P, m, settings.autoShade);
       if (settings.autoShade && isSolved(state.P, m.edges)) paintSolvedFaces(state.P, m);
-    }
+    };
+    const before = snapshot();
+    syncOne(state.marks);
+    for (const m of [...state.undo, ...state.redo]) syncOne(m);
     if (!sameMarks(before, state.marks)) { save(); refresh(); }
   }
 });
@@ -1091,8 +1101,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
       const prev = snapshot();
       for (const x of item.targets.segOn) { state.marks.edges[x] = 1; state.marks.autoE[x] = 0; }
       for (const x of item.targets.segOff) { state.marks.edges[x] = 2; state.marks.autoE[x] = 0; }
-      reconcileAutoX(state.P, prev, state.marks, settings.autoX);
-      reconcileAutoShade(state.P, prev, state.marks, settings.autoShade);
+      reconcileAuto(state.P, prev, state.marks);
       refresh();
       return true;
     },

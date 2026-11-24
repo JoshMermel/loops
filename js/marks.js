@@ -31,10 +31,12 @@ export function cycleFaceMarkReverse(cur) {
 // ------------------------------------------------------------ Auto-X mode
 
 /**
- * Compute the fixed point of obvious Auto-X edges from ONLY the player's own edge marks in `m`
- * (ignoring any existing auto-placed X's so removing a causing segment or cross cleanly unwinds cascades).
+ * Compute the fixed point of obvious Auto-X edges from ONLY the player's own manual marks in `m`
+ * (ignoring any existing auto-placed X's or auto-shades so removing a causing mark cleanly unwinds cascades).
+ * When `useShade` is true (both Auto-X and Auto-Shade enabled), also crosses out edges separating
+ * two identically shaded squares (including outer-border edges adjacent to an Outside-shaded square).
  */
-export function autoXReasons(P, m) {
+export function autoXReasons(P, m, { useShade = false } = {}) {
   const { N, numEdges, ed, ed2, clue, whites, blacks } = P;
   const autoE = m.autoE;
   const w = new Uint8Array(numEdges);
@@ -67,11 +69,11 @@ export function autoXReasons(P, m) {
     }
   }
 
-  // Rule 2: white circle going straight 2 steps on one side -> X out straight past the other side
+  // Rule 2: white circle with both straight segments drawn and continuing straight on one side -> X out straight past the other side
   for (const i of whites) {
     for (let d = 0; d < 4; d++) {
-      const e1 = ed[i * 4 + d], ext1 = ed2[i * 4 + d];
-      if (e1 >= 0 && ext1 >= 0 && w[e1] === 1 && w[ext1] === 1) {
+      const e1 = ed[i * 4 + d], e2 = ed[i * 4 + (d ^ 2)], ext1 = ed2[i * 4 + d];
+      if (e1 >= 0 && e2 >= 0 && ext1 >= 0 && w[e1] === 1 && w[e2] === 1 && w[ext1] === 1) {
         const oppExt = ed2[i * 4 + (d ^ 2)];
         if (oppExt >= 0 && w[oppExt] !== 1) add(oppExt, `white:${i}:${d}`);
       }
@@ -169,15 +171,43 @@ export function autoXReasons(P, m) {
         }
       }
     }
+    if (changed) continue;
+
+    // Rule 5 (when both Auto-X and Auto-Shade are ON): cross out edges separating two identically shaded squares,
+    // including outer-border edges bordering an Outside-shaded square (exterior is always Outside).
+    if (useShade && P.rows > 1 && P.cols > 1) {
+      const fr = P.rows - 1, fc = P.cols - 1;
+      const sh = autoShadeCompute(P, { edges: w, faces: m.faces, autoF: m.autoF });
+      const colAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? sh.color[r * fc + c] : FACE_OUT);
+      const faceIdx = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : -1);
+      for (let r = 0; r < P.rows; r++) {
+        for (let c = 0; c < fc; c++) {
+          const x = 2 * (r * P.cols + c);
+          const cA = colAt(r - 1, c), cB = colAt(r, c);
+          if (cA && cA === cB) {
+            if (add(x, `shade:${faceIdx(r - 1, c)}:${faceIdx(r, c)}:${cA}`)) changed = true;
+          }
+        }
+      }
+      for (let r = 0; r < fr; r++) {
+        for (let c = 0; c < P.cols; c++) {
+          const x = 2 * (r * P.cols + c) + 1;
+          const cA = colAt(r, c - 1), cB = colAt(r, c);
+          if (cA && cA === cB) {
+            if (add(x, `shade:${faceIdx(r, c - 1)}:${faceIdx(r, c)}:${cA}`)) changed = true;
+          }
+        }
+      }
+    }
   }
 
   return reasons;
 }
 
-export function reconcileAutoX(P, prev, cur, enabled = true) {
+export function reconcileAutoX(P, prev, cur, enabled = true, opts = undefined) {
   if (!cur.autoE) cur.autoE = new Uint8Array(P.numEdges);
-  const before = prev ? autoXReasons(P, prev) : new Map();
-  const now = autoXReasons(P, cur);
+  const before = prev ? autoXReasons(P, prev, opts) : new Map();
+  const now = autoXReasons(P, cur, opts);
 
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
@@ -198,11 +228,11 @@ export function reconcileAutoX(P, prev, cur, enabled = true) {
   }
 }
 
-export function applyAutoX(P, m, on) {
+export function applyAutoX(P, m, on, opts = undefined) {
   if (!m.autoE) m.autoE = new Uint8Array(P.numEdges);
   const was = Uint8Array.from(m.edges);
   if (on) {
-    reconcileAutoX(P, null, m, true);
+    reconcileAutoX(P, null, m, true, opts);
   } else {
     for (let x = 0; x < P.numEdges; x++) {
       if (m.edges[x] === 2 && m.autoE[x]) { m.edges[x] = 0; m.autoE[x] = 0; }

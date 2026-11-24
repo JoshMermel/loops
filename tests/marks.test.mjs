@@ -76,24 +76,32 @@ test('Auto-X rule 1: cell with 2 segments X-es out its remaining incident edges'
   assert.equal(m.autoE[P.ed[c * 4 + 2]], 0);
 });
 
-test('Auto-X rule 2: white circle with 2 straight segments on one side X-es straight continuation on the other side', () => {
+test('Auto-X rule 2: white circle requires both straight segments through the dot before X-ing straight continuation on the other side', () => {
   const P = compile({ name: 'r2', rows: 5, cols: 5, clues: [{ r: 2, c: 2, t: 'W' }] });
   const m = blank(P);
   const w = 2 * 5 + 2;
-  const prev = snap(m);
-  // Draw horizontal straight into white circle from left: (2,0)-(2,1)-(2,2)
+  const oppExt = P.ed2[w * 4 + 1]; // (2,3)-(2,4)
+
+  // Step 1: Drawing only left half (2,0)-(2,1)-(2,2) must NOT eagerly auto-X (2,3)-(2,4)
+  let prev = snap(m);
   m.edges[P.ed[w * 4 + 3]] = 1;
   m.edges[P.ed2[w * 4 + 3]] = 1;
   reconcileAutoX(P, prev, m, true);
-  const oppExt = P.ed2[w * 4 + 1]; // (2,3)-(2,4)
-  assert.equal(m.edges[oppExt], 2, 'must auto-X straight continuation past right neighbor');
+  assert.equal(m.edges[oppExt], 0, 'must wait until right segment through white circle is also drawn');
+
+  // Step 2: Now draw the opposite straight segment through the white circle: (2,2)-(2,3)
+  prev = snap(m);
+  m.edges[P.ed[w * 4 + 1]] = 1;
+  reconcileAutoX(P, prev, m, true);
+  assert.equal(m.edges[oppExt], 2, 'must auto-X straight continuation past right neighbor once both halves are drawn');
   assert.equal(m.autoE[oppExt], 1);
 
-  // Erasing the outer segment (2,0)-(2,1) removes the auto-X on (2,3)-(2,4)
-  const prev2 = snap(m);
-  m.edges[P.ed2[w * 4 + 3]] = 0;
-  reconcileAutoX(P, prev2, m, true);
+  // Step 3: Erasing either the right half (2,2)-(2,3) or outer left segment (2,0)-(2,1) cleanly removes the auto-X
+  prev = snap(m);
+  m.edges[P.ed[w * 4 + 1]] = 0;
+  reconcileAutoX(P, prev, m, true);
   assert.equal(m.edges[oppExt], 0);
+  assert.equal(m.autoE[oppExt], 0);
 });
 
 test('Auto-X rule 3: black circle with a segment X-es out the opposite direction', () => {
@@ -461,4 +469,65 @@ test('shadeConflicts with checkBorder=false allows inverted manual color schemes
   const bad = shadeConflicts(P, m, false);
   assert.equal(bad.has(0), true);
   assert.equal(bad.has(1), true);
+});
+
+test('Auto-X + Auto-Shade places X between same-color squares and between Outside-shaded squares and the border, and unwinds cleanly', () => {
+  // 4x4 board (3x3 faces):
+  // Draw top-border lines (0,0)-(0,1) and (0,1)-(0,2) -> faces (0,0) and (0,1) are both Inside!
+  // With useShade=true, interior vertical edge (0,1)-(1,1) separates Inside & Inside -> auto-X!
+  // Also manually paint face (2,2) = Outside -> its two outer-border edges (3,2)-(3,3) and (2,3)-(3,3) both separate Outside & exterior -> auto-X!
+  // (And since (3,3) becomes a corner with 2 X's, everything stays consistent and unwinds when cleared.)
+  const P = compile({ name: 'xs', rows: 4, cols: 4, clues: [] });
+  const m = blank(P);
+  const eTop0 = P.ed[(0 * 4 + 0) * 4 + 1]; // (0,0)-(0,1)
+  const eTop1 = P.ed[(0 * 4 + 1) * 4 + 1]; // (0,1)-(0,2)
+  const eMidV = P.ed[(0 * 4 + 1) * 4 + 2]; // (0,1)-(1,1) between face(0,0) and face(0,1)
+
+  let prev = snap(m);
+  m.edges[eTop0] = 1;
+  m.edges[eTop1] = 1;
+  reconcileAutoX(P, prev, m, true, { useShade: true });
+  reconcileAutoShade(P, prev, m, true);
+  assert.equal(m.faces[0], FACE_IN);
+  assert.equal(m.faces[1], FACE_IN);
+  assert.equal(m.edges[eMidV], 2, 'edge between two Inside squares must auto-X');
+  assert.equal(m.autoE[eMidV], 1);
+
+  // Paint bottom-right square (2,2) manually Outside -> both its outer-border edges auto-X
+  const fBR = 2 * 3 + 2;
+  const eBotR = P.ed[(3 * 4 + 2) * 4 + 1]; // (3,2)-(3,3)
+  const eRightB = P.ed[(2 * 4 + 3) * 4 + 2]; // (2,3)-(3,3)
+  prev = snap(m);
+  m.faces[fBR] = FACE_OUT;
+  m.autoF[fBR] = 0;
+  reconcileAutoX(P, prev, m, true, { useShade: true });
+  reconcileAutoShade(P, prev, m, true);
+  assert.equal(m.edges[eBotR], 2, 'bottom-border edge next to Outside square must auto-X');
+  assert.equal(m.autoE[eBotR], 1);
+  assert.equal(m.edges[eRightB], 2, 'right-border edge next to Outside square must auto-X');
+  assert.equal(m.autoE[eRightB], 1);
+
+  // Turning Auto-Shade OFF (useShade=false) cleanly unwinds shade-derived border auto-X's
+  // (while keeping Rule 1 full-cell auto-X on eMidV because (0,1) still has 2 segments!)
+  prev = snap(m);
+  reconcileAutoX(P, prev, m, true, { useShade: false });
+  applyAutoShade(P, m, false);
+  assert.equal(m.edges[eBotR], 0, 'shade-derived border auto-X must unwind when Auto-Shade turns off');
+  assert.equal(m.edges[eRightB], 0);
+  assert.equal(m.edges[eMidV], 2, 'Rule 1 full-cell auto-X remains when Auto-Shade turns off');
+
+  // Test pure same-color interior auto-X WITHOUT Rule 1: two manual Inside faces (1,0) and (1,1) separated by (1,1)-(2,1)
+  const m2 = blank(P);
+  const eIntV = P.ed[(1 * 4 + 1) * 4 + 2]; // (1,1)-(2,1) between face(1,0) and face(1,1)
+  prev = snap(m2);
+  m2.faces[1 * 3 + 0] = FACE_IN;
+  m2.faces[1 * 3 + 1] = FACE_IN;
+  reconcileAutoX(P, prev, m2, true, { useShade: true });
+  assert.equal(m2.edges[eIntV], 2, 'pure same-color interior edge must auto-X');
+  assert.equal(m2.autoE[eIntV], 1);
+  // Clearing one manual face cleanly unwinds the auto-X
+  prev = snap(m2);
+  m2.faces[1 * 3 + 1] = FACE_BLANK;
+  reconcileAutoX(P, prev, m2, true, { useShade: true });
+  assert.equal(m2.edges[eIntV], 0, 'clearing one same-color face must unwind the auto-X');
 });
