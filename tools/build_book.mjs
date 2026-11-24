@@ -260,6 +260,17 @@ function interleaveByGroup(list, groups, { limitRun = 3, seed = 'interleave', ca
   return out;
 }
 
+const interleavePerTier = (res) => {
+  const byT = { Beginner: [], Medium: [], Hard: [], Expert: [] };
+  for (const p of res) if (byT[p.tier]) byT[p.tier].push(p);
+  const out = [];
+  for (const tierName of ['Beginner', 'Medium', 'Hard', 'Expert']) {
+    if (!byT[tierName].length) continue;
+    out.push(...interleaveByGroup(byT[tierName], prefixes, { limitRun: maxRun, seed: `${id}:${tierName}`, carry: runCarry }));
+  }
+  return out;
+};
+
 const groupReport = [];
 const runCarry = { prevG: null, runLen: 0 };
 if (tierShares) {
@@ -312,12 +323,12 @@ if (tierShares) {
 } else if (limit > 0) {
   const res = pickWithLocked(locked, puzzles, limit);
   puzzles = (interleaveGroups && prefixes.length > 1)
-    ? interleaveByGroup(res, prefixes, { limitRun: maxRun, seed: id, carry: runCarry })
+    ? interleavePerTier(res)
     : res.sort(byOrder);
 } else {
   const res = [...locked, ...puzzles];
   puzzles = (interleaveGroups && prefixes.length > 1)
-    ? interleaveByGroup(res, prefixes, { limitRun: maxRun, seed: id, carry: runCarry })
+    ? interleavePerTier(res)
     : res.sort(byOrder);
 }
 

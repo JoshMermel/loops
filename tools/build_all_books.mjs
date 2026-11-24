@@ -171,9 +171,10 @@ const recipes = [
     blurb: 'The loop visits every single intersection.',
   },
   {
-    id: 'bonus-lattice', name: 'Lattice', label: '💠 Lattice (9×9 – 13×13)', group: 'Bonus',
-    glob: 'lattice_9x9,lattice_9x11,lattice_13x13', limit: 60,
-    blurb: 'Every even row and column holds a circle.',
+    id: 'bonus-patterns', name: 'Patterns', label: '💠 Patterns (9×9 – 13×13)', group: 'Bonus',
+    glob: 'lattice_9x9,lattice_9x11,lattice_13x13,pat_concentric_9x9,pat_twin_10x10,pat_blocks2x2_9x9,pat_quilt2x2_10x10,pat_honeycomb_9x9,pat_honeycomb_10x10,pat_galaxy_10x10,pat_circle_10x10,pat_stripes_9x9',
+    tierBands: '0:,0:,0:,0:1300', interleaveGroups: true, maxRun: 2,
+    blurb: 'Lattice, concentric rings, spirals, spaced squares, and more.',
   },
 ];
 

@@ -215,13 +215,13 @@
       "blurb": "The loop visits every single intersection."
     },
     {
-      "id": "bonus-lattice",
-      "name": "Lattice",
-      "label": "💠 Lattice (9×9 – 13×13)",
-      "file": "data/bonus-lattice.csv",
-      "count": 60,
+      "id": "bonus-patterns",
+      "name": "Patterns",
+      "label": "💠 Patterns (9×9 – 13×13)",
+      "file": "data/bonus-patterns.csv",
+      "count": 234,
       "group": "Bonus",
-      "blurb": "Every even row and column holds a circle."
+      "blurb": "Lattice, concentric rings, spirals, spaced squares, and more."
     },
     {
       "id": "armory",

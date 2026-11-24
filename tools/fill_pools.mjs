@@ -362,6 +362,17 @@ if (!isMainThread) {
     { group: 'bonus-cookie', pool: 'cookie_diag_12x12', cols: 12, rows: 12, layout: 'cookie-diag', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'full_10x12', cols: 10, rows: 12, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 25000 },
     { group: 'bonus-oversized', pool: 'lattice_13x13', cols: 13, rows: 13, layout: 'lattice', total: 14, budgetSec: 180, perPuzzleMs: 35000 },
+
+    // ---- Bonus: Geometric Patterns (fixed interior dot masks, folded with Lattice into `bonus-patterns`)
+    { group: 'bonus-patterns', pool: 'pat_concentric_9x9', cols: 9, rows: 9, layout: 'concentric-sq', total: 45, budgetSec: 60, perPuzzleMs: 12000 },
+    { group: 'bonus-patterns', pool: 'pat_twin_10x10', cols: 10, rows: 10, layout: 'twin-sq', total: 35, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_blocks2x2_9x9', cols: 9, rows: 9, layout: 'blocks2x2', total: 40, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_quilt2x2_10x10', cols: 10, rows: 10, layout: 'quilt2x2', total: 40, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_honeycomb_9x9', cols: 9, rows: 9, layout: 'honeycomb', total: 40, budgetSec: 45, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_honeycomb_10x10', cols: 10, rows: 10, layout: 'honeycomb', total: 35, budgetSec: 45, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_galaxy_10x10', cols: 10, rows: 10, layout: 'galaxy', total: 35, budgetSec: 45, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_circle_10x10', cols: 10, rows: 10, layout: 'circle-ring', total: 25, budgetSec: 60, perPuzzleMs: 15000 },
+    { group: 'bonus-patterns', pool: 'pat_stripes_9x9', cols: 9, rows: 9, layout: 'diag-stripes', total: 20, budgetSec: 30, perPuzzleMs: 15000 },
   ];
 
   const groups = onlyGroup === 'all' ? null : new Set(onlyGroup.split(','));

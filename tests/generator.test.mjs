@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
 import { rate } from '../js/rating.js';
-import { randomLoop, allowedClues, generatePuzzle, makeRng } from '../js/generator.js';
+import { randomLoop, allowedClues, generatePuzzle, makeRng, maskPoints } from '../js/generator.js';
 
 test('randomLoop always produces a single valid closed loop across sizes', () => {
   const rng = makeRng(101);
@@ -135,4 +135,11 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
   const pcd = generatePuzzle({ rows: 8, cols: 8, seed: 112, layout: 'cookie-diag', budgetMs: 8000 });
   assert.ok(pcd, 'failed to generate cookie-diag half-split puzzle');
   assert.ok(pcd.clues.every((c) => (c.t === 'W' ? c.r + c.c < 7 : c.r + c.c > 7)));
+
+  const pcs = generatePuzzle({ rows: 9, cols: 9, seed: 113, layout: 'concentric-sq', budgetMs: 8000 });
+  assert.ok(pcs, 'failed to generate concentric-sq geometric pattern puzzle');
+  const expectedPts = maskPoints('concentric-sq', 9, 9);
+  assert.equal(pcs.clues.length, expectedPts.length);
+  const ptSet = new Set(expectedPts.map(([r, c]) => r * 9 + c));
+  assert.ok(pcs.clues.every((c) => ptSet.has(c.r * 9 + c.c)));
 });

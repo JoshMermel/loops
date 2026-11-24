@@ -400,16 +400,94 @@ const MEDIUM_UPTO = RULES.findIndex((r) => r.tier !== 'Beginner' && r.tier !== '
  *   name                 puzzle name
  */
 /**
- * Generate a full-lattice Masyu puzzle where every (r%2===1, c%2===1) intersection holds a W or B circle
+ * Return the fixed dot coordinates [[r, c], ...] for a named geometric pattern mask, or null if not a mask layout.
+ * All masks keep dots strictly inside the interior (1..rows-2, 1..cols-2) so loops route cleanly around them.
+ */
+export function maskPoints(layout, rows, cols) {
+  const collect = (pred) => {
+    const pts = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (pred(r, c)) pts.push([r, c]);
+    return pts;
+  };
+  switch (layout) {
+    case 'lattice':
+      return collect((r, c) => (r & 1) === 1 && (c & 1) === 1);
+    case 'concentric-sq': // 9x9: dotted outer ring (d=1) + inner diamond (d=2 midpoints) + center
+      return collect((r, c) => {
+        const d = Math.min(r, rows - 1 - r, c, cols - 1 - c);
+        const mr = (rows - 1) / 2, mc = (cols - 1) / 2;
+        return (d === 1 && ((r + c) & 1) === 0) || (d === 2 && (r === mr || c === mc)) || (r === mr && c === mc);
+      });
+    case 'twin-sq': // 10x10: two concentric dotted square rings (d=1 and d=3)
+      return collect((r, c) => {
+        const d = Math.min(r, rows - 1 - r, c, cols - 1 - c);
+        return (d === 1 || d === 3) && ((r + c) & 1) === 0;
+      });
+    case 'blocks2x2': // 9x9: four inset 2x2 squares + center diamond
+      return collect((r, c) => (
+        ((r === 1 || r === 2 || r === rows - 3 || r === rows - 2) && (c === 1 || c === 2 || c === cols - 3 || c === cols - 2))
+        || (Math.abs(r - ((rows - 1) / 2)) + Math.abs(c - ((cols - 1) / 2)) === 1)
+      ));
+    case 'quilt2x2': // 10x10: five spaced 2x2 squares (4 corners + center) + 4 side accents
+      if (rows !== 10 || cols !== 10) return [];
+      return [
+        [1, 1], [1, 2], [2, 1], [2, 2],
+        [1, 7], [1, 8], [2, 7], [2, 8],
+        [7, 1], [7, 2], [8, 1], [8, 2],
+        [7, 7], [7, 8], [8, 7], [8, 8],
+        [4, 4], [4, 5], [5, 4], [5, 5],
+        [1, 4], [4, 8], [8, 5], [5, 1],
+      ];
+    case 'honeycomb': // 9x9 or 10x10: staggered brickwork / hexagonal lattice strictly interior
+      return collect((r, c) => (
+        r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
+        && (((r & 1) === 1 && c % 3 === 1) || ((r & 1) === 0 && c % 3 === 2))
+      ));
+    case 'galaxy': // 10x10: 4-arm swirling spiral radiating from a central 2x2 core
+      if (rows !== 10 || cols !== 10) return [];
+      return [
+        [4, 4], [4, 5], [5, 4], [5, 5],
+        [2, 4], [1, 5], [1, 7], [3, 8],
+        [4, 7], [5, 8], [7, 8], [8, 6],
+        [7, 5], [8, 4], [8, 2], [6, 1],
+        [5, 2], [4, 1], [2, 1], [1, 3],
+      ];
+    case 'circle-ring': // 10x10: outer circular ring + central 2x2 core
+      if (rows !== 10 || cols !== 10) return [];
+      return [
+        [1, 3], [1, 4], [1, 5], [1, 6],
+        [2, 2], [2, 7],
+        [3, 1], [3, 8], [4, 1], [4, 8], [5, 1], [5, 8], [6, 1], [6, 8],
+        [7, 2], [7, 7],
+        [8, 3], [8, 4], [8, 5], [8, 6],
+        [4, 4], [4, 5], [5, 4], [5, 5],
+      ];
+    case 'diag-stripes': // 9x9: parallel diagonal bands strictly interior
+      return collect((r, c) => r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2 && (r + c) % 3 === 1);
+    default:
+      return null;
+  }
+}
+
+/**
+ * Generate a fixed-mask Masyu puzzle where every intersection in `pts` holds a W or B circle
  * (all dots present, none elsewhere) via guided W<->B hill-climbing toward uniqueness.
  */
-function generateLatticePuzzle({
-  rows, cols, rand, deadline, maxTierIdx, targetTier, verifyMaxNodes, name, minLoopCells,
+function generateMaskPuzzle({
+  rows, cols, pts, rand, deadline, maxTierIdx, targetTier, verifyMaxNodes, name, minLoopCells,
 }) {
-  const pts = [];
-  for (let r = 1; r < rows; r += 2) for (let c = 1; c < cols; c += 2) pts.push([r, c]);
   const K = pts.length;
   if (K < 4) return null;
+
+  const ptIdxMap = new Map(pts.map(([r, c], i) => [r * cols + c, i]));
+  const adjList = pts.map(([r, c]) => {
+    const out = [];
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const j = ptIdxMap.get((r + dr) * cols + (c + dc));
+      if (j !== undefined) out.push(j);
+    }
+    return out;
+  });
 
   const unkCount = (P, st) => {
     let u = 0;
@@ -438,11 +516,16 @@ function generateLatticePuzzle({
     }
     return out;
   };
-  const stepNodeCap = K <= 16 ? 8000 : 12000;
+  const stepNodeCap = K <= 16 ? 8000 : K <= 20 ? 12000 : 16000;
 
   while (Date.now() < deadline) {
-    const pW = 0.36 + 0.24 * rand();
+    const pW = 0.36 + 0.28 * rand();
     const types = pts.map(() => (rand() < pW ? 'W' : 'B'));
+    for (let i = 0; i < K; i++) {
+      if (types[i] === 'B' && adjList[i].length >= 2 && rand() < 0.5) {
+        if (adjList[i].some((j) => types[j] === 'B')) types[i] = 'W';
+      }
+    }
     let P = compile({ name, rows, cols, clues: pts.map(([r, c], i) => ({ r, c, t: types[i] })) });
     let st = initialState(P);
     if (!propagate(P, st)) continue;
@@ -523,9 +606,10 @@ export function generatePuzzle({
   const minLoopCells = Math.max(8, Math.floor(N * fillRatio));
   const wantUnsolved = targetTier === 'Expert+';
   const maxTierIdx = wantUnsolved ? TIERS.length - 1 : TIERS.indexOf(maxTier);
-  if (layout === 'lattice') {
-    return generateLatticePuzzle({
-      rows, cols, rand, deadline, maxTierIdx, targetTier: wantUnsolved ? null : targetTier, verifyMaxNodes, name, minLoopCells,
+  const pts = maskPoints(layout, rows, cols);
+  if (pts) {
+    return generateMaskPuzzle({
+      rows, cols, pts, rand, deadline, maxTierIdx, targetTier: wantUnsolved ? null : targetTier, verifyMaxNodes, name, minLoopCells,
     });
   }
   const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
