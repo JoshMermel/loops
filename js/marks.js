@@ -152,8 +152,26 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   }
 
   // Rule 4: dead-end intersections (1 exit) and dead-end pockets (2-exit corridor returning to same node)
-  let hasAnyClueOrSeg = P.clueCells.length > 0 || Boolean(P.hasSlither && P.slither.some((s) => s.n > 0));
-  if (!hasAnyClueOrSeg) for (let i = 0; i < N; i++) if (deg[i] > 0) { hasAnyClueOrSeg = true; break; }
+  let anyDegGt0 = false;
+  for (let i = 0; i < N; i++) if (deg[i] > 0) { anyDegGt0 = true; break; }
+  const cycleViolatesSlither = (cycleEdges) => {
+    if (!P.hasSlither) return false;
+    const inCyc = new Uint8Array(numEdges);
+    for (let k = 0; k < cycleEdges.length; k++) inCyc[cycleEdges[k]] = 1;
+    const fe = P.faceEdges, sl = P.slither;
+    for (let k = 0; k < sl.length; k++) {
+      const sc = sl[k];
+      const f4 = sc.f * 4;
+      let on = 0;
+      const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
+      if (e0 >= 0 && inCyc[e0]) on++;
+      if (e1 >= 0 && inCyc[e1]) on++;
+      if (e2 >= 0 && inCyc[e2]) on++;
+      if (e3 >= 0 && inCyc[e3]) on++;
+      if (on !== sc.n) return true;
+    }
+    return false;
+  };
 
   const availEdges = (i) => {
     const out = [];
@@ -219,7 +237,8 @@ export function autoXForced(P, m, { useShade = false } = {}) {
 
         const w1 = walk(eA);
         if (w1.closed) {
-          if (hasAnyClueOrSeg) {
+          const impossible = P.clueCells.length > 0 || anyDegGt0 || cycleViolatesSlither(w1.edges);
+          if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
           }
           continue;
@@ -230,6 +249,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           let impossible = deg[t] >= 1;
           if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
           if (!impossible) for (let i = 0; i < N; i++) if (i !== t && deg[i] > 0) { impossible = true; break; }
+          if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
             for (const x of w2.edges) if (add(x)) changed = true;
@@ -411,26 +431,24 @@ export function autoShadeCompute(P, m) {
 
   // Propagate both color bits independently via BFS across active interior lines (opposite) and X's (same)
   // so any conflicted parity component clears to 0 regardless of seed or face-index order.
+  const stepNbr = (nr, nc, x, col) => {
+    if (P.edgeA[x] < 0) return;
+    const g = faceAt(nr, nc);
+    if (g < 0) return;
+    const ev = m.edges[x];
+    if (ev === 1) mark(g, flipColor(col));
+    else if (ev === 2) mark(g, col);
+  };
   let head = 0;
   while (head < queue.length) {
     const f = queue[head++];
     const col = queue[head++];
     const r = (f / fc) | 0, c = f % fc;
-
-    const nbrs = [
-      [r - 1, c, 2 * (r * P.cols + c)],             // top
-      [r + 1, c, 2 * ((r + 1) * P.cols + c)],       // bottom
-      [r, c - 1, 2 * (r * P.cols + c) + 1],         // left
-      [r, c + 1, 2 * (r * P.cols + c + 1) + 1],     // right
-    ];
-    for (const [nr, nc, x] of nbrs) {
-      if (P.edgeA[x] < 0) continue;
-      const g = faceAt(nr, nc);
-      if (g < 0) continue;
-      const ev = m.edges[x];
-      if (ev === 1) mark(g, flipColor(col));
-      else if (ev === 2) mark(g, col);
-    }
+    const base = r * P.cols + c;
+    stepNbr(r - 1, c, 2 * base, col);
+    stepNbr(r + 1, c, 2 * (base + P.cols), col);
+    stepNbr(r, c - 1, 2 * base + 1, col);
+    stepNbr(r, c + 1, 2 * (base + 1) + 1, col);
   }
 
   const color = new Uint8Array(F);

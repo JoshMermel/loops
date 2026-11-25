@@ -375,16 +375,31 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       fTail = (fTail + 1) & qMask;
     }
   };
+  const frMax = P.rows - 1, fcMax = P.cols - 1, pCols = P.cols;
+  const pushVertexFaces = (v) => {
+    const r = (v / pCols) | 0, c = v % pCols;
+    if (r > 0) {
+      const base = (r - 1) * fcMax;
+      if (c > 0) pushFace(base + c - 1);
+      if (c < fcMax) pushFace(base + c);
+    }
+    if (r < frMax) {
+      const base = r * fcMax;
+      if (c > 0) pushFace(base + c - 1);
+      if (c < fcMax) pushFace(base + c);
+    }
+  };
   const wakeEdge = (x) => {
     const a = edgeA[x];
     if (a < 0) return;
+    const b = edgeB[x];
     pushCell(a);
-    pushCell(edgeB[x]);
+    pushCell(b);
     const end = ecOff[x + 1];
     for (let k = ecOff[x]; k < end; k++) pushClue(ecData[k]);
     if (hasSlither) {
-      pushFace(edgeFaces[x * 2]);
-      pushFace(edgeFaces[x * 2 + 1]);
+      pushVertexFaces(a);
+      pushVertexFaces(b);
     }
   };
 
@@ -771,17 +786,18 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
     // Prefer open ends (on === 1) with fewest choices, then circles with on === 0, then any LOOP cell.
     let bi = -1, bestKey = -1;
     const ties = rng ? [] : null;
+    const hasSl = P.hasSlither, sn = P.slitherNum, ef = P.edgeFaces;
     for (let i = 0; i < N; i++) {
       if (cell[i] !== LOOP) continue;
       const i4 = i * 4;
-      let on = 0, unk = 0;
+      let on = 0, unk = 0, touchSl = 0;
       const x0 = ed[i4], x1 = ed[i4 + 1], x2 = ed[i4 + 2], x3 = ed[i4 + 3];
-      if (x0 >= 0) { const v = e[x0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
-      if (x1 >= 0) { const v = e[x1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
-      if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
-      if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x0 >= 0) { const v = e[x0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x0 * 2] >= 0 && sn[ef[x0 * 2]] > 0) || (ef[x0 * 2 + 1] >= 0 && sn[ef[x0 * 2 + 1]] > 0))) touchSl = 1; } }
+      if (x1 >= 0) { const v = e[x1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x1 * 2] >= 0 && sn[ef[x1 * 2]] > 0) || (ef[x1 * 2 + 1] >= 0 && sn[ef[x1 * 2 + 1]] > 0))) touchSl = 1; } }
+      if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x2 * 2] >= 0 && sn[ef[x2 * 2]] > 0) || (ef[x2 * 2 + 1] >= 0 && sn[ef[x2 * 2 + 1]] > 0))) touchSl = 1; } }
+      if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x3 * 2] >= 0 && sn[ef[x3 * 2]] > 0) || (ef[x3 * 2 + 1] >= 0 && sn[ef[x3 * 2 + 1]] > 0))) touchSl = 1; } }
       if (unk === 0) continue;
-      const isClue = clue[i] !== NONE ? 1 : 0;
+      const isClue = (clue[i] !== NONE || touchSl) ? 1 : 0;
       const key = on * 100 + isClue * 10 + (4 - unk);
       if (ties) {
         if (key > bestKey) { bestKey = key; ties.length = 0; }
@@ -831,6 +847,7 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
     // branch directly on an undecided edge of the tightest unsatisfied Slitherlink face.
     if (P.hasSlither) {
       let bestEdge = -1, bestPri = -1;
+      const slTies = rng ? [] : null;
       const fe = P.faceEdges;
       for (let si = 0; si < P.slither.length; si++) {
         const sc = P.slither[si];
@@ -847,8 +864,14 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
         const need = sc.n - on;
         if (need <= 0) continue;
         const pri = sc.n * 20 + (4 - unk) * 4 + (need === 1 ? 2 : 0);
-        if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
+        if (slTies) {
+          if (pri > bestPri) { bestPri = pri; slTies.length = 0; }
+          if (pri === bestPri) {
+            for (let d = 0; d < 4; d++) { const y = fe[f4 + d]; if (y >= 0 && e[y] === E_UNKNOWN) slTies.push(y); }
+          }
+        } else if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
       }
+      if (slTies && slTies.length) bestEdge = slTies[(rng() * slTies.length) | 0];
       if (bestEdge >= 0) {
         const onFirst = rng ? rng() < 0.5 : true;
         const v0 = onFirst ? E_ON : E_OFF;
@@ -1114,7 +1137,9 @@ export function parseCsv(text) {
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
     if (!t || t.startsWith('#') || t.startsWith('name,')) continue;
-    const [name, rows, cols, cluesStr, solution, rules, tier, score] = t.split(',');
+    const parts = t.split(',');
+    if (parts.length < 4) throw new Error(`malformed CSV row: "${t.slice(0, 60)}"`);
+    const [name, rows, cols, cluesStr, solution, rules, tier, score] = parts;
     const { clues, slither, fullBoard, givens, voids } = parseCluesField(cluesStr);
     const rec = {
       name,

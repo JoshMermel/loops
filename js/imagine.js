@@ -8,7 +8,11 @@ import {
   NONE, WHITE, BLACK, GRAY, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   cloneState, propagate, lastPropChanges,
 } from './logic.js';
-import { isSlitherSatisfied } from './variants/slitherlink.js';
+import { isSlitherSatisfied, isSlitherEdge, firstUnsatisfiedSlitherOnClose } from './variants/slitherlink.js';
+
+const isFrontierEdge = (P, st, x) => (
+  st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP || isSlitherEdge(P, x)
+);
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
 export const HARD_MAX = 75;   // imagineTrace (36..60) sits in Hard; imagineChain (>= 80) sits in Expert
@@ -36,11 +40,7 @@ export function classifyImagine(P, baseState, edge, steps, broke, area, grayCell
   const dist = (c1, c2) => Math.abs(((c1 / cols) | 0) - ((c2 / cols) | 0)) + Math.abs((c1 % cols) - (c2 % cols));
   const distToEdge = (c) => Math.min(dist(c, a), dist(c, b));
 
-  const touchesSlither = P.hasSlither && grayCell < 0 && (
-    (P.edgeFaces[edge * 2] >= 0 && P.slitherNum[P.edgeFaces[edge * 2]] > 0)
-    || (P.edgeFaces[edge * 2 + 1] >= 0 && P.slitherNum[P.edgeFaces[edge * 2 + 1]] > 0)
-  );
-  const isFrontier = grayCell >= 0 || baseState.cell[a] === LOOP || baseState.cell[b] === LOOP || touchesSlither;
+  const isFrontier = grayCell >= 0 || isFrontierEdge(P, baseState, edge);
   const nSteps = steps.length;
   const earlyClose = !!(broke && (broke.kind === 'earlyClose' || broke.kind === 'twoLoops'));
 
@@ -58,7 +58,7 @@ export function classifyImagine(P, baseState, edge, steps, broke, area, grayCell
     if (s.info && s.info.cell !== undefined && s.info.cell >= 0) curCells.add(s.info.cell);
     for (let k = 0; k < s.sets.length; k++) {
       const [kind, idx] = s.sets[k];
-      if (kind === 'c') curCells.add(idx);
+      if (kind === 'c' || kind === 'g') curCells.add(idx);
       else { curCells.add(P.edgeA[idx]); curCells.add(P.edgeB[idx]); }
     }
     let touchesCluster = false;
@@ -330,7 +330,7 @@ export function easyContradiction(P, st, scope = null) {
         if (e[x] === E_ON) on++;
         else if (e[x] === E_UNKNOWN) unk++;
       }
-      if (on > sc.n || on + unk < sc.n) return { kind: 'slitherBroken', face: sc.f, n: sc.n };
+      if (on > sc.n || on + unk < sc.n) return { kind: 'slitherBroken', face: sc.f, n: sc.n, over: on > sc.n };
     }
   }
 
@@ -475,23 +475,23 @@ function findEasyStep(P, st, forbid, scope = null) {
     for (let si = 0; si < P.slither.length; si++) {
       const sc = P.slither[si];
       const f4 = sc.f * 4;
-      let on = 0;
-      const unks = [];
-      for (let d = 0; d < 4; d++) {
-        const x = fe[f4 + d];
-        if (x < 0) continue;
-        if (e[x] === E_ON) on++;
-        else if (e[x] === E_UNKNOWN) unks.push(x);
-      }
-      if (!unks.length) continue;
-      if (sc.n === 0) {
-        const s = tryEmit('slitherZero', unks.map((x) => ['e', x, E_OFF]), { face: sc.f, n: 0 });
-        if (s) return s;
-      } else if (on === sc.n) {
-        const s = tryEmit('slitherCount', unks.map((x) => ['e', x, E_OFF]), { face: sc.f, n: sc.n, mode: 'done' });
-        if (s) return s;
-      } else if (on + unks.length === sc.n) {
-        const s = tryEmit('slitherCount', unks.map((x) => ['e', x, E_ON]), { face: sc.f, n: sc.n, mode: 'fill' });
+      const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
+      let on = 0, unk = 0;
+      if (e0 >= 0) { const v = e[e0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e1 >= 0) { const v = e[e1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e2 >= 0) { const v = e[e2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e3 >= 0) { const v = e[e3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (unk === 0) continue;
+      if (sc.n === 0 || on === sc.n || on + unk === sc.n) {
+        const val = (sc.n === 0 || on === sc.n) ? E_OFF : E_ON;
+        const sets = [];
+        if (e0 >= 0 && e[e0] === E_UNKNOWN) sets.push(['e', e0, val]);
+        if (e1 >= 0 && e[e1] === E_UNKNOWN) sets.push(['e', e1, val]);
+        if (e2 >= 0 && e[e2] === E_UNKNOWN) sets.push(['e', e2, val]);
+        if (e3 >= 0 && e[e3] === E_UNKNOWN) sets.push(['e', e3, val]);
+        const s = sc.n === 0
+          ? tryEmit('slitherZero', sets, { face: sc.f, n: 0 })
+          : tryEmit('slitherCount', sets, { face: sc.f, n: sc.n, mode: val === E_OFF ? 'done' : 'fill' });
         if (s) return s;
       }
     }
@@ -708,9 +708,12 @@ function findEasyStep(P, st, forbid, scope = null) {
     const b = edgeB[x];
     if (cell[a] !== LOOP || cell[b] !== LOOP) continue;
     const ra = find(a);
-    if (ra === find(b) && size[ra] < loopCount) {
-      const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], { edge: x, a, b });
-      if (step) return step;
+    if (ra === find(b)) {
+      const slFace = size[ra] < loopCount ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
+      if (size[ra] < loopCount || slFace >= 0) {
+        const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], slFace >= 0 ? { edge: x, a, b, slitherFace: slFace } : { edge: x, a, b });
+        if (step) return step;
+      }
     }
   }
 
@@ -825,7 +828,7 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
  * if the contradiction still occurs without a step, drop it.
  */
 function pruneChain(P, baseState, edge, val, rawSteps, area, costCap, grayCell = -1) {
-  const isFrontier = grayCell >= 0 || baseState.cell[P.edgeA[edge]] === LOOP || baseState.cell[P.edgeB[edge]] === LOOP;
+  const isFrontier = grayCell >= 0 || isFrontierEdge(P, baseState, edge);
   if (minImagineCost(0, area, isFrontier) >= costCap) return null;
   const forbid = new Set();
   const kept = [];
@@ -872,16 +875,11 @@ function pruneChain(P, baseState, edge, val, rawSteps, area, costCap, grayCell =
 function candidateEdges(P, st, frontierOnly = false) {
   const { numEdges, edgeA, edgeB, clue, nb } = P;
   const { cell, e } = st;
-  const isSlitherEdge = (x) => P.hasSlither && (
-    (P.edgeFaces[x * 2] >= 0 && P.slitherNum[P.edgeFaces[x * 2]] > 0)
-    || (P.edgeFaces[x * 2 + 1] >= 0 && P.slitherNum[P.edgeFaces[x * 2 + 1]] > 0)
-  );
   const primary = [];
   if (frontierOnly) {
     for (let x = 0; x < numEdges; x++) {
       if (e[x] !== E_UNKNOWN) continue;
-      const a = edgeA[x], b = edgeB[x];
-      if (a >= 0 && (cell[a] === LOOP || cell[b] === LOOP || isSlitherEdge(x))) primary.push(x);
+      if (edgeA[x] >= 0 && isFrontierEdge(P, st, x)) primary.push(x);
     }
     return primary;
   }
@@ -911,7 +909,7 @@ function candidateEdges(P, st, frontierOnly = false) {
     if (e[x] !== E_UNKNOWN) continue;
     const a = edgeA[x], b = edgeB[x];
     if (a < 0) continue;
-    if (cell[a] === LOOP || cell[b] === LOOP || isSlitherEdge(x)) primary.push(x);
+    if (isFrontierEdge(P, st, x)) primary.push(x);
     else if (near[a] && near[b]) secondary.push(x);
   }
   return primary.concat(secondary);
@@ -963,7 +961,7 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
 
   for (let ei = 0; ei < edges.length; ei++) {
     const x = edges[ei];
-    const isFront = st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP;
+    const isFront = isFrontierEdge(P, st, x);
     for (let vi = 0; vi < 2; vi++) {
       const val = vi === 0 ? E_ON : E_OFF;
       stProp.cell.set(st.cell);

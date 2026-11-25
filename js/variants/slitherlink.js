@@ -9,37 +9,52 @@
 
 const E_UNKNOWN = 0, E_ON = 1, E_OFF = 2;
 
-/** Return the 4 edge indices [top, right, bottom, left] surrounding face (r, c), or -1 if off-board/void. */
-export function faceEdgesOf(P, f) {
-  const fc = P.cols - 1;
-  const r = (f / fc) | 0, c = f % fc;
-  const cols = P.cols;
-  const e0 = 2 * (r * cols + c);             // top: (r, c) - (r, c+1)
-  const e1 = 2 * (r * cols + c + 1) + 1;     // right: (r, c+1) - (r+1, c+1)
-  const e2 = 2 * ((r + 1) * cols + c);       // bottom: (r+1, c) - (r+1, c+1)
-  const e3 = 2 * (r * cols + c) + 1;         // left: (r, c) - (r+1, c)
-  const a = P.edgeA;
-  return [
-    a[e0] >= 0 ? e0 : -1,
-    a[e1] >= 0 ? e1 : -1,
-    a[e2] >= 0 ? e2 : -1,
-    a[e3] >= 0 ? e3 : -1,
-  ];
+/** True if edge `x` borders at least one numbered Slitherlink face (with optional nonzero filter). */
+export function isSlitherEdge(P, x, nonzeroOnly = true) {
+  if (!P.hasSlither || !P.edgeFaces) return false;
+  const f0 = P.edgeFaces[x * 2], f1 = P.edgeFaces[x * 2 + 1];
+  const sn = P.slitherNum;
+  if (nonzeroOnly) return (f0 >= 0 && sn[f0] > 0) || (f1 >= 0 && sn[f1] > 0);
+  return (f0 >= 0 && sn[f0] >= 0) || (f1 >= 0 && sn[f1] >= 0);
+}
+
+/**
+ * Check whether closing an edge `closingEdge` (currently UNKNOWN -> ON) would leave any
+ * Slitherlink face unsatisfied. Returns the first unsatisfied face index, or -1 if all match.
+ */
+export function firstUnsatisfiedSlitherOnClose(P, st, closingEdge) {
+  if (!P.hasSlither) return -1;
+  const ef0 = P.edgeFaces[closingEdge * 2], ef1 = P.edgeFaces[closingEdge * 2 + 1];
+  const fe = P.faceEdges, e = st.e, sl = P.slither;
+  for (let si = 0; si < sl.length; si++) {
+    const sc = sl[si];
+    const f4 = sc.f * 4;
+    let fon = (sc.f === ef0 || sc.f === ef1) ? 1 : 0;
+    const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
+    if (e0 >= 0 && e[e0] === E_ON) fon++;
+    if (e1 >= 0 && e[e1] === E_ON) fon++;
+    if (e2 >= 0 && e[e2] === E_ON) fon++;
+    if (e3 >= 0 && e[e3] === E_ON) fon++;
+    if (fon !== sc.n) return sc.f;
+  }
+  return -1;
 }
 
 /**
  * Compile Slitherlink face clues onto puzzle `P`.
  * Expects `P.rows`, `P.cols`, `P.edgeA`, `P.faceExterior`, `P.faceHoleId` to already be computed.
  * Attaches: `slither`, `hasSlither`, `slitherNum` (Int8Array(F), -1 if empty), `slitherAt` (Int16Array(F)),
- * `faceEdges` (Int32Array(F * 4)), and `edgeFaces` (Int32Array(numEdges * 2)).
+ * `faceEdges` (Int32Array(F * 4)), and `edgeFaces` (Int32Array(numEdges * 2), null when !hasSlither).
  */
 export function compileSlither(P, raw) {
   const { rows, cols, numEdges, edgeA } = P;
   const fr = Math.max(0, rows - 1), fc = Math.max(0, cols - 1), F = fr * fc;
+  const rawSlither = Array.isArray(raw.slither) ? raw.slither : [];
+  const hasRaw = rawSlither.length > 0;
 
-  // Dual face adjacency tables (shared by Slitherlink & any future face-based variant)
+  // Dual face adjacency tables (skip edgeFaces allocation when puzzle has no Slitherlink clues)
   const faceEdges = new Int32Array(F * 4).fill(-1);
-  const edgeFaces = new Int32Array(numEdges * 2).fill(-1);
+  const edgeFaces = hasRaw ? new Int32Array(numEdges * 2).fill(-1) : null;
   for (let r = 0; r < fr; r++) {
     for (let c = 0; c < fc; c++) {
       const f = r * fc + c;
@@ -50,27 +65,26 @@ export function compileSlither(P, raw) {
       const f4 = f * 4;
       if (edgeA[e0] >= 0) {
         faceEdges[f4] = e0;
-        if (edgeFaces[e0 * 2] < 0) edgeFaces[e0 * 2] = f; else edgeFaces[e0 * 2 + 1] = f;
+        if (edgeFaces) { if (edgeFaces[e0 * 2] < 0) edgeFaces[e0 * 2] = f; else edgeFaces[e0 * 2 + 1] = f; }
       }
       if (edgeA[e1] >= 0) {
         faceEdges[f4 + 1] = e1;
-        if (edgeFaces[e1 * 2] < 0) edgeFaces[e1 * 2] = f; else edgeFaces[e1 * 2 + 1] = f;
+        if (edgeFaces) { if (edgeFaces[e1 * 2] < 0) edgeFaces[e1 * 2] = f; else edgeFaces[e1 * 2 + 1] = f; }
       }
       if (edgeA[e2] >= 0) {
         faceEdges[f4 + 2] = e2;
-        if (edgeFaces[e2 * 2] < 0) edgeFaces[e2 * 2] = f; else edgeFaces[e2 * 2 + 1] = f;
+        if (edgeFaces) { if (edgeFaces[e2 * 2] < 0) edgeFaces[e2 * 2] = f; else edgeFaces[e2 * 2 + 1] = f; }
       }
       if (edgeA[e3] >= 0) {
         faceEdges[f4 + 3] = e3;
-        if (edgeFaces[e3 * 2] < 0) edgeFaces[e3 * 2] = f; else edgeFaces[e3 * 2 + 1] = f;
+        if (edgeFaces) { if (edgeFaces[e3 * 2] < 0) edgeFaces[e3 * 2] = f; else edgeFaces[e3 * 2 + 1] = f; }
       }
     }
   }
 
-  const rawSlither = Array.isArray(raw.slither) ? raw.slither : [];
   const slither = [];
   let slitherNum = null, slitherAt = null;
-  if (rawSlither.length) {
+  if (hasRaw) {
     slitherNum = new Int8Array(F).fill(-1);
     slitherAt = new Int16Array(F).fill(-1);
     rawSlither.forEach((sc, k) => {
@@ -155,14 +169,16 @@ export function isSlitherSatisfied(P, edges) {
 
 /**
  * Exact local propagation for Slitherlink face `f` inside `propagate()`.
+ * Applies exact count completion plus O(1) blocked-corner (3/1) and 3-line-in deductions.
  * Returns false on contradiction.
  */
 export function propagateSlitherFace(P, st, f, setEdge) {
   const n = P.slitherNum[f];
   if (n < 0) return true;
   const e = st.e;
+  const fe = P.faceEdges;
   const f4 = f * 4;
-  const e0 = P.faceEdges[f4], e1 = P.faceEdges[f4 + 1], e2 = P.faceEdges[f4 + 2], e3 = P.faceEdges[f4 + 3];
+  const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
   let on = 0, unk = 0;
   if (e0 >= 0) { const v = e[e0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
   if (e1 >= 0) { const v = e[e1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
@@ -175,11 +191,60 @@ export function propagateSlitherFace(P, st, f, setEdge) {
       if (e1 >= 0 && e[e1] === E_UNKNOWN) setEdge(e1, E_OFF);
       if (e2 >= 0 && e[e2] === E_UNKNOWN) setEdge(e2, E_OFF);
       if (e3 >= 0 && e[e3] === E_UNKNOWN) setEdge(e3, E_OFF);
-    } else if (on + unk === n) {
+      return true;
+    }
+    if (on + unk === n) {
       if (e0 >= 0 && e[e0] === E_UNKNOWN) setEdge(e0, E_ON);
       if (e1 >= 0 && e[e1] === E_UNKNOWN) setEdge(e1, E_ON);
       if (e2 >= 0 && e[e2] === E_UNKNOWN) setEdge(e2, E_ON);
       if (e3 >= 0 && e[e3] === E_UNKNOWN) setEdge(e3, E_ON);
+      return true;
+    }
+    // O(1) blocked-corner (3/1) and 3-line-in deductions (zero-alloc, accelerates solve() dramatically)
+    if (n === 3 || n === 1) {
+      const cols = P.cols, fc = cols - 1, ed = P.ed, nb = P.nb, cell = st.cell;
+      const fr = (f / fc) | 0, c = f % fc;
+      for (let ci = 0; ci < 4; ci++) {
+        const sp = CORNER_SPEC[ci];
+        const v = (fr + sp[0]) * cols + (c + sp[1]);
+        const odA = sp[6], odB = sp[7];
+        const xA = ed[v * 4 + odA], xB = ed[v * 4 + odB];
+        const blkA = xA < 0 || e[xA] === E_OFF || cell[nb[v * 4 + odA]] === OFF;
+        const blkB = xB < 0 || e[xB] === E_OFF || cell[nb[v * 4 + odB]] === OFF;
+        if (blkA && blkB) {
+          const ea = fe[f4 + sp[2]], eb = fe[f4 + sp[3]];
+          if (ea >= 0 && eb >= 0) {
+            if (n === 3) {
+              if (e[ea] === E_OFF || e[eb] === E_OFF) return false;
+              if (e[ea] === E_UNKNOWN) setEdge(ea, E_ON);
+              if (e[eb] === E_UNKNOWN) setEdge(eb, E_ON);
+            } else {
+              if (e[ea] === E_ON || e[eb] === E_ON) return false;
+              if (e[ea] === E_UNKNOWN) setEdge(ea, E_OFF);
+              if (e[eb] === E_UNKNOWN) setEdge(eb, E_OFF);
+            }
+          }
+        } else if (n === 3) {
+          const onA = xA >= 0 && e[xA] === E_ON;
+          const onB = xB >= 0 && e[xB] === E_ON;
+          if (onA !== onB) {
+            const eoA = fe[f4 + sp[4]], eoB = fe[f4 + sp[5]];
+            const otherOut = onA ? xB : xA;
+            if (eoA >= 0) {
+              if (e[eoA] === E_OFF) return false;
+              if (e[eoA] === E_UNKNOWN) setEdge(eoA, E_ON);
+            }
+            if (eoB >= 0) {
+              if (e[eoB] === E_OFF) return false;
+              if (e[eoB] === E_UNKNOWN) setEdge(eoB, E_ON);
+            }
+            if (otherOut >= 0 && e[otherOut] === E_UNKNOWN) setEdge(otherOut, E_OFF);
+          } else if (onA && onB) {
+            // Both outside exits ON -> corner has degree 2 -> both inner edges OFF -> at most 2 edges left for 3!
+            return false;
+          }
+        }
+      }
     }
   }
   return true;
@@ -250,16 +315,25 @@ export function autoXSlither(P, w, add) {
  *   5. Diagonally adjacent `3`–`3` sharing a corner vertex: the two off-diagonal flanking faces
  *      ALWAYS have OPPOSITE parity (xor = 1), and each `3`'s two outer edges are ON.
  */
+const PARITY_PAIRS = [[0, 1, 2, 3], [0, 2, 1, 3], [0, 3, 1, 2]];
+const scratchNb = new Int32Array(4);
+const scratchRel = new Int8Array(4);
+
 /**
  * True when some constraint outside the 1x2 rectangle of two orthogonally adjacent 3s
- * prevents that 1x2 box from being the entire loop on its own (always true on real puzzles,
- * and guards synthetic 2-clue boards from false positives).
+ * prevents that 1x2 box from being the entire loop on its own (sound even when 1 clues
+ * sit orthogonally adjacent to the 1x2 box, which share 1 perimeter edge with it!).
  */
 function hasLoopOutsideAdj3(P, st, r1, c1, r2, c2, f1, f2) {
   if (P.fullBoard && P.activeCount > 6) return true;
   for (let k = 0; k < P.slither.length; k++) {
     const sc = P.slither[k];
-    if (sc.n > 0 && sc.f !== f1 && sc.f !== f2) return true;
+    if (sc.f === f1 || sc.f === f2) continue;
+    const adjToBox = (Math.abs(sc.r - r1) + Math.abs(sc.c - c1) === 1)
+      || (Math.abs(sc.r - r2) + Math.abs(sc.c - c2) === 1);
+    if (sc.n >= 2) return true;
+    if (sc.n === 1 && !adjToBox) return true;
+    if (sc.n === 0 && adjToBox) return true;
   }
   const minR = Math.min(r1, r2), maxR = Math.max(r1, r2) + 1;
   const minC = Math.min(c1, c2), maxC = Math.max(c1, c2) + 1;
@@ -286,7 +360,7 @@ export function applySlitherParity(P, st, ctx) {
   if (!P.hasSlither) return false;
   const { rows, cols, slither, slitherNum } = P;
   const fr = rows - 1, fc = cols - 1;
-  const { EXT, relate, link, canonFace = (f) => f } = ctx;
+  const { EXT, relate, link, canonFace = (f) => f, buildGraph = true } = ctx;
   const faceAt = (r, c) => canonFace(r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : EXT);
   let anyLinked = false;
   const addLink = (u, v, xor, reason) => {
@@ -299,47 +373,51 @@ export function applySlitherParity(P, st, ctx) {
     const sc = slither[k];
     const { r, c, n } = sc;
     const f = canonFace(sc.f);
-    const nb = [faceAt(r - 1, c), faceAt(r, c + 1), faceAt(r + 1, c), faceAt(r, c - 1)];
     if (n === 0) {
-      for (let d = 0; d < 4; d++) addLink(f, nb[d], 0, { kind: 'slither0', face: sc.f });
+      const r0 = buildGraph ? { kind: 'slither0', face: sc.f } : null;
+      addLink(f, faceAt(r - 1, c), 0, r0);
+      addLink(f, faceAt(r, c + 1), 0, r0);
+      addLink(f, faceAt(r + 1, c), 0, r0);
+      addLink(f, faceAt(r, c - 1), 0, r0);
     } else if (n === 3) {
       // Orthogonal adjacent 3-3 (check right and down to avoid duplicate links)
       if (c + 1 < fc && slitherNum[sc.f + 1] === 3 && hasLoopOutsideAdj3(P, st, r, c, r, c + 1, sc.f, sc.f + 1)) {
         const f2Raw = sc.f + 1, f2 = canonFace(f2Raw);
-        addLink(f, f2, 1, { kind: 'slither33', face: sc.f, face2: f2Raw });
-        addLink(f, faceAt(r, c - 1), 1, { kind: 'slither33', face: sc.f, face2: f2Raw });
-        addLink(f2, faceAt(r, c + 2), 1, { kind: 'slither33', face: sc.f, face2: f2Raw });
+        const r33 = buildGraph ? { kind: 'slither33', face: sc.f, face2: f2Raw } : null;
+        addLink(f, f2, 1, r33);
+        addLink(f, faceAt(r, c - 1), 1, r33);
+        addLink(f2, faceAt(r, c + 2), 1, r33);
       }
       if (r + 1 < fr && slitherNum[sc.f + fc] === 3 && hasLoopOutsideAdj3(P, st, r, c, r + 1, c, sc.f, sc.f + fc)) {
         const f2Raw = sc.f + fc, f2 = canonFace(f2Raw);
-        addLink(f, f2, 1, { kind: 'slither33', face: sc.f, face2: f2Raw });
-        addLink(f, faceAt(r - 1, c), 1, { kind: 'slither33', face: sc.f, face2: f2Raw });
-        addLink(f2, faceAt(r + 2, c), 1, { kind: 'slither33', face: sc.f, face2: f2Raw });
+        const r33 = buildGraph ? { kind: 'slither33', face: sc.f, face2: f2Raw } : null;
+        addLink(f, f2, 1, r33);
+        addLink(f, faceAt(r - 1, c), 1, r33);
+        addLink(f2, faceAt(r + 2, c), 1, r33);
       }
       // Diagonal adjacent 3-3 (check SE and SW to avoid duplicates)
       if (r + 1 < fr && c + 1 < fc && slitherNum[(r + 1) * fc + (c + 1)] === 3) {
         const f2Raw = (r + 1) * fc + (c + 1), f2 = canonFace(f2Raw);
-        const a = faceAt(r, c + 1), b = faceAt(r + 1, c);
-        addLink(a, b, 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f, faceAt(r - 1, c), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f, faceAt(r, c - 1), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f2, faceAt(r + 2, c + 1), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f2, faceAt(r + 1, c + 2), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
+        const rd = buildGraph ? { kind: 'slitherDiag33', face: sc.f, face2: f2Raw } : null;
+        addLink(faceAt(r, c + 1), faceAt(r + 1, c), 1, rd);
+        addLink(f, faceAt(r - 1, c), 1, rd);
+        addLink(f, faceAt(r, c - 1), 1, rd);
+        addLink(f2, faceAt(r + 2, c + 1), 1, rd);
+        addLink(f2, faceAt(r + 1, c + 2), 1, rd);
       }
       if (r + 1 < fr && c - 1 >= 0 && slitherNum[(r + 1) * fc + (c - 1)] === 3) {
         const f2Raw = (r + 1) * fc + (c - 1), f2 = canonFace(f2Raw);
-        const a = faceAt(r, c - 1), b = faceAt(r + 1, c);
-        addLink(a, b, 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f, faceAt(r - 1, c), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f, faceAt(r, c + 1), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f2, faceAt(r + 2, c - 1), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
-        addLink(f2, faceAt(r + 1, c - 2), 1, { kind: 'slitherDiag33', face: sc.f, face2: f2Raw });
+        const rd = buildGraph ? { kind: 'slitherDiag33', face: sc.f, face2: f2Raw } : null;
+        addLink(faceAt(r, c - 1), faceAt(r + 1, c), 1, rd);
+        addLink(f, faceAt(r - 1, c), 1, rd);
+        addLink(f, faceAt(r, c + 1), 1, rd);
+        addLink(f2, faceAt(r + 2, c - 1), 1, rd);
+        addLink(f2, faceAt(r + 1, c - 2), 1, rd);
       }
     }
   }
 
   // 2. Iterative parity propagation for exact counts + universal mod-2 law across all clues
-  const PAIRS = [[0, 1, 2, 3], [0, 2, 1, 3], [0, 3, 1, 2]];
   let changed = true;
   while (changed && !ctx.hasConflict()) {
     changed = false;
@@ -348,35 +426,40 @@ export function applySlitherParity(P, st, ctx) {
       const { r, c, n } = sc;
       if (n === 0) continue;
       const f = canonFace(sc.f);
-      const nb = [faceAt(r - 1, c), faceAt(r, c + 1), faceAt(r + 1, c), faceAt(r, c - 1)];
+      scratchNb[0] = faceAt(r - 1, c);
+      scratchNb[1] = faceAt(r, c + 1);
+      scratchNb[2] = faceAt(r + 1, c);
+      scratchNb[3] = faceAt(r, c - 1);
       let same = 0, opp = 0;
-      const rel = [-1, -1, -1, -1];
       for (let d = 0; d < 4; d++) {
-        const rv = relate(f, nb[d]);
-        rel[d] = rv;
+        const rv = relate(f, scratchNb[d]);
+        scratchRel[d] = rv;
         if (rv === 0) same++;
         else if (rv === 1) opp++;
       }
       if (opp > n || same > 4 - n) { ctx.markConflict(); break; }
       if (opp === n && same < 4 - n) {
+        const rc = buildGraph ? { kind: 'slitherCount', face: sc.f, n } : null;
         for (let d = 0; d < 4; d++) {
-          if (rel[d] < 0 && addLink(f, nb[d], 0, { kind: 'slitherCount', face: sc.f, n })) changed = true;
+          if (scratchRel[d] < 0 && addLink(f, scratchNb[d], 0, rc)) changed = true;
         }
       } else if (same === 4 - n && opp < n) {
+        const rc = buildGraph ? { kind: 'slitherCount', face: sc.f, n } : null;
         for (let d = 0; d < 4; d++) {
-          if (rel[d] < 0 && addLink(f, nb[d], 1, { kind: 'slitherCount', face: sc.f, n })) changed = true;
+          if (scratchRel[d] < 0 && addLink(f, scratchNb[d], 1, rc)) changed = true;
         }
       }
       // Universal mod-2 law: relate(a, b) ^ relate(c, d) === (n & 1)
       const par = n & 1;
       for (let pi = 0; pi < 3; pi++) {
-        const [a, b, c2, d2] = PAIRS[pi];
-        const rAB = relate(nb[a], nb[b]);
-        const rCD = relate(nb[c2], nb[d2]);
+        const p = PARITY_PAIRS[pi];
+        const a = scratchNb[p[0]], b = scratchNb[p[1]], c2 = scratchNb[p[2]], d2 = scratchNb[p[3]];
+        const rAB = relate(a, b);
+        const rCD = relate(c2, d2);
         if (rAB >= 0 && rCD < 0) {
-          if (addLink(nb[c2], nb[d2], rAB ^ par, { kind: 'slitherMod2', face: sc.f, n })) changed = true;
+          if (addLink(c2, d2, rAB ^ par, buildGraph ? { kind: 'slitherMod2', face: sc.f, n } : null)) changed = true;
         } else if (rCD >= 0 && rAB < 0) {
-          if (addLink(nb[a], nb[b], rCD ^ par, { kind: 'slitherMod2', face: sc.f, n })) changed = true;
+          if (addLink(a, b, rCD ^ par, buildGraph ? { kind: 'slitherMod2', face: sc.f, n } : null)) changed = true;
         } else if (rAB >= 0 && rCD >= 0 && (rAB ^ rCD) !== par) {
           ctx.markConflict();
           break;
@@ -435,19 +518,21 @@ export function findSlitherCount(P, st) {
     const sc = slither[k];
     if (sc.n === 0) continue;
     const f4 = sc.f * 4;
-    let on = 0;
-    const unks = [];
-    for (let d = 0; d < 4; d++) {
-      const x = faceEdges[f4 + d];
-      if (x < 0) continue;
-      if (e[x] === E_ON) on++;
-      else if (e[x] === E_UNKNOWN) unks.push(x);
-    }
-    if (!unks.length) continue;
-    if (on === sc.n) {
-      out.push({ sets: unks.map((x) => ['e', x, E_OFF]), info: { face: sc.f, n: sc.n, mode: 'done' } });
-    } else if (on + unks.length === sc.n) {
-      out.push({ sets: unks.map((x) => ['e', x, E_ON]), info: { face: sc.f, n: sc.n, mode: 'fill' } });
+    const e0 = faceEdges[f4], e1 = faceEdges[f4 + 1], e2 = faceEdges[f4 + 2], e3 = faceEdges[f4 + 3];
+    let on = 0, unk = 0;
+    if (e0 >= 0) { const v = e[e0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+    if (e1 >= 0) { const v = e[e1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+    if (e2 >= 0) { const v = e[e2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+    if (e3 >= 0) { const v = e[e3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+    if (unk === 0) continue;
+    if (on === sc.n || on + unk === sc.n) {
+      const val = on === sc.n ? E_OFF : E_ON;
+      const sets = [];
+      if (e0 >= 0 && e[e0] === E_UNKNOWN) sets.push(['e', e0, val]);
+      if (e1 >= 0 && e[e1] === E_UNKNOWN) sets.push(['e', e1, val]);
+      if (e2 >= 0 && e[e2] === E_UNKNOWN) sets.push(['e', e2, val]);
+      if (e3 >= 0 && e[e3] === E_UNKNOWN) sets.push(['e', e3, val]);
+      out.push({ sets, info: { face: sc.f, n: sc.n, mode: val === E_OFF ? 'done' : 'fill' } });
     }
   }
   return out;
@@ -486,12 +571,13 @@ export function findSlitherCorner(P, st) {
         for (const [adr, adc, contDir, perpOutDir] of [adjA, adjB]) {
           const av = (sc.r + adr) * cols + (sc.c + adc);
           const xCont = ed[av * 4 + contDir];
-          if (xCont < 0 || e[xCont] !== E_UNKNOWN) continue;
           const xPerp = ed[av * 4 + perpOutDir];
-          if (isBlockedDir(P, st, av, perpOutDir)) {
-            sets.push(['e', xCont, E_ON]);
-          } else if (xPerp >= 0 && e[xPerp] === E_ON) {
-            sets.push(['e', xCont, E_OFF]);
+          if (xCont >= 0 && e[xCont] === E_UNKNOWN) {
+            if (isBlockedDir(P, st, av, perpOutDir)) sets.push(['e', xCont, E_ON]);
+            else if (xPerp >= 0 && e[xPerp] === E_ON) sets.push(['e', xCont, E_OFF]);
+          } else if (xPerp >= 0 && e[xPerp] === E_UNKNOWN) {
+            if (isBlockedDir(P, st, av, contDir)) sets.push(['e', xPerp, E_ON]);
+            else if (xCont >= 0 && e[xCont] === E_ON) sets.push(['e', xPerp, E_OFF]);
           }
         }
         if (sets.length) out.push({ sets, info: { face: sc.f, n: 2, cell: v } });
@@ -688,7 +774,7 @@ export function describeSlitherChainStep(P, s, { faceName }) {
     case 'slitherCount':
       return info.mode === 'fill'
         ? `the ${info.n} square ${fn} needs all of its remaining open sides`
-        : `the ${info.n} square ${fn} already has ${info.n} segments, so its other sides are off`;
+        : `the ${info.n} square ${fn} already has ${info.n} segment${info.n === 1 ? '' : 's'}, so its other sides are off`;
     case 'slitherCorner':
       return `the blocked corner on the ${info.n} square ${fn} forces its edges`;
     case 'slitherAdjacent3':
@@ -753,7 +839,7 @@ export function explainSlitherStep(P, step, helpers) {
     case 'slitherDiag3':
       addFace(faces.focus, info.face);
       addFace(faces.focus, info.face2);
-      if (info.cell !== undefined) roles.clue.push(info.cell);
+      if (info.cell !== undefined) roles.focus.push(info.cell);
       return {
         nudge: `Look at the two diagonally touching 3 squares at ${fn} and ${fn2}.`,
         text: `The diagonal 3 squares at ${fn} and ${fn2} cannot both turn sharply around their shared corner ${cellName(P, info.cell)}, so each must use both of its outer sides — ${marks}.`,

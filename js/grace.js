@@ -19,6 +19,8 @@ export function makeGrace() {
 /**
  * Short grace period before Auto-X / Auto-Shade fire after a single tap into an intermediate
  * cycle state (e.g. empty -> line when double-tapping to place X), preventing flicker between taps.
+ * If `onFire({ force: false })` returns `false` (e.g. pointer is currently held down), the target
+ * stays pending as a missed timer so `flush(exceptKey)` or `flushIfMissed()` runs it safely later.
  */
 export function makeAutoGrace({
   delayMs = 320,
@@ -26,37 +28,58 @@ export function makeAutoGrace({
   clearTimer = (id) => clearTimeout(id),
 } = {}) {
   let key = null;
+  let missedKey = null;
   let timer = null;
   let pendingFn = null;
+  const activeKey = () => (key !== null ? key : missedKey);
   return {
     isPending(targetKey = null) {
-      return key !== null && (targetKey === null || key === targetKey);
+      const k = activeKey();
+      return k !== null && (targetKey === null || k === targetKey);
     },
     schedule(targetKey, onFire) {
       if (timer !== null) clearTimer(timer);
       key = targetKey;
+      missedKey = null;
       pendingFn = onFire;
       timer = setTimer(() => {
+        const k = key;
         const fn = pendingFn;
         key = null;
         timer = null;
-        pendingFn = null;
-        if (fn) fn();
+        const ran = fn ? fn({ force: false }) : true;
+        if (ran === false) {
+          missedKey = k;
+        } else {
+          missedKey = null;
+          pendingFn = null;
+        }
       }, delayMs);
     },
     flush(exceptKey = null) {
-      if (key === null || (exceptKey !== null && key === exceptKey)) return false;
+      const k = activeKey();
+      if (k === null || (exceptKey !== null && k === exceptKey)) return false;
       const fn = pendingFn;
       if (timer !== null) clearTimer(timer);
       key = null;
+      missedKey = null;
       timer = null;
       pendingFn = null;
-      if (fn) fn();
+      if (fn) fn({ force: true });
+      return true;
+    },
+    flushIfMissed() {
+      if (missedKey === null) return false;
+      const fn = pendingFn;
+      missedKey = null;
+      pendingFn = null;
+      if (fn) fn({ force: true });
       return true;
     },
     cancel() {
       if (timer !== null) clearTimer(timer);
       key = null;
+      missedKey = null;
       timer = null;
       pendingFn = null;
     },

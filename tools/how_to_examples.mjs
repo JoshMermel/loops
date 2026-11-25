@@ -46,26 +46,36 @@ if (fs.existsSync(libDir)) {
 
 candidates.sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols) || (a.score ?? 0) - (b.score ?? 0));
 
-// Prioritize up to 12 smallest puzzles per rule ID (matching p.rules), plus up to 600 smallest boards overall,
-// so rare rules are found immediately without replaying all 15,000+ large boards single-threaded.
+// Prioritize up to 12 smallest puzzles per rule ID (matching p.rules), plus dedicated quotas per
+// puzzle family (Slitherlink, Hamilton cycle, Swiss cheese, Gray circles) so newer/smaller families
+// are never crowded out by 2,000+ 8x8 classic Masyu boards, plus general smallest boards up to 1200.
 const prioritized = [];
 const pickedKey = new Set();
+const addCand = (p) => {
+  const sk = symmetryKey(p);
+  if (pickedKey.has(sk)) return false;
+  pickedKey.add(sk);
+  prioritized.push(p);
+  return true;
+};
 const perRule = new Map();
 for (const p of candidates) {
   const n = perRule.get(p.rules) || 0;
   if (targetRules.has(p.rules) && n < 12) {
     perRule.set(p.rules, n + 1);
-    const sk = symmetryKey(p);
-    pickedKey.add(sk);
-    prioritized.push(p);
+    addCand(p);
   }
 }
+const familyQuota = { slither: 200, full: 120, voids: 80, gray: 120 };
 for (const p of candidates) {
-  if (prioritized.length >= 900) break;
-  const sk = symmetryKey(p);
-  if (pickedKey.has(sk)) continue;
-  pickedKey.add(sk);
-  prioritized.push(p);
+  if (p.slither && p.slither.length && familyQuota.slither > 0 && addCand(p)) familyQuota.slither--;
+  else if (p.fullBoard && familyQuota.full > 0 && addCand(p)) familyQuota.full--;
+  else if (p.voids && p.voids.length && familyQuota.voids > 0 && addCand(p)) familyQuota.voids--;
+  else if (p.clues.some((c) => c.t === 'G') && familyQuota.gray > 0 && addCand(p)) familyQuota.gray--;
+}
+for (const p of candidates) {
+  if (prioritized.length >= 1200) break;
+  addCand(p);
 }
 // Sort prioritized smallest-first so early-exit never locks in a large board when a smaller example exists
 prioritized.sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols) || (a.score ?? 0) - (b.score ?? 0));

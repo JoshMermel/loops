@@ -593,6 +593,7 @@ export class Board {
     const P = this.P;
     if (!P) { this.el.innerHTML = ''; return; }
     this.marks = marks; this.info = info; this.hint = hint;
+    this._renderSeq = (this._renderSeq || 0) + 1;
 
     const wanted = new Set();
     (info.clueState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`c${k}`); });
@@ -1011,8 +1012,9 @@ export class Board {
       else if (hit.kind === 'face') { this.hoverCell = -1; this.hoverEdge = -1; this.hoverFace = hit.face; }
       else { this.hoverCell = hit.cell; this.hoverEdge = hit.kind === 'edge' ? hit.edge : -1; this.hoverFace = -1; }
     }
+    const prevRender = this._renderSeq || 0;
     this.h.onEnd(false);
-    if (this.marks) this.render(this.marks, this.info, this.hint);
+    if (this.marks && (this._renderSeq || 0) === prevRender) this.render(this.marks, this.info, this.hint);
   }
 
   cancel() {

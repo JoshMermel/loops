@@ -206,6 +206,7 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
     const slitherCtx = runSlither ? {
       EXT,
       canonFace,
+      buildGraph,
       relate,
       link: (u, v, xor, reason) => link(u, v, xor, buildGraph ? reason : null),
       hasConflict: () => conflict,
@@ -216,7 +217,7 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
     while (progress && !conflict) {
       progress = false;
       if (runSlither && applySlitherParity(P, st, slitherCtx)) progress = true;
-      if (conflict) break;
+      if (conflict || !blacks.length) break;
       for (let k = 0; k < blacks.length; k++) {
         const bi = blacks[k];
         const br = (bi / cols) | 0, bc = bi % cols;
@@ -434,11 +435,21 @@ function findFaceParityCore(P, st, opts, { useCircles, useSlither = false, ancho
     const hops = chains.reduce((acc, c) => acc + c.length, 0);
     const clues = [];
     const seenClue = new Set();
+    const slitherFaces = [];
+    const seenSlFace = new Set();
     for (const ch of chains) {
       for (const s of ch) {
         if (s.reason.cell !== undefined && !seenClue.has(s.reason.cell)) {
           seenClue.add(s.reason.cell);
           clues.push(s.reason.cell);
+        }
+        if (s.reason.face !== undefined && !seenSlFace.has(s.reason.face)) {
+          seenSlFace.add(s.reason.face);
+          slitherFaces.push(s.reason.face);
+        }
+        if (s.reason.face2 !== undefined && !seenSlFace.has(s.reason.face2)) {
+          seenSlFace.add(s.reason.face2);
+          slitherFaces.push(s.reason.face2);
         }
       }
     }
@@ -457,6 +468,7 @@ function findFaceParityCore(P, st, opts, { useCircles, useSlither = false, ancho
         chains,
         hops,
         clues,
+        slitherFaces,
         facesIn,
         facesOut,
         shadeOnly: !useCircles,

@@ -90,6 +90,34 @@ test('makeAutoGrace defers auto-marks for double-tap, skips flush on same target
   fn();
   assert.equal(fired, 2);
   assert.equal(ag.isPending(), false);
+
+  // Timer firing while pointer is held (callback returns false) stays pending as missedKey until flushed
+  let busy = true;
+  ag.schedule('e:9', ({ force } = {}) => {
+    if (!force && busy) return false;
+    fired++;
+    return true;
+  });
+  const [{ fn: fnBusy }] = [...timers.values()];
+  fnBusy();
+  assert.equal(fired, 2, 'busy callback must defer without firing');
+  assert.equal(ag.isPending('e:9'), true);
+  assert.equal(ag.flush('e:9'), false, 'same-target flush stays deferred');
+  assert.equal(ag.flush('e:10'), true, 'other-target flush forces missed callback immediately');
+  assert.equal(fired, 3);
+  assert.equal(ag.isPending(), false);
+
+  // Missed timer also flushes via flushIfMissed() at end of gesture
+  ag.schedule('e:11', ({ force } = {}) => {
+    if (!force && busy) return false;
+    fired++;
+    return true;
+  });
+  [...timers.values()][0].fn();
+  assert.equal(fired, 3);
+  assert.equal(ag.flushIfMissed(), true);
+  assert.equal(fired, 4);
+  assert.equal(ag.isPending(), false);
 });
 
 // ---- Auto-X tests
@@ -735,4 +763,36 @@ test('Slitherlink Auto-X marks 0 faces and satisfied numbered faces, chains with
   reconcileAutoX(P, m, true);
   assert.equal(m.edges[fMidEdges[2]], 0);
   assert.equal(m.edges[fMidEdges[3]], 0);
+
+  // 4. Regression: Rule 4 must NEVER cross out the valid solution loop on a pure Slitherlink board
+  //    when the player shades Inside/Outside matching the solution before drawing any line segments!
+  //    4x4 dots with a 2x2 center loop around faces (0,0),(0,1),(1,0),(1,1):
+  const Ppure = compile({
+    name: 'sl_pure_r4', rows: 4, cols: 4, clues: [],
+    slither: [
+      { r: 0, c: 0, n: 2 }, { r: 0, c: 1, n: 2 }, { r: 0, c: 2, n: 1 },
+      { r: 1, c: 0, n: 2 }, { r: 1, c: 1, n: 2 }, { r: 1, c: 2, n: 1 },
+      { r: 2, c: 0, n: 1 }, { r: 2, c: 1, n: 1 }, { r: 2, c: 2, n: 0 },
+    ],
+  });
+  const mp = blank(Ppure);
+  const fc = 3;
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      mp.faces[r * fc + c] = (r < 2 && c < 2) ? FACE_IN : FACE_OUT;
+    }
+  }
+  reconcileAutoX(Ppure, mp, true, { useShade: true });
+  // All 8 edges of the 2x2 solution loop must remain OPEN (0), never auto-X'd!
+  const solEdges = [
+    Ppure.ed[0 * 4 + 1], Ppure.ed[1 * 4 + 1],
+    Ppure.ed[2 * 4 + 2], Ppure.ed[(1 * 4 + 2) * 4 + 2],
+    Ppure.ed[(2 * 4 + 1) * 4 + 1], Ppure.ed[(2 * 4 + 0) * 4 + 1],
+    Ppure.ed[(1 * 4 + 0) * 4 + 2], Ppure.ed[0 * 4 + 2],
+  ];
+  for (const x of solEdges) {
+    assert.equal(mp.edges[x], 0, `solution loop edge ${x} must NOT be auto-X'd on pure Slitherlink`);
+  }
+  // Meanwhile non-solution interior edge (1,1)-(1,2) between two Inside faces MUST be auto-X'd
+  assert.equal(mp.edges[Ppure.ed[(1 * 4 + 1) * 4 + 1]], 2);
 });

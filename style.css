@@ -171,6 +171,10 @@ button.ghost { background: transparent; }
   text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none;
 }
 .slither-num.bad { fill: var(--pearl-bad); }
+:root[data-theme="dark"] .slither-num.bad {
+  fill: #ff6b6b; paint-order: stroke; stroke: var(--cell-bg); stroke-width: 3px; stroke-linejoin: round;
+}
+svg [hidden] { display: none; }
 .hr-num {
   fill: var(--pearl-ink); font-size: 13px; font-weight: 700;
   text-anchor: middle; dominant-baseline: central; pointer-events: none;
@@ -228,7 +232,7 @@ button.ghost { background: transparent; }
 .chain-seg { stroke: var(--hint-problem); stroke-linecap: round; stroke-dasharray: 6 5; opacity: 0.92; pointer-events: none; }
 .ghost-seg { stroke: var(--hint-ink); stroke-linecap: round; stroke-dasharray: 5 4; pointer-events: none; }
 .ghost-x { stroke: var(--color-error); stroke-width: 2.8; stroke-linecap: round; fill: none; pointer-events: none; }
-.ghost-x-halo { stroke: var(--bg-white); stroke-width: 5.5; stroke-linecap: round; fill: none; pointer-events: none; }
+.ghost-x-halo { stroke: var(--cell-bg); stroke-width: 5.5; stroke-linecap: round; fill: none; pointer-events: none; }
 .ghost-gray-white { fill: #fff; stroke: var(--hint-ink); stroke-width: 2.2; stroke-dasharray: 4 2.5; pointer-events: none; }
 .ghost-gray-black { fill: #111; stroke: var(--hint-ink); stroke-width: 2.2; stroke-dasharray: 4 2.5; pointer-events: none; }
 .wrong-seg { stroke: var(--color-error); stroke-linecap: round; opacity: 0.5; pointer-events: none; }

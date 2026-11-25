@@ -13,13 +13,6 @@ const manifestPath = path.join(root, 'data', 'manifest.json');
 
 fs.mkdirSync(path.join(root, 'data'), { recursive: true });
 
-// Preserve any hidden books (like armory) if manifest already exists
-let existingHidden = [];
-if (fs.existsSync(manifestPath)) {
-  const prev = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  existingHidden = (prev.books || []).filter((b) => b.hidden);
-}
-
 const manifest = {
   default: 'intro',
   groups: [
@@ -89,7 +82,6 @@ const manifest = {
       blurb: 'Two loop puzzle rules combined on one board — every puzzle genuinely needs both.',
     },
   ],
-  books: existingHidden,
 };
 
 const recipes = [
@@ -358,9 +350,9 @@ for (const r of recipes) {
     '--group', r.group,
     '--glob', r.glob,
     '--blurb', r.blurb,
+    '--sub', r.sub || '',
+    '--sub2', r.sub2 || '',
   ];
-  if (r.sub) args.push('--sub', r.sub);
-  if (r.sub2) args.push('--sub2', r.sub2);
   if (r.limit) args.push('--limit', String(r.limit));
   if (r.tiers) args.push('--tiers', r.tiers);
   if (r.onlyTier) args.push('--only-tier', r.onlyTier);

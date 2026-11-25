@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile } from '../js/logic.js';
 import { hitTestCoords, advanceDrag, advanceFaceDrag, tilesOutlinePath, CELL_SIZE } from '../js/board.js';
-import { clueStates, earlyLoopEdges, trappedFullCells } from '../js/clues.js';
+import { clueStates, slitherStates, earlyLoopEdges, trappedFullCells } from '../js/clues.js';
 import { otherEnd } from '../js/lineends.js';
 import { makeColorKeeper, assignPathColors } from '../js/pathcolors.js';
 
@@ -165,6 +165,29 @@ test('earlyLoopEdges flags closed loops that miss clues or leave other segments,
   const mTrap = { edges: new Uint8Array(Pfb.numEdges) };
   mTrap.edges[Pfb.ed[0 * 4 + 1]] = 2; // corner (0,0) now has only 1 exit left!
   assert.deepEqual([...trappedFullCells(Pfb, mTrap)], [0]);
+
+  // Pure Slitherlink: slitherStates flags over-count / under-available faces, and earlyLoopEdges flags unsatisfied loops
+  const Psl = compile({
+    name: 'sl_ui', rows: 4, cols: 4, clues: [],
+    slither: [{ r: 0, c: 0, n: 0 }, { r: 1, c: 1, n: 3 }, { r: 2, c: 2, n: 2 }],
+  });
+  const msl = { edges: new Uint8Array(Psl.numEdges) };
+  assert.deepEqual(slitherStates(Psl, msl), ['', '', '']);
+  // Put 1 segment on the 0 face -> bad; cross out 2 edges on the 3 face -> bad (avail 2 < 3)
+  msl.edges[Psl.faceEdges[0 * 4 + 0]] = 1;
+  msl.edges[Psl.faceEdges[(1 * 3 + 1) * 4 + 0]] = 2;
+  msl.edges[Psl.faceEdges[(1 * 3 + 1) * 4 + 1]] = 2;
+  assert.deepEqual(slitherStates(Psl, msl), ['bad', 'bad', '']);
+
+  // Closed 1x1 box around face (2,2) leaves face (1,1)=3 unsatisfied -> flagged as early loop
+  const mslLoop = { edges: new Uint8Array(Psl.numEdges) };
+  for (let d = 0; d < 4; d++) mslLoop.edges[Psl.faceEdges[(2 * 3 + 2) * 4 + d]] = 1;
+  assert.equal(earlyLoopEdges(Psl, mslLoop).size, 4);
+  // A pure Slitherlink loop that satisfies ALL faces is NOT flagged
+  const PslOk = compile({ name: 'sl_ok', rows: 3, cols: 3, clues: [], slither: [{ r: 0, c: 0, n: 2 }, { r: 1, c: 1, n: 2 }] });
+  const mslOk = { edges: new Uint8Array(PslOk.numEdges) };
+  for (const x of [PslOk.ed[0 * 4 + 1], PslOk.ed[1 * 4 + 1], PslOk.ed[2 * 4 + 2], PslOk.ed[5 * 4 + 2], PslOk.ed[7 * 4 + 1], PslOk.ed[6 * 4 + 1], PslOk.ed[3 * 4 + 2], PslOk.ed[0 * 4 + 2]]) mslOk.edges[x] = 1;
+  assert.equal(earlyLoopEdges(PslOk, mslOk).size, 0);
 });
 
 test('advanceDrag includes the starting segment when dragging from A4-A5 to A5-A6 (upper or lower half) or around corners', () => {

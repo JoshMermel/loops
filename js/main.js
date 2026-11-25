@@ -64,7 +64,14 @@ const settings = {
 
 const board = new Board($('board'), {
   onStart: () => { state.pending = snapshot(); state.dragStack = []; },
-  onBeginDrag: () => { if (state.pending) state.marks = cloneMarks(state.pending); state.dragStack = []; },
+  onBeginDrag: () => {
+    autoGrace.cancel();
+    if (state.pending) {
+      reconcileAuto(state.P, state.pending);
+      state.marks = cloneMarks(state.pending);
+    }
+    state.dragStack = [];
+  },
   onEdgeTap: (edge) => cycleEdge(edge),
   onEdgeRight: (edge) => toggleEdge(edge),
   onCellTap: (cell) => cycleGray(cell, false),
@@ -139,7 +146,6 @@ function edgeBetween(P, a, b) {
 
 const AUTO_GRACE_MS = 320;
 const autoGrace = makeAutoGrace({ delayMs: AUTO_GRACE_MS });
-let autoGraceMissed = false;
 
 const reconcileAuto = (P, m) => {
   reconcileAutoGray(P, m);
@@ -147,31 +153,18 @@ const reconcileAuto = (P, m) => {
   reconcileAutoShade(P, m, settings.autoShade);
 };
 
-function commitAutoGrace() {
-  if (!state.P || !state.marks) return;
-  if (board.gesture) {
-    // User already has a pointer down (e.g. starting the 2nd tap); wait until gesture resolves
-    autoGraceMissed = true;
-    return;
-  }
-  autoGraceMissed = false;
-  reconcileAuto(state.P, state.marks);
-  save();
-  refresh();
-  if (state.solved) markSolved();
-}
-
-function flushAuto(exceptKey = null) {
-  autoGraceMissed = false;
-  if (!autoGrace.isPending() || (exceptKey !== null && autoGrace.isPending(exceptKey))) return false;
-  autoGrace.cancel();
-  if (!state.P || !state.marks) return false;
+function commitAutoGrace({ force = false } = {}) {
+  if (!state.P || !state.marks) return true;
+  if (!force && board.gesture) return false;
   reconcileAuto(state.P, state.marks);
   save();
   refresh();
   if (state.pending) state.pending = snapshot();
+  if (state.solved) markSolved();
   return true;
 }
+
+const flushAuto = (exceptKey = null) => autoGrace.flush(exceptKey);
 
 const faceGraceKey = (P, f) => (P.hasVoids && P.faceHoleId && P.faceHoleId[f] >= 0 ? `fh:${P.faceHoleId[f]}` : `f:${f}`);
 
@@ -187,7 +180,7 @@ function cycleGray(cell, reverse = false) {
   const next = reverse ? cycleGrayLabelReverse(prev) : cycleGrayLabel(prev);
   m.grays[k] = next;
   m.autoG[k] = 0;
-  const defer = !reverse && prev === 0 && next === WHITE && (settings.autoX || settings.autoShade);
+  const defer = !reverse && prev === 0 && next === WHITE && settings.autoX;
   if (defer) {
     autoGrace.schedule(key, commitAutoGrace);
   } else {
@@ -240,7 +233,7 @@ function cycleFace(f, reverse = false) {
   setFaceGroup(P, m, f, next, 0);
   state.facePaintVal = next;
   // Brief grace period on blank -> Inside so double-tapping to shade Outside doesn't flash Auto-Shade / Auto-X
-  const defer = !reverse && prev === 0 && next === 1 && (settings.autoX || settings.autoShade);
+  const defer = !reverse && prev === 0 && next === 1 && settings.autoShade;
   if (defer) {
     autoGrace.schedule(key, commitAutoGrace);
   } else {
@@ -258,7 +251,6 @@ function paintFaceStep(f) {
   if (m.faces[f] && m.autoF[f]) return;
   if (m.faces[f] === val) return;
   autoGrace.cancel();
-  autoGraceMissed = false;
   setFaceGroup(P, m, f, val, 0);
   reconcileAuto(P, m);
   refresh();
@@ -318,7 +310,6 @@ function crossStep(a, b, first) {
 function undoDragStep() {
   if (!state.dragStack.length) return;
   autoGrace.cancel();
-  autoGraceMissed = false;
   state.marks = state.dragStack.pop();
   refresh();
 }
@@ -329,13 +320,20 @@ function endGesture(cancelled) {
   state.dragStack = [];
   state.facePaintVal = null;
   if (!before) return;
-  if (cancelled) { autoGrace.cancel(); autoGraceMissed = false; state.marks = before; refresh(); return; }
+  if (cancelled) {
+    autoGrace.cancel();
+    state.marks = before;
+    reconcileAuto(state.P, state.marks);
+    save();
+    refresh();
+    return;
+  }
   if (!sameMarks(before, state.marks)) {
     state.undo.push(before);
     state.redo = [];
     save();
   }
-  if (autoGraceMissed) commitAutoGrace();
+  autoGrace.flushIfMissed();
   if (state.solved) markSolved();
   updateButtons();
 }
@@ -343,7 +341,6 @@ function endGesture(cancelled) {
 function undo() {
   if (!state.undo.length) return;
   autoGrace.cancel();
-  autoGraceMissed = false;
   state.redo.push(snapshot());
   state.marks = state.undo.pop();
   reconcileAuto(state.P, state.marks);
@@ -353,7 +350,6 @@ function undo() {
 function redo() {
   if (!state.redo.length) return;
   autoGrace.cancel();
-  autoGraceMissed = false;
   state.undo.push(snapshot());
   state.marks = state.redo.pop();
   reconcileAuto(state.P, state.marks);
@@ -363,7 +359,6 @@ function redo() {
 function reset() {
   if (isPristine(state.marks)) return;
   autoGrace.cancel();
-  autoGraceMissed = false;
   state.undo.push(snapshot());
   state.redo = [];
   state.marks = freshMarks(state.P);
@@ -539,8 +534,10 @@ function recordBookSolved(book) {
 }
 
 function markSolved() {
+  const h = puzzleHash(state.P);
   const set = solvedSet();
-  set.add(puzzleHash(state.P));
+  if (set.has(h)) return;
+  set.add(h);
   store.set('ms_solved', JSON.stringify([...set]));
   recordBookSolved(state.book);
 }
@@ -636,7 +633,8 @@ function showHintToast(meta, text, extraLine, usedRoles, faceLabels = null) {
     el.append(more);
   }
 
-  const legendItems = (usedRoles || []).map((r) => [ROLE_COLORS[r] || 'var(--hint-focus)', ROLES[r] || r]);
+  const roleLabel = (r) => (r === 'clue' && state.P && !state.P.clues.length ? 'the clue' : (ROLES[r] || r));
+  const legendItems = (usedRoles || []).map((r) => [ROLE_COLORS[r] || 'var(--hint-focus)', roleLabel(r)]);
   if (faceLabels) {
     if (faceLabels.hasIn) legendItems.push([ROLE_COLORS.faceIn, faceLabels.inLabel]);
     if (faceLabels.hasOut) legendItems.push([ROLE_COLORS.faceOut, faceLabels.outLabel]);
@@ -696,10 +694,18 @@ function renderCurrentHint() {
   const item = h.hints[h.index];
   const full = h.stage >= 2;
   const roles = full ? item.roles : item.nudgeRoles;
+  const nudgeFaces = item.faces && ((item.faces.clue && item.faces.clue.length) || (item.faces.focus && item.faces.focus.length))
+    ? { in: [], out: [], clue: item.faces.clue || [], focus: item.faces.focus || [] }
+    : null;
+  const activeFaces = full ? item.faces : nudgeFaces;
   board.render(state.marks, analyse(), full
-    ? { roles, targets: item.targets, chain: item.chain, faces: item.faces }
-    : { roles });
+    ? { roles, targets: item.targets, chain: item.chain, faces: activeFaces }
+    : { roles, faces: activeFaces });
   const usedRoles = Object.keys(roles).filter((k) => roles[k].length > 0);
+  if (activeFaces) {
+    if (activeFaces.focus && activeFaces.focus.length && !usedRoles.includes('focus')) usedRoles.push('focus');
+    if (activeFaces.clue && activeFaces.clue.length && !usedRoles.includes('clue')) usedRoles.push('clue');
+  }
   const faceLabels = full && item.faces && (item.faces.in.length || item.faces.out.length)
     ? {
         hasIn: item.faces.in.length > 0,
@@ -900,10 +906,10 @@ function renderBrowse() {
   const book = state.book;
   if (!book) return;
   const solved = solvedSet();
-  const isDone = (P) => solved.has(puzzleHash(P));
+  const hashes = book.puzzles.map((P) => puzzleHash(P));
   const grid = $('browse-grid');
   grid.textContent = '';
-  const doneCount = book.puzzles.filter(isDone).length;
+  const doneCount = hashes.filter((h) => solved.has(h)).length;
   $('browse-summary').textContent = `${book.name}: ${doneCount} of ${book.puzzles.length} solved`;
 
   const TIER_ORDER = ['Beginner', 'Medium', 'Hard', 'Expert', 'Expert+ (beyond hints)'];
@@ -940,7 +946,7 @@ function renderBrowse() {
       grid.append(head);
       sectionNodes.push({ label: sec, el: head });
     }
-    const done = isDone(P), started = !done && hasSave(P);
+    const done = solved.has(hashes[i]), started = !done && store.get(`ms_save_${hashes[i]}`) !== null;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'browse-tile' + (done ? ' bt-solved' : started ? ' bt-in-progress' : '') + (i === state.idx ? ' bt-current' : '');
@@ -1017,11 +1023,15 @@ function renderBookPicker(path = []) {
   const solvedCounts = bookSolvedMap();
   const countText = (b) => {
     const total = b.count ?? (b.puzzles ? b.puzzles.length : null);
-    const done = solvedCounts[b.id] || 0;
-    return { text: total === null ? '' : done ? `${done} / ${total} solved` : `${total} puzzles`, done: total !== null && done > 0 && done === total };
+    const rawDone = solvedCounts[b.id] || 0;
+    const done = total !== null ? Math.min(rawDone, total) : rawDone;
+    return { text: total === null ? '' : done ? `${done} / ${total} solved` : `${total} puzzles`, done: total !== null && done > 0 && done >= total };
   };
   const pick = (b) => { bookModal.close(); if (!isCurrent(b)) openBook(b.id, 0); };
-  const show = (nextPath) => renderBookPicker(nextPath);
+  const show = (nextPath) => {
+    renderBookPicker(nextPath);
+    body.querySelector('.bp-back, .bp-card, .bp-book')?.focus();
+  };
 
   const card = (icon, name, blurb, meta, current, onClick) => {
     const node = el('button', 'bp-card' + (current ? ' bp-current' : ''));
@@ -1063,7 +1073,7 @@ function renderBookPicker(path = []) {
       const books = listed.filter((b) => bookPath(b)[0] === g.name);
       if (!books.length) continue;
       const only = books.length === 1 ? books[0] : null;
-      grid.append(card(g.icon, g.name, g.blurb || (only && only.blurb), only ? countText(only).text : plural(books.length, 'book'),
+      grid.append(card(g.icon, g.name, g.blurb || (only && (only.blurb || only.name)), only ? countText(only).text : plural(books.length, 'book'),
         books.some(isCurrent), () => (only ? pick(only) : show([g.name]))));
     }
     body.append(grid);
@@ -1144,7 +1154,16 @@ function renderHelpModal() {
     } else if (hasSlither) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines so each numbered square has that many loop segments around it, with no crossings or branches.';
     } else if (isFull && !hasClues) {
-      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b>, respecting all pre-filled segments and walls, with no crossings or branches.';
+      const hasGivenLines = Boolean(hasGivens && P.givens.some((g) => g.v === 1));
+      const hasWalls = Boolean(hasGivens && P.givens.some((g) => g.v === 0));
+      const givenPart = hasGivenLines && hasWalls
+        ? ', respecting all pre-filled segments and walls'
+        : hasGivenLines
+          ? ', respecting all pre-filled segments'
+          : hasWalls
+            ? ', respecting all permanent walls'
+            : '';
+      intro.innerHTML = `Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b>${givenPart}, with no crossings or branches.`;
     } else if (isFull) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and every circle, with no crossings or branches.';
     } else if (hasVoids) {
@@ -1216,7 +1235,6 @@ $('setting-color-lines').addEventListener('change', (e) => {
 $('setting-auto-x').checked = settings.autoX;
 $('setting-auto-x').addEventListener('change', (e) => {
   autoGrace.cancel();
-  autoGraceMissed = false;
   settings.autoX = e.target.checked;
   store.set('ms_autoX', settings.autoX ? '1' : '0');
   if (state.P) {
@@ -1237,7 +1255,6 @@ $('setting-auto-x').addEventListener('change', (e) => {
 $('setting-auto-shade').checked = settings.autoShade;
 $('setting-auto-shade').addEventListener('change', (e) => {
   autoGrace.cancel();
-  autoGraceMissed = false;
   settings.autoShade = e.target.checked;
   store.set('ms_autoShade', settings.autoShade ? '1' : '0');
   if (state.P) {
@@ -1316,6 +1333,7 @@ clearBtn.addEventListener('click', () => {
     clearBtn.textContent = 'Are you sure?';
     return;
   }
+  autoGrace.cancel();
   try {
     Object.keys(localStorage)
       .filter((k) => k.startsWith('ms_save_') || k === 'ms_solved' || k === 'ms_book_solved')
@@ -1353,7 +1371,7 @@ function renderOfflineStatus(status) {
   offlineActions.hidden = !status.enabled;
   offlineRefreshBtn.disabled = offlineBusy || navigator.onLine === false;
   if (!status.enabled) {
-    offlineDesc.textContent = `Save the app and ${count} (~7 MB) to play without internet`;
+    offlineDesc.textContent = `Save the app and ${count} (~9 MB) to play without internet`;
   } else if (status.total === 0) {
     offlineDesc.textContent = 'Ready offline';
   } else if (status.cached >= status.total) {

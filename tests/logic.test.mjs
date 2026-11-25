@@ -517,4 +517,7 @@ test('slitherlink & hybrids (slither+masyu, slither+fullBoard): brute-force cros
   assert.notEqual(puzzleHash(pA), puzzleHash(pFlip));
   assert.throws(() => compile({ name: 'bad_s', rows: 4, cols: 4, clues: [], slither: [{ r: 3, c: 0, n: 2 }] }), /out of bounds/);
   assert.throws(() => compile({ name: 'bad_n', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 4 }] }), /bad slitherlink/);
+  assert.throws(() => compile({ name: 'dup_s', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 1 }, { r: 0, c: 0, n: 2 }] }), /duplicate slitherlink/);
+  assert.throws(() => compile({ name: 'void_s', rows: 4, cols: 4, clues: [], voids: [{ r: 0, c: 0 }], slither: [{ r: 0, c: 0, n: 1 }] }), /exterior void/);
+  assert.throws(() => parseCsv('bad_row_only_two_cols,4'), /malformed CSV/);
 });

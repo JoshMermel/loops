@@ -141,8 +141,8 @@ export function randomLoop(rows, cols, rng, { targetFill = null, steps = null } 
     inS[idx] = cur ? 0 : 1;
     faceCount += cur ? -1 : 1;
   }
-  const { edges, loopCells } = toEdges();
-  return { edges, loopCells, faceCount };
+  const { edges, loopCells, emptyBorders, minQuadFill } = toEdges();
+  return { edges, loopCells, faceCount, emptyBorders, minQuadFill };
 }
 
 /** Find every cell on `edges` where a White ('W') or Black ('B') circle is legally allowed. */
@@ -897,11 +897,12 @@ function generateFullBoardPuzzle({
         const trial = current.slice(0, i).concat(current.slice(i + 1));
         if (solvedByRules(compile({ name, rows, cols, clues: trial, fullBoard: true }), fastUpto).solved) current = trial;
       }
+      const sortClues = (list) => list.slice().sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
       // Pass 2: exact-search pruning + binary search back to effectiveMaxTier
       let cachedRated = null;
       let skipPass2 = beginnerOnly;
       if (!skipPass2 && mediumOnly && Date.now() < deadline) {
-        const r1 = rate(compile({ name, rows, cols, clues: current, fullBoard: true }));
+        const r1 = rate(compile({ name, rows, cols, clues: sortClues(current), fullBoard: true }));
         if (r1.solved && r1.tier === 'Medium') { cachedRated = r1; skipPass2 = true; }
       }
       if (!skipPass2 && Date.now() < deadline) {
@@ -916,7 +917,7 @@ function generateFullBoardPuzzle({
           removed.push(current[i]);
           current = trial;
         }
-        const rated = rate(compile({ name, rows, cols, clues: current, fullBoard: true }));
+        const rated = rate(compile({ name, rows, cols, clues: sortClues(current), fullBoard: true }));
         if (wantUnsolved || isWithin(rated)) {
           cachedRated = rated;
         } else if (removed.length > 0 && Date.now() < deadline) {
@@ -924,7 +925,7 @@ function generateFullBoardPuzzle({
           let lo = 0, hi = removed.length, bestC = base.concat(removed), bestR = null;
           while (lo + 1 < hi && Date.now() < deadline) {
             const mid = (lo + hi) >> 1;
-            const cand = base.concat(removed.slice(mid));
+            const cand = sortClues(base.concat(removed.slice(mid)));
             const r = rate(compile({ name, rows, cols, clues: cand, fullBoard: true }));
             if (isWithin(r)) { lo = mid; bestC = cand; bestR = r; }
             else hi = mid;
@@ -936,18 +937,9 @@ function generateFullBoardPuzzle({
 
       if (Date.now() >= deadline) break;
       if (!current.some((c) => c.t === 'W') || !current.some((c) => c.t === 'B')) continue;
-      current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
-
-      // Must GENUINELY require the full-board rule (standard Masyu without fullBoard must have > 1 solution!)
-      const withoutFull = solve(compile({ name, rows, cols, clues: current }), { limit: 2, maxNodes: 20000 });
-      if (!withoutFull.exceeded && withoutFull.count === 1) continue;
+      current = sortClues(current);
 
       const P = compile({ name, rows, cols, clues: current, fullBoard: true });
-      const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
-      if (verify.exceeded || verify.count !== 1) continue;
-      const sol = verify.solutions[0];
-      if (!isSolved(P, sol.e)) continue;
-
       const rated = cachedRated || rate(P);
       if (wantUnsolved) { if (rated.solved) continue; }
       else if (!rated.solved) { if (!allowUnsolved) continue; }
@@ -955,6 +947,16 @@ function generateFullBoardPuzzle({
         if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
         if (targetTier && rated.tier !== targetTier) continue;
       }
+
+      // Must GENUINELY require the full-board rule (standard Masyu without fullBoard must have >= 2 solutions!)
+      const withoutFull = solve(compile({ name, rows, cols, clues: current }), { limit: 2, maxNodes: 50000, rng: rand });
+      if (withoutFull.count < 2) continue;
+
+      const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+      if (verify.exceeded || verify.count !== 1) continue;
+      const sol = verify.solutions[0];
+      if (!isSolved(P, sol.e)) continue;
+
       P.solution = encodeSolution(P, sol);
       P.rules = rated.rules;
       P.tier = rated.tier;
@@ -1448,7 +1450,7 @@ function generateSlitherPuzzle({
   const isHybrid = style === 'slither-masyu';
   if (isFull && ((rows * cols) & 1)) return null;
   const N = rows * cols;
-  const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
+  const pruneNodeCap = N >= 225 ? 8000 : N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
   const empty = compile({ name: 'esl', rows, cols, clues: [], fullBoard: isFull });
 
   const solvedByPropagate = (P) => {
@@ -1461,6 +1463,9 @@ function generateSlitherPuzzle({
   const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
   const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
   const reqQuadFill = rows >= 10 && cols >= 10 ? 0.35 : rows >= 8 && cols >= 8 ? 0.28 : 0;
+  const reqQuadItems = rows >= 10 && cols >= 10 ? Math.max(2, Math.floor((N / 4) * 0.08)) : 0;
+  const minClues = isHybrid ? (N >= 100 ? 6 : N >= 64 ? 5 : 3) : 0;
+  const minSlither = isHybrid ? (N >= 100 ? 8 : N >= 64 ? 6 : 4) : Math.max(4, Math.floor(N * 0.08));
 
   while (Date.now() < deadline) {
     let edges;
@@ -1469,168 +1474,152 @@ function generateSlitherPuzzle({
       if (sample.count === 0) continue;
       edges = sample.solutions[0].e;
     } else {
-      const grid = makeDualGrid(rows, cols);
-      const { fr, fc, F, inS, at, canToggle, toEdges } = grid;
-      inS[((rand() * fr) | 0) * fc + ((rand() * fc) | 0)] = 1;
-      let faceCount = 1;
-      const wantFrac = 0.44 + 0.14 * rand();
-      const steps = Math.max(160, F * 24);
-      for (let s = 0; s < steps; s++) {
-        const r = (rand() * fr) | 0, c = (rand() * fc) | 0;
-        const idx = r * fc + c;
-        const cur = inS[idx];
-        if (cur && faceCount <= 2) continue;
-        if (!canToggle(r, c)) continue;
-        const frac = faceCount / F;
-        if (!cur && frac > wantFrac + 0.12 && rand() < 0.72) continue;
-        if (cur && frac < wantFrac - 0.12 && rand() < 0.72) continue;
-        const orth = at(r - 1, c) + at(r, c + 1) + at(r + 1, c) + at(r, c - 1);
-        if (!cur && orth === 2 && rand() < 0.25) continue;
-        inS[idx] = cur ? 0 : 1;
-        faceCount += cur ? -1 : 1;
-      }
-      const res = toEdges();
+      const res = randomLoop(rows, cols, rand, {
+        targetFill: 0.44 + 0.14 * rand(),
+        steps: Math.max(160, (rows - 1) * (cols - 1) * 24),
+      });
       if (res.loopCells < minLoopCells || res.emptyBorders > 0) continue;
       if (reqQuadFill > 0 && res.minQuadFill < reqQuadFill) continue;
       edges = res.edges;
     }
 
-    let slither = allowedSlither(rows, cols, edges, empty);
-    let clues = [];
+    const slitherInit = allowedSlither(rows, cols, edges, empty);
+    let cluesInit = [];
     if (isHybrid) {
       const { whites, blacks } = allowedClues(rows, cols, edges, empty);
-      clues = whites.concat(blacks);
-      if (clues.length < 4) continue;
+      cluesInit = whites.concat(blacks);
+      if (cluesInit.length < Math.max(4, minClues)) continue;
     }
-    if (slither.length < 4) continue;
+    if (slitherInit.length < Math.max(4, minSlither)) continue;
+
+    // Canonical initial order (clues sorted by cell index, slither sorted by face index)
+    cluesInit.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+    slitherInit.sort((a, b) => (a.r * (cols - 1) + a.c) - (b.r * (cols - 1) + b.c));
 
     // Verify full pool is uniquely solvable before stripping
-    const P0 = compile({ name, rows, cols, clues, slither, fullBoard: isFull });
+    const P0 = compile({ name, rows, cols, clues: cluesInit, slither: slitherInit, fullBoard: isFull });
     let baseTight = solvedByPropagate(P0);
     if (!baseTight) {
       const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
       if (ex.exceeded || ex.count !== 1) continue;
     }
 
-    // Tag all removable items uniformly so hybrids strip a balanced mix of circles & face numbers
-    const makeItems = (cs, ss) => {
-      const arr = [];
-      for (const c of cs) arr.push({ kind: 'c', key: `c:${c.r}:${c.c}`, item: c });
-      for (const s of ss) arr.push({ kind: 's', key: `s:${s.r}:${s.c}`, item: s });
-      return arr;
-    };
-    const splitItems = (items) => {
+    // Track active items via O(1) Uint8Array mask (always extracts canonically sorted clues & slither!)
+    const totalItems = cluesInit.length + slitherInit.length;
+    const cLen = cluesInit.length;
+    const active = new Uint8Array(totalItems).fill(1);
+    let nC = cLen, nS = slitherInit.length;
+
+    const extractActive = (skipIdx = -1) => {
       const cs = [], ss = [];
-      for (const u of items) (u.kind === 'c' ? cs : ss).push(u.item);
+      for (let i = 0; i < cLen; i++) if (active[i] && i !== skipIdx) cs.push(cluesInit[i]);
+      for (let i = 0; i < slitherInit.length; i++) if (active[cLen + i] && cLen + i !== skipIdx) ss.push(slitherInit[i]);
       return { clues: cs, slither: ss };
     };
-    const sortOrder = (items) => {
-      const arr = items.slice();
+    const buildOrder = () => {
+      const idxs = [];
+      for (let i = 0; i < totalItems; i++) if (active[i]) idxs.push(i);
       if (isHybrid) {
-        // Slightly prefer stripping faces earlier so hybrids keep a balanced circle/number mix
-        const keyed = arr.map((u) => ({ u, k: (u.kind === 's' ? 0 : 0.22) + rand() }));
+        const keyed = idxs.map((i) => ({ i, k: (i >= cLen ? 0 : 0.22) + rand() }));
         keyed.sort((a, b) => a.k - b.k);
-        return keyed.map((x) => x.u);
+        return keyed.map((x) => x.i);
       }
-      return shuffle(arr, rand);
+      return shuffle(idxs, rand);
     };
-
-    const minClues = isHybrid ? (rows >= 8 ? 5 : 3) : 0;
-    const minSlither = isHybrid ? (rows >= 8 ? 6 : 4) : 4;
-    let items = makeItems(clues, slither);
-    let nC = clues.length, nS = slither.length;
 
     // Pass 0: ultra-fast propagation-only pruning
     if (baseTight) {
-      for (const u of sortOrder(items)) {
+      for (const idx of buildOrder()) {
         if (Date.now() >= deadline) break;
-        if (u.kind === 'c' && nC <= minClues) continue;
-        if (u.kind === 's' && nS <= minSlither) continue;
-        const trial = items.filter((x) => x.key !== u.key);
-        const { clues: tc, slither: ts } = splitItems(trial);
+        const isC = idx < cLen;
+        if (isC ? nC <= minClues : nS <= minSlither) continue;
+        const { clues: tc, slither: ts } = extractActive(idx);
         if (solvedByPropagate(compile({ name, rows, cols, clues: tc, slither: ts, fullBoard: isFull }))) {
-          items = trial;
-          if (u.kind === 'c') nC--; else nS--;
+          active[idx] = 0;
+          if (isC) nC--; else nS--;
         }
       }
     }
 
-    // Pass 1: sound human-rule pruning
-    for (const u of sortOrder(items)) {
+    // Pass 1: sound human-rule pruning (capped on large boards for fast scaling)
+    const p1Order = buildOrder();
+    const pass1Cap = N >= 200 ? 24 : p1Order.length;
+    for (let k = 0; k < p1Order.length && k < pass1Cap; k++) {
       if (Date.now() >= deadline) break;
-      if (u.kind === 'c' && nC <= minClues) continue;
-      if (u.kind === 's' && nS <= minSlither) continue;
-      const trial = items.filter((x) => x.key !== u.key);
-      const { clues: tc, slither: ts } = splitItems(trial);
+      const idx = p1Order[k];
+      const isC = idx < cLen;
+      if (isC ? nC <= minClues : nS <= minSlither) continue;
+      const { clues: tc, slither: ts } = extractActive(idx);
       if (solvedByRules(compile({ name, rows, cols, clues: tc, slither: ts, fullBoard: isFull }), fastUpto).solved) {
-        items = trial;
-        if (u.kind === 'c') nC--; else nS--;
+        active[idx] = 0;
+        if (isC) nC--; else nS--;
       }
     }
 
     // Pass 2: exact uniqueness pruning + binary-search rollback to stay within effectiveMaxTier
     let cachedRated = null;
     let skipPass2 = beginnerOnly;
+    let r1Pre = null;
     if (!skipPass2 && mediumOnly && Date.now() < deadline) {
-      const { clues: tc, slither: ts } = splitItems(items);
-      const r1 = rate(compile({ name, rows, cols, clues: tc, slither: ts, fullBoard: isFull }));
-      if (r1.solved && r1.tier === 'Medium') {
-        cachedRated = r1;
+      const { clues: tc, slither: ts } = extractActive();
+      r1Pre = rate(compile({ name, rows, cols, clues: tc, slither: ts, fullBoard: isFull }));
+      if (r1Pre.solved && r1Pre.tier === 'Medium') {
+        cachedRated = r1Pre;
         skipPass2 = true;
       }
     }
     if (!skipPass2 && Date.now() < deadline) {
-      const rem = sortOrder(items);
-      const maxStrips = deepStrip ? rem.length
+      const rem = buildOrder();
+      const maxStrips = N >= 225 && !wantUnsolved ? (deepStrip ? 8 : 4)
+        : deepStrip ? rem.length
         : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(2, Math.min(8, Math.ceil(rem.length * 0.30)))
         : Math.max(3, Math.min(12, Math.ceil(rem.length * 0.50)));
-      let stripped = 0;
+      const maxPass2Tries = N >= 200 && !wantUnsolved ? 40 : rem.length;
+      let stripped = 0, tried = 0;
       const removed = [];
-      for (const u of rem) {
-        if (Date.now() >= deadline || stripped >= maxStrips) break;
-        if (u.kind === 'c' && nC <= minClues) continue;
-        if (u.kind === 's' && nS <= minSlither) continue;
-        const trial = items.filter((x) => x.key !== u.key);
-        const { clues: tc, slither: ts } = splitItems(trial);
+      for (const idx of rem) {
+        if (Date.now() >= deadline || stripped >= maxStrips || tried >= maxPass2Tries) break;
+        const isC = idx < cLen;
+        if (isC ? nC <= minClues : nS <= minSlither) continue;
+        tried++;
+        const { clues: tc, slither: ts } = extractActive(idx);
         const exact = solve(compile({ name, rows, cols, clues: tc, slither: ts, fullBoard: isFull }), { limit: 2, maxNodes: pruneNodeCap });
         if (exact.exceeded || exact.count !== 1) continue;
-        items = trial;
-        if (u.kind === 'c') nC--; else nS--;
-        removed.push(u);
+        active[idx] = 0;
+        if (isC) nC--; else nS--;
+        removed.push(idx);
         stripped++;
       }
 
-      const { clues: cNow, slither: sNow } = splitItems(items);
-      const rated = rate(compile({ name, rows, cols, clues: cNow, slither: sNow, fullBoard: isFull }));
+      const { clues: cNow, slither: sNow } = extractActive();
+      const rated = (removed.length === 0 && r1Pre) ? r1Pre : rate(compile({ name, rows, cols, clues: cNow, slither: sNow, fullBoard: isFull }));
       if (wantUnsolved || isWithin(rated)) {
         cachedRated = rated;
       } else if (removed.length > 0 && Date.now() < deadline) {
-        const strippedBase = items;
         let lo = 0, hi = removed.length;
-        let bestItems = strippedBase.concat(removed);
+        let bestMid = removed.length;
         let bestRated = null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
-          const cand = strippedBase.concat(removed.slice(mid));
-          const { clues: cc, slither: cs } = splitItems(cand);
+          for (let j = mid; j < removed.length; j++) active[removed[j]] = 1;
+          const { clues: cc, slither: cs } = extractActive();
+          for (let j = mid; j < removed.length; j++) active[removed[j]] = 0;
           const r = rate(compile({ name, rows, cols, clues: cc, slither: cs, fullBoard: isFull }));
           if (isWithin(r)) {
             lo = mid;
-            bestItems = cand;
+            bestMid = mid;
             bestRated = r;
           } else {
             hi = mid;
           }
         }
-        items = bestItems;
+        for (let j = bestMid; j < removed.length; j++) active[removed[j]] = 1;
         cachedRated = bestRated;
       }
     }
 
     if (Date.now() >= deadline) break;
-    const fin = splitItems(items);
-    fin.clues.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
-    fin.slither.sort((a, b) => (a.r * (cols - 1) + a.c) - (b.r * (cols - 1) + b.c));
+    const fin = extractActive();
     if (fin.slither.length < minSlither) continue;
     const distinctDigits = new Set(fin.slither.map((s) => s.n));
     if (distinctDigits.size < 2) continue;
@@ -1640,26 +1629,17 @@ function generateSlitherPuzzle({
       const nB = fin.clues.filter((c) => c.t === 'B').length;
       if (fin.clues.length < minClues || (rows >= 5 && cols >= 5 && (nW < 1 || nB < 1))) continue;
     }
+    if (reqQuadItems > 0) {
+      const midR = rows >> 1, midC = cols >> 1;
+      const qCnt = [0, 0, 0, 0];
+      for (const c of fin.clues) qCnt[(c.r >= midR ? 2 : 0) + (c.c >= midC ? 1 : 0)]++;
+      for (const s of fin.slither) qCnt[(s.r >= midR ? 2 : 0) + (s.c >= midC ? 1 : 0)]++;
+      if (Math.min(...qCnt) < reqQuadItems) continue;
+    }
 
     const P = compile({ name, rows, cols, clues: fin.clues, slither: fin.slither, fullBoard: isFull });
 
-    // Independent exact verification
-    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
-    if (verify.exceeded || verify.count !== 1) continue;
-    const sol = verify.solutions[0];
-    if (!isSolved(P, sol.e)) continue;
-
-    // Hybrid necessity checks
-    if (isHybrid) {
-      const onlySlither = solve(compile({ name: `${name}_s`, rows, cols, clues: [], slither: fin.slither }), { limit: 2, maxNodes: verifyMaxNodes });
-      if (onlySlither.exceeded || onlySlither.count < 2) continue;
-      const onlyMasyu = solve(compile({ name: `${name}_m`, rows, cols, clues: fin.clues, slither: [] }), { limit: 2, maxNodes: verifyMaxNodes });
-      if (onlyMasyu.exceeded || onlyMasyu.count < 2) continue;
-    } else if (isFull) {
-      const noFull = solve(compile({ name: `${name}_nf`, rows, cols, clues: [], slither: fin.slither, fullBoard: false }), { limit: 2, maxNodes: verifyMaxNodes });
-      if (noFull.exceeded || noFull.count < 2) continue;
-    }
-
+    // Check tier filter BEFORE expensive exact verification & necessity searches
     const rated = cachedRated || rate(P);
     if (wantUnsolved) {
       if (rated.solved) continue;
@@ -1668,6 +1648,25 @@ function generateSlitherPuzzle({
     } else {
       if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
       if (targetTier && rated.tier !== targetTier) continue;
+    }
+
+    // Independent exact verification
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
+
+    // Hybrid necessity checks (fast randomized search first, fallback to higher cap)
+    const hasSecondSol = (altP) => {
+      let alt = solve(altP, { limit: 2, maxNodes: 50000, rng: rand });
+      if (alt.count < 2 && alt.exceeded) alt = solve(altP, { limit: 2, maxNodes: verifyMaxNodes, rng: rand });
+      return alt.count >= 2;
+    };
+    if (isHybrid) {
+      if (!hasSecondSol(compile({ name: `${name}_s`, rows, cols, clues: [], slither: fin.slither }))) continue;
+      if (!hasSecondSol(compile({ name: `${name}_m`, rows, cols, clues: fin.clues, slither: [] }))) continue;
+    } else if (isFull) {
+      if (!hasSecondSol(compile({ name: `${name}_nf`, rows, cols, clues: [], slither: fin.slither, fullBoard: false }))) continue;
     }
 
     P.solution = encodeSolution(P, sol);

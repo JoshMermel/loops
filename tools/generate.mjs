@@ -11,7 +11,7 @@ import path from 'node:path';
 import { toCsvRow, parseCsv, CSV_HEADER, symmetryKey } from '../js/logic.js';
 import { generatePuzzle, makeRng } from '../js/generator.js';
 import { TIERS } from '../js/rating.js';
-import { arg, verifyPuzzle } from './_cli.mjs';
+import { arg, repoRoot, verifyPuzzle } from './_cli.mjs';
 
 const sizeStr = arg('size', '8x8');
 const sizeParts = sizeStr.toLowerCase().split('x');
@@ -28,7 +28,16 @@ if (!Number.isFinite(count) || count < 1 || !Number.isFinite(seed) || !Number.is
   console.error('Invalid numeric flag (--count, --seed, --budget, --per-puzzle-ms must be valid positive numbers)');
   process.exit(1);
 }
-const style = arg('style', 'balanced'); // balanced | white | black | sparse | gray-mixed | gray-all | full-masyu | full-lines | full-walls | full-mixed
+const VALID_STYLES = new Set([
+  'balanced', 'white', 'black', 'sparse', 'gray-mixed', 'gray-all',
+  'full-masyu', 'full-lines', 'full-walls', 'full-mixed',
+  'shaped', 'swiss-cheese', 'slither', 'slither-masyu', 'slither-full',
+]);
+const style = arg('style', 'balanced');
+if (!VALID_STYLES.has(style)) {
+  console.error(`Invalid --style "${style}" (valid: ${[...VALID_STYLES].join(', ')})`);
+  process.exit(1);
+}
 const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | cookie-angle | cookie:<deg> | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
 if (minFill !== null && (!Number.isFinite(minFill) || minFill <= 0 || minFill > 1)) {
@@ -52,7 +61,7 @@ if (keepFrac !== null && (!Number.isFinite(keepFrac) || keepFrac < 0 || keepFrac
   process.exit(1);
 }
 const prefix = arg('prefix', `${layout !== 'none' ? layout : style}_${cols}x${rows}`);
-const defaultOut = path.join('tools', 'library', `${prefix}.csv`);
+const defaultOut = path.join(repoRoot(import.meta.url), 'tools', 'library', `${prefix}.csv`);
 const outPath = arg('out', defaultOut);
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -99,7 +108,12 @@ while (added < count && Date.now() < deadline) {
   // Independent re-verification before storing (never trust the generator's own claim)
   const r = verifyPuzzle(p);
   if (!r) continue;
-  if (tier === 'Expert+' ? r.solved : !r.solved) continue;
+  if (tier === 'Expert+') {
+    if (r.solved) continue;
+  } else {
+    if (!r.solved) continue;
+    if (tier !== 'any' && r.tier !== tier) continue;
+  }
   p.rules = r.rules;
   p.tier = r.tier;
   p.score = r.score;
@@ -109,7 +123,11 @@ while (added < count && Date.now() < deadline) {
   added++;
   seq++;
   tierCounts[p.tier] = (tierCounts[p.tier] || 0) + 1;
-  process.stdout.write(`[${added}/${count}] ${p.name} (${p.clues.length} clues) -> ${p.tier} / ${p.rules} / ${p.score}\n`);
+  const parts = [];
+  if (p.clues.length) parts.push(`${p.clues.length} circles`);
+  if (p.slither && p.slither.length) parts.push(`${p.slither.length} numbers`);
+  if (p.givens && p.givens.length) parts.push(`${p.givens.length} givens`);
+  process.stdout.write(`[${added}/${count}] ${p.name} (${parts.join(', ') || '0 clues'}) -> ${p.tier} / ${p.rules} / ${p.score}\n`);
 }
 
 console.log(`Done: added ${added} puzzles to ${outPath} (tiers: B=${tierCounts.Beginner} M=${tierCounts.Medium} H=${tierCounts.Hard} E=${tierCounts.Expert})`);

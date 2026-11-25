@@ -172,10 +172,17 @@ function describeContradiction(P, broke, finalState) {
     case 'grayBroken':
       return { text: `the gray circle at ${cellName(P, broke.cell)} cannot be either white or black`, cells: [broke.cell], area: [] };
     case 'slitherBroken':
-      return { text: `the ${broke.n} square ${faceName(P, broke.face)} cannot reach ${broke.n} segments`, cells: [], area: [] };
+      return {
+        text: broke.over
+          ? `the ${broke.n} square ${faceName(P, broke.face)} ends up with too many segments`
+          : `the ${broke.n} square ${faceName(P, broke.face)} cannot reach ${broke.n} segment${broke.n === 1 ? '' : 's'}`,
+        cells: [],
+        area: [],
+        face: broke.face,
+      };
     case 'earlyClose':
       return broke.face !== undefined
-        ? { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [] }
+        ? { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [], face: broke.face }
         : { text: `the loop closes early while ${cellName(P, broke.cell)} is still outside it`, cells: [broke.cell], area: [] };
     case 'twoLoops':
       return { text: 'two separate closed loops form', cells: [], area: [] };
@@ -349,7 +356,12 @@ export function explainStep(P, step, st = null) {
       roles.path.push(info.a, info.b);
       nudgeRoles.path.push(info.a, info.b);
       nudge = `Look at ${cellName(P, info.a)} and ${cellName(P, info.b)} — check if they are both ends of the same open path.`;
-      text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path while other loop cells lie outside it, so ${edgeName(P, info.edge)} cannot connect them.`;
+      if (info.slitherFace !== undefined && info.slitherFace >= 0) {
+        faces = { in: [], out: [], clue: [info.slitherFace], focus: [] };
+        text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the ${P.slitherNum[info.slitherFace]} square ${faceName(P, info.slitherFace)} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
+      } else {
+        text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path while other loop cells lie outside it, so ${edgeName(P, info.edge)} cannot connect them.`;
+      }
       break;
     }
     case 'samePathExits': {
@@ -506,7 +518,7 @@ export function explainStep(P, step, st = null) {
         : info.clues && info.clues.length
           ? `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`
           : `Look at ${edgeName(P, info.edge)} — use relative Inside/Outside shading to compare the squares on either side.`;
-      faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: !!info.anchored };
+      faces = { in: info.facesIn || [], out: info.facesOut || [], clue: info.slitherFaces || [], focus: [], anchored: !!info.anchored };
       const label = (par) => (info.anchored ? (par === 1 ? 'Inside' : 'Outside') : (par === 1 ? 'Side A' : 'Side B'));
       const describeLink = (s, destPar) => {
         const dst = faceName(P, s.to);
@@ -552,7 +564,7 @@ export function explainStep(P, step, st = null) {
       const sideStr = info.val === E_ON
         ? `puts opposite sides (${label(info.parA)} and ${label(info.parB)}) across ${edgeName(P, info.edge)}, so draw ${edgeName(P, info.edge)}`
         : `puts ${label(info.parA)} on both sides of ${edgeName(P, info.edge)}, so cross out ${edgeName(P, info.edge)}`;
-      const heading = isSl ? 'Inside/outside shading' : 'Circle shading';
+      const heading = isSl || !(info.clues && info.clues.length) ? 'Inside/outside shading' : 'Circle shading';
       text = chainDesc
         ? `${heading}: ${chainDesc}. That ${sideStr}.`
         : `${heading} ${sideStr}.`;
@@ -728,6 +740,7 @@ export function explainStep(P, step, st = null) {
       const end = describeContradiction(P, info.broke, finalState);
       roles.problem.push(...end.cells);
       roles.area.push(...end.area);
+      if (end.face !== undefined && end.face >= 0) faces = { in: [], out: [], clue: [end.face], focus: [] };
       const chainText = clauses.length
         ? `: then ${clauses.join('; then ')}; and finally ${end.text}.`
         : `: immediately ${end.text}.`;

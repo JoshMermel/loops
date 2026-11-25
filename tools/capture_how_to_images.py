@@ -30,6 +30,9 @@ def capture(page, base, ex, out_path):
         ex["puzzle"],
     )
     save = {"e": ex["edges"], "ae": "0" * len(ex["edges"])}
+    if ex.get("grays"):
+        save["g"] = ex["grays"]
+        save["ag"] = "0" * len(ex["grays"])
     page.evaluate(
         """([key, save]) => {
             localStorage.setItem(key, JSON.stringify(save));

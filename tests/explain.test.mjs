@@ -358,8 +358,9 @@ test('every armory rule produces a non-spoiling nudge and at least one nudgeRole
       seenRules.add(s.rule);
       assert.ok(exp.nudge && exp.nudge.length > 15, `missing nudge for ${s.rule}`);
       assert.notEqual(exp.nudge, exp.text, `nudge should not duplicate full text for ${s.rule}`);
-      const count = Object.values(exp.nudgeRoles).reduce((acc, arr) => acc + arr.length, 0);
-      assert.ok(count > 0, `nudgeRoles must highlight at least one cell for ${s.rule}`);
+      const cellCount = Object.values(exp.nudgeRoles).reduce((acc, arr) => acc + arr.length, 0);
+      const faceCount = exp.faces ? ((exp.faces.focus?.length || 0) + (exp.faces.clue?.length || 0)) : 0;
+      assert.ok(cellCount + faceCount > 0, `nudge must highlight at least one cell or face for ${s.rule}`);
       assert.equal(exp.nudgeRoles.problem.length, 0, `nudgeRoles.problem should be empty for ${s.rule}`);
       assert.equal(exp.nudgeRoles.exit.length, 0, `nudgeRoles.exit should be empty for ${s.rule}`);
       assert.ok(!/\b(So draw|So cross out|must go two cells|must use)\b/.test(exp.nudge), `nudge leaked answer for ${s.rule}: ${exp.nudge}`);
@@ -603,4 +604,34 @@ test('Slitherlink & hybrid hints: end-to-end solving, explanations, nudges, and 
   }
   assert.ok(solvedPure >= 5, `expected >= 5 solved pure Slitherlink hint runs, got ${solvedPure}`);
   assert.ok(solvedHybrid >= 5, `expected >= 5 solved Slitherlink+Masyu hint runs, got ${solvedHybrid}`);
+
+  // Direct wrong-mark detection, slitherBroken over-count text, and singular pluralization check
+  const Pwrong = compile({
+    name: 'sl_wrong', rows: 4, cols: 4, clues: [],
+    slither: [{ r: 0, c: 0, n: 0 }, { r: 1, c: 1, n: 3 }, { r: 2, c: 2, n: 1 }],
+  });
+  const mBad = { edges: new Uint8Array(Pwrong.numEdges) };
+  mBad.edges[Pwrong.faceEdges[0 * 4 + 0]] = 1; // violates 0 square!
+  const hw = computeHint(Pwrong, mBad);
+  assert.equal(hw.kind, 'wrong');
+  assert.equal(hw.contradiction, true);
+
+  const expOver = explainStep(Pwrong, {
+    rule: 'imagineLocal', tier: 'Medium', weight: 22,
+    sets: [['e', Pwrong.faceEdges[0], E_OFF]],
+    info: { edge: Pwrong.faceEdges[0], hyp: E_ON, deduce: E_OFF, steps: [], broke: { kind: 'slitherBroken', face: 0, n: 0, over: true } },
+  });
+  assert.ok(expOver.text.includes('too many segments'), `expected over-count text, got: ${expOver.text}`);
+  assert.ok(expOver.faces && expOver.faces.clue.includes(0));
+
+  const expSing = explainStep(Pwrong, {
+    rule: 'imagineLocal', tier: 'Medium', weight: 24,
+    sets: [['e', Pwrong.faceEdges[0], E_OFF]],
+    info: {
+      edge: Pwrong.faceEdges[0], hyp: E_ON, deduce: E_OFF,
+      steps: [{ rule: 'slitherCount', info: { face: 8, n: 1, mode: 'done' }, sets: [] }],
+      broke: { kind: 'slitherBroken', face: 4, n: 1, over: false },
+    },
+  });
+  assert.equal(expSing.text.includes('1 segments'), false, `pluralization bug: ${expSing.text}`);
 });

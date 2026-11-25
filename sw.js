@@ -1,7 +1,7 @@
 // Opt-in service worker for offline Masyu play.
 // Registered only when the user enables "Offline play" in Settings.
 const CACHE_PREFIX = 'masyu-';
-const APP_CACHE = 'masyu-app-v1';
+const APP_CACHE = 'masyu-app-v2';
 const BOOK_CACHE = 'masyu-books-v1';
 
 const APP_SHELL = [

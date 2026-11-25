@@ -126,12 +126,14 @@ if (process.argv.includes('--worker')) {
       if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
     }
 
-    // Verify mutual necessity on Slitherlink + Masyu hybrids: neither clue set alone may be unique
-    if (P.hasSlither && P.clueCells.length > 0 && !P.fullBoard && !entry.hidden) {
+    // Verify mutual necessity on Slitherlink + Masyu hybrids (including 3-way with fullBoard):
+    // neither circles nor Slitherlink numbers alone may be redundant
+    if (P.hasSlither && P.clueCells.length > 0 && !entry.hidden) {
       const baseOpts = {
         name: raw.name,
         rows: raw.rows,
         cols: raw.cols,
+        ...(P.fullBoard ? { fullBoard: true } : {}),
         ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
       };
@@ -233,10 +235,14 @@ await new Promise((resolve) => {
         if (code !== 0) {
           problems.push(`worker failed on ${t.id} ${t.range} (exit ${code})`);
         } else {
-          const res = JSON.parse(buf.trim());
-          checked += res.checked;
-          exhaustive += res.exhaustive;
-          problems.push(...res.bad);
+          try {
+            const res = JSON.parse(buf.trim());
+            checked += res.checked;
+            exhaustive += res.exhaustive;
+            problems.push(...res.bad);
+          } catch (err) {
+            problems.push(`worker output parse failed on ${t.id} ${t.range}: ${err.message}`);
+          }
         }
         next();
       });

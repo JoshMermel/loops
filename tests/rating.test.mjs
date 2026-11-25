@@ -9,7 +9,8 @@ import {
 } from '../js/logic.js';
 import { RULES, rate, solvedByRules, nextSteps, applySets, TIERS, detectSymmetries, findSymmetry } from '../js/rating.js';
 import { explainStep } from '../js/explain.js';
-import { findFaceShade, findFaceCircle } from '../js/faceparity.js';
+import { findFaceShade, findFaceCircle, findFaceSlither, buildFaceParity } from '../js/faceparity.js';
+import { classifyImagine } from '../js/imagine.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -829,14 +830,59 @@ test('Slitherlink rules & faceSlither fire cleanly and are 100% sound on pure, +
   assert.equal(rC2[0].sets.length, 2);
   assert.ok(rC2[0].sets.every((s) => s[2] === E_ON));
 
-  // Adjacent 3-3 negative guard: when ONLY two adjacent 3s exist, do NOT fire (1x2 rectangle is a valid loop)
+  // Adjacent 3-3 negative guard: when ONLY two adjacent 3s exist, OR when surrounded ONLY by adjacent 1s
+  // (which a 1x2 rectangle loop satisfies!), do NOT fire and do NOT report a face-parity conflict!
   const PadjOnly = compile({ name: 'sa_only', rows: 4, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 1, c: 2, n: 3 }] });
   assert.equal(RULES.find((r) => r.id === 'slitherAdjacent3').find(PadjOnly, initialState(PadjOnly)).length, 0);
+  const PadjOnes = compile({
+    name: 'sa_ones', rows: 4, cols: 5, clues: [],
+    slither: [
+      { r: 1, c: 1, n: 3 }, { r: 1, c: 2, n: 3 },
+      { r: 0, c: 1, n: 1 }, { r: 0, c: 2, n: 1 },
+      { r: 1, c: 0, n: 1 }, { r: 1, c: 3, n: 1 },
+      { r: 2, c: 1, n: 1 }, { r: 2, c: 2, n: 1 },
+    ],
+  });
+  assert.equal(solve(PadjOnes, { limit: 2 }).count, 1, '1x2 box must be the unique solution');
+  assert.equal(RULES.find((r) => r.id === 'slitherAdjacent3').find(PadjOnes, initialState(PadjOnes)).length, 0);
+  assert.equal(buildFaceParity(PadjOnes, initialState(PadjOnes), { useCircles: true, useSlither: true }).conflict, false);
+  assert.equal(rate(PadjOnes).solved, true, 'rate() must solve adjacent 3-3 surrounded by 1s cleanly');
   // With a third clue outside, adjacent 3-3 fires cleanly!
   const Padj = compile({ name: 'sa', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 1, c: 2, n: 3 }, { r: 3, c: 3, n: 1 }] });
   const rAdj = RULES.find((r) => r.id === 'slitherAdjacent3').find(Padj, initialState(Padj));
   assert.equal(rAdj.length, 1);
   assert.equal(rAdj[0].sets.length, 5);
+
+  // Direct slither3LineIn, slither1LineIn, symmetric corner-2, and faceSlither checks
+  const P3in = compile({ name: 's3in', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }] });
+  const st3in = initialState(P3in);
+  st3in.e[P3in.ed[(1 * 5 + 1) * 4 + 0]] = E_ON; // line enters NW corner (1,1) from north
+  const r3in = RULES.find((r) => r.id === 'slither3LineIn').find(P3in, st3in);
+  assert.equal(r3in.length, 1);
+  assert.equal(r3in[0].sets.length, 3);
+
+  const P1in = compile({ name: 's1in', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 1 }] });
+  const st1in = initialState(P1in);
+  st1in.e[P1in.ed[(1 * 5 + 1) * 4 + 0]] = E_ON;
+  st1in.e[P1in.ed[(1 * 5 + 1) * 4 + 3]] = E_OFF;
+  const r1in = RULES.find((r) => r.id === 'slither1LineIn').find(P1in, st1in);
+  assert.equal(r1in.length, 1);
+  assert.equal(r1in[0].sets.length, 2);
+
+  // faceSlither parity: 0 at (0,0) makes (0,1) Outside (same as top border) -> 2 at (0,1) has 2 SAME neighbors -> forces bottom & right ON
+  const Pfs = compile({ name: 'sfs', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 0 }, { r: 0, c: 1, n: 2 }, { r: 2, c: 2, n: 2 }] });
+  const rfs = findFaceSlither(Pfs, initialState(Pfs));
+  assert.ok(rfs.length >= 2, 'findFaceSlither must deduce forced edges from 0-2 border parity');
+
+  // Regression: classifyImagine with a 'g' (gray cell) step must treat idx as a cell, not an edge index
+  const Pgray = compile({ name: 'gcls', rows: 5, cols: 5, clues: [{ r: 4, c: 4, t: 'G' }] });
+  const clsG = classifyImagine(
+    Pgray, initialState(Pgray), -1,
+    [{ rule: 'grayMustBeBlack', sets: [['g', 24, BLACK]], info: { cell: 24 } }],
+    { kind: 'blackBroken', cell: 24 }, false, 24,
+  );
+  assert.equal(clsG.rule, 'imagineLocal');
+  assert.equal(clsG.maxDist, 0);
 
   // Diagonal 3-3 and diagonal 3-2-3
   const Pdiag3 = compile({ name: 'sd3', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 2, c: 2, n: 3 }] });
