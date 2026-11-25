@@ -694,6 +694,15 @@ export class Board {
     if (!this.gesture || e.pointerId !== this.gesture.id) return;
     this.gesture = null;
     try { this.el.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (e.pointerType === 'touch') {
+      this.hoverCell = -1; this.hoverEdge = -1; this.hoverFace = -1;
+    } else {
+      const c = this.coordsFromEvent(e);
+      const hit = c ? hitTestCoords(this.P, c.gx, c.gy) : null;
+      if (!hit) { this.hoverCell = -1; this.hoverEdge = -1; this.hoverFace = -1; }
+      else if (hit.kind === 'face') { this.hoverCell = -1; this.hoverEdge = -1; this.hoverFace = hit.face; }
+      else { this.hoverCell = hit.cell; this.hoverEdge = hit.kind === 'edge' ? hit.edge : -1; this.hoverFace = -1; }
+    }
     this.h.onEnd(false);
     if (this.marks) this.render(this.marks, this.info, this.hint);
   }

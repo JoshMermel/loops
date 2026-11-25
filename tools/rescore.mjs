@@ -73,8 +73,9 @@ if (!isMainThread) {
 
   let next = 0;
   const pending = new Map();
+  const workersDone = new WeakSet();
   const feed = (w) => {
-    if (next >= tasks.length) { w.terminate(); return; }
+    if (next >= tasks.length) { workersDone.add(w); w.terminate(); return; }
     const id = next++;
     pending.set(id, tasks[id]);
     w.postMessage({ id, p: tasks[id].book.ps[tasks[id].i] });
@@ -92,6 +93,12 @@ if (!isMainThread) {
       feed(w);
     });
     w.on('error', (e) => { console.error(e); process.exit(1); });
+    w.on('exit', (code) => {
+      if (!workersDone.has(w)) {
+        console.error(`rescore worker exited unexpectedly (code ${code})`);
+        process.exit(1);
+      }
+    });
     feed(w);
   }
 }

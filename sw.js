@@ -98,9 +98,13 @@ function isBookCsv(url) {
 
 async function handleBookRequest(event, request) {
   const cache = await caches.open(BOOK_CACHE);
-  const cached = request.cache === 'reload' ? null : await cache.match(request);
+  const isReload = request.cache === 'reload';
+  const cached = isReload ? null : await cache.match(request);
   const networkPromise = fetch(request).then(async (res) => {
-    if (isCacheable(res)) await safePut(cache, request, res.clone());
+    if (isCacheable(res)) {
+      if (isReload) await cache.put(request, res.clone());
+      else await safePut(cache, request, res.clone());
+    }
     return res;
   });
   if (cached) {
@@ -116,7 +120,7 @@ async function handleNavigation(request, url) {
   const rootNav = isAppRootNavigation(url);
   try {
     const raw = await fetch(request);
-    const res = raw.redirected ? await cleanResponse(raw) : raw;
+    const res = raw.redirected && isCacheable(raw) ? await cleanResponse(raw) : raw;
     if (isCacheable(res)) {
       await safePut(cache, rootNav ? indexUrl : request, res.clone());
     }

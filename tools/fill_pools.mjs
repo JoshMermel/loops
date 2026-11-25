@@ -464,8 +464,14 @@ if (!isMainThread) {
       }));
     }
 
-    await Promise.all(donePromises);
-    flush();
+    try {
+      await Promise.all(donePromises);
+    } finally {
+      for (const w of workers) {
+        try { w.postMessage({ stop: true }); } catch { /* ignore */ }
+      }
+      flush();
+    }
     const dt = ((Date.now() - t0) / 1000).toFixed(1);
     console.log(`[done] ${job.pool}: +${added} in ${dt}s | ${fmtCounts()}`);
   }

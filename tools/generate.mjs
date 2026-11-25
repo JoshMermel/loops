@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { toCsvRow, parseCsv, CSV_HEADER, symmetryKey } from '../js/logic.js';
 import { generatePuzzle, makeRng } from '../js/generator.js';
+import { TIERS } from '../js/rating.js';
 import { arg, verifyPuzzle } from './_cli.mjs';
 
 const sizeStr = arg('size', '8x8');
@@ -18,15 +19,28 @@ if (!cols || !rows || cols < 4 || rows < 4) {
   console.error(`Invalid --size "${sizeStr}" (use COLSxROWS, each >= 4)`);
   process.exit(1);
 }
-const count = +arg('count', 10);
-const seed = +arg('seed', 1);
+const count = Math.trunc(+arg('count', 10));
+const seed = Math.trunc(+arg('seed', 1));
 const budgetSec = +arg('budget', 120);
 const perPuzzleMs = +arg('per-puzzle-ms', 15000);
+if (!Number.isFinite(count) || count < 1 || !Number.isFinite(seed) || !Number.isFinite(budgetSec) || budgetSec <= 0 || !Number.isFinite(perPuzzleMs) || perPuzzleMs <= 0) {
+  console.error('Invalid numeric flag (--count, --seed, --budget, --per-puzzle-ms must be valid positive numbers)');
+  process.exit(1);
+}
 const style = arg('style', 'balanced'); // balanced | white | black | sparse
 const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
 const tier = arg('tier', 'any');        // any | Beginner | Medium | Hard | Expert | Expert+
 const maxTier = arg('max-tier', 'Expert');
+const validTiers = new Set(['any', ...TIERS, 'Expert+']);
+if (!validTiers.has(tier)) {
+  console.error(`Invalid --tier "${tier}" (valid: ${[...validTiers].join(', ')})`);
+  process.exit(1);
+}
+if (!TIERS.includes(maxTier)) {
+  console.error(`Invalid --max-tier "${maxTier}" (valid: ${TIERS.join(', ')})`);
+  process.exit(1);
+}
 const keepFrac = arg('keep', null) !== null ? +arg('keep') : null;
 const prefix = arg('prefix', `${layout !== 'none' ? layout : style}_${cols}x${rows}`);
 const defaultOut = path.join('tools', 'library', `${prefix}.csv`);

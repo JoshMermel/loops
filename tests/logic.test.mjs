@@ -252,8 +252,15 @@ test('incremental propagate(P, st, seedEdge) matches full propagate() and compil
   compile(raw);
   assert.equal(raw._ecOff, null, 'compile() must reset cached CSR edge-clue table');
 
-  // Invalid board dimensions must throw cleanly
+  // Invalid board dimensions, malformed clues, and corrupt/short solutions are handled cleanly
   for (const bad of [{ rows: NaN, cols: 4 }, { rows: 1, cols: 4 }, { rows: 4, cols: 0 }, { rows: 3.5, cols: 4 }]) {
     assert.throws(() => compile({ name: 'bad', ...bad, clues: [] }), /invalid board size/);
   }
+  assert.throws(() => compile({ name: 'badc', rows: 4, cols: 4, clues: [{ r: NaN, c: 1, t: 'W' }] }), /clue out of bounds/);
+  assert.throws(() => compile({ name: 'badf', rows: 4, cols: 4, clues: [{ r: 1.5, c: 1, t: 'W' }] }), /clue out of bounds/);
+  for (const s of ['foo:2:W', ':2:W', '1.5:2:W', '1:2:W:junk']) {
+    assert.throws(() => parseCsv(`bad,4,4,${s},,,,`), /bad clue/);
+  }
+  const shortDec = decodeSolution(P, '6a');
+  assert.equal(shortDec.cell[P.N - 1], 1, 'trailing cells on short solution must stay OFF, not LOOP');
 });

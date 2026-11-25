@@ -397,7 +397,7 @@ test('named Medium/Hard pattern rules fire cleanly and respect negative/boundary
   const rBnecFinal = RULES.find((r) => r.id === 'blackNoEarlyClose').find(P5final, st5f);
   assert.equal(rBnecFinal.length, 0, 'blackNoEarlyClose must not fire on final loop close');
 
-  // 9. corridorNoEarlyClose must NOT fire when closing final loop or on length-1 corridor
+  // 9. corridorNoEarlyClose must NOT fire when closing final loop
   const P8final = compile({ name: 'cnec_final', rows: 6, cols: 6, clues: [] });
   const st8f = initialState(P8final);
   for (const [r1, c1, r2, c2] of [[2, 2, 1, 2], [1, 2, 1, 3], [1, 3, 2, 3]]) st8f.e[eBetween(P8final, r1, c1, r2, c2)] = E_ON;
@@ -443,4 +443,14 @@ test('named Medium/Hard pattern rules fire cleanly and respect negative/boundary
   const s3b = RULES.find((r) => r.id === 'blackWhiteNoTurn').find(P3s, st3b);
   assert.equal(s3b.length, 1);
   assert.equal(s3b[0].info.reason, 'blocked');
+
+  // 13. parityPocket and chokepoint bail with [] on already-contradictory states (never emit bogus/opposing edges)
+  const Pbad = compile({ name: 'bad_topo', rows: 6, cols: 6, clues: [{ r: 2, c: 4, t: 'W' }, { r: 4, c: 4, t: 'W' }] });
+  const stBad = initialState(Pbad);
+  stBad.e[eBetween(Pbad, 1, 1, 2, 1)] = E_ON;
+  stBad.e[eBetween(Pbad, 0, 1, 0, 2)] = E_OFF;
+  stBad.e[eBetween(Pbad, 1, 1, 1, 2)] = E_OFF;
+  stBad.e[eBetween(Pbad, 1, 0, 2, 0)] = E_OFF;
+  assert.equal(RULES.find((r) => r.id === 'parityPocket').find(Pbad, stBad, {}).length, 0);
+  assert.equal(RULES.find((r) => r.id === 'chokepoint').find(Pbad, stBad, {}).length, 0);
 });

@@ -232,6 +232,7 @@ function endGesture(cancelled) {
     state.redo = [];
     save();
   }
+  if (state.solved) markSolved();
   updateButtons();
 }
 
@@ -330,7 +331,7 @@ function refresh() {
   if (solved) {
     // Only auto-paint on win/reopen when Auto-Shade is ON (so manual/inverted color schemes are never touched)
     if (settings.autoShade) paintSolvedFaces(state.P, state.marks);
-    if (!state.solved) markSolved();
+    if (!state.solved && !board.gesture) markSolved();
   }
   state.solved = solved;
   board.render(state.marks, analyse());
@@ -389,7 +390,12 @@ function load(P) {
 }
 
 const solvedSet = () => { try { return new Set(JSON.parse(store.get('ms_solved') || '[]')); } catch { return new Set(); } };
-const bookSolvedMap = () => { try { return JSON.parse(store.get('ms_book_solved') || '{}'); } catch { return {}; } };
+const bookSolvedMap = () => {
+  try {
+    const o = JSON.parse(store.get('ms_book_solved') || '{}');
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch { return {}; }
+};
 
 function recordBookSolved(book) {
   if (!book) return;
@@ -721,7 +727,12 @@ $('hint-btn').addEventListener('click', () => hint());
 
 const modals = [];
 const modalOpen = () => modals.some(({ modal }) => !modal.classList.contains('modal-hidden'));
-const syncModalInert = () => { $('game-container').inert = modalOpen(); };
+const syncModalInert = () => {
+  const open = modalOpen();
+  for (const child of $('game-container').children) {
+    if (child.id !== 'toast') child.inert = open;
+  }
+};
 function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
   const modal = $(modalId), openBtn = $(openBtnId);
   modal.inert = true;
@@ -1090,6 +1101,7 @@ let offlineAbort = null;
 let offlineQueue = Promise.resolve();
 let offlineBusy = false;
 let offlineSeq = 0;
+let offlineUiSeq = 0;
 
 function renderOfflineStatus(status) {
   const count = status.total ? `all ${status.total} puzzle books` : 'all puzzle books';
@@ -1117,7 +1129,11 @@ function renderOfflineStatus(status) {
 
 async function syncOfflineUI() {
   if (offlineBusy) return;
-  renderOfflineStatus(await getOfflineStatus(state.books));
+  const opSeq = offlineSeq;
+  const uiSeq = ++offlineUiSeq;
+  const status = await getOfflineStatus(state.books);
+  if (offlineBusy || opSeq !== offlineSeq || uiSeq !== offlineUiSeq) return;
+  renderOfflineStatus(status);
 }
 
 function queueOfflineOp(fn) {
@@ -1158,7 +1174,7 @@ function runOfflineSync(force) {
     let res = null;
     let failed = false;
     try {
-      if (force) await refreshManifestBooks(signal);
+      if (force || !state.books.some((b) => b.file)) await refreshManifestBooks(signal);
       if (signal.aborted) return;
       res = await enableOffline(state.books, {
         force,

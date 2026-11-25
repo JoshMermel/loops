@@ -83,8 +83,17 @@ if (process.argv.includes('--worker')) {
 const only = arg('book', '') ? arg('book').split(',').filter(Boolean) : null;
 const includeHidden = process.argv.includes('--all');
 const userChunk = arg('chunk', null);
-const chunk = userChunk ? +userChunk : 25;
-const jobs = Math.max(1, +arg('jobs', Math.max(2, os.availableParallelism() - 1)));
+const chunk = userChunk !== null ? Math.trunc(+userChunk) : 25;
+if (!Number.isFinite(chunk) || chunk < 1) {
+  console.error(`Invalid --chunk "${userChunk}" (must be a positive integer)`);
+  process.exit(1);
+}
+const rawJobs = arg('jobs', null);
+const jobs = rawJobs !== null ? Math.trunc(+rawJobs) : Math.max(2, os.availableParallelism() - 1);
+if (!Number.isFinite(jobs) || jobs < 1) {
+  console.error(`Invalid --jobs "${rawJobs}" (must be a positive integer)`);
+  process.exit(1);
+}
 const withRating = process.argv.includes('--rate');
 
 if (only) {
@@ -163,6 +172,9 @@ await new Promise((resolve) => {
 });
 
 const sec = ((Date.now() - t0) / 1000).toFixed(2);
+if (!problems.length && checked !== total) {
+  problems.push(`checked ${checked} puzzles, expected ${total}`);
+}
 if (problems.length) {
   console.error(`\nAUDIT FAILED (${problems.length} problems in ${sec}s):`);
   for (const p of problems.slice(0, 40)) console.error('  -', p);

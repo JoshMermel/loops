@@ -1083,6 +1083,7 @@ function computeAllChokepoints(P, st) {
   }
   if (totalLoops < 2) return out;
   const precomp = { isLoop, canOpen, firstLoop, totalLoops };
+  if (chokepointCheck(P, st, true, precomp)) return out;
   const s2 = cloneState(st);
   for (let x = 0; x < numEdges; x++) {
     if (st.e[x] !== E_UNKNOWN) continue;
@@ -1152,8 +1153,8 @@ function computeAllParities(P, st) {
   const out = [];
   const onc = new Int8Array(N);
   for (let x = 0; x < numEdges; x++) if (st.e[x] === E_ON) { onc[edgeA[x]]++; onc[edgeB[x]]++; }
-  const baseOdd = oddOpenEnds(P, st) !== null;
-  const bridge = baseOdd ? null : markUnknownBridges(P, st, onc);
+  if (oddOpenEnds(P, st) !== null) return out;
+  const bridge = markUnknownBridges(P, st, onc);
   const s2 = cloneState(st);
   for (let x = 0; x < numEdges; x++) {
     if (st.e[x] !== E_UNKNOWN) continue;
@@ -1507,9 +1508,9 @@ function runFreeBookkeeping(P, st, bookkeeping = null) {
  */
 export function nextSteps(P, st, bookkeeping = null, without = null) {
   if (!runFreeBookkeeping(P, st, bookkeeping)) return null;
-  const noImagine = !!without && (
-    without.includes('imagineLocal') || without.includes('imagineTrace') || without.includes('imagineChain')
-  );
+  const noImagine = !!without
+    && without.includes('imagineLocal') && without.includes('imagineTrace') && without.includes('imagineChain');
+  const imagineAllowed = (f) => !!f && !(without && without.includes(f.rule));
   let found;
   let foundCap = 0;
   const imagined = (costCap = Infinity) => {
@@ -1518,7 +1519,7 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
       found = bestImagine(P, st, { costCap });
       foundCap = costCap;
     }
-    return found;
+    return imagineAllowed(found) ? found : null;
   };
 
   const stepCache = {};
@@ -1530,7 +1531,7 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
       const cap = rule.weight <= HARD_MAX ? HARD_MAX + 1 : Infinity;
       const f = imagined(cap);
       if (f && f.cost < rule.weight) return imagineStep(f);
-    } else if (found && found.cost < rule.weight) {
+    } else if (imagineAllowed(found) && found.cost < rule.weight) {
       return imagineStep(found);
     }
     const firings = rule.find(P, st, { upto: FIRST_LOOKAHEAD, stepCache });

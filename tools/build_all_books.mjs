@@ -63,7 +63,6 @@ const manifest = {
   ],
   books: existingHidden,
 };
-fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
 const recipes = [
   // ---- Start here
@@ -262,6 +261,8 @@ for (const r of recipes) {
 // Re-order manifest.books so non-hidden books appear in recipe order, hidden at the end
 const finalManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const byId = new Map(finalManifest.books.map((b) => [b.id, b]));
+finalManifest.default = manifest.default;
+finalManifest.groups = manifest.groups;
 finalManifest.books = [
   ...recipes.map((r) => byId.get(r.id)).filter(Boolean),
   ...finalManifest.books.filter((b) => b.hidden),

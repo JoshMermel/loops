@@ -40,8 +40,11 @@ export function compile(p) {
   const clue = new Uint8Array(N); // 0 none, 1 white, 2 black
   const clueAt = new Int16Array(N).fill(-1);
   const whites = [], blacks = [], clueCells = [];
+  if (!Array.isArray(p.clues)) throw new Error('puzzle clues must be an array');
   p.clues.forEach((cl, k) => {
-    if (cl.r < 0 || cl.c < 0 || cl.r >= rows || cl.c >= cols) throw new Error(`clue out of bounds at ${cl.r},${cl.c}`);
+    if (!Number.isInteger(cl.r) || !Number.isInteger(cl.c) || cl.r < 0 || cl.c < 0 || cl.r >= rows || cl.c >= cols) {
+      throw new Error(`clue out of bounds at ${cl.r},${cl.c}`);
+    }
     const i = cl.r * cols + cl.c;
     if (clueAt[i] >= 0) throw new Error(`two clues on cell ${cl.r},${cl.c}`);
     if (cl.t !== 'W' && cl.t !== 'B') throw new Error(`unknown clue type "${cl.t}" at ${cl.r},${cl.c}`);
@@ -625,11 +628,14 @@ export function decodeSolution(P, str) {
   const st = initialState(P);
   st.cell.fill(OFF);
   st.e.fill(E_OFF);
-  for (let i = 0; i < P.N; i++) {
+  if (typeof str !== 'string') return st;
+  const lim = Math.min(P.N, str.length);
+  for (let i = 0; i < lim; i++) {
     const ch = str[i];
-    if (ch === '#') continue;
-    st.cell[i] = LOOP;
+    if (!ch || ch === '#') continue;
     const m = parseInt(ch, 16);
+    if (!Number.isFinite(m)) continue;
+    st.cell[i] = LOOP;
     for (let d = 0; d < 4; d++) {
       if (m & (1 << d)) {
         const x = P.ed[i * 4 + d];
@@ -726,9 +732,11 @@ export function cluesToString(clues) {
 export function cluesFromString(s) {
   if (!s) return [];
   return s.split(';').map((tok) => {
-    const [r, c, t] = tok.split(':');
-    if (t !== 'W' && t !== 'B') throw new Error(`bad clue "${tok}"`);
-    return { r: +r, c: +c, t };
+    const parts = tok.split(':');
+    if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1]) || (parts[2] !== 'W' && parts[2] !== 'B')) {
+      throw new Error(`bad clue "${tok}"`);
+    }
+    return { r: +parts[0], c: +parts[1], t: parts[2] };
   });
 }
 

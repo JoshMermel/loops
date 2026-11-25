@@ -533,11 +533,12 @@ export function maskPoints(layout, rows, cols) {
   };
   switch (layout) {
     case 'lattice':
-      return collect((r, c) => (r & 1) === 1 && (c & 1) === 1);
+      return collect((r, c) => r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2 && (r & 1) === 1 && (c & 1) === 1);
     case 'blocks2x2': // 9x9: four inset 2x2 squares + center diamond
       return collect((r, c) => (
-        ((r === 1 || r === 2 || r === rows - 3 || r === rows - 2) && (c === 1 || c === 2 || c === cols - 3 || c === cols - 2))
-        || (Math.abs(r - ((rows - 1) / 2)) + Math.abs(c - ((cols - 1) / 2)) === 1)
+        r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
+        && (((r === 1 || r === 2 || r === rows - 3 || r === rows - 2) && (c === 1 || c === 2 || c === cols - 3 || c === cols - 2))
+          || (Math.abs(r - ((rows - 1) / 2)) + Math.abs(c - ((cols - 1) / 2)) === 1))
       ));
     case 'quilt2x2': // 10x10: five spaced 2x2 squares (4 corners + center) + 4 side accents
       if (rows !== 10 || cols !== 10) return [];

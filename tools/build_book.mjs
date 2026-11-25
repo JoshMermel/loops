@@ -77,13 +77,33 @@ for (const ef of excludeFiles) {
 const seen = new Set(excluded);
 const locked = [];
 const lockedExpertPlus = [];
+const lockedBonus = [];
 const lockedBySk = new Map();
+const bonusKeyToGrp = new Map();
+if (preserveExisting && bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
+  const bFiles = fs.readdirSync(dir)
+    .filter((f) => bonusPrefixes.some((pre) => f.startsWith(pre)) && f.endsWith('.csv'))
+    .sort();
+  for (const f of bFiles) {
+    const grp = bonusPrefixes.find((pre) => f.startsWith(pre)) || f;
+    for (const p of parseCsv(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+      const sk = symmetryKey(p);
+      if (!bonusKeyToGrp.has(sk)) bonusKeyToGrp.set(sk, grp);
+    }
+  }
+}
 const existingBookPath = path.join(root, 'data', `${id}.csv`);
 if (preserveExisting && fs.existsSync(existingBookPath)) {
   for (const p of parseCsv(fs.readFileSync(existingBookPath, 'utf8'))) {
-    if (!matchesBand(p)) continue;
     const sk = symmetryKey(p);
     if (seen.has(sk)) continue;
+    if (bonusKeyToGrp.has(sk)) {
+      seen.add(sk);
+      p._group = bonusKeyToGrp.get(sk);
+      lockedBonus.push(p);
+      continue;
+    }
+    if (!matchesBand(p)) continue;
     seen.add(sk);
     lockedBySk.set(sk, p);
     if (p.rules === 'unsolved') lockedExpertPlus.push(p);
@@ -358,9 +378,13 @@ if (bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
     }
   }
   bonusPool.sort(byOrder);
-  const rawBonus = (balanceGroups && bonusPrefixes.length > 1)
-    ? pickBalancedAcrossGroups(bonusPool, bonusCount, bonusPrefixes).picked
-    : pickEvenly(bonusPool, bonusCount);
+  const needBonus = Math.max(0, bonusCount - lockedBonus.length);
+  const extraBonus = needBonus > 0
+    ? ((balanceGroups && bonusPrefixes.length > 1)
+      ? pickBalancedAcrossGroups(bonusPool, needBonus, bonusPrefixes).picked
+      : pickEvenly(bonusPool, needBonus))
+    : [];
+  const rawBonus = [...lockedBonus.slice(0, bonusCount), ...extraBonus];
   const pickedBonus = (interleaveGroups && bonusPrefixes.length > 1)
     ? interleaveByGroup(rawBonus, bonusPrefixes, { limitRun: maxRun, seed: `${id}:bonus`, carry: runCarry })
       .sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols))

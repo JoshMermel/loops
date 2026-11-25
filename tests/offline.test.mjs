@@ -295,6 +295,7 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
 
 test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededError, and atomic precache rollback', async () => {
   let mode = 'ok';
+  let version = 1;
   let quotaFail = false;
   const env = makeMockEnv({
     fetchImpl: async (req) => {
@@ -309,19 +310,20 @@ test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededEr
         Object.defineProperty(res, 'redirected', { value: true });
         return res;
       }
-      return new Response(`fresh:${url}`, { status: 200 });
+      return new Response(`v${version}:${url}`, { status: 200 });
     },
   });
 
-  // Initial clean install
+  // Initial clean install at v1
   await env.dispatchLifecycle('install');
 
-  // Atomic precacheAppShell: if 1 file fails during REFRESH_APP, prior APP_CACHE stays intact
+  // Atomic precacheAppShell: bump to v2 and fail 1 file -> prior v1 APP_CACHE must stay untouched
+  version = 2;
   mode = 'fail-one';
   const failedRefresh = await env.dispatchMessage({ type: 'REFRESH_APP' });
   assert.equal(failedRefresh?.ok, false);
   const cachedMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/masyu/js/main.js');
-  assert.equal(await cachedMain.text(), 'fresh:https://example.com/masyu/js/main.js');
+  assert.equal(await cachedMain.text(), 'v1:https://example.com/masyu/js/main.js');
 
   // Redirected navigation response is cleaned before returning and caching
   mode = 'redirect';
@@ -337,14 +339,14 @@ test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededEr
   const badAsset = await env.dispatchFetch(new Request('https://example.com/masyu/js/main.js'));
   assert.equal(badAsset.response.status, 500);
   const stillGoodMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/masyu/js/main.js');
-  assert.equal(await stillGoodMain.text(), 'fresh:https://example.com/masyu/js/main.js');
+  assert.equal(await stillGoodMain.text(), 'v1:https://example.com/masyu/js/main.js');
 
   mode = 'status-206';
   const partialRes = await env.dispatchFetch(new Request('https://example.com/masyu/data/other.csv'));
   assert.equal(partialRes.response.status, 206);
   assert.equal(await (await env.caches.open(BOOK_CACHE)).match('https://example.com/masyu/data/other.csv'), undefined);
 
-  // QuotaExceededError during cache.put must not break online fetch
+  // QuotaExceededError during cache.put must not break normal online fetches, but MUST fail cache: 'reload'
   const origOpen = env.caches.open.bind(env.caches);
   env.caches.open = async (name) => {
     const c = await origOpen(name);
@@ -360,7 +362,11 @@ test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededEr
   quotaFail = true;
   const onlineRes = await env.dispatchFetch(new Request('https://example.com/masyu/data/new.csv'));
   assert.equal(onlineRes.response.status, 200);
-  assert.equal(await onlineRes.response.text(), 'fresh:https://example.com/masyu/data/new.csv');
+  assert.equal(await onlineRes.response.text(), 'v2:https://example.com/masyu/data/new.csv');
+  await assert.rejects(
+    () => env.dispatchFetch(new Request('https://example.com/masyu/data/new.csv', { cache: 'reload' })),
+    /QuotaExceededError/,
+  );
 });
 
 test('js/offline.js controller handles status, cacheBooks pruning/abort, enableOffline, disableOffline, and syncMissingBooks', async () => {
@@ -413,12 +419,14 @@ test('js/offline.js controller handles status, cacheBooks pruning/abort, enableO
     return reg;
   };
 
+  let registerCount = 0;
   const mockNav = {
     get onLine() { return online; },
     serviceWorker: {
       controller: null,
       async getRegistration() { return currentReg; },
       async register(path) {
+        registerCount++;
         currentReg = makeReg(new URL(path, base).href, 'activated');
         return currentReg;
       },
@@ -426,27 +434,29 @@ test('js/offline.js controller handles status, cacheBooks pruning/abort, enableO
   };
 
   let fetchFailUrl = null;
-  const orig = {
-    window: globalThis.window,
-    location: globalThis.location,
-    caches: globalThis.caches,
-    fetch: globalThis.fetch,
-    navigatorDesc: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
-  };
-
-  Object.defineProperty(globalThis, 'window', { value: { isSecureContext: true, caches: mockCaches }, configurable: true });
-  Object.defineProperty(globalThis, 'location', { value: new URL(`${base}index.html`), configurable: true });
-  Object.defineProperty(globalThis, 'caches', { value: mockCaches, configurable: true });
-  Object.defineProperty(globalThis, 'navigator', { value: mockNav, configurable: true });
-  globalThis.fetch = async (req, opts) => {
-    if (opts?.signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
-    const url = typeof req === 'string' ? req : req.url;
-    if (fetchFailUrl && url === fetchFailUrl) return new Response('err', { status: 500 });
-    return new Response(`csv:${url}`, { status: 200 });
-  };
+  const keysToPatch = ['window', 'location', 'caches', 'navigator', 'fetch'];
+  const origDescs = Object.fromEntries(keysToPatch.map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]));
 
   try {
+    Object.defineProperty(globalThis, 'window', { value: { isSecureContext: true, caches: mockCaches }, configurable: true, writable: true });
+    Object.defineProperty(globalThis, 'location', { value: new URL(`${base}index.html`), configurable: true, writable: true });
+    Object.defineProperty(globalThis, 'caches', { value: mockCaches, configurable: true, writable: true });
+    Object.defineProperty(globalThis, 'navigator', { value: mockNav, configurable: true, writable: true });
+    globalThis.fetch = async (req, opts) => {
+      if (opts?.signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+      const url = typeof req === 'string' ? req : req.url;
+      if (fetchFailUrl && url === fetchFailUrl) return new Response('err', { status: 500 });
+      return new Response(`csv:${url}`, { status: 200 });
+    };
+
     assert.equal(isOfflineSupported(), true);
+
+    // Pre-aborted signal returns immediately without registering SW
+    const preAbort = new AbortController();
+    preAbort.abort();
+    const preRes = await enableOffline(books, { signal: preAbort.signal });
+    assert.equal(preRes.aborted, true);
+    assert.equal(registerCount, 0);
 
     // Disabled by default
     let st = await getOfflineStatus(books);
@@ -469,6 +479,14 @@ test('js/offline.js controller handles status, cacheBooks pruning/abort, enableO
 
     st = await getOfflineStatus(books);
     assert.deepEqual(st, { supported: true, enabled: true, cached: 2, total: 2 });
+
+    // Foreign SW controller must NOT skip cache.put on force: true
+    mockNav.serviceWorker.controller = { scriptURL: 'https://example.com/other-sw.js' };
+    getMap(BOOK_CACHE).clear();
+    const foreignRes = await cacheBooks(books, { force: true });
+    assert.equal(foreignRes.ok, true);
+    assert.equal(getMap(BOOK_CACHE).size, 3);
+    mockNav.serviceWorker.controller = null;
 
     // Empty books array must NEVER prune BOOK_CACHE
     const emptyRes = await cacheBooks([]);
@@ -496,7 +514,7 @@ test('js/offline.js controller handles status, cacheBooks pruning/abort, enableO
     assert.equal(partial.failed, 1);
     fetchFailUrl = null;
 
-    // AbortSignal cancels enableOffline cleanly
+    // AbortSignal cancels enableOffline cleanly without disabling already-enabled offline mode
     const ctrl = new AbortController();
     ctrl.abort();
     const aborted = await enableOffline(books, { force: true, signal: ctrl.signal });
@@ -518,11 +536,10 @@ test('js/offline.js controller handles status, cacheBooks pruning/abort, enableO
     online = true;
     assert.equal(await syncMissingBooks(books), null);
   } finally {
-    Object.defineProperty(globalThis, 'window', { value: orig.window, configurable: true });
-    Object.defineProperty(globalThis, 'location', { value: orig.location, configurable: true });
-    Object.defineProperty(globalThis, 'caches', { value: orig.caches, configurable: true });
-    if (orig.navigatorDesc) Object.defineProperty(globalThis, 'navigator', orig.navigatorDesc);
-    globalThis.fetch = orig.fetch;
+    for (const k of keysToPatch) {
+      if (origDescs[k]) Object.defineProperty(globalThis, k, origDescs[k]);
+      else delete globalThis[k];
+    }
   }
 });
 

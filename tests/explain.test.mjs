@@ -318,6 +318,24 @@ test('computeHint catches wrong Auto-X caused by wrong manual shade and solution
   const h2 = computeHint(PnoSol, badMarks);
   assert.equal(h2.kind, 'wrong');
   assert.equal(h2.contradiction, true);
+
+  // Solution-less puzzle with topological odd-open-end pocket contradiction (propagate still returns true!)
+  const Ptopo = compile({ name: 'topo_contra', rows: 6, cols: 6, clues: [{ r: 2, c: 4, t: 'W' }, { r: 4, c: 4, t: 'W' }] });
+  const mTopo = { edges: new Uint8Array(Ptopo.numEdges) };
+  mTopo.edges[Ptopo.ed[(1 * 6 + 1) * 4 + 2]] = 1; // (1,1)-(2,1) ON
+  mTopo.edges[Ptopo.ed[(0 * 6 + 1) * 4 + 1]] = 2; // seal top-left 2x2 pocket with 1 open end at (1,1)
+  mTopo.edges[Ptopo.ed[(1 * 6 + 1) * 4 + 1]] = 2;
+  mTopo.edges[Ptopo.ed[(1 * 6 + 0) * 4 + 2]] = 2;
+  const hTopo = computeHint(Ptopo, mTopo);
+  assert.equal(hTopo.kind, 'wrong');
+  assert.equal(hTopo.contradiction, true);
+
+  // Corrupted P.solution of length N must not wrongly flag valid player marks
+  const Pcorrupt = compile({ name: 'corrupt', rows: 3, cols: 3, clues: [{ r: 0, c: 0, t: 'B' }, { r: 2, c: 2, t: 'B' }], solution: 'z'.repeat(9) });
+  const mValid = { edges: new Uint8Array(Pcorrupt.numEdges) };
+  mValid.edges[Pcorrupt.ed[0 * 4 + 1]] = 1;
+  assert.equal(checkMarksAgainstSolution(Pcorrupt, mValid).total, 0);
+  assert.equal(computeHint(Pcorrupt, mValid).kind, 'step');
 });
 
 test('every armory rule produces a non-spoiling nudge and at least one nudgeRoles highlight (with imagine chain replay)', () => {

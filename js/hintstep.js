@@ -5,9 +5,10 @@
 //   marks.autoE: optional Uint8Array(numEdges) — 1 where an X was placed automatically by Auto-X
 import {
   E_UNKNOWN, E_ON, E_OFF,
-  initialState, cloneState, propagate, decodeSolution,
+  initialState, cloneState, propagate, decodeSolution, isSolved,
 } from './logic.js';
-import { nextSteps } from './rating.js';
+import { nextSteps, contradiction } from './rating.js';
+import { buildFaceParity } from './faceparity.js';
 import { explainStep } from './explain.js';
 
 /** Convert edge-only player board marks into a solver state `st` (circles start as LOOP). */
@@ -21,6 +22,12 @@ export function stateFromMarks(P, marks) {
   return st;
 }
 
+function validSolutionState(P, solutionStr = P.solution) {
+  if (!solutionStr || solutionStr.length !== P.N) return null;
+  const sol = decodeSolution(P, solutionStr);
+  return isSolved(P, sol.e) ? sol : null;
+}
+
 /**
  * Compare player marks against the stored solution (for "Correct so far?" and Hint's mistake check).
  * Auto-X marks are excluded so error counts only report the player's own mistakes.
@@ -28,8 +35,8 @@ export function stateFromMarks(P, marks) {
  */
 export function checkMarksAgainstSolution(P, marks, solutionStr = P.solution) {
   const wrongEdges = [];
-  if (!solutionStr || solutionStr.length !== P.N) return { wrongEdges, total: 0 };
-  const sol = decodeSolution(P, solutionStr);
+  const sol = validSolutionState(P, solutionStr);
+  if (!sol) return { wrongEdges, total: 0 };
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
     if (marks.edges[x] === 1 && sol.e[x] !== E_ON) wrongEdges.push(x);
@@ -40,28 +47,32 @@ export function checkMarksAgainstSolution(P, marks, solutionStr = P.solution) {
 
 /**
  * Compute the next Hint from player `marks`.
- * First reports any wrong marks (if solution is known); otherwise replays the scorer's nextSteps()
- * and explains every firing of the cheapest applicable rule.
+ * First reports any wrong marks (if a valid solution is known); otherwise checks for local/topological/parity
+ * contradictions and replays the scorer's nextSteps() explaining every firing of the cheapest rule.
  */
 export function computeHint(P, marks) {
-  const wrong = checkMarksAgainstSolution(P, marks);
-  if (wrong.total > 0) return { kind: 'wrong', ...wrong };
-
-  if (P.solution && P.solution.length === P.N) {
-    const sol = decodeSolution(P, P.solution);
+  const sol = validSolutionState(P);
+  if (sol) {
+    const wrongEdges = [];
     const wrongAuto = [];
     for (let x = 0; x < P.numEdges; x++) {
       if (P.edgeA[x] < 0) continue;
-      if (marks.edges[x] === 2 && marks.autoE && marks.autoE[x] && sol.e[x] === E_ON) wrongAuto.push(x);
+      if (marks.edges[x] === 1 && sol.e[x] !== E_ON) wrongEdges.push(x);
+      else if (marks.edges[x] === 2 && sol.e[x] === E_ON) {
+        if (marks.autoE && marks.autoE[x]) wrongAuto.push(x);
+        else wrongEdges.push(x);
+      }
     }
-    if (wrongAuto.length > 0) {
-      return { kind: 'wrong', wrongEdges: wrongAuto, total: wrongAuto.length, fromShade: true };
-    }
+    if (wrongEdges.length > 0) return { kind: 'wrong', wrongEdges, total: wrongEdges.length };
+    if (wrongAuto.length > 0) return { kind: 'wrong', wrongEdges: wrongAuto, total: wrongAuto.length, fromShade: true };
   }
 
   const st = stateFromMarks(P, marks);
-  if ((!P.solution || P.solution.length !== P.N) && !propagate(P, cloneState(st))) {
-    return { kind: 'wrong', wrongEdges: [], total: 0, contradiction: true };
+  if (!sol) {
+    const chk = cloneState(st);
+    if (!propagate(P, chk) || contradiction(P, chk) || buildFaceParity(P, chk, { buildGraph: false, useCircles: true }).conflict) {
+      return { kind: 'wrong', wrongEdges: [], total: 0, contradiction: true };
+    }
   }
   const res = nextSteps(P, st);
   if (!res) {

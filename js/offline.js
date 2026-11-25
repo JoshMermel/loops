@@ -161,6 +161,8 @@ export async function cacheBooks(books, { force = false, onProgress, signal } = 
   onProgress?.(cachedVisible, visible.length);
 
   let next = 0;
+  const expectedSw = new URL(SW_PATH, location.href).href;
+  const controlledByOurs = navigator.serviceWorker?.controller?.scriptURL === expectedSw;
   const worker = async () => {
     while (next < todo.length) {
       if (signal?.aborted) return;
@@ -168,12 +170,13 @@ export async function cacheBooks(books, { force = false, onProgress, signal } = 
       try {
         const req = new Request(url, force ? { cache: 'reload' } : undefined);
         const res = await fetch(req, { signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        // When the SW already controls this page, sw.js's handleBookRequest writes to BOOK_CACHE on miss/reload.
-        // Only write from the page if uncontrolled (or if SW storage skipped it) to avoid double-writing ~6.6 MB.
-        const controlled = Boolean(navigator.serviceWorker?.controller);
-        if (!controlled || (!force && !(await cache.match(url)))) {
+        if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+        // When our sw.js already controls this page, handleBookRequest writes to BOOK_CACHE on miss/reload.
+        // Fall back to cache.put if uncontrolled or if the entry is still missing, otherwise cancel the unread body.
+        if (!controlledByOurs || !(await cache.match(url))) {
           await cache.put(url, res);
+        } else {
+          res.body?.cancel?.().catch(() => {});
         }
         if (visibleSet.has(url)) {
           cachedVisible++;
@@ -199,9 +202,15 @@ export async function cacheBooks(books, { force = false, onProgress, signal } = 
 export async function enableOffline(books, { force = false, onProgress, signal } = {}) {
   if (!isOfflineSupported()) throw new Error('Offline play is not supported in this browser');
   const total = bookUrlsOf(books).visible.length;
+  if (signal?.aborted) return { aborted: true, ok: false, appOk: false, cached: 0, total, failed: 0 };
   const reg = await navigator.serviceWorker.register(SW_PATH, { scope: './' });
+  const cleanupInitial = async () => {
+    if (force) return;
+    await reg.unregister().catch(() => {});
+    await disableOffline();
+  };
   const abortAndCleanup = async () => {
-    if (!force) await reg.unregister().catch(() => {});
+    await cleanupInitial();
     return { aborted: true, ok: false, appOk: false, cached: 0, total, failed: 0 };
   };
   if (signal?.aborted) return abortAndCleanup();
@@ -212,7 +221,7 @@ export async function enableOffline(books, { force = false, onProgress, signal }
     active = await waitForActive(reg, signal);
   } catch (err) {
     if (signal?.aborted || err?.name === 'AbortError') return abortAndCleanup();
-    if (!force) await reg.unregister().catch(() => {});
+    await cleanupInitial();
     throw err;
   }
   if (signal?.aborted) return abortAndCleanup();
@@ -229,7 +238,7 @@ export async function enableOffline(books, { force = false, onProgress, signal }
     res = await cacheBooks(books, { force, onProgress, signal });
   } catch (err) {
     if (signal?.aborted || err?.name === 'AbortError') return abortAndCleanup();
-    if (!force) await reg.unregister().catch(() => {});
+    await cleanupInitial();
     throw err;
   }
   if (res.aborted) return abortAndCleanup();

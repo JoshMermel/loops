@@ -627,7 +627,8 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
 
   try {
     if (!runBookkeeping(P, st, [P.edgeA[edge], P.edgeB[edge]], scoped ? touchCell : null)) {
-      return { broke: { kind: 'conflict' }, area: false, steps: [], state: st };
+      const c = easyContradiction(P, st, null);
+      return { broke: c || { kind: 'conflict' }, area: false, steps: [], state: st };
     }
     if (scoped) sortScope();
     const c0 = easyContradiction(P, st, scope);
@@ -658,7 +659,8 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
         }
       }
       if (!runBookkeeping(P, st, touched, scoped ? touchCell : null)) {
-        return { broke: { kind: 'conflict', step }, area: false, steps, state: st };
+        const c = easyContradiction(P, st, null);
+        return { broke: c || { kind: 'conflict', step }, area: false, steps, state: st };
       }
       if (scoped) sortScope();
       const c = easyContradiction(P, st, scope);
