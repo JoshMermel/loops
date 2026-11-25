@@ -476,7 +476,7 @@ export function applySlitherParity(P, st, ctx) {
 // ------------------------------------------------------------ Human-style solving rules
 
 const OFF = 1;
-const CORNER_SPEC = [
+export const CORNER_SPEC = [
   // [dr, dc, fEdgeA, fEdgeB, oppA, oppB, outDirA, outDirB, adjA: [dr,dc,contDir,perpOutDir], adjB: [dr,dc,contDir,perpOutDir]]
   [0, 0, 0, 3, 1, 2, 0, 3, [0, 1, 1, 0], [1, 0, 2, 3]], // NW
   [0, 1, 0, 1, 2, 3, 0, 1, [0, 0, 3, 0], [1, 1, 2, 1]], // NE
@@ -484,7 +484,7 @@ const CORNER_SPEC = [
   [1, 0, 2, 3, 0, 1, 2, 3, [1, 1, 1, 2], [0, 0, 0, 3]], // SW
 ];
 
-const isBlockedDir = (P, st, v, d) => {
+export const isBlockedDir = (P, st, v, d) => {
   const x = P.ed[v * 4 + d];
   if (x < 0 || st.e[x] === E_OFF) return true;
   const j = P.nb[v * 4 + d];
@@ -541,15 +541,41 @@ export function findSlitherCount(P, st) {
   return out;
 }
 
-/** Corner patterns on a 3, 1, or 2 at any corner vertex whose two outside exits are blocked (board corner, 0, or X). */
+/** Corner patterns on a 3 or 1 at any corner vertex whose two outside exits are blocked (board corner, 0, or X). */
 export function findSlitherCorner(P, st) {
+  if (!P.hasSlither) return [];
+  const { cols, slither, faceEdges } = P;
+  const e = st.e;
+  const out = [];
+  for (let k = 0; k < slither.length; k++) {
+    const sc = slither[k];
+    if (sc.n !== 3 && sc.n !== 1) continue;
+    const f4 = sc.f * 4;
+    for (let ci = 0; ci < 4; ci++) {
+      const [dr, dc, fea, feb, , , odA, odB] = CORNER_SPEC[ci];
+      const v = (sc.r + dr) * cols + (sc.c + dc);
+      if (!isBlockedDir(P, st, v, odA) || !isBlockedDir(P, st, v, odB)) continue;
+      const ea = faceEdges[f4 + fea], eb = faceEdges[f4 + feb];
+      if (ea < 0 || eb < 0) continue;
+      const val = sc.n === 3 ? E_ON : E_OFF;
+      const sets = [];
+      if (e[ea] === E_UNKNOWN) sets.push(['e', ea, val]);
+      if (e[eb] === E_UNKNOWN) sets.push(['e', eb, val]);
+      if (sets.length) out.push({ sets, info: { face: sc.f, n: sc.n, cell: v } });
+    }
+  }
+  return out;
+}
+
+/** Blocked-corner 2: both corner sides are coupled (both ON or both OFF), forcing adjacent-corner outside exits. */
+export function findSlitherCorner2(P, st) {
   if (!P.hasSlither) return [];
   const { cols, slither, faceEdges, ed } = P;
   const e = st.e;
   const out = [];
   for (let k = 0; k < slither.length; k++) {
     const sc = slither[k];
-    if (sc.n === 0) continue;
+    if (sc.n !== 2) continue;
     const f4 = sc.f * 4;
     for (let ci = 0; ci < 4; ci++) {
       const [dr, dc, fea, feb, , , odA, odB, adjA, adjB] = CORNER_SPEC[ci];
@@ -557,37 +583,25 @@ export function findSlitherCorner(P, st) {
       if (!isBlockedDir(P, st, v, odA) || !isBlockedDir(P, st, v, odB)) continue;
       const ea = faceEdges[f4 + fea], eb = faceEdges[f4 + feb];
       if (ea < 0 || eb < 0) continue;
-      if (sc.n === 3) {
-        const sets = [];
-        if (e[ea] === E_UNKNOWN) sets.push(['e', ea, E_ON]);
-        if (e[eb] === E_UNKNOWN) sets.push(['e', eb, E_ON]);
-        if (sets.length) out.push({ sets, info: { face: sc.f, n: 3, cell: v } });
-      } else if (sc.n === 1) {
-        const sets = [];
-        if (e[ea] === E_UNKNOWN) sets.push(['e', ea, E_OFF]);
-        if (e[eb] === E_UNKNOWN) sets.push(['e', eb, E_OFF]);
-        if (sets.length) out.push({ sets, info: { face: sc.f, n: 1, cell: v } });
-      } else if (sc.n === 2) {
-        // At a blocked-corner 2, ea and eb are coupled (both ON or both OFF), so each adjacent corner
-        // has exactly 1 ON edge on the 2 and therefore exactly 1 ON edge among its two outside edges.
-        const sets = [];
-        for (const [adr, adc, contDir, perpOutDir] of [adjA, adjB]) {
-          const av = (sc.r + adr) * cols + (sc.c + adc);
-          const xCont = ed[av * 4 + contDir];
-          const xPerp = ed[av * 4 + perpOutDir];
-          const blkCont = isBlockedDir(P, st, av, contDir);
-          const blkPerp = isBlockedDir(P, st, av, perpOutDir);
-          if (xCont >= 0 && e[xCont] === E_UNKNOWN && !blkCont) {
-            if (blkPerp) sets.push(['e', xCont, E_ON]);
-            else if (xPerp >= 0 && e[xPerp] === E_ON) sets.push(['e', xCont, E_OFF]);
-          }
-          if (xPerp >= 0 && e[xPerp] === E_UNKNOWN && !blkPerp) {
-            if (blkCont) sets.push(['e', xPerp, E_ON]);
-            else if (xCont >= 0 && e[xCont] === E_ON) sets.push(['e', xPerp, E_OFF]);
-          }
+      // At a blocked-corner 2, ea and eb are coupled (both ON or both OFF), so each adjacent corner
+      // has exactly 1 ON edge on the 2 and therefore exactly 1 ON edge among its two outside edges.
+      const sets = [];
+      for (const [adr, adc, contDir, perpOutDir] of [adjA, adjB]) {
+        const av = (sc.r + adr) * cols + (sc.c + adc);
+        const xCont = ed[av * 4 + contDir];
+        const xPerp = ed[av * 4 + perpOutDir];
+        const blkCont = isBlockedDir(P, st, av, contDir);
+        const blkPerp = isBlockedDir(P, st, av, perpOutDir);
+        if (xCont >= 0 && e[xCont] === E_UNKNOWN && !blkCont) {
+          if (blkPerp) sets.push(['e', xCont, E_ON]);
+          else if (xPerp >= 0 && e[xPerp] === E_ON) sets.push(['e', xCont, E_OFF]);
         }
-        if (sets.length) out.push({ sets, info: { face: sc.f, n: 2, cell: v } });
+        if (xPerp >= 0 && e[xPerp] === E_UNKNOWN && !blkPerp) {
+          if (blkCont) sets.push(['e', xPerp, E_ON]);
+          else if (xCont >= 0 && e[xCont] === E_ON) sets.push(['e', xPerp, E_OFF]);
+        }
       }
+      if (sets.length) out.push({ sets, info: { face: sc.f, n: 2, cell: v } });
     }
   }
   return out;
@@ -671,18 +685,35 @@ export function findSlitherDiag3(P, st) {
   return out;
 }
 
-/** A line entering a corner of a 3 from outside forces the two opposite edges ON and blocks the other outside exit at that corner. */
-export function findSlither3LineIn(P, st) {
+/**
+ * Generalized line-into-corner rule (covers 3 with 0 X's, 2 with 1 X, 1 with 2 X's, etc.):
+ * Whenever a square needs `rem >= 1` of its `unk = rem + 1` remaining unknown edges, and a single
+ * outside segment enters a corner `v` whose two edges on the square are both unknown, at most one
+ * of those two edges can be ON — forcing all other unknown sides of the square ON and blocking the
+ * other outside exit at `v`.
+ */
+export function findSlitherLineIn(P, st) {
   if (!P.hasSlither) return [];
   const { cols, slither, faceEdges, ed } = P;
   const e = st.e;
   const out = [];
   for (let k = 0; k < slither.length; k++) {
     const sc = slither[k];
-    if (sc.n !== 3) continue;
+    if (sc.n === 0) continue;
     const f4 = sc.f * 4;
+    let on = 0, unk = 0;
+    for (let d = 0; d < 4; d++) {
+      const x = faceEdges[f4 + d];
+      if (x < 0) continue;
+      if (e[x] === E_ON) on++;
+      else if (e[x] === E_UNKNOWN) unk++;
+    }
+    const rem = sc.n - on;
+    if (rem < 1 || unk !== rem + 1 || unk < 2) continue;
     for (let ci = 0; ci < 4; ci++) {
-      const [dr, dc, , , oppA, oppB, odA, odB] = CORNER_SPEC[ci];
+      const [dr, dc, fea, feb, oppA, oppB, odA, odB] = CORNER_SPEC[ci];
+      const ea = faceEdges[f4 + fea], eb = faceEdges[f4 + feb];
+      if (ea < 0 || eb < 0 || e[ea] !== E_UNKNOWN || e[eb] !== E_UNKNOWN) continue;
       const v = (sc.r + dr) * cols + (sc.c + dc);
       const xA = ed[v * 4 + odA], xB = ed[v * 4 + odB];
       const onA = xA >= 0 && e[xA] === E_ON;
@@ -694,7 +725,7 @@ export function findSlither3LineIn(P, st) {
       if (eoA >= 0 && e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_ON]);
       if (eoB >= 0 && e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_ON]);
       if (otherOut >= 0 && e[otherOut] === E_UNKNOWN) sets.push(['e', otherOut, E_OFF]);
-      if (sets.length) out.push({ sets, info: { face: sc.f, cell: v } });
+      if (sets.length) out.push({ sets, info: { face: sc.f, n: sc.n, cell: v, rem, unk } });
     }
   }
   return out;
@@ -762,10 +793,11 @@ export function findSlitherDiag32(P, st) {
 export const SLITHER_RULES = [
   { id: 'slitherZero', tier: 'Beginner', weight: 2, find: findSlitherZero, label: 'a 0 square has no loop segments around it' },
   { id: 'slitherCount', tier: 'Beginner', weight: 2, find: findSlitherCount, label: 'a numbered square whose remaining edges match its count must fill or cross them out' },
-  { id: 'slitherCorner', tier: 'Beginner', weight: 3, find: findSlitherCorner, label: 'a 3, 1, or 2 at a blocked corner forces its corner or outer extension segments' },
+  { id: 'slitherCorner', tier: 'Beginner', weight: 3, find: findSlitherCorner, label: 'a 3 or 1 at a blocked corner forces both of its corner sides on (for 3) or off (for 1)' },
   { id: 'slitherAdjacent3', tier: 'Beginner', weight: 5, find: findSlitherAdjacent3, label: 'two orthogonally adjacent 3s force three parallel segments and cross out the shared-vertex extensions' },
   { id: 'slitherDiag3', tier: 'Beginner', weight: 6, find: findSlitherDiag3, label: 'two diagonally adjacent 3s force both outer corners on' },
-  { id: 'slither3LineIn', tier: 'Beginner', weight: 6, find: findSlither3LineIn, label: 'a segment entering a corner of a 3 forces its two opposite sides on and blocks the other exit' },
+  { id: 'slitherLineIn', tier: 'Beginner', weight: 6, find: findSlitherLineIn, label: 'a segment entering a corner of a square with one spare side (e.g. a 3, or a 2 with one X) forces its other open sides on and blocks the other exit' },
+  { id: 'slitherCorner2', tier: 'Medium', weight: 10, find: findSlitherCorner2, label: 'a 2 at a blocked corner couples its two corner sides (both on or both off), forcing exits at its adjacent corners' },
   { id: 'slither1LineIn', tier: 'Medium', weight: 12, find: findSlither1LineIn, label: 'a segment forced into a corner of a 1 crosses out its two opposite sides' },
   { id: 'slitherDiag32', tier: 'Medium', weight: 14, find: findSlitherDiag32, label: 'a diagonal chain of 2s between two 3s forces both outer corners on' },
 ];
@@ -782,13 +814,15 @@ export function describeSlitherChainStep(P, s, { faceName }) {
         ? `the ${info.n} square ${fn} needs all of its remaining open sides`
         : `the ${info.n} square ${fn} already has ${info.n} segment${info.n === 1 ? '' : 's'}, so its other sides are off`;
     case 'slitherCorner':
-      return `the blocked corner on the ${info.n} square ${fn} forces its edges`;
+      return `the blocked corner on the ${info.n} square ${fn} forces its corner sides`;
+    case 'slitherCorner2':
+      return `the blocked corner on the 2 square ${fn} forces its outer exits`;
     case 'slitherAdjacent3':
       return `the adjacent 3 squares ${fn} and ${faceName(P, info.face2)} force three parallel segments`;
     case 'slitherDiag3':
       return `the diagonal 3 squares ${fn} and ${faceName(P, info.face2)} force their outer corners`;
-    case 'slither3LineIn':
-      return `the segment entering the 3 square ${fn} forces its opposite corner`;
+    case 'slitherLineIn':
+      return `the segment entering the ${info.n ?? 3} square ${fn} forces its remaining sides`;
     case 'slither1LineIn':
       return `the segment entering the 1 square ${fn} crosses out its opposite sides`;
     case 'slitherDiag32':
@@ -831,9 +865,14 @@ export function explainSlitherStep(P, step, helpers) {
         nudge: `Look at the ${info.n} square at ${fn} near the blocked corner ${cellName(P, info.cell)}.`,
         text: info.n === 3
           ? `Because corner ${cellName(P, info.cell)} of the 3 square at ${fn} has no exits outside the square, skipping that corner would leave at most two sides — so ${marks}.`
-          : info.n === 1
-            ? `Because corner ${cellName(P, info.cell)} of the 1 square at ${fn} has no exits outside the square, using either corner side would force both (two sides on a 1) — so ${marks}.`
-            : `Because corner ${cellName(P, info.cell)} of the 2 square at ${fn} has no outside exits, the two sides at that corner are either both on or both off — forcing ${marks}.`,
+          : `Because corner ${cellName(P, info.cell)} of the 1 square at ${fn} has no exits outside the square, using either corner side would force both (two sides on a 1) — so ${marks}.`,
+      };
+    case 'slitherCorner2':
+      addFace(faces.focus, info.face);
+      if (info.cell !== undefined) { roles.focus.push(info.cell); nudgeRoles.focus.push(info.cell); }
+      return {
+        nudge: `Look at the 2 square at ${fn} near the blocked corner ${cellName(P, info.cell)} and check its two adjacent corners.`,
+        text: `Because corner ${cellName(P, info.cell)} of the 2 square at ${fn} has no outside exits, the two sides at that corner are either both on or both off — forcing ${marks}.`,
       };
     case 'slitherAdjacent3':
       addFace(faces.focus, info.face);
@@ -850,14 +889,22 @@ export function explainSlitherStep(P, step, helpers) {
         nudge: `Look at the two diagonally touching 3 squares at ${fn} and ${fn2}.`,
         text: `The diagonal 3 squares at ${fn} and ${fn2} cannot both turn sharply around their shared corner ${cellName(P, info.cell)}, so each must use both of its outer sides — ${marks}.`,
       };
-    case 'slither3LineIn':
+    case 'slitherLineIn': {
+      const n = info.n ?? 3;
+      const cn = cellName(P, info.cell);
       addFace(faces.focus, info.face);
       roles.focus.push(info.cell);
       nudgeRoles.focus.push(info.cell);
+      const text = (n === 3 && (info.unk ?? 4) === 4)
+        ? `A segment enters corner ${cn} of the 3 square at ${fn}, so at most one of the 3's two edges at ${cn} can be used — forcing its two opposite sides on and blocking the other exit: ${marks}.`
+        : info.rem === 1
+          ? `A segment enters corner ${cn} of the ${n} square at ${fn}, and the ${n} square needs one of its two open sides at ${cn} — so the line must turn into the square rather than using the other exit at ${cn}: ${marks}.`
+          : `A segment enters corner ${cn} of the ${n} square at ${fn}, so at most one of its two open sides at ${cn} can be used — since the ${n} square still needs ${info.rem} of its ${info.unk} remaining open sides, its other open side must be drawn and the other exit at ${cn} is blocked: ${marks}.`;
       return {
-        nudge: `Look at the segment entering corner ${cellName(P, info.cell)} of the 3 square at ${fn}.`,
-        text: `A segment enters corner ${cellName(P, info.cell)} of the 3 square at ${fn}, so at most one of the 3's two edges at ${cellName(P, info.cell)} can be used — forcing its two opposite sides on and blocking the other exit: ${marks}.`,
+        nudge: `Look at the segment entering corner ${cn} of the ${n} square at ${fn}.`,
+        text,
       };
+    }
     case 'slither1LineIn':
       addFace(faces.focus, info.face);
       roles.focus.push(info.cell);

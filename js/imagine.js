@@ -8,7 +8,10 @@ import {
   NONE, WHITE, BLACK, GRAY, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   cloneState, propagate, lastPropChanges,
 } from './logic.js';
-import { isSlitherSatisfied, isSlitherEdge, firstUnsatisfiedSlitherOnClose } from './variants/slitherlink.js';
+import {
+  isSlitherSatisfied, isSlitherEdge, firstUnsatisfiedSlitherOnClose,
+  CORNER_SPEC, isBlockedDir,
+} from './variants/slitherlink.js';
 
 const isFrontierEdge = (P, st, x) => (
   st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP || isSlitherEdge(P, x)
@@ -507,9 +510,9 @@ function findEasyStep(P, st, forbid, scope = null) {
     return { rule, sets: fresh, sig, info };
   };
 
-  // 0b. Slitherlink direct counts (slitherZero / slitherCount)
+  // 0b. Slitherlink easy rules (slitherZero / slitherCount / slitherCorner 3&1 / slitherLineIn)
   if (P.hasSlither) {
-    const fe = P.faceEdges;
+    const fe = P.faceEdges, cols = P.cols;
     const sf = scope && scope.faces ? scope.faces : null;
     const slLen = sf ? sf.length : P.slither.length;
     for (let k = 0; k < slLen; k++) {
@@ -532,6 +535,59 @@ function findEasyStep(P, st, forbid, scope = null) {
         const s = sc.n === 0
           ? tryEmit('slitherZero', sets, { face: sc.f, n: 0 })
           : tryEmit('slitherCount', sets, { face: sc.f, n: sc.n, mode: val === E_OFF ? 'done' : 'fill' });
+        if (s) return s;
+      }
+    }
+    // 0c. Slitherlink blocked corners on 3 and 1
+    for (let k = 0; k < slLen; k++) {
+      const sc = P.slither[sf ? sf[k] : k];
+      if (sc.n !== 3 && sc.n !== 1) continue;
+      const f4 = sc.f * 4;
+      const val = sc.n === 3 ? E_ON : E_OFF;
+      for (let ci = 0; ci < 4; ci++) {
+        const [dr, dc, fea, feb, , , odA, odB] = CORNER_SPEC[ci];
+        const ea = fe[f4 + fea], eb = fe[f4 + feb];
+        if (ea < 0 || eb < 0 || (e[ea] !== E_UNKNOWN && e[eb] !== E_UNKNOWN)) continue;
+        const v = (sc.r + dr) * cols + (sc.c + dc);
+        if (!isBlockedDir(P, st, v, odA) || !isBlockedDir(P, st, v, odB)) continue;
+        const sets = [];
+        if (e[ea] === E_UNKNOWN) sets.push(['e', ea, val]);
+        if (e[eb] === E_UNKNOWN) sets.push(['e', eb, val]);
+        const s = tryEmit('slitherCorner', sets, { face: sc.f, n: sc.n, cell: v });
+        if (s) return s;
+      }
+    }
+    // 0d. Slitherlink generalized line-in (unk === rem + 1)
+    for (let k = 0; k < slLen; k++) {
+      const sc = P.slither[sf ? sf[k] : k];
+      if (sc.n === 0) continue;
+      const f4 = sc.f * 4;
+      let on = 0, unk = 0;
+      const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
+      if (e0 >= 0) { const v = e[e0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e1 >= 0) { const v = e[e1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e2 >= 0) { const v = e[e2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e3 >= 0) { const v = e[e3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      const rem = sc.n - on;
+      if (rem < 1 || unk !== rem + 1 || unk < 2) continue;
+      for (let ci = 0; ci < 4; ci++) {
+        const [dr, dc, fea, feb, oppA, oppB, odA, odB] = CORNER_SPEC[ci];
+        const ea = fe[f4 + fea], eb = fe[f4 + feb];
+        if (ea < 0 || eb < 0 || e[ea] !== E_UNKNOWN || e[eb] !== E_UNKNOWN) continue;
+        const v = (sc.r + dr) * cols + (sc.c + dc);
+        const xA = ed[v * 4 + odA], xB = ed[v * 4 + odB];
+        const onA = xA >= 0 && e[xA] === E_ON;
+        const onB = xB >= 0 && e[xB] === E_ON;
+        if (onA === onB) continue;
+        const otherOut = onA ? xB : xA;
+        const eoA = fe[f4 + oppA], eoB = fe[f4 + oppB];
+        if ((eoA < 0 || e[eoA] !== E_UNKNOWN) && (eoB < 0 || e[eoB] !== E_UNKNOWN)
+          && (otherOut < 0 || e[otherOut] !== E_UNKNOWN)) continue;
+        const sets = [];
+        if (eoA >= 0 && e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_ON]);
+        if (eoB >= 0 && e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_ON]);
+        if (otherOut >= 0 && e[otherOut] === E_UNKNOWN) sets.push(['e', otherOut, E_OFF]);
+        const s = tryEmit('slitherLineIn', sets, { face: sc.f, n: sc.n, cell: v, rem, unk });
         if (s) return s;
       }
     }

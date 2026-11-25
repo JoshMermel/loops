@@ -823,9 +823,10 @@ test('Slitherlink rules & faceSlither fire cleanly and are 100% sound on pure, +
   assert.equal(rC1.length, 1);
   assert.ok(rC1[0].sets.every((s) => s[2] === E_OFF));
 
-  // Corner 2 forces outer extension edges along board border ON
+  // Corner 2 (Medium slitherCorner2) forces outer extension edges along board border ON
   const Pc2 = compile({ name: 'sc2', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 2 }] });
-  const rC2 = RULES.find((r) => r.id === 'slitherCorner').find(Pc2, initialState(Pc2));
+  assert.equal(RULES.find((r) => r.id === 'slitherCorner').find(Pc2, initialState(Pc2)).length, 0);
+  const rC2 = RULES.find((r) => r.id === 'slitherCorner2').find(Pc2, initialState(Pc2));
   assert.equal(rC2.length, 1);
   assert.equal(rC2[0].sets.length, 2);
   assert.ok(rC2[0].sets.every((s) => s[2] === E_ON));
@@ -853,13 +854,35 @@ test('Slitherlink rules & faceSlither fire cleanly and are 100% sound on pure, +
   assert.equal(rAdj.length, 1);
   assert.equal(rAdj[0].sets.length, 5);
 
-  // Direct slither3LineIn, slither1LineIn, symmetric corner-2, and faceSlither checks
+  // Direct slitherLineIn (3 with 0 X, 2 with 1 X, 1 with 2 X), slither1LineIn, and faceSlither checks
   const P3in = compile({ name: 's3in', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }] });
   const st3in = initialState(P3in);
   st3in.e[P3in.ed[(1 * 5 + 1) * 4 + 0]] = E_ON; // line enters NW corner (1,1) from north
-  const r3in = RULES.find((r) => r.id === 'slither3LineIn').find(P3in, st3in);
+  const r3in = RULES.find((r) => r.id === 'slitherLineIn').find(P3in, st3in);
   assert.equal(r3in.length, 1);
   assert.equal(r3in[0].sets.length, 3);
+
+  // Generalized slitherLineIn on a 2 with 1 X: incoming line at NW corner forces the other open opposite side ON and blocks W exit
+  const P2in = compile({ name: 's2in', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 2 }] });
+  const st2in = initialState(P2in);
+  const f2in = 1 * 4 + 1;
+  st2in.e[P2in.faceEdges[f2in * 4 + 1]] = E_OFF; // east side of 2 is X
+  st2in.e[P2in.ed[(1 * 5 + 1) * 4 + 0]] = E_ON;  // line enters NW corner (1,1) from north
+  const r2in = RULES.find((r) => r.id === 'slitherLineIn').find(P2in, st2in);
+  assert.equal(r2in.length, 1);
+  assert.equal(r2in[0].sets.length, 2); // south side ON + west outside exit OFF
+  assert.ok(r2in[0].sets.some(([k, x, v]) => k === 'e' && x === P2in.faceEdges[f2in * 4 + 2] && v === E_ON));
+  assert.ok(r2in[0].sets.some(([k, x, v]) => k === 'e' && x === P2in.ed[(1 * 5 + 1) * 4 + 3] && v === E_OFF));
+
+  // Generalized slitherLineIn on a 1 with 2 X's: incoming line at NW corner must enter the 1, blocking west outside exit
+  const P1x = compile({ name: 's1x', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 1 }] });
+  const st1x = initialState(P1x);
+  st1x.e[P1x.faceEdges[f2in * 4 + 1]] = E_OFF;
+  st1x.e[P1x.faceEdges[f2in * 4 + 2]] = E_OFF;
+  st1x.e[P1x.ed[(1 * 5 + 1) * 4 + 0]] = E_ON;
+  const r1x = RULES.find((r) => r.id === 'slitherLineIn').find(P1x, st1x);
+  assert.equal(r1x.length, 1);
+  assert.deepEqual(r1x[0].sets, [['e', P1x.ed[(1 * 5 + 1) * 4 + 3], E_OFF]]);
 
   const P1in = compile({ name: 's1in', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 1 }] });
   const st1in = initialState(P1in);
@@ -972,11 +995,8 @@ test('Slitherlink rules & faceSlither fire cleanly and are 100% sound on pure, +
   assert.ok(slitherRulesSeen.size >= 4, `expected >= 4 Slitherlink rules to fire, saw ${[...slitherRulesSeen].join(', ')}`);
 });
 
-test('findSlitherCorner n=2 handles blocked contDir via OFF cell symmetrically', () => {
-  // 4x4 board with a 2 at top-left corner face (0,0) -> corner vertex (0,0) is blocked on U and L.
-  // Adjacent corner (0,1) has contDir=R -> (0,2), perpOutDir=U (off-board -> blocked).
-  // Adjacent corner (1,0) has contDir=D -> (2,0), perpOutDir=L (off-board -> blocked).
-  // Put a 2 at interior face (1,1) instead and block corner (1,1) via OFF neighbors,
+test('findSlitherCorner2 handles blocked contDir via OFF cell symmetrically', () => {
+  // Put a 2 at interior face (1,1) and block corner (1,1),
   // then at adjacent corner (1,2) block contDir (R -> (1,3)) via st.cell[(1,3)] = OFF while keeping edge (1,2)-(1,3) E_UNKNOWN!
   const P = compile({ name: 'sc2_off', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 2 }] });
   const st = initialState(P);
@@ -986,7 +1006,7 @@ test('findSlitherCorner n=2 handles blocked contDir via OFF cell symmetrically',
   // At adjacent corner (1,2): contDir = R -> (1,3), perpOutDir = U -> (0,2).
   // Mark (1,3) OFF while leaving edge (1,2)-(1,3) E_UNKNOWN -> must force perpOutDir edge (1,2)-(0,2) ON!
   st.cell[1 * 5 + 3] = OFF;
-  const cornerRule = RULES.find((r) => r.id === 'slitherCorner');
+  const cornerRule = RULES.find((r) => r.id === 'slitherCorner2');
   const fs = cornerRule.find(P, st);
   const perpEdge = P.ed[(1 * 5 + 2) * 4 + 0];
   assert.ok(fs.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === perpEdge && v === E_ON)),

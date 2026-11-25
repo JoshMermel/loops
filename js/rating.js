@@ -2199,7 +2199,7 @@ export const RULES = [
   defRule({ id: 'corridorNoEarlyClose', tier: 'Hard', weight: 30, find: findCorridorNoEarlyClose, label: 'a forced multi-cell corridor joining the two ends of one path would close the loop early' }),
   defRule({ id: 'checkerParity', tier: 'Hard', weight: 36, fullBoardOnly: true, find: findChecker(false), label: 'checkerboard light/dark dot counts in a full-board region force its exit segments' }),
   defRule({ id: 'faceCircle', tier: 'Hard', weight: 38, find: (P, st, o) => (!P.clueCells.length && P.hasSlither ? [] : findFaceCircle(P, st, o)), extra: extraFaceCircle, label: 'advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge' }),
-  defRule({ id: 'faceSlither', tier: 'Hard', weight: 38, slitherOnly: true, find: findFaceSlither, extra: extraFaceCircle, label: 'inside/outside shading around numbered Slitherlink squares (and circles on hybrids) forces an edge' }),
+  defRule({ id: 'faceSlither', tier: 'Hard', weight: 30, slitherOnly: true, find: findFaceSlither, extra: extraFaceCircle, label: 'inside/outside shading around numbered Slitherlink squares (and circles on hybrids) forces an edge' }),
   defRule({ id: 'twoEndsJoin', tier: 'Hard', weight: 44, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
   defRule({ id: 'chokepoint', tier: 'Hard', weight: 48, costly: true, find: findChokepoint(true), label: 'blocking this segment would cut off a small area or leave a single chokepoint cell' }),
   defRule({ id: 'parityPocket', tier: 'Hard', weight: 52, costly: true, find: findParity(true), label: 'the other choice would seal off a small pocket with an odd number of open ends' }),

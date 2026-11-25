@@ -52,7 +52,7 @@ const VARIANT_GROUPS = [
     title: 'Slitherlink & Hybrids',
     intro: 'Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrids** books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.',
     htmlIntro: 'Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrids</b> books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.',
-    ruleIds: ['slitherZero', 'slitherCount', 'slitherCorner', 'slitherAdjacent3', 'slitherDiag3', 'slither3LineIn', 'slither1LineIn', 'slitherDiag32', 'faceSlither'],
+    ruleIds: ['slitherZero', 'slitherCount', 'slitherCorner', 'slitherAdjacent3', 'slitherDiag3', 'slitherLineIn', 'slitherCorner2', 'slither1LineIn', 'slitherDiag32', 'faceSlither'],
   },
 ];
 const VARIANT_RULE_IDS = new Set(VARIANT_GROUPS.flatMap((g) => g.ruleIds));
