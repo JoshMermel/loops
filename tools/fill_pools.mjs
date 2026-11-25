@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | shaped | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -71,7 +71,6 @@ if (!isMainThread) {
           rng,
           style: job.style || 'balanced',
           layout: job.layout || 'none',
-          shape: job.shape || null,
           minFill: job.minFill ?? null,
           maxTier: mode.maxTier || 'Expert',
           targetTier: mode.targetTier,
@@ -108,7 +107,6 @@ if (!isMainThread) {
         rng,
         style: job.style || 'balanced',
         layout: job.layout || 'none',
-        shape: job.shape || null,
         minFill: job.minFill ?? null,
         maxTier: job.maxTier || 'Expert',
         targetTier: job.tier || null,
@@ -349,32 +347,51 @@ if (!isMainThread) {
       budgetSec: 240, perPuzzleMs: 12000,
     },
 
-    // ---- Shaped boards (top-level section: Swiss cheese 10x10 + 12-shape sampler)
+    // ---- Swiss cheese (top-level section: 10x10, 12x12, 16x16, 12x20 — 500 core + 10 Expert+ each)
     {
-      group: 'shaped', pool: 'shaped_swiss_10x10', cols: 10, rows: 10, style: 'swiss-cheese',
+      group: 'swiss', pool: 'shaped_swiss_10x10', cols: 10, rows: 10, style: 'swiss-cheese',
       buckets: {
         Beginner: { need: 52, maxScore: 350 },
         Medium: { need: 204, minScore: 300, maxScore: 410 },
         Hard: { need: 204, minScore: 355, maxScore: 620 },
         Expert: { need: 52, minScore: 520, maxScore: 1300 },
+        'Expert+': { need: 10 },
       },
-      budgetSec: 240, perPuzzleMs: 12000,
+      budgetSec: 180, perPuzzleMs: 12000,
     },
-    ...[
-      'donut', 'cross', 'hourglass', 'figure8', 'octagon', 'staircase',
-      'lshape', 'hshape', 'window', 'ushape', 'pinwheel', 'twin-islands',
-    ].map((sh) => ({
-      group: 'shaped',
-      pool: `shape_${sh.replace(/-/g, '_')}`,
-      cols: 10, rows: 10, shape: sh,
+    {
+      group: 'swiss', pool: 'swiss_12x12', cols: 12, rows: 12, style: 'swiss-cheese',
       buckets: {
-        Beginner: { need: 2, maxScore: 500 },
-        Medium: { need: 4, maxScore: 600 },
-        Hard: { need: 3, maxScore: 900 },
-        Expert: { need: 1, maxScore: 1400 },
+        Beginner: { need: 52, maxScore: 485 },
+        Medium: { need: 204, minScore: 440, maxScore: 560 },
+        Hard: { need: 204, minScore: 490, maxScore: 820 },
+        Expert: { need: 52, minScore: 600, maxScore: 1700 },
+        'Expert+': { need: 10 },
       },
-      budgetSec: 120, perPuzzleMs: 12000,
-    })),
+      budgetSec: 240, perPuzzleMs: 15000,
+    },
+    {
+      group: 'swiss', pool: 'swiss_16x16', cols: 16, rows: 16, style: 'swiss-cheese',
+      buckets: {
+        Beginner: { need: 52, maxScore: 870 },
+        Medium: { need: 204, minScore: 780, maxScore: 960 },
+        Hard: { need: 204, minScore: 890, maxScore: 1350 },
+        Expert: { need: 52, minScore: 1100, maxScore: 2900 },
+        'Expert+': { need: 10 },
+      },
+      budgetSec: 360, perPuzzleMs: 25000,
+    },
+    {
+      group: 'swiss', pool: 'swiss_12x20', cols: 12, rows: 20, style: 'swiss-cheese',
+      buckets: {
+        Beginner: { need: 52, maxScore: 810 },
+        Medium: { need: 204, minScore: 725, maxScore: 900 },
+        Hard: { need: 204, minScore: 800, maxScore: 1250 },
+        Expert: { need: 52, minScore: 1020, maxScore: 2700 },
+        'Expert+': { need: 10 },
+      },
+      budgetSec: 360, perPuzzleMs: 25000,
+    },
 
     // ---- Bonus: Black & White Cookie (left/right, top/bottom, and diagonal W/B half-splits)
     {

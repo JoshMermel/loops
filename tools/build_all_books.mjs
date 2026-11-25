@@ -66,9 +66,9 @@ const manifest = {
       blurb: 'Every single intersection must be visited — with circles or pure given lines & walls.',
     },
     {
-      name: 'Shaped boards',
-      icon: '✂️',
-      blurb: 'Cutout silhouettes and Swiss cheese boards with interior holes.',
+      name: 'Swiss cheese',
+      icon: '🧀',
+      blurb: 'Boards punched with random interior holes across four sizes — each hole is entirely Inside or Outside the loop.',
     },
     {
       name: 'Bonus',
@@ -233,17 +233,30 @@ const recipes = [
     blurb: 'No circles — a mix of permanent segments and walls with the full-board rule.',
   },
 
-  // ---- Shaped boards (top-level section: Swiss cheese + 12-shape sampler)
+  // ---- Swiss cheese (top-level section: 10x10, 12x12, 16x16, 12x20 — 500 core + Expert+ tail)
   {
-    id: 'shaped-swiss', name: 'Swiss cheese (10×10)', label: '🧀 Swiss cheese (10×10)', group: 'Shaped boards',
+    id: 'swiss-10x10', name: 'Swiss cheese (10×10)', label: '🧀 10×10', group: 'Swiss cheese',
     glob: 'shaped_swiss_10x10', tiers: '50,200,200,50', tierBands: '0:350,300:410,355:620,520:1300',
-    blurb: 'Boards punched with random scattered interior holes — each hole is either Inside or Outside the loop.',
+    expertPlus: 10,
+    blurb: 'Compact 10×10 boards with 3–5 interior cutout holes across all four difficulties, plus Expert+.',
   },
   {
-    id: 'shaped-sampler', name: 'Shape sampler', label: '🍩 Shape sampler', group: 'Shaped boards',
-    glob: 'shape_donut,shape_cross,shape_hourglass,shape_figure8,shape_octagon,shape_staircase,shape_lshape,shape_hshape,shape_window,shape_ushape,shape_pinwheel,shape_twin_islands',
-    sortByGroup: true,
-    blurb: '10 puzzles each across 12 iconic cutout shapes (sorted by shape) — Donut, Cross, Hourglass, Figure-8, Octagon, Staircase, L, H, Window, U, Pinwheel, and Twin Islands.',
+    id: 'swiss-12x12', name: 'Swiss cheese (12×12)', label: '🧀 12×12', group: 'Swiss cheese',
+    glob: 'swiss_12x12', tiers: '50,200,200,50', tierBands: '0:485,440:560,490:820,600:1700',
+    expertPlus: 10,
+    blurb: 'Classic 12×12 boards with 5–8 interior cutout holes across all four difficulties, plus Expert+.',
+  },
+  {
+    id: 'swiss-16x16', name: 'Swiss cheese (16×16)', label: '🧀 16×16', group: 'Swiss cheese',
+    glob: 'swiss_16x16', tiers: '50,200,200,50', tierBands: '0:870,780:960,890:1350,1100:2900',
+    expertPlus: 10,
+    blurb: 'Big 16×16 boards with 8–13 scattered cutout holes across all four difficulties, plus Expert+.',
+  },
+  {
+    id: 'swiss-12x20', name: 'Swiss cheese (12×20)', label: '🧀 12×20', group: 'Swiss cheese',
+    glob: 'swiss_12x20', tiers: '50,200,200,50', tierBands: '0:810,725:900,800:1250,1020:2700',
+    expertPlus: 10,
+    blurb: 'Tall 12×20 boards with 8–13 scattered cutout holes across all four difficulties, plus Expert+.',
   },
 
   // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 Expert+ + 10 Mega finale) + Patterns

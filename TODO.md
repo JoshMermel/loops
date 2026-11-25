@@ -4,7 +4,7 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## Variants & future twists
 
-- [x] **Shaped / cutout boards:** void intersections (`X`), exact rounded board silhouettes, unified single-target interior holes with Inside/Outside propagation, **Swiss cheese (10×10)** (500 puzzles), and **Shape sampler** (120 puzzles across 12 shapes sorted by shape — curate keepers/cuts after playtesting).
+- [x] **Shaped / cutout boards (Swiss cheese):** void intersections (`X`), exact rounded board silhouettes, dark/light hole contrast, unified single-target interior holes with Inside/Outside propagation, and four **🧀 Swiss cheese** books (`10×10`, `12×12`, `16×16`, `12×20` — 500 puzzles + Expert+ each).
 - [ ] **Pre-walled / maze Masyu:** standard Masyu puzzles with permanent given walls (`H0`/`V0`, already supported by the engine & UI) forming rooms, corridors, and mazes.
 - [ ] **New circle types:**
   - **Strict / double-turn whites & numbered blacks:** e.g. marked white circles that must turn on *both* sides, and/or numbered black circles whose straight legs have a required length.

@@ -19,6 +19,10 @@
   --cell-bg: #fff;
   --cell-border: #d8d8d8;
   --grid-dot: #bcbcbc;
+  --void-cutout: #111;
+  --void-cutout-stroke: #e0e0e0;
+  --void-hatch-stroke: #e0e0e0;
+  --void-hatch-opacity: 0.45;
   --pearl-ink: #111;
   --pearl-white-fill: #fff;
   --pearl-gray-fill: #b6bcc4;
@@ -64,8 +68,12 @@
   --text-secondary: #aaa;
 
   --cell-bg: #222;
-  --cell-border: #383838;
-  --grid-dot: #505050;
+  --cell-border: #4a4a4a;
+  --grid-dot: #626262;
+  --void-cutout: #5e636e;
+  --void-cutout-stroke: #7a808d;
+  --void-hatch-stroke: #8c93a1;
+  --void-hatch-opacity: 0.35;
   --pearl-ink: #e6e6e6;
   --pearl-white-fill: #222;
   --pearl-gray-fill: #78808a;
@@ -135,9 +143,9 @@ button.ghost { background: transparent; }
 #board svg { width: 100%; height: auto; display: block; }
 .board-bg { fill: var(--cell-bg); stroke: var(--border-light); stroke-width: 1.5; }
 #board.solved .board-bg { stroke: var(--color-solved); stroke-width: 2.5; }
-.void-cutout { fill: var(--bg); pointer-events: none; }
-.void-cutout-frame { fill: url(#void-hatch); stroke: var(--border-light); stroke-width: 1.5; pointer-events: none; }
-.void-hatch-line { stroke: var(--border-light); opacity: 0.45; }
+.void-cutout { fill: var(--void-cutout); pointer-events: none; }
+.void-cutout-frame { fill: url(#void-hatch); stroke: var(--void-cutout-stroke); stroke-width: 1.5; pointer-events: none; }
+.void-hatch-line { stroke: var(--void-hatch-stroke); opacity: var(--void-hatch-opacity); }
 .face-in { fill: var(--face-in); pointer-events: none; }
 .face-out { fill: var(--face-out); pointer-events: none; }
 .face-in.auto, .face-out.auto { opacity: 0.72; }

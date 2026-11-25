@@ -1012,83 +1012,13 @@ function generateFullBoardPuzzle({
   return null;
 }
 
-// ------------------------------------------------------------ Shaped / Cutout boards
-
-/** Catalog of iconic shaped-board silhouettes for the Shape sampler & shaped generator. */
-export const SHAPED_SPECS = [
-  {
-    id: 'donut', label: 'Donut', rows: 10, cols: 10,
-    isVoid: (r, c) => r >= 3 && r <= 6 && c >= 3 && c <= 6,
-  },
-  {
-    id: 'cross', label: 'Cross', rows: 10, cols: 10,
-    isVoid: (r, c) => (r < 3 || r > 6) && (c < 3 || c > 6),
-  },
-  {
-    id: 'hourglass', label: 'Hourglass', rows: 11, cols: 11,
-    isVoid: (r, c) => ((r === 3 || r === 7) && (c <= 1 || c >= 9)) || (r >= 4 && r <= 6 && (c <= 2 || c >= 8)),
-  },
-  {
-    id: 'figure8', label: 'Figure-8', rows: 9, cols: 12,
-    isVoid: (r, c) => (
-      (r >= 3 && r <= 4 && ((c >= 2 && c <= 3) || (c >= 8 && c <= 9)))
-      || ((r === 0 || r === 8) && (c === 5 || c === 6))
-    ),
-  },
-  {
-    id: 'octagon', label: 'Octagon', rows: 10, cols: 10,
-    isVoid: (r, c) => (r + c < 3) || (r + (9 - c) < 3) || ((9 - r) + c < 3) || ((9 - r) + (9 - c) < 3),
-  },
-  {
-    id: 'staircase', label: 'Staircase', rows: 10, cols: 10,
-    isVoid: (r, c) => (r < 2 && c >= 5) || (r < 4 && c >= 7) || (r >= 8 && c < 5) || (r >= 6 && c < 3),
-  },
-  {
-    id: 'lshape', label: 'L-Shape', rows: 10, cols: 10,
-    isVoid: (r, c) => r < 5 && c >= 5,
-  },
-  {
-    id: 'hshape', label: 'H-Shape', rows: 10, cols: 10,
-    isVoid: (r, c) => (r < 3 || r >= 7) && c >= 3 && c <= 6,
-  },
-  {
-    id: 'window', label: 'Window', rows: 11, cols: 11,
-    isVoid: (r, c) => ((r >= 2 && r <= 3) || (r >= 7 && r <= 8)) && ((c >= 2 && c <= 3) || (c >= 7 && c <= 8)),
-  },
-  {
-    id: 'ushape', label: 'U-Shape', rows: 10, cols: 10,
-    isVoid: (r, c) => r < 6 && c >= 3 && c <= 6,
-  },
-  {
-    id: 'pinwheel', label: 'Pinwheel', rows: 10, cols: 10,
-    isVoid: (r, c) => (
-      (r < 3 && (c === 5 || c === 6))
-      || (c >= 7 && (r === 5 || r === 6))
-      || (r >= 7 && (c === 3 || c === 4))
-      || (c < 3 && (r === 3 || r === 4))
-    ),
-  },
-  {
-    id: 'twin-islands', label: 'Twin Islands', rows: 9, cols: 11,
-    isVoid: (r, c) => r >= 2 && r <= 6 && c >= 4 && c <= 6,
-  },
-];
-
-/** Build `{ rows, cols, voids }` for a named shape from `SHAPED_SPECS`. */
-export function shapeSpec(id) {
-  const spec = SHAPED_SPECS.find((s) => s.id === id);
-  if (!spec) return null;
-  const voids = [];
-  for (let r = 0; r < spec.rows; r++) {
-    for (let c = 0; c < spec.cols; c++) {
-      if (spec.isVoid(r, c)) voids.push({ r, c });
-    }
-  }
-  return { id: spec.id, label: spec.label, rows: spec.rows, cols: spec.cols, voids };
-}
+// ------------------------------------------------------------ Shaped / Cutout boards (Swiss cheese)
 
 /** Generate organic random interior cutouts ("Swiss cheese") on `rows x cols` with no dead ends. */
-export function swissCheeseVoids(rows, cols, rng, { minHoles = 3, maxHoles = 5 } = {}) {
+export function swissCheeseVoids(rows, cols, rng, { minHoles = null, maxHoles = null } = {}) {
+  const area = rows * cols;
+  const loHoles = minHoles ?? Math.max(3, Math.round(area * 0.032));
+  const hiHoles = maxHoles ?? Math.max(loHoles + 2, Math.round(area * 0.052));
   const stamps = [
     [[0, 0]],                                       // 1x1 pinhole
     [[0, 0]],                                       // 1x1 pinhole (higher weight)
@@ -1097,11 +1027,24 @@ export function swissCheeseVoids(rows, cols, rng, { minHoles = 3, maxHoles = 5 }
     [[0, 0], [0, 1], [1, 0], [1, 1]],               // 2x2 pocket
     [[0, 0], [0, 1], [1, 0]],                       // 3-cell L pocket
   ];
+  if (rows >= 12 && cols >= 12) {
+    stamps.push(
+      [[0, 0], [0, 1], [1, 0], [1, 1]],                             // extra 2x2 weight on big boards
+      [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]],             // 2x3 pocket
+      [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]],             // 3x2 pocket
+    );
+  }
+  if (rows >= 16 || cols >= 16) {
+    stamps.push(
+      [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]], // 3x3 chunk
+    );
+  }
   const grid = new Uint8Array(rows * cols);
-  const targetHoles = minHoles + ((rng() * (maxHoles - minHoles + 1)) | 0);
+  const targetHoles = loHoles + ((rng() * (hiHoles - loHoles + 1)) | 0);
   const voids = [];
   let holes = 0;
-  for (let tries = 0; tries < 120 && holes < targetHoles; tries++) {
+  const maxTries = Math.max(140, targetHoles * 35);
+  for (let tries = 0; tries < maxTries && holes < targetHoles; tries++) {
     const stamp = stamps[(rng() * stamps.length) | 0];
     const r0 = 1 + ((rng() * (rows - 2)) | 0);
     const c0 = 1 + ((rng() * (cols - 2)) | 0);
@@ -1348,6 +1291,10 @@ function generateShapedPuzzle({
     }
 
     if (cur.unk > 0 || cur.loopCells < minLoopCells || cur.clues.length < 4) continue;
+    if (rows >= 12 && cols >= 12) {
+      const qs = quadrantStats(rows, cols, cur.edges, cur.clues);
+      if (qs.minFill < 0.38 || qs.minClues < 2) continue;
+    }
 
     // 2. Strip clues (Pass 1 fast rules + Pass 2 exact solve + binary search back to targetTier)
     let current = cur.clues.slice();
@@ -1361,8 +1308,11 @@ function generateShapedPuzzle({
     }
     if (!beginnerOnly && Date.now() < deadline) {
       const order1b = shuffle(current.slice(), rand);
+      const p1Cap = baseGrid.activeCount >= 200 ? 22 : order1b.length;
+      let p1Tried = 0;
       for (const cl of order1b) {
-        if (Date.now() >= deadline || current.length <= 4) break;
+        if (Date.now() >= deadline || current.length <= 4 || p1Tried >= p1Cap) break;
+        p1Tried++;
         const trial = current.filter((x) => x !== cl);
         if (solvedByRules(compile({ name, rows, cols, voids, clues: trial }), fastUpto).solved) current = trial;
       }
@@ -1377,10 +1327,17 @@ function generateShapedPuzzle({
     if (!skipPass2 && Date.now() < deadline) {
       const order2 = shuffle(current.slice(), rand);
       const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
-      const maxStrips = deepStrip ? order2.length : Math.max(3, Math.min(10, Math.ceil(order2.length * 0.38)));
+      const maxStrips = wantUnsolved
+        ? order2.length
+        : baseGrid.activeCount >= 200
+          ? (deepStrip ? 14 : 5)
+          : (deepStrip ? order2.length : Math.max(3, Math.min(10, Math.ceil(order2.length * 0.38))));
+      const maxPass2Tries = (wantUnsolved || baseGrid.activeCount < 200) ? order2.length : 50;
       const removed = [];
+      let p2Tried = 0;
       for (const cl of order2) {
-        if (Date.now() >= deadline || current.length <= 4 || removed.length >= maxStrips) break;
+        if (Date.now() >= deadline || current.length <= 4 || removed.length >= maxStrips || p2Tried >= maxPass2Tries) break;
+        p2Tried++;
         const trial = current.filter((x) => x !== cl);
         const ex = solve(compile({ name, rows, cols, voids, clues: trial }), { limit: 2, maxNodes: pruneNodeCap });
         if (ex.exceeded || ex.count !== 1) continue;
@@ -1440,8 +1397,7 @@ function generateShapedPuzzle({
  *   rows, cols           board dimensions (each >= 4)
  *   seed                 PRNG seed (or pass `rng` directly)
  *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all' | 'full-masyu' | 'full-lines' | 'full-walls' | 'full-mixed' | 'shaped' | 'swiss-cheese'
- *   voids                optional explicit array of `{ r, c }` cutout voids (or pass `shape` name from SHAPED_SPECS)
- *   shape                optional named shape from SHAPED_SPECS (overrides rows/cols/voids)
+ *   voids                optional explicit array of `{ r, c }` cutout voids
  *   layout               clue filter or geometric pattern mask name (default 'none')
  *   minFill              minimum loop fill fraction (e.g. 1.0 for Full board)
  *   maxTier              'Beginner' | 'Medium' | 'Hard' | 'Expert' (default 'Expert')
@@ -1461,7 +1417,6 @@ export function generatePuzzle({
   style = 'balanced',
   layout = 'none',
   voids = null,
-  shape = null,
   minFill = null,
   maxTier = 'Expert',
   targetTier = null,
@@ -1474,13 +1429,7 @@ export function generatePuzzle({
 } = {}) {
   const rand = rng || makeRng(seed);
   const deadline = Date.now() + budgetMs;
-  if (shape) {
-    const spec = shapeSpec(shape);
-    if (!spec) throw new Error(`Unknown shape "${shape}"`);
-    rows = spec.rows;
-    cols = spec.cols;
-    voids = spec.voids;
-  } else if (style === 'swiss-cheese' && (!voids || !voids.length)) {
+  if (style === 'swiss-cheese' && (!voids || !voids.length)) {
     voids = swissCheeseVoids(rows, cols, rand);
   }
   const N = rows * cols;
