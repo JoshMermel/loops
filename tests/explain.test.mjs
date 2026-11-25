@@ -477,3 +477,66 @@ test('gray pearl hints: end-to-end solving, wrong manual gray label detection, a
   }
   assert.ok(solvedGray >= 12, `expected >= 12 solved gray hint runs, got ${solvedGray}`);
 });
+
+test('fullBoard & given edges/walls hints: end-to-end solving, checkerPocket explanations, and given-edge safety', () => {
+  // 1. checkerPocket rect and hyp explanations + non-spoiling nudges
+  const Pc = compile({
+    name: 'fb_exp', rows: 4, cols: 6, fullBoard: true, clues: [],
+    givens: [{ r: 0, c: 2, dir: 'H', v: 0 }],
+  });
+  const e0 = Pc.ed[(0 * 6 + 0) * 4 + 2], e1 = Pc.ed[(0 * 6 + 1) * 4 + 2], e2 = Pc.ed[(0 * 6 + 2) * 4 + 2];
+  const expRect = explainStep(Pc, {
+    rule: 'checkerPocket', tier: 'Medium', weight: 18,
+    sets: [['e', e0, E_ON], ['e', e2, E_ON], ['e', e1, E_OFF]],
+    info: { mode: 'rect', area: [0, 1, 2], needLight: 4, needDark: 2, diff: 2 },
+  });
+  assert.ok(expRect.text.includes('Checkerboard parity'));
+  assert.ok(expRect.nudge.length > 15 && !expRect.nudge.includes('cross out'));
+  assert.ok(expRect.nudgeRoles.area.length === 3);
+
+  const expHyp = explainStep(Pc, {
+    rule: 'checkerParity', tier: 'Hard', weight: 36,
+    sets: [['e', e1, E_OFF]],
+    info: { mode: 'hyp', edge: e1, hyp: E_ON, area: [0, 1, 2], needLight: 4, needDark: 2 },
+  });
+  assert.ok(expHyp.text.includes('checkerboard counts'));
+  assert.ok(expHyp.nudgeRoles.focus.length === 2);
+
+  // 2. Follow computeHint() from initial givens to solve unique full-board no-circle puzzles
+  const rng = mulberry32(5511);
+  let solvedFB = 0;
+  for (let attempt = 0; attempt < 250 && solvedFB < 10; attempt++) {
+    const empty = compile({ name: 'ef', rows: 4, cols: 6, clues: [], fullBoard: true });
+    const solRes = solve(empty, { limit: 1, maxNodes: 3000, rng });
+    if (solRes.count === 0) continue;
+    const truth = solRes.solutions[0];
+    const givens = [];
+    for (let x = 0; x < empty.numEdges; x++) {
+      if (empty.edgeA[x] < 0) continue;
+      if (rng() < 0.32) {
+        const i = x >> 1;
+        givens.push({ r: (i / 6) | 0, c: i % 6, dir: (x & 1) ? 'V' : 'H', v: truth.e[x] === E_ON ? 1 : 0 });
+      }
+    }
+    const P = compile({ name: `fbh_${attempt}`, rows: 4, cols: 6, clues: [], fullBoard: true, givens });
+    const exact = solve(P, { limit: 2, maxNodes: 20000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    const r = rate(P);
+    if (!r.solved) continue;
+    P.solution = encodeSolution(P, exact.solutions[0]);
+
+    const marks = { edges: new Uint8Array(P.numEdges) };
+    for (const gv of P.givens) marks.edges[gv.edge] = gv.v ? 1 : 2;
+    let steps = 0;
+    while (!isSolved(P, marks.edges) && steps < 300) {
+      const h = computeHint(P, marks);
+      assert.equal(h.kind, 'step', `got ${h.kind} on ${P.name} at step ${steps}`);
+      assert.equal(applyHintToMarks(marks, h.hints[0]), true);
+      steps++;
+    }
+    assert.equal(isSolved(P, marks.edges), true);
+    assert.equal(checkMarksAgainstSolution(P, marks).total, 0);
+    solvedFB++;
+  }
+  assert.ok(solvedFB >= 8, `expected >= 8 solved fullBoard hint runs, got ${solvedFB}`);
+});

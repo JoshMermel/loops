@@ -40,4 +40,14 @@ test('boardSvg outputs fixed black-and-white SVG with white/black/gray circles a
 
   const svgSol = boardSvg(P, decodeSolution(P, P.solution));
   assert.ok(svgSol.includes('class="loop"'));
+
+  // Full-board with given line and given wall renders full-dot, given-line, and given-wall
+  const Pfb = compile({
+    name: 'pfb', rows: 4, cols: 4, clues: [], fullBoard: true,
+    givens: [{ r: 0, c: 0, dir: 'H', v: 1 }, { r: 1, c: 1, dir: 'V', v: 0 }],
+  });
+  const svgFb = boardSvg(Pfb, null);
+  assert.ok(svgFb.includes('class="full-dot"'));
+  assert.ok(svgFb.includes('class="given-line"'));
+  assert.ok(svgFb.includes('class="given-wall"'));
 });

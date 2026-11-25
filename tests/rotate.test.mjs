@@ -80,6 +80,23 @@ test('rotateMarksCW and unrotateMarksCW round-trip edges, autoE, faces, and auto
   const gBackM = unrotateMarksCW(gBase, gRot, gRotM);
   assert.deepEqual(gBackM.grays, gm.grays);
   assert.deepEqual(gBackM.autoG, gm.autoG);
+
+  // Verify fullBoard + givens rotate 90° CW cleanly (4 rotations = identity, symmetryKey invariant)
+  const fBase = compile({
+    name: 'frot', rows: 4, cols: 6, fullBoard: true,
+    clues: [{ r: 0, c: 2, t: 'W' }],
+    givens: [{ r: 1, c: 2, dir: 'H', v: 1 }, { r: 2, c: 4, dir: 'V', v: 0 }],
+  });
+  const fRot = rotatePuzzleCW(fBase);
+  assert.equal(fRot.fullBoard, true);
+  assert.equal(fRot.givens.length, 2);
+  assert.equal(puzzleHash(fRot), puzzleHash(fBase));
+  let cur = fBase;
+  for (let k = 0; k < 4; k++) cur = rotatePuzzleCW(cur);
+  assert.deepEqual(
+    cur.givens.map(({ r, c, dir, v }) => ({ r, c, dir, v })).sort((a, b) => a.r - b.r || a.c - b.c),
+    fBase.givens.map(({ r, c, dir, v }) => ({ r, c, dir, v })).sort((a, b) => a.r - b.r || a.c - b.c),
+  );
 });
 
 test('hints and auto-marks work identically on rotated puzzles', () => {

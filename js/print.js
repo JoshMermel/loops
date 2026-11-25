@@ -79,11 +79,28 @@ export function boardSvg(P, sol = null) {
   for (let c = 0; c < cols; c++) g += `<line x1="${c}" y1="0" x2="${c}" y2="${h}" stroke="${GRID}" stroke-width="0.03"/>`;
   for (let r = 0; r < rows; r++) g += `<line x1="0" y1="${r}" x2="${w}" y2="${r}" stroke="${GRID}" stroke-width="0.03"/>`;
 
+  if (P.fullBoard) {
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      g += `<circle class="full-dot" cx="${c}" cy="${r}" r="0.065" fill="#555"/>`;
+    }
+  }
   if (sol) {
     for (let x = 0; x < P.numEdges; x++) {
       if (sol.e[x] !== E_ON) continue;
       const a = x >> 1, b = (x & 1) ? a + cols : a + 1;
       g += `<line class="loop" x1="${a % cols}" y1="${(a / cols) | 0}" x2="${b % cols}" y2="${(b / cols) | 0}" stroke="${INK}" stroke-width="0.14" stroke-linecap="round"/>`;
+    }
+  }
+  if (P.hasGivens) {
+    for (const gv of P.givens) {
+      const x1 = gv.c, y1 = gv.r, x2 = gv.dir === 'H' ? gv.c + 1 : gv.c, y2 = gv.dir === 'V' ? gv.r + 1 : gv.r;
+      if (gv.v === 1) {
+        if (!sol) g += `<line class="given-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${INK}" stroke-width="0.16" stroke-linecap="round"/>`;
+      } else {
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = 0.11;
+        const p = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
+        g += `<path class="given-wall" d="${p}" stroke="${INK}" stroke-width="0.065" stroke-linecap="round" fill="none"/>`;
+      }
     }
   }
   // Circles on intersections (drawn above loop line so white/gray circles stay unobstructed)

@@ -8,19 +8,20 @@ A browser game and puzzle toolkit for **Masyu**, built in the same puzzle-toolki
 
 - **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
 - **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each direction).
-- **Gray circle (bonus):** secretly either white or black — the loop must visit it and satisfy either rule. Tap a gray circle in the app to label it white or black as a note (optional).
-- Empty intersections may or may not be on the loop.
+- **Gray circle:** secretly either white or black — the loop must visit it and satisfy either rule. Tap a gray circle in the app to label it white or black as a note (optional).
+- **Full board:** the loop must visit **every** intersection on the grid; dark pre-filled segments and bold **✕** walls are permanent givens.
+- Empty intersections may or may not be on the loop (except in **Full board** books).
 
 ## Status
 
 | Part | State |
 | --- | --- |
-| Exact solver / uniqueness counter (`js/logic.js`) | done: worklist-driven incremental `propagate()` with CSR edge-clue wakeups, direct cycle tracing, and mystery gray-circle resolution (`W`/`B`/`G`), cross-checked against a brute-force reference (`tests/reference_solver.mjs`) |
-| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 44 rules (6 bookkeeping + 38 solving rules, including gray-circle deductions and gray-color lookahead) across Beginner, Medium, Hard, and Expert; soundness-tested against exact solutions and `data/armory.csv` |
-| Hint button (`js/explain.js`, `js/hintstep.js`) | done: two-press progressive hints (first press highlights where to look without spoiling the move; second press replays the scorer's next step, explains imagined chains step by step, and draws ghost edge/gray-label marks and dashed chains; further presses cycle alternate firings); tested end-to-end on Beginner/Medium puzzles, gray puzzles, and `data/armory.csv` |
-| Generator (`js/generator.js`, `tools/generate.mjs`, `tools/fill_pools.mjs`, `tools/overnight.mjs`) | done: dual-face `tightLoop` (all-4-border + four-quadrant coverage and two-pass clue stripping) + guided `W↔B` mask hill-climber, verified by complete search; supports `--size`, `--seed`, `--budget`, `--style` (`balanced`, `white`, `black`, `sparse`, `gray-mixed`, `gray-all`), `--layout` (symmetry/region filters: `checkerboard`, `interior`, `frame`, `stripes`, `rot180`, `mirror`, `transpose`, `rot90`, `yinyang`, `yinyang-mirror`, `yinyang-transpose`, `cookie`, `cookie-horiz`, `cookie-diag`; fixed geometric/wallpaper masks: `lattice`, `blocks2x2`, `quilt2x2`, `circle-ring`, `honeycomb`, `pillars`, `hourglass`, `brackets`, `x-bracket`, `spiral`, `stairs`, `small-x`, `bricks`, `dominoes`, `ltiles`, `mirror-ltiles`, `herringbone`, `slashes`, `zigzags`), `--min-fill`, `--tier`, `--max-tier`, `--keep` |
-| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/build_all_books.mjs`, `tools/audit_books.mjs`) | 30 visible books (**14,604 audited puzzles**): Gentle intro (100: 50 `5×5` + 50 `6×6`); Default across 5 sizes (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`), each with 4 score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert = 2,010 per size); Bonus (8 fixed-size 520-puzzle books split 10% B / 40% M / 40% H / 10% E + 10 `Expert+` + 10 Mega finale puzzles each: All white `8×8`+`12×20`, All black `10×10`+`12×20`, Gray circles `8×8`+`12×20`, All gray `8×8`+`10×12`, Black & White Cookie `10×10`+`12×20` balanced across vertical/horizontal/diagonal splits, Skyscraper `6×20`+`6×40`, Exact symmetry `10×10`+`14×14` balanced across mirror/diagonal/180°, Full board `10×10`+`12×20`; plus **Patterns** with 294 all-square `9×9`–`13×13` puzzles across 19 shapes & wallpapers) and hidden `armory` (32) |
-| Browser GUI (`index.html`, `style.css`, `js/board.js`, `js/main.js`, `js/rotate.js`, `js/offline.js`, `sw.js`) | playable: intersection-grid edge controls (tap segment to cycle empty/line/✕, drag to draw/erase loop, right-click/drag for ✕, tap/right-click square center to shade Inside/Outside, tap/right-click gray circles to label white/black with auto-labeling on 2 segments), auto-rotation + manual `↻ Turn` for tall boards, undo/redo, localStorage saves by canonical puzzle hash, "Correct so far?", Hint, Book picker modal, Browse grid, dark mode, line-color palettes, locked Auto-X and Auto-Shade modes, opt-in **Offline play** service worker (`sw.js` + `manifest.webmanifest`), `?book=<id>&puzzle=N` deep links |
+| Exact solver / uniqueness counter (`js/logic.js`) | done: worklist-driven incremental `propagate()` with CSR edge-clue wakeups, direct cycle tracing, mystery gray-circle resolution (`W`/`B`/`G`), full-board mode (`full`), and permanent given lines/walls (`H1`/`H0`/`V1`/`V0`), cross-checked against a brute-force reference (`tests/reference_solver.mjs`) |
+| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 46 rules (6 bookkeeping + 40 solving rules, including gray-circle deductions, gray-color lookahead, and full-board checkerboard parity `checkerPocket`/`checkerParity`) across Beginner, Medium, Hard, and Expert; soundness-tested against exact solutions and `data/armory.csv` |
+| Hint button (`js/explain.js`, `js/hintstep.js`) | done: two-press progressive hints with Settings toggle for immediate full hints (first press highlights where to look without spoiling the move; second press replays the scorer's next step, explains imagined chains step by step, and draws ghost edge/gray-label marks and dashed chains; further presses cycle alternate firings); tested end-to-end on Beginner/Medium puzzles, gray puzzles, full-board puzzles, and `data/armory.csv` |
+| Generator (`js/generator.js`, `tools/generate.mjs`, `tools/fill_pools.mjs`, `tools/overnight.mjs`) | done: dual-face `tightLoop` (all-4-border + four-quadrant coverage and two-pass clue stripping) + guided `W↔B` mask hill-climber + Hamiltonian full-board generator, verified by complete search; supports `--size`, `--seed`, `--budget`, `--style` (`balanced`, `white`, `black`, `sparse`, `gray-mixed`, `gray-all`, `full-masyu`, `full-lines`, `full-walls`, `full-mixed`), `--layout` (symmetry/region filters: `checkerboard`, `interior`, `frame`, `stripes`, `rot180`, `mirror`, `transpose`, `rot90`, `yinyang`, `yinyang-mirror`, `yinyang-transpose`, `cookie`, `cookie-horiz`, `cookie-diag`; fixed geometric/wallpaper masks: `lattice`, `blocks2x2`, `quilt2x2`, `circle-ring`, `honeycomb`, `pillars`, `hourglass`, `brackets`, `x-bracket`, `spiral`, `stairs`, `small-x`, `bricks`, `dominoes`, `ltiles`, `mirror-ltiles`, `herringbone`, `slashes`, `zigzags`), `--min-fill`, `--tier`, `--max-tier`, `--keep` |
+| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/build_all_books.mjs`, `tools/audit_books.mjs`) | 33 visible books (**16,084 audited puzzles**) across 5 top-level sections: **Start here** (`Gentle intro`, 100); **Default** across 5 sizes (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`, 2,010 per size); **Gray circles** (`Gray circles 8×8`+`12×20` and `All gray 8×8`+`10×12`, 520 each); **Full board** (4 `8×8` books × 500 enforcing the full-board rule: `Full board Masyu`, `Given lines`, `Given walls`, `Lines & walls`); **Bonus** (All white `8×8`+`12×20`, All black `10×10`+`12×20`, Black & White Cookie `10×10`+`12×20`, Skyscraper `6×20`+`6×40`, Exact symmetry `10×10`+`14×14`, 520 each; plus `Patterns`, 294); and hidden `armory` (33) |
+| Browser GUI (`index.html`, `style.css`, `js/board.js`, `js/main.js`, `js/rotate.js`, `js/offline.js`, `sw.js`) | playable: intersection-grid edge controls (tap segment to cycle empty/line/✕, drag to draw/erase loop, right-click/drag for ✕, tap/right-click square center to shade Inside/Outside, tap/right-click gray circles for 0° checkerboard white/black labels with auto-labeling, locked permanent given lines & walls + full-board trapped-dot highlights), auto-rotation + manual `↻ Turn` for tall boards, undo/redo, localStorage saves by canonical puzzle hash, "Correct so far?", Hint (with Two-step hints toggle), Book picker modal, Browse grid, dark mode, line-color palettes, locked Auto-X and Auto-Shade modes, opt-in **Offline play** service worker (`sw.js` + `manifest.webmanifest`), `?book=<id>&puzzle=N` deep links |
 | Printing (`js/print.js`, Settings → Print puzzles) | done: fixed black-and-white SVG booklet for any range (`1-10, 15`), optional answer key, laid out by cell size for A4 and Letter, every page header linking to the site |
 | Docs (`docs/how_to_solve.md`, `docs/how_to_solve.html`) | generated from `js/rating.js` with illustrations from the hidden `armory` book |
 
@@ -48,7 +49,7 @@ node --test tests/*.test.mjs
 # Generate puzzles into a pool in tools/library/ (COLSxROWS)
 node tools/generate.mjs --size 8x8 --count 10 --seed 1 --budget 60 --style balanced --tier any
 
-# Fill pools in parallel (groups: core | giants | bonus | bonus-cookie | bonus-gray | bonus-patterns | bonus-finales | all)
+# Fill pools in parallel (groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | bonus-patterns | bonus-finales | all)
 node tools/fill_pools.mjs --only core
 node tools/fill_pools.mjs --only giants
 node tools/build_all_books.mjs
@@ -74,7 +75,7 @@ node tools/build_how_to_solve.mjs
 name,rows,cols,clues,solution,rules,tier,score
 ```
 
-- `clues`: `row:col:W|B|G` items joined by `;` (0-based row and column, `W` = white circle, `B` = black circle, `G` = mystery gray circle).
+- `clues`: semicolon-separated tokens: optional `full` (full-board rule), circle clues `row:col:W|B|G` (0-based row/col, `W` = white, `B` = black, `G` = mystery gray), and optional permanent given edges `row:col:H1|H0|V1|V0` (`H`/`V` = right/bottom track, `1` = given segment, `0` = given wall).
 - `solution`: one char per cell, row-major: a hex digit of the loop cell's exits (`U=1, R=2, D=4, L=8`, so `3`=UR, `5`=UD, `6`=RD, `9`=UL, `a`=RL, `c`=DL), or `#` for a cell not on the loop.
 - `rules`, `tier`, `score`: hardest rule needed, difficulty tier (`Beginner`, `Medium`, `Hard`, `Expert`), and integer step-cost sum from `js/rating.js`.
 
@@ -140,19 +141,21 @@ The human-style solver (`js/rating.js`) always applies the cheapest applicable r
 | 29 | `whiteCornerPinch` | a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors | Medium | 17 |
 | 30 | `whiteDeadEndPinch` | a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes | Medium | 17 |
 | 31 | `faceShade` | basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge | Medium | 18 |
-| 32 | `boxStrand` | closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side | Medium | 20 |
-| 33 | `corridorNoEarlyClose` | a forced multi-cell corridor joining the two ends of one path would close the loop early | Hard | 30 |
-| 34 | `faceCircle` | advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge | Hard | 38 |
-| 35 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Hard | 44 |
-| 36 | `chokepoint` | blocking this segment would cut off a small area or leave a single chokepoint cell | Hard | 48 |
-| 37 | `parityPocket` | the other choice would seal off a small pocket with an odd number of open ends | Hard | 52 |
-| 38 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 58 |
-| 39 | `chokepointArea` | blocking this segment would cut off a large area or leave a single chokepoint cell | Hard | 64 |
-| 40 | `parityForces` | the other choice would seal off an area with an odd number of open ends | Hard | 68 |
-| 41 | `tryEdge` | trying a segment or gray circle one way leads to a contradiction | Expert | 120 |
-| 42 | `imagineLocal` | imagine a segment or gray circle one way: one local step immediately breaks a rule | Medium | 22–28 |
-| 43 | `imagineTrace` | imagine a segment or gray circle one way and trace one single thread 2–3 steps ahead until something breaks | Hard | 36–75 |
-| 44 | `imagineChain` | imagine a segment or gray circle one way and follow a long, multi-front, or area-parity chain until something breaks | Expert | ≥80 |
+| 32 | `checkerPocket` | checkerboard light/dark dot counts in a small full-board pocket force its exit segments | Medium | 18 |
+| 33 | `boxStrand` | closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side | Medium | 20 |
+| 34 | `corridorNoEarlyClose` | a forced multi-cell corridor joining the two ends of one path would close the loop early | Hard | 30 |
+| 35 | `checkerParity` | checkerboard light/dark dot counts in a full-board region force its exit segments | Hard | 36 |
+| 36 | `faceCircle` | advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge | Hard | 38 |
+| 37 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Hard | 44 |
+| 38 | `chokepoint` | blocking this segment would cut off a small area or leave a single chokepoint cell | Hard | 48 |
+| 39 | `parityPocket` | the other choice would seal off a small pocket with an odd number of open ends | Hard | 52 |
+| 40 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 58 |
+| 41 | `chokepointArea` | blocking this segment would cut off a large area or leave a single chokepoint cell | Hard | 64 |
+| 42 | `parityForces` | the other choice would seal off an area with an odd number of open ends | Hard | 68 |
+| 43 | `tryEdge` | trying a segment or gray circle one way leads to a contradiction | Expert | 120 |
+| 44 | `imagineLocal` | imagine a segment or gray circle one way: one local step immediately breaks a rule | Medium | 22–28 |
+| 45 | `imagineTrace` | imagine a segment or gray circle one way and trace one single thread 2–3 steps ahead until something breaks | Hard | 36–75 |
+| 46 | `imagineChain` | imagine a segment or gray circle one way and follow a long, multi-front, or area-parity chain until something breaks | Expert | ≥80 |
 
 ## License
 

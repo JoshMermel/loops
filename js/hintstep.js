@@ -46,6 +46,7 @@ export function checkMarksAgainstSolution(P, marks, solutionStr = P.solution) {
   if (!sol) return { wrongEdges, wrongClues, total: 0 };
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
+    if (P.hasGivens && P.givenE[x] !== 0) continue;
     if (marks.edges[x] === 1 && sol.e[x] !== E_ON) wrongEdges.push(x);
     else if (marks.edges[x] === 2 && sol.e[x] === E_ON && !(marks.autoE && marks.autoE[x])) wrongEdges.push(x);
   }
@@ -74,6 +75,7 @@ export function computeHint(P, marks) {
     const wrongAuto = [];
     for (let x = 0; x < P.numEdges; x++) {
       if (P.edgeA[x] < 0) continue;
+      if (P.hasGivens && P.givenE[x] !== 0) continue;
       if (marks.edges[x] === 1 && sol.e[x] !== E_ON) wrongEdges.push(x);
       else if (marks.edges[x] === 2 && sol.e[x] === E_ON) {
         if (marks.autoE && marks.autoE[x]) wrongAuto.push(x);

@@ -90,6 +90,29 @@ test('generatePuzzle respects targetTier Beginner and style white/black', () => 
   assert.ok(pga, 'failed to generate 6x6 gray-all puzzle');
   assert.ok(pga.clues.every((c) => c.t === 'G'));
   assert.equal(rate(pga).solved, true);
+
+  for (const style of ['full-masyu', 'full-lines', 'full-walls', 'full-mixed']) {
+    const pf = generatePuzzle({ rows: 6, cols: 6, seed: 88, style, budgetMs: 8000 });
+    assert.ok(pf, `failed to generate 6x6 ${style} puzzle`);
+    assert.equal(pf.fullBoard, true);
+    assert.equal(pf.solution.includes('#'), false);
+    assert.equal(rate(pf).solved, true);
+    if (style === 'full-masyu') {
+      assert.ok(pf.clues.length >= 2);
+      // Must genuinely require fullBoard (non-unique as plain Masyu)
+      const plain = solve(compile({ name: 'plain', rows: 6, cols: 6, clues: pf.clues }), { limit: 2, maxNodes: 20000 });
+      assert.notEqual(plain.count, 1, 'full-masyu puzzle must require fullBoard');
+    } else {
+      assert.equal(pf.clues.length, 0);
+      assert.ok(pf.givens.length >= 2);
+      if (style === 'full-lines') assert.ok(pf.givens.every((g) => g.v === 1));
+      if (style === 'full-walls') assert.ok(pf.givens.every((g) => g.v === 0));
+      if (style === 'full-mixed') {
+        assert.ok(pf.givens.some((g) => g.v === 1));
+        assert.ok(pf.givens.some((g) => g.v === 0));
+      }
+    }
+  }
 });
 
 test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yinyang, full-fill)', () => {

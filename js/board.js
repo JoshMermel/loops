@@ -15,7 +15,7 @@
 //   * right-click a gray circle       -> handlers.onCellRight(cellIdx)                 (cycle gray -> black -> white -> gray)
 //   * tap any other intersection      -> no-op (prevents accidental marks)
 // handlers.onStart() / handlers.onEnd(cancelled) bracket every gesture (1 undo step per gesture).
-import { colName, edgeCells, WHITE, BLACK, GRAY } from './logic.js';
+import { colName, edgeCells, WHITE, BLACK, GRAY, E_ON, E_OFF } from './logic.js';
 import { makeColorKeeper, assignPathColors } from './pathcolors.js';
 import { makeGrace } from './grace.js';
 import { otherEnd } from './lineends.js';
@@ -407,6 +407,7 @@ export class Board {
     (info.clueState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`c${k}`); });
     if (info.badFaces) for (const f of info.badFaces) wanted.add(`f${f}`);
     if (info.earlyLoops) for (const x of info.earlyLoops) wanted.add(`l${x}`);
+    if (info.trappedCells) for (const i of info.trappedCells) wanted.add(`t${i}`);
     const { show, waiting, fresh } = this.grace.update(wanted, this._graceNow);
     this._graceNow = false;
     if (!waiting.size) clearTimeout(this._badTimer);
@@ -483,19 +484,23 @@ export class Board {
       g += `<line class="grid-line" x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}"/>`;
     }
 
-    // Subtle anchor dots at empty intersections so the lattice vertices read crisply
+    // Subtle anchor dots at empty intersections (bolder on full-board puzzles to show unvisited dots)
+    const dotR = P.fullBoard ? 2.6 : 1.4;
+    const dotCls = P.fullBoard ? 'grid-dot full-board' : 'grid-dot';
     for (let i = 0; i < P.N; i++) {
       if (P.clue[i] || deg[i] > 0) continue;
-      g += `<circle class="grid-dot" cx="${ix(i)}" cy="${iy(i)}" r="1.4"/>`;
+      g += `<circle class="${dotCls}" cx="${ix(i)}" cy="${iy(i)}" r="${dotR}"/>`;
     }
 
-    // Branching error ring (deg > 2)
+    // Branching error ring (deg > 2) & full-board trapped-intersection error ring
     for (let i = 0; i < P.N; i++) {
       if (deg[i] > 2) g += `<circle class="over" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.30}"/>`;
+      else if (show.has(`t${i}`)) g += `<circle class="trapped-cell" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.21}"/>`;
     }
 
     // Drawn loop segments directly along the lattice tracks (behind all pearls so circles read crisply)
     const pc = this.opts.pathColors;
+    const givenE = P.hasGivens ? P.givenE : null;
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 1 || !show.has(`l${x}`)) continue;
       const [x1, y1, x2, y2] = segCoords(x);
@@ -505,11 +510,16 @@ export class Board {
       if (marks.edges[x] !== 1) continue;
       const [x1, y1, x2, y2] = segCoords(x);
       const isBadLoop = show.has(`l${x}`);
-      const a = P.edgeA[x];
-      const style = !isBadLoop && this.opts.colorLines && pc
-        ? ` style="stroke:${pc[colorOf.get(find(a)) % pc.length]}"`
-        : '';
-      g += `<line class="seg${isBadLoop ? ' bad' : ''}"${style} stroke-width="${S * 0.14}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      const isGiven = givenE && givenE[x] === E_ON;
+      if (isGiven) {
+        g += `<line class="seg-given${isBadLoop ? ' bad' : ''}" stroke-width="${S * 0.165}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      } else {
+        const a = P.edgeA[x];
+        const style = !isBadLoop && this.opts.colorLines && pc
+          ? ` style="stroke:${pc[colorOf.get(find(a)) % pc.length]}"`
+          : '';
+        g += `<line class="seg${isBadLoop ? ' bad' : ''}"${style} stroke-width="${S * 0.14}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      }
     }
 
     // Circles (white, black, unlabeled gray, and 0° 2×2 checkerboard labeled gray) on top of loop segments
@@ -553,14 +563,19 @@ export class Board {
       }
     }
 
-    // Small crisp ✕ marks on crossed-out lattice tracks (auto-placed ones are fainter)
+    // Small crisp ✕ marks on crossed-out lattice tracks (auto-placed fainter; permanent given walls bolder/darker)
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 2) continue;
       const [x1, y1, x2, y2] = segCoords(x);
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.085;
+      const isGivenWall = givenE && givenE[x] === E_OFF;
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = isGivenWall ? S * 0.105 : S * 0.085;
       const path = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
-      const autoCls = marks.autoE && marks.autoE[x] ? ' auto' : '';
-      g += `<path class="edge-x-halo${autoCls}" d="${path}"/><path class="edge-x${autoCls}" d="${path}"/>`;
+      if (isGivenWall) {
+        g += `<path class="wall-given-halo" d="${path}"/><path class="wall-given" d="${path}"/>`;
+      } else {
+        const autoCls = marks.autoE && marks.autoE[x] ? ' auto' : '';
+        g += `<path class="edge-x-halo${autoCls}" d="${path}"/><path class="edge-x${autoCls}" d="${path}"/>`;
+      }
     }
 
     // Hint overlays
@@ -602,7 +617,8 @@ export class Board {
     // Hover feedback (track midpoint highlight, tappable gray circle ring, or open line-end diamonds)
     if (!this.gesture) {
       const hoverAutoX = this.hoverEdge >= 0 && marks.edges[this.hoverEdge] === 2 && marks.autoE && marks.autoE[this.hoverEdge];
-      if (this.hoverEdge >= 0 && !hoverAutoX) {
+      const hoverGiven = this.hoverEdge >= 0 && givenE && givenE[this.hoverEdge] !== 0;
+      if (this.hoverEdge >= 0 && !hoverAutoX && !hoverGiven) {
         const [x1, y1, x2, y2] = segCoords(this.hoverEdge);
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
         g += `<circle class="edge-hover" cx="${mx}" cy="${my}" r="${S * 0.16}"/>`;

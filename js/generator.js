@@ -796,11 +796,228 @@ function generateMaskPuzzle({
 }
 
 /**
+ * Generate one verified, rated Full-board puzzle (`fullBoard: true`):
+ *   - 'full-masyu': circles + full-board rule, verified to REQUIRE the full-board rule (non-unique without it).
+ *   - 'full-lines': zero circles, permanent given loop segments only.
+ *   - 'full-walls': zero circles, permanent given walls (X) only.
+ *   - 'full-mixed': zero circles, mix of permanent given segments and given walls.
+ */
+function generateFullBoardPuzzle({
+  rows, cols, style, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier,
+  wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
+}) {
+  if ((rows * cols) & 1) return null;
+  const N = rows * cols;
+  const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
+  const emptyFull = compile({ name: 'ef', rows, cols, clues: [], fullBoard: true });
+  const isCornerEdge = (x) => {
+    const a = emptyFull.edgeA[x], b = emptyFull.edgeB[x];
+    const degOf = (i) => {
+      const r = (i / cols) | 0, c = i % cols;
+      return (r > 0) + (r < rows - 1) + (c > 0) + (c < cols - 1);
+    };
+    return degOf(a) === 2 || degOf(b) === 2;
+  };
+  const solvedByPropagate = (P) => {
+    const st = initialState(P);
+    if (!propagate(P, st)) return false;
+    for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
+    return isSolved(P, st.e);
+  };
+  const isWithin = (r) => (allowUnsolved && !r.solved) || (r.solved && TIERS.indexOf(r.tier) <= effectiveMaxTier);
+
+  while (Date.now() < deadline) {
+    // Sample a general random Hamiltonian cycle on rows x cols
+    const sample = solve(emptyFull, { limit: 1, maxNodes: 4000, rng: rand });
+    if (sample.count === 0) continue;
+    const edges = sample.solutions[0].e;
+
+    if (style === 'full-masyu') {
+      const { whites, blacks } = allowedClues(rows, cols, edges, emptyFull);
+      let current = shuffle(whites.concat(blacks), rand);
+      if (current.length < 4) continue;
+      const Pfull = compile({ name, rows, cols, clues: current, fullBoard: true });
+      let baseTight = solvedByPropagate(Pfull);
+      if (!baseTight) {
+        const chk = solve(Pfull, { limit: 2, maxNodes: pruneNodeCap });
+        if (chk.exceeded || chk.count !== 1) continue;
+      }
+
+      // Pass 0: propagation-only pruning
+      if (baseTight) {
+        for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2; i--) {
+          const trial = current.slice(0, i).concat(current.slice(i + 1));
+          if (solvedByPropagate(compile({ name, rows, cols, clues: trial, fullBoard: true }))) current = trial;
+        }
+      }
+      // Pass 1: sound human-rule pruning
+      const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
+      shuffle(current, rand);
+      for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2; i--) {
+        const trial = current.slice(0, i).concat(current.slice(i + 1));
+        if (solvedByRules(compile({ name, rows, cols, clues: trial, fullBoard: true }), fastUpto).solved) current = trial;
+      }
+      // Pass 2: exact-search pruning + binary search back to effectiveMaxTier
+      let cachedRated = null;
+      let skipPass2 = beginnerOnly;
+      if (!skipPass2 && mediumOnly && Date.now() < deadline) {
+        const r1 = rate(compile({ name, rows, cols, clues: current, fullBoard: true }));
+        if (r1.solved && r1.tier === 'Medium') { cachedRated = r1; skipPass2 = true; }
+      }
+      if (!skipPass2 && Date.now() < deadline) {
+        shuffle(current, rand);
+        const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
+        const maxStrips = deepStrip ? current.length : Math.max(2, Math.min(8, Math.ceil(current.length * 0.4)));
+        const removed = [];
+        for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2 && removed.length < maxStrips; i--) {
+          const trial = current.slice(0, i).concat(current.slice(i + 1));
+          const ex = solve(compile({ name, rows, cols, clues: trial, fullBoard: true }), { limit: 2, maxNodes: pruneNodeCap });
+          if (ex.exceeded || ex.count !== 1) continue;
+          removed.push(current[i]);
+          current = trial;
+        }
+        const rated = rate(compile({ name, rows, cols, clues: current, fullBoard: true }));
+        if (wantUnsolved || isWithin(rated)) {
+          cachedRated = rated;
+        } else if (removed.length > 0 && Date.now() < deadline) {
+          const base = current;
+          let lo = 0, hi = removed.length, bestC = base.concat(removed), bestR = null;
+          while (lo + 1 < hi && Date.now() < deadline) {
+            const mid = (lo + hi) >> 1;
+            const cand = base.concat(removed.slice(mid));
+            const r = rate(compile({ name, rows, cols, clues: cand, fullBoard: true }));
+            if (isWithin(r)) { lo = mid; bestC = cand; bestR = r; }
+            else hi = mid;
+          }
+          current = bestC;
+          cachedRated = bestR;
+        }
+      }
+
+      if (Date.now() >= deadline) break;
+      if (!current.some((c) => c.t === 'W') || !current.some((c) => c.t === 'B')) continue;
+      current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+
+      // Must GENUINELY require the full-board rule (standard Masyu without fullBoard must have > 1 solution!)
+      const withoutFull = solve(compile({ name, rows, cols, clues: current }), { limit: 2, maxNodes: 20000 });
+      if (!withoutFull.exceeded && withoutFull.count === 1) continue;
+
+      const P = compile({ name, rows, cols, clues: current, fullBoard: true });
+      const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+      if (verify.exceeded || verify.count !== 1) continue;
+      const sol = verify.solutions[0];
+      if (!isSolved(P, sol.e)) continue;
+
+      const rated = cachedRated || rate(P);
+      if (wantUnsolved) { if (rated.solved) continue; }
+      else if (!rated.solved) { if (!allowUnsolved) continue; }
+      else {
+        if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+        if (targetTier && rated.tier !== targetTier) continue;
+      }
+      P.solution = encodeSolution(P, sol);
+      P.rules = rated.rules;
+      P.tier = rated.tier;
+      P.score = rated.score;
+      return P;
+    }
+
+    // Zero-circle Full-board puzzles: 'full-lines' | 'full-walls' | 'full-mixed'
+    const pool = [];
+    for (let x = 0; x < emptyFull.numEdges; x++) {
+      if (emptyFull.edgeA[x] < 0) continue;
+      const isOn = edges[x] === E_ON;
+      if (isOn && isCornerEdge(x)) continue; // corner edges are always forced on step 0
+      if (style === 'full-lines' && !isOn) continue;
+      if (style === 'full-walls' && isOn) continue;
+      const i = x >> 1;
+      pool.push({ r: (i / cols) | 0, c: i % cols, dir: (x & 1) ? 'V' : 'H', v: isOn ? 1 : 0 });
+    }
+    let current = shuffle(pool, rand);
+    // Pass 0: ultra-fast propagation-only pruning
+    for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2; i--) {
+      const trial = current.slice(0, i).concat(current.slice(i + 1));
+      if (solvedByPropagate(compile({ name, rows, cols, clues: [], fullBoard: true, givens: trial }))) current = trial;
+    }
+    // Pass 1: sound human-rule pruning
+    const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
+    shuffle(current, rand);
+    for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2; i--) {
+      const trial = current.slice(0, i).concat(current.slice(i + 1));
+      if (solvedByRules(compile({ name, rows, cols, clues: [], fullBoard: true, givens: trial }), fastUpto).solved) current = trial;
+    }
+    // Pass 2: exact-search pruning + binary search back to effectiveMaxTier
+    let cachedRated = null;
+    let skipPass2 = beginnerOnly;
+    if (!skipPass2 && mediumOnly && Date.now() < deadline) {
+      const r1 = rate(compile({ name, rows, cols, clues: [], fullBoard: true, givens: current }));
+      if (r1.solved && r1.tier === 'Medium') { cachedRated = r1; skipPass2 = true; }
+    }
+    if (!skipPass2 && Date.now() < deadline) {
+      shuffle(current, rand);
+      const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
+      const maxStrips = deepStrip ? current.length : Math.max(2, Math.min(8, Math.ceil(current.length * 0.4)));
+      const removed = [];
+      for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2 && removed.length < maxStrips; i--) {
+        const trial = current.slice(0, i).concat(current.slice(i + 1));
+        const ex = solve(compile({ name, rows, cols, clues: [], fullBoard: true, givens: trial }), { limit: 2, maxNodes: pruneNodeCap });
+        if (ex.exceeded || ex.count !== 1) continue;
+        removed.push(current[i]);
+        current = trial;
+      }
+      const rated = rate(compile({ name, rows, cols, clues: [], fullBoard: true, givens: current }));
+      if (wantUnsolved || isWithin(rated)) {
+        cachedRated = rated;
+      } else if (removed.length > 0 && Date.now() < deadline) {
+        const base = current;
+        let lo = 0, hi = removed.length, bestG = base.concat(removed), bestR = null;
+        while (lo + 1 < hi && Date.now() < deadline) {
+          const mid = (lo + hi) >> 1;
+          const cand = base.concat(removed.slice(mid));
+          const r = rate(compile({ name, rows, cols, clues: [], fullBoard: true, givens: cand }));
+          if (isWithin(r)) { lo = mid; bestG = cand; bestR = r; }
+          else hi = mid;
+        }
+        current = bestG;
+        cachedRated = bestR;
+      }
+    }
+
+    if (Date.now() >= deadline) break;
+    if (style === 'full-mixed') {
+      let nOn = 0, nOff = 0;
+      for (const gv of current) if (gv.v === 1) nOn++; else nOff++;
+      if (nOn < 2 || nOff < 2) continue;
+    }
+    current.sort((a, b) => ((a.r * cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)));
+    const P = compile({ name, rows, cols, clues: [], fullBoard: true, givens: current });
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
+
+    const rated = cachedRated || rate(P);
+    if (wantUnsolved) { if (rated.solved) continue; }
+    else if (!rated.solved) { if (!allowUnsolved) continue; }
+    else {
+      if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+      if (targetTier && rated.tier !== targetTier) continue;
+    }
+    P.solution = encodeSolution(P, sol);
+    P.rules = rated.rules;
+    P.tier = rated.tier;
+    P.score = rated.score;
+    return P;
+  }
+  return null;
+}
+
+/**
  * Generate one verified, rated Masyu puzzle.
  * Options:
  *   rows, cols           board dimensions (each >= 4)
  *   seed                 PRNG seed (or pass `rng` directly)
- *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all'
+ *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all' | 'full-masyu' | 'full-lines' | 'full-walls' | 'full-mixed'
  *   layout               clue filter or geometric pattern mask name (default 'none')
  *   minFill              minimum loop fill fraction (e.g. 1.0 for Full board)
  *   maxTier              'Beginner' | 'Medium' | 'Hard' | 'Expert' (default 'Expert')
@@ -852,6 +1069,12 @@ export function generatePuzzle({
   const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
   const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
   const mediumOnly = stripMode === 'medium' || (stripMode === null && effectiveMaxTier === 1);
+  if (style === 'full-masyu' || style === 'full-lines' || style === 'full-walls' || style === 'full-mixed') {
+    return generateFullBoardPuzzle({
+      rows, cols, style, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
+      wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
+    });
+  }
   const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : N < 320 ? 40000 : 6000;
   const solvedByPropagate = (P) => {
     const st = initialState(P);

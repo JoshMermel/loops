@@ -89,8 +89,31 @@ export function compile(p) {
     }
   }
 
+  // Optional full-board flag & given edges (v=1 given segment, v=0 given wall/X)
+  const fullBoard = Boolean(p.fullBoard);
+  const rawGivens = Array.isArray(p.givens) ? p.givens : [];
+  const givens = [];
+  let givenE = null;
+  if (rawGivens.length) {
+    givenE = new Int8Array(numEdges);
+    for (const gv of rawGivens) {
+      const { r, c, dir, v } = gv;
+      if (dir !== 'H' && dir !== 'V') throw new Error(`bad given dir "${dir}"`);
+      if (v !== 0 && v !== 1) throw new Error(`bad given value "${v}"`);
+      if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || c < 0
+        || (dir === 'H' ? (r >= rows || c >= cols - 1) : (r >= rows - 1 || c >= cols))) {
+        throw new Error(`given edge out of bounds at ${r},${c},${dir}`);
+      }
+      const edge = dir === 'H' ? 2 * (r * cols + c) : 2 * (r * cols + c) + 1;
+      if (givenE[edge] !== 0) throw new Error(`duplicate given on edge ${r},${c},${dir}`);
+      givenE[edge] = v ? E_ON : E_OFF;
+      givens.push({ r, c, dir, v, edge });
+    }
+  }
+
   return Object.assign(p, {
     N, numEdges, clue, clueAt, grayAt, clueCells, whites, blacks, grays,
+    fullBoard, givens, hasGivens: givens.length > 0, givenE,
     nb, ed, step2, ed2, edgeA, edgeB,
     _ecOff: null, _ecData: null,
   });
@@ -98,8 +121,21 @@ export function compile(p) {
 
 export function initialState(P) {
   const cell = new Int8Array(P.N);
-  for (const i of P.clueCells) cell[i] = LOOP;
+  if (P.fullBoard) {
+    cell.fill(LOOP);
+  } else {
+    for (const i of P.clueCells) cell[i] = LOOP;
+  }
   const e = new Int8Array(P.numEdges);
+  if (P.hasGivens) {
+    for (const gv of P.givens) {
+      e[gv.edge] = gv.v ? E_ON : E_OFF;
+      if (gv.v) {
+        cell[P.edgeA[gv.edge]] = LOOP;
+        cell[P.edgeB[gv.edge]] = LOOP;
+      }
+    }
+  }
   const hasGray = P.grays && P.grays.length > 0;
   // Share immutable P.clue when there are no gray pearls (zero allocation overhead on standard puzzles).
   const clue = hasGray ? P.clue.slice() : P.clue;
@@ -187,6 +223,7 @@ function getEdgeClues(P) {
  */
 export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const { N, cols, nb, ed, ed2, edgeA, edgeB, whites, blacks, grays } = P;
+  if (P.fullBoard && (N & 1)) return false;
   const cell = st.cell, e = st.e;
   const clue = st.clue || P.clue;
 
@@ -732,6 +769,14 @@ export function isSolved(P, edges) {
     if (deg[i] === 2) { loopCells++; if (start < 0) start = i; }
   }
   if (loopCells < 4) return false;
+  if (P.fullBoard && loopCells !== N) return false;
+
+  // Every given edge/wall must be respected
+  if (P.hasGivens) {
+    for (const gv of P.givens) {
+      if ((edges[gv.edge] === E_ON) !== (gv.v === 1)) return false;
+    }
+  }
 
   // Every circle must be on the loop
   for (const i of clueCells) if (deg[i] !== 2) return false;
@@ -812,25 +857,52 @@ export function isSolved(P, edges) {
 
 export const CSV_HEADER = 'name,rows,cols,clues,solution,rules,tier,score';
 
-/** Serialize clues as `row:col:W|B` joined by `;`. */
+/** Serialize circle clues as `row:col:W|B|G` joined by `;`. */
 export function cluesToString(clues) {
   return (clues || []).map((c) => `${c.r}:${c.c}:${c.t}`).join(';');
 }
 
-export function cluesFromString(s) {
-  if (!s) return [];
-  return s.split(';').map((tok) => {
+/** Serialize fullBoard flag, circle clues, and given edges/walls into the CSV clues field. */
+export function puzzleCluesToString(p) {
+  const parts = [];
+  if (p.fullBoard) parts.push('full');
+  for (const c of p.clues || []) parts.push(`${c.r}:${c.c}:${c.t}`);
+  for (const gv of p.givens || []) parts.push(`${gv.r}:${gv.c}:${gv.dir}${gv.v}`);
+  return parts.join(';');
+}
+
+/** Parse the CSV clues field into `{ clues, fullBoard, givens }`. */
+export function parseCluesField(s) {
+  const clues = [];
+  const givens = [];
+  let fullBoard = false;
+  if (!s) return { clues, fullBoard, givens };
+  for (const tok of s.split(';')) {
+    if (!tok) continue;
+    if (tok === 'full') { fullBoard = true; continue; }
     const parts = tok.split(':');
-    if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1]) || (parts[2] !== 'W' && parts[2] !== 'B' && parts[2] !== 'G')) {
+    if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) {
       throw new Error(`bad clue "${tok}"`);
     }
-    return { r: +parts[0], c: +parts[1], t: parts[2] };
-  });
+    const r = +parts[0], c = +parts[1], tag = parts[2];
+    if (tag === 'W' || tag === 'B' || tag === 'G') {
+      clues.push({ r, c, t: tag });
+    } else if (tag === 'H0' || tag === 'H1' || tag === 'V0' || tag === 'V1') {
+      givens.push({ r, c, dir: tag[0], v: tag[1] === '1' ? 1 : 0 });
+    } else {
+      throw new Error(`bad clue "${tok}"`);
+    }
+  }
+  return { clues, fullBoard, givens };
+}
+
+export function cluesFromString(s) {
+  return parseCluesField(s).clues;
 }
 
 export function toCsvRow(p) {
   return [
-    p.name, p.rows, p.cols, cluesToString(p.clues),
+    p.name, p.rows, p.cols, puzzleCluesToString(p),
     p.solution || '', p.rules || '', p.tier || '', p.score ?? '',
   ].join(',');
 }
@@ -844,17 +916,21 @@ export function parseCsv(text) {
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
     if (!t || t.startsWith('#') || t.startsWith('name,')) continue;
-    const [name, rows, cols, clues, solution, rules, tier, score] = t.split(',');
-    out.push({
+    const [name, rows, cols, cluesStr, solution, rules, tier, score] = t.split(',');
+    const { clues, fullBoard, givens } = parseCluesField(cluesStr);
+    const rec = {
       name,
       rows: +rows,
       cols: +cols,
-      clues: cluesFromString(clues),
+      clues,
       solution: solution || '',
       rules: rules || '',
       tier: tier || '',
       score: score === undefined || score === '' ? null : +score,
-    });
+    };
+    if (fullBoard) rec.fullBoard = true;
+    if (givens.length) rec.givens = givens;
+    out.push(rec);
   }
   return out;
 }
@@ -865,28 +941,49 @@ export function parseCsv(text) {
  */
 export function symmetryKey(p) {
   const { rows, cols } = p;
+  const givens = p.givens || [];
+  const prefix = p.fullBoard ? 'F|' : '';
   let best = null;
   for (let t = 0; t < 8; t++) {
     const swap = t & 1, flipR = t & 2, flipC = t & 4;
     const R = swap ? cols : rows, C = swap ? rows : cols;
-    const items = p.clues.map((cl) => {
-      let r = cl.r, c = cl.c;
+    const xform = (r, c) => {
       if (swap) [r, c] = [c, r];
       if (flipR) r = R - 1 - r;
       if (flipC) c = C - 1 - c;
+      return [r, c];
+    };
+    const items = p.clues.map((cl) => {
+      const [r, c] = xform(cl.r, cl.c);
       return [r * C + c, `${r}:${c}:${cl.t}`];
     }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
-    const key = `${R}x${C}|${items}`;
+    let gPart = '';
+    if (givens.length) {
+      gPart = '|' + givens.map((gv) => {
+        const [r1, c1] = xform(gv.r, gv.c);
+        const [r2, c2] = xform(gv.dir === 'V' ? gv.r + 1 : gv.r, gv.dir === 'H' ? gv.c + 1 : gv.c);
+        const dir = r1 === r2 ? 'H' : 'V';
+        const r = Math.min(r1, r2), c = Math.min(c1, c2);
+        return [(r * C + c) * 2 + (dir === 'V' ? 1 : 0), `${r}:${c}:${dir}${gv.v}`];
+      }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
+    }
+    const key = `${prefix}${R}x${C}|${items}${gPart}`;
     if (best === null || key < best) best = key;
   }
   return best;
 }
 
-/** Orientation-specific short stable hash of size + clues, for localStorage save keys. */
+/** Orientation-specific short stable hash of size + clues (+ fullBoard / givens), for localStorage save keys. */
 export function puzzleHash(p) {
   if (p.hashKey) return p.hashKey;
   const sorted = [...p.clues].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c));
-  const s = `${p.rows}x${p.cols}|${cluesToString(sorted)}`;
+  const sortedG = p.givens && p.givens.length
+    ? [...p.givens].sort((a, b) => ((a.r * p.cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * p.cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)))
+    : null;
+  const body = (p.fullBoard || sortedG)
+    ? puzzleCluesToString({ fullBoard: p.fullBoard, clues: sorted, givens: sortedG || [] })
+    : cluesToString(sorted);
+  const s = `${p.rows}x${p.cols}|${body}`;
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
   return h.toString(36);

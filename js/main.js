@@ -11,7 +11,7 @@ import {
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
 } from './marks.js';
-import { clueStates, earlyLoopEdges } from './clues.js';
+import { clueStates, earlyLoopEdges, trappedFullCells } from './clues.js';
 import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
 import {
@@ -87,17 +87,25 @@ board.setOptions({ colorLines: settings.colorLines, ...paletteOptions() });
 
 // ------------------------------------------------------------ marks & undo
 
-const emptyMarks = (P) => ({
-  edges: new Uint8Array(P.numEdges),
-  autoE: new Uint8Array(P.numEdges),
-  faces: new Uint8Array(numFacesOf(P)),
-  autoF: new Uint8Array(numFacesOf(P)),
-  grays: new Uint8Array(P.grays ? P.grays.length : 0),
-  autoG: new Uint8Array(P.grays ? P.grays.length : 0),
-});
+const isGivenEdge = (P, x) => Boolean(P && P.hasGivens && P.givenE[x] !== 0);
+
+const emptyMarks = (P) => {
+  const edges = new Uint8Array(P.numEdges);
+  if (P.hasGivens) {
+    for (const gv of P.givens) edges[gv.edge] = gv.v ? 1 : 2;
+  }
+  return {
+    edges,
+    autoE: new Uint8Array(P.numEdges),
+    faces: new Uint8Array(numFacesOf(P)),
+    autoF: new Uint8Array(numFacesOf(P)),
+    grays: new Uint8Array(P.grays ? P.grays.length : 0),
+    autoG: new Uint8Array(P.grays ? P.grays.length : 0),
+  };
+};
 const freshMarks = (P) => {
   const m = emptyMarks(P);
-  if (settings.autoShade) reconcileAutoShade(P, m, true);
+  reconcileAuto(P, m);
   return m;
 };
 const cloneMarks = (m) => ({
@@ -117,8 +125,8 @@ const sameMarks = (a, b) => (
   && a.grays.every((v, i) => v === b.grays[i])
   && a.autoG.every((v, i) => v === b.autoG[i])
 );
-const isPristine = (m) => (
-  m.edges.every((v, x) => v === 0 || (v === 2 && m.autoE[x]))
+const isPristine = (m, P = state.P) => (
+  m.edges.every((v, x) => isGivenEdge(P, x) || v === 0 || (v === 2 && m.autoE[x]))
   && m.faces.every((v, f) => v === 0 || m.autoF[f])
   && m.grays.every((v, k) => v === 0 || m.autoG[k])
 );
@@ -148,7 +156,7 @@ function cycleGray(cell, reverse = false) {
 
 function cycleEdge(x) {
   const P = state.P, m = state.marks;
-  if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x)) return;
+  if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x) || isGivenEdge(P, x)) return;
   m.edges[x] = cycleEdgeMark(m.edges[x]);
   m.autoE[x] = 0;
   reconcileAuto(P, m);
@@ -157,7 +165,7 @@ function cycleEdge(x) {
 
 function toggleEdge(x) {
   const P = state.P, m = state.marks;
-  if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x)) return;
+  if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x) || isGivenEdge(P, x)) return;
   m.edges[x] = toggleEdgeCross(m.edges[x]);
   m.autoE[x] = 0;
   reconcileAuto(P, m);
@@ -194,7 +202,10 @@ function dragStep(a, b, first) {
   const P = state.P, m = state.marks;
   state.dragStack.push(snapshot());
   const x = edgeBetween(P, a, b);
-  if (x < 0) return;
+  if (x < 0 || isGivenEdge(P, x)) {
+    if (first && isGivenEdge(P, x)) state.drawMode = m.edges[x] === 1 ? 1 : 0;
+    return;
+  }
   if (first) state.drawMode = m.edges[x] === 1 ? 0 : 1;
   if (state.drawMode === 1) {
     // Don't draw across crossed-out edges
@@ -215,7 +226,7 @@ function crossStep(a, b, first) {
   const P = state.P, m = state.marks;
   state.dragStack.push(snapshot());
   const x = edgeBetween(P, a, b);
-  if (x < 0 || isAutoX(m, x)) {
+  if (x < 0 || isAutoX(m, x) || isGivenEdge(P, x)) {
     if (first) state.drawMode = null;
     return;
   }
@@ -287,6 +298,7 @@ function analyse() {
     clueState: state.solved ? state.P.clues.map(() => '') : clueStates(state.P, state.marks),
     badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
+    trappedCells: state.solved ? new Set() : trappedFullCells(state.P, state.marks),
   };
 }
 
@@ -413,6 +425,9 @@ function load(P) {
       }
       if (G && s.ag && s.ag.length === G) {
         for (let k = 0; k < G; k++) m.autoG[k] = +s.ag[k];
+      }
+      if (P.hasGivens) {
+        for (const gv of P.givens) { m.edges[gv.edge] = gv.v ? 1 : 2; m.autoE[gv.edge] = 0; }
       }
       reconcileAutoGray(P, m);
       applyAutoX(P, m, settings.autoX, { useShade: settings.autoShade });
@@ -647,10 +662,11 @@ function updateUrl() {
 
 function showInfo() {
   const P = state.P;
+  const full = P.fullBoard ? ' · Full board' : '';
   const tier = P.tier ? ` · ${P.tier}` : '';
   const extra = beyondHints(P) ? ' (beyond hints)' : '';
   const info = $('puz-info');
-  info.textContent = `${P.name} · ${P.cols}×${P.rows}${tier}${extra}`;
+  info.textContent = `${P.name} · ${P.cols}×${P.rows}${full}${tier}${extra}`;
   info.title = P.tier && TIER_INFO[P.tier] ? `${P.tier}: ${TIER_INFO[P.tier].blurb}` : '';
 }
 

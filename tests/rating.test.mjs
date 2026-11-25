@@ -557,3 +557,95 @@ test('gray pearl human rules fire cleanly and are 100% sound on random unique mi
   assert.ok(solvedCount >= checked * 0.8, `expected rules to solve most gray boards, solved ${solvedCount}/${checked}`);
   assert.ok(grayRulesSeen.size >= 2, `expected gray rules to fire, saw ${[...grayRulesSeen].join(', ')}`);
 });
+
+test('fullBoard rules (checkerPocket, checkerParity, givens) fire cleanly and are 100% sound on random unique boards', () => {
+  // 1. Direct checkerPocket firing: 4x4 full board with a 3-cell pocket (0,0)-(0,1)-(0,2)
+  // Wait: let's construct a clean 4x4 full-board where (0,0)-(0,1)-(0,2) has 2 light (0,0),(0,2) and 1 dark (0,1):
+  // If right edge (0,2)-(0,3) is E_OFF and (0,0)-(1,0) is E_ON, (0,1)-(1,1) is unknown (dark), (0,2)-(1,2) is unknown (light):
+  // Let's test on a clean 4x6 full board with top-left 1x3 rect (0,0)..(0,2) where (0,2)-(0,3) is E_OFF:
+  // Inside rect: (0,0)=L need 2, (0,1)=D need 2, (0,2)=L need 2 -> needLight=4, needDark=2, diff=+2.
+  // Exits downward: (0,0)-(1,0) (L), (0,1)-(1,1) (D), (0,2)-(1,2) (L) -> kL=2, kD=1!
+  // Since diff === kL === 2, BOTH light exits (0,0)-(1,0) & (0,2)-(1,2) MUST be ON and dark exit (0,1)-(1,1) MUST be OFF!
+  const Pc = compile({
+    name: 'cp_test', rows: 4, cols: 6, fullBoard: true, clues: [],
+    givens: [{ r: 0, c: 2, dir: 'H', v: 0 }],
+  });
+  const stc = initialState(Pc);
+  const cpHits = RULES.find((r) => r.id === 'checkerPocket').find(Pc, stc);
+  assert.ok(cpHits.length >= 1, 'expected checkerPocket to fire on 1x3 corner pocket');
+  const hit = cpHits.find((f) => f.sets.some(([k, x, v]) => k === 'e' && x === Pc.ed[(0 * 6 + 1) * 4 + 2] && v === E_OFF));
+  assert.ok(hit, 'expected checkerPocket to force dark exit (0,1)-(1,1) OFF');
+
+  // 1b. Direct checkerParity firing on a larger (> 6 cell) 1x7 row band (0,0)..(0,6) on a 4x8 full board
+  // where (0,6)-(0,7) is E_OFF: 4 Light + 3 Dark -> needLight=8, needDark=6, diff=+2; wait: downward exits have 4 L & 3 D,
+  // so block 2 Light exits (0,2)-(1,2) and (0,4)-(1,4) -> remaining kL=2, kD=3 -> diff===kL===2 forces ALL 2 light exits ON and ALL 3 dark exits OFF!
+  const Pcp = compile({
+    name: 'cp_large', rows: 4, cols: 8, fullBoard: true, clues: [],
+    givens: [
+      { r: 0, c: 6, dir: 'H', v: 0 },
+      { r: 0, c: 2, dir: 'V', v: 0 },
+      { r: 0, c: 4, dir: 'V', v: 0 },
+    ],
+  });
+  const cpLarge = RULES.find((r) => r.id === 'checkerParity').find(Pcp, initialState(Pcp));
+  assert.ok(cpLarge.length >= 1, 'expected checkerParity to fire on 1x7 band');
+  assert.ok(cpLarge.some((f) => f.info.area.length === 7 && f.sets.length === 5));
+
+  // 2. Soundness fuzz across 35+ unique random 4x6 and 6x6 full-board puzzles (circles, lines, walls, mixed givens)
+  const rng = mulberry32(8080);
+  let checked = 0;
+  let solvedCount = 0;
+  const rulesSeen = new Set();
+  for (let attempt = 0; attempt < 600 && checked < 35; attempt++) {
+    const rows = attempt % 2 === 0 ? 4 : 6, cols = 6;
+    const empty = compile({ name: 'ef', rows, cols, clues: [], fullBoard: true });
+    const solRes = solve(empty, { limit: 1, maxNodes: 4000, rng });
+    if (solRes.count === 0) continue;
+    const truth = solRes.solutions[0];
+    const mode = attempt % 4;
+    const clues = [];
+    const givens = [];
+    if (mode === 0) {
+      for (let i = 0; i < empty.N; i++) {
+        const dirs = [];
+        for (let d = 0; d < 4; d++) { const x = empty.ed[i * 4 + d]; if (x >= 0 && truth.e[x] === E_ON) dirs.push(d); }
+        const straight = ((dirs[0] ^ dirs[1]) & 1) === 0;
+        const ext0 = empty.ed2[i * 4 + dirs[0]], ext1 = empty.ed2[i * 4 + dirs[1]];
+        const s0 = ext0 >= 0 && truth.e[ext0] === E_ON, s1 = ext1 >= 0 && truth.e[ext1] === E_ON;
+        if (straight && !(s0 && s1) && rng() < 0.35) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'W' });
+        else if (!straight && s0 && s1 && rng() < 0.35) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'B' });
+      }
+    } else {
+      for (let x = 0; x < empty.numEdges; x++) {
+        if (empty.edgeA[x] < 0) continue;
+        const isOn = truth.e[x] === E_ON;
+        if (mode === 1 && !isOn) continue;
+        if (mode === 2 && isOn) continue;
+        if (rng() < 0.28) {
+          const i = x >> 1;
+          givens.push({ r: (i / cols) | 0, c: i % cols, dir: (x & 1) ? 'V' : 'H', v: isOn ? 1 : 0 });
+        }
+      }
+    }
+    const P = compile({ name: `fbf_${attempt}`, rows, cols, clues, fullBoard: true, givens });
+    const exact = solve(P, { limit: 2, maxNodes: 30000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    checked++;
+    const exactSol = exact.solutions[0];
+    const r = rate(P);
+    for (const s of r.steps) {
+      if (!s.info?.bookkeeping) rulesSeen.add(s.rule);
+      for (const [k, idx, val] of s.sets) {
+        if (k === 'e') assert.equal(val, exactSol.e[idx], `UNSOUND edge by ${s.rule} on ${P.name}`);
+        else if (k === 'c') assert.equal(val, exactSol.cell[idx], `UNSOUND cell by ${s.rule} on ${P.name}`);
+      }
+    }
+    if (r.solved) {
+      solvedCount++;
+      assert.equal(encodeSolution(P, r.state), encodeSolution(P, exactSol));
+    }
+  }
+  assert.ok(checked >= 25, `expected >= 25 unique fullBoard boards, got ${checked}`);
+  assert.ok(solvedCount >= checked * 0.85, `expected rules to solve most fullBoard boards, got ${solvedCount}/${checked}`);
+  assert.ok(rulesSeen.size >= 3, `expected >= 3 rules on fullBoard fuzz, saw ${[...rulesSeen].join(', ')}`);
+});

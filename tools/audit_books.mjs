@@ -47,6 +47,17 @@ if (process.argv.includes('--worker')) {
       seen.add(idx);
       if (c.t !== 'W' && c.t !== 'B' && c.t !== 'G') return fail(`bad clue type "${c.t}"`);
     }
+    const seenG = new Set();
+    for (const gv of raw.givens || []) {
+      if (gv.dir !== 'H' && gv.dir !== 'V') return fail(`bad given dir "${gv.dir}"`);
+      if (gv.v !== 0 && gv.v !== 1) return fail(`bad given value "${gv.v}"`);
+      if (gv.r < 0 || gv.c < 0 || (gv.dir === 'H' ? (gv.r >= raw.rows || gv.c >= raw.cols - 1) : (gv.r >= raw.rows - 1 || gv.c >= raw.cols))) {
+        return fail('given edge outside the board');
+      }
+      const ek = `${gv.r}:${gv.c}:${gv.dir}`;
+      if (seenG.has(ek)) return fail('duplicate given edge');
+      seenG.add(ek);
+    }
 
     let P;
     try { P = compile(raw); } catch (e) { return fail(`does not compile: ${e.message}`); }

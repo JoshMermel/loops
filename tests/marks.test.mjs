@@ -599,3 +599,12 @@ test('gray pearl cycling, auto-labeling (autoG), unwinding, and Auto-X integrati
   reconcileAutoX(P2, m2, true);
   assert.equal(m2.edges[P2.ed[c11 * 4 + 3]], 0, 'must never auto-X last exit of gray pearl');
 });
+
+test('Auto-X skips Rule 4 dead ends on fullBoard puzzles', () => {
+  const P = compile({ name: 'fb_ax', rows: 4, cols: 4, clues: [], fullBoard: true });
+  const m = blank(P);
+  // Corner (0,0) has 2 exits; cross out right exit (0,0)-(0,1) -> only 1 exit left (0,0)-(1,0)
+  m.edges[P.ed[0 * 4 + 1]] = 2;
+  reconcileAutoX(P, m, true);
+  assert.equal(m.edges[P.ed[0 * 4 + 2]], 0, 'must never auto-X exits on a fullBoard puzzle');
+});

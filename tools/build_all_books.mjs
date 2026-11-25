@@ -56,9 +56,19 @@ const manifest = {
       },
     },
     {
+      name: 'Gray circles',
+      icon: '🔘',
+      blurb: 'Mystery gray circles that are secretly either white or black.',
+    },
+    {
+      name: 'Full board',
+      icon: '🧱',
+      blurb: 'Every single intersection must be visited — with circles or pure given lines & walls.',
+    },
+    {
       name: 'Bonus',
       icon: '🎁',
-      blurb: 'Themed variations and mystery gray circles.',
+      blurb: 'Themed variations with the same Masyu rules.',
     },
   ],
   books: existingHidden,
@@ -182,6 +192,42 @@ const recipes = [
     blurb: 'Complex lookahead chains, plus 10 Expert+ puzzles beyond hints.',
   },
 
+  // ---- Gray circles (top-level section)
+  {
+    id: 'bonus-gray', name: 'Gray circles', label: '🔘 Gray circles (8×8)', group: 'Gray circles',
+    glob: 'gray_8x8', tiers: '50,200,200,50', tierBands: '0:265,235:315,300:540,520:1500',
+    expertPlus: 10, bonusGlob: 'gray_12x20', bonusCount: 10,
+    blurb: 'Mystery gray circles mixed with white and black — deduce which each one is (tap to label).',
+  },
+  {
+    id: 'bonus-allgray', name: 'All gray', label: '🌫️ All gray (8×8)', group: 'Gray circles',
+    glob: 'allgray_8x8', tiers: '50,200,200,50', tierBands: '0:270,245:325,310:520,500:1600',
+    expertPlus: 10, bonusGlob: 'allgray_10x12', bonusCount: 10,
+    blurb: 'Every circle is a mystery gray circle — figure out white vs. black from scratch.',
+  },
+
+  // ---- Full board (top-level section: true full-board rule enforced)
+  {
+    id: 'full-masyu-8x8', name: 'Full board Masyu (8×8)', label: '🧱 Full board Masyu (8×8)', group: 'Full board',
+    glob: 'full_masyu_8x8', tiers: '50,200,200,50', tierBands: '0:245,210:295,265:520,470:1300',
+    blurb: 'Sparse circles where visiting every intersection is required to find the unique loop.',
+  },
+  {
+    id: 'full-lines-8x8', name: 'Given lines (8×8)', label: '➖ Given lines (8×8)', group: 'Full board',
+    glob: 'full_lines_8x8', tiers: '50,200,200,50', tierBands: '0:245,215:295,255:480,430:1200',
+    blurb: 'No circles — just permanent pre-filled loop segments and the full-board rule.',
+  },
+  {
+    id: 'full-walls-8x8', name: 'Given walls (8×8)', label: '✕ Given walls (8×8)', group: 'Full board',
+    glob: 'full_walls_8x8', tiers: '50,200,200,50', tierBands: '0:255,220:300,265:480,430:1200',
+    blurb: 'No circles — just permanent blocked walls (✕) and the full-board rule.',
+  },
+  {
+    id: 'full-mixed-8x8', name: 'Lines & walls (8×8)', label: '🔀 Lines & walls (8×8)', group: 'Full board',
+    glob: 'full_mixed_8x8', tiers: '50,200,200,50', tierBands: '0:255,220:300,265:500,450:1200',
+    blurb: 'No circles — a mix of permanent segments and walls with the full-board rule.',
+  },
+
   // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 Expert+ + 10 Mega finale) + Patterns
   {
     id: 'bonus-white', name: 'All white', label: '⚪ All white (8×8)', group: 'Bonus',
@@ -194,18 +240,6 @@ const recipes = [
     glob: 'black_10x10', tiers: '50,200,200,50', tierBands: '0:345,315:380,365:510,500:1100',
     expertPlus: 10, bonusGlob: 'black_12x20', bonusCount: 10,
     blurb: 'Every circle is black — sharp corners and long legs.',
-  },
-  {
-    id: 'bonus-gray', name: 'Gray circles', label: '🔘 Gray circles (8×8)', group: 'Bonus',
-    glob: 'gray_8x8', tiers: '50,200,200,50', tierBands: '0:265,235:315,300:540,520:1500',
-    expertPlus: 10, bonusGlob: 'gray_12x20', bonusCount: 10,
-    blurb: 'Mystery gray circles mixed with white and black — deduce which each one is (tap to label).',
-  },
-  {
-    id: 'bonus-allgray', name: 'All gray', label: '🌫️ All gray (8×8)', group: 'Bonus',
-    glob: 'allgray_8x8', tiers: '50,200,200,50', tierBands: '0:270,245:325,310:520,500:1600',
-    expertPlus: 10, bonusGlob: 'allgray_10x12', bonusCount: 10,
-    blurb: 'Every circle is a mystery gray circle — figure out white vs. black from scratch.',
   },
   {
     id: 'bonus-cookie', name: 'Black & White Cookie', label: '🍪 Black & White Cookie (10×10)', group: 'Bonus',
@@ -226,12 +260,6 @@ const recipes = [
     tiers: '50,200,200,50', tierBands: '0:365,315:420,375:600,570:1200', balanceGroups: true, interleaveGroups: true, maxRun: 3,
     expertPlus: 10, bonusGlob: 'sym_rot180_14x14,sym_mirror_14x14,sym_transpose_14x14', bonusCount: 10,
     blurb: 'Mirror, diagonal, and 180° symmetric clues and loops.',
-  },
-  {
-    id: 'bonus-full', name: 'Full board', label: '🧱 Full board (10×10)', group: 'Bonus',
-    glob: 'full_10x10', tiers: '50,200,200,50', tierBands: '0:420,390:465,450:640,610:1250',
-    expertPlus: 10, bonusGlob: 'full_12x20', bonusCount: 10,
-    blurb: 'The loop visits every single intersection.',
   },
   {
     id: 'bonus-patterns', name: 'Patterns', label: '💠 Patterns (9×9 – 13×13)', group: 'Bonus',

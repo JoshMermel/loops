@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile } from '../js/logic.js';
 import { hitTestCoords, advanceDrag, advanceFaceDrag, CELL_SIZE } from '../js/board.js';
-import { clueStates, earlyLoopEdges } from '../js/clues.js';
+import { clueStates, earlyLoopEdges, trappedFullCells } from '../js/clues.js';
 import { otherEnd } from '../js/lineends.js';
 import { makeColorKeeper, assignPathColors } from '../js/pathcolors.js';
 
@@ -154,6 +154,17 @@ test('earlyLoopEdges flags closed loops that miss clues or leave other segments,
   // Adding a stray segment inside that full loop makes it an early/extra loop -> full loop edges flagged
   full.edges[edge(1, 1, 1, 2)] = 1;
   assert.equal(earlyLoopEdges(P, full).size, 12);
+
+  // Full-board zero-circle puzzle: a 2x2 closed sub-loop misses intersections -> flagged as early loop!
+  const Pfb = compile({ name: 'fb_el', rows: 4, cols: 4, clues: [], fullBoard: true });
+  const mfb = { edges: new Uint8Array(Pfb.numEdges) };
+  for (const x of [Pfb.ed[0 * 4 + 1], Pfb.ed[1 * 4 + 2], Pfb.ed[5 * 4 + 3], Pfb.ed[4 * 4 + 0]]) mfb.edges[x] = 1;
+  assert.equal(earlyLoopEdges(Pfb, mfb).size, 4, 'sub-loop on fullBoard must be flagged even with 0 circles');
+
+  // trappedFullCells flags an empty intersection with < 2 exits left on a fullBoard puzzle
+  const mTrap = { edges: new Uint8Array(Pfb.numEdges) };
+  mTrap.edges[Pfb.ed[0 * 4 + 1]] = 2; // corner (0,0) now has only 1 exit left!
+  assert.deepEqual([...trappedFullCells(Pfb, mTrap)], [0]);
 });
 
 test('advanceDrag includes the starting segment when dragging from A4-A5 to A5-A6 (upper or lower half) or around corners', () => {

@@ -306,3 +306,64 @@ test('gray pearls: cross-check fast solver against brute-force reference on 120 
   }
   assert.ok(checkedNonZero >= 30, `expected >= 30 solvable random gray boards, got ${checkedNonZero}`);
 });
+
+test('fullBoard & given edges/walls: brute-force cross-check, CSV roundtrip, symmetryKey, and puzzleHash', () => {
+  // Odd-area fullBoard (3x3) has 0 Hamiltonian cycles immediately
+  const P3 = compile({ name: 'odd_fb', rows: 3, cols: 3, clues: [], fullBoard: true });
+  assert.equal(solve(P3, { limit: 10 }).count, 0);
+  assert.equal(referenceCount(P3), 0);
+
+  // 120 random 4x4 and 4x5 full-board puzzles (with circles, given lines, given walls, and zero-circle givens)
+  const rng = mulberry32(20260);
+  let checkedNonZero = 0;
+  for (let k = 0; k < 120; k++) {
+    const rows = 4, cols = k < 80 ? 4 : 5;
+    const mode = k % 4; // 0: full+circles, 1: full+lines, 2: full+walls, 3: full+mixed givens
+    const clues = [];
+    const givens = [];
+    if (mode === 0) {
+      const used = new Set();
+      for (let j = 0; j < 2 + (k % 3); j++) {
+        const r = (rng() * rows) | 0, c = (rng() * cols) | 0;
+        if (used.has(r * cols + c)) continue;
+        used.add(r * cols + c);
+        clues.push({ r, c, t: rng() < 0.5 ? 'W' : 'B' });
+      }
+    } else {
+      const usedE = new Set();
+      const target = 2 + ((rng() * 5) | 0);
+      while (givens.length < target) {
+        const dir = rng() < 0.5 ? 'H' : 'V';
+        const r = (rng() * (dir === 'H' ? rows : rows - 1)) | 0;
+        const c = (rng() * (dir === 'H' ? cols - 1 : cols)) | 0;
+        const key = `${r}:${c}:${dir}`;
+        if (usedE.has(key)) continue;
+        usedE.add(key);
+        const v = mode === 1 ? 1 : mode === 2 ? 0 : (rng() < 0.5 ? 1 : 0);
+        givens.push({ r, c, dir, v });
+      }
+    }
+    const P = compile({ name: `fb_${k}`, rows, cols, clues, fullBoard: true, givens });
+    const ref = referenceCount(P);
+    const fast = solve(P, { limit: 500 });
+    assert.equal(fast.exceeded, false);
+    assert.equal(fast.count, ref, `fullBoard mismatch on ${k} (mode=${mode}): fast=${fast.count} ref=${ref}`);
+    for (const sol of fast.solutions) assert.equal(isSolved(P, sol.e), true);
+    if (ref > 0) checkedNonZero++;
+  }
+  assert.ok(checkedNonZero >= 35, `expected >= 35 solvable fullBoard boards, got ${checkedNonZero}`);
+
+  // CSV roundtrip + symmetryKey invariance + puzzleHash distinction
+  const pA = compile({
+    name: 'rt_fb', rows: 4, cols: 6, fullBoard: true,
+    clues: [{ r: 0, c: 1, t: 'W' }],
+    givens: [{ r: 1, c: 2, dir: 'H', v: 1 }, { r: 2, c: 0, dir: 'V', v: 0 }],
+  });
+  const parsed = parseCsv(toCsv([pA]))[0];
+  assert.equal(parsed.fullBoard, true);
+  assert.deepEqual(parsed.clues, pA.clues);
+  assert.deepEqual(parsed.givens, [{ r: 1, c: 2, dir: 'H', v: 1 }, { r: 2, c: 0, dir: 'V', v: 0 }]);
+  const pPlain = compile({ name: 'rt_plain', rows: 4, cols: 6, clues: [{ r: 0, c: 1, t: 'W' }] });
+  assert.notEqual(symmetryKey(pA), symmetryKey(pPlain));
+  assert.notEqual(puzzleHash(pA), puzzleHash(pPlain));
+});

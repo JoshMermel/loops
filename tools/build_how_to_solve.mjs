@@ -48,7 +48,8 @@ say(
   '- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.',
   '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.',
   '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).',
-  '- **Gray circle (bonus):** secretly either a white circle or a black circle — the loop must visit it and satisfy either the white or black rule. Tap a gray circle in the app to label it white or black as a note (labeling is optional).',
+  '- **Gray circle:** secretly either a white circle or a black circle — the loop must visit it and satisfy either the white or black rule. Tap a gray circle in the app to label it white or black as a note (labeling is optional).',
+  '- **Full board:** the loop must visit **every** intersection on the grid. Dark pre-filled segments and bold **✕** walls are permanent givens.',
   '',
   '## How the examples work',
   '',
@@ -179,7 +180,8 @@ htmlParts.push(`<!DOCTYPE html>
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li><b>Gray circle (bonus):</b> secretly either a white circle or a black circle — the loop must visit it and satisfy either rule. Tap a gray circle in the app to label it white or black as a note (optional).</li>
+      <li><b>Gray circle:</b> secretly either a white circle or a black circle — the loop must visit it and satisfy either rule. Tap a gray circle in the app to label it white or black as a note (optional).</li>
+      <li><b>Full board:</b> the loop must visit <b>every</b> intersection on the grid. Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>

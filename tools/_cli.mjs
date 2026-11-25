@@ -29,7 +29,14 @@ export const byOrder = (a, b) => (
  * Returns the rating object from `rate()`, or `null` if verification fails.
  */
 export function verifyPuzzle(p, { maxNodes = 500000 } = {}) {
-  const fresh = compile({ name: p.name, rows: p.rows, cols: p.cols, clues: p.clues });
+  const fresh = compile({
+    name: p.name,
+    rows: p.rows,
+    cols: p.cols,
+    clues: p.clues,
+    ...(p.fullBoard ? { fullBoard: true } : {}),
+    ...(p.givens && p.givens.length ? { givens: p.givens } : {}),
+  });
   const dec = decodeSolution(fresh, p.solution);
   if (!isSolved(fresh, dec.e)) return null;
   const exact = solve(fresh, { limit: 2, maxNodes });

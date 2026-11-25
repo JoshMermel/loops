@@ -1,6 +1,6 @@
 // Live circle error feedback from player edge marks and gray labels alone (never looks at the stored solution).
 // Returns an array of 'bad' | '' per clue in P.clues (only broken circles are marked; completion is left to the player).
-import { WHITE, BLACK, GRAY } from './logic.js';
+import { NONE, WHITE, BLACK, GRAY } from './logic.js';
 
 export function clueStates(P, marks) {
   const { ed, ed2, nb } = P;
@@ -106,10 +106,31 @@ export function earlyLoopEdges(P, marks) {
   for (const [r, edges] of compEdges) {
     if (!compClosed.get(r)) continue;
     const missesClue = (compClues.get(r) || 0) < totalClues;
+    const missesFull = P.fullBoard && edges.length < P.N;
     const hasOtherSegments = edges.length < totalOn;
-    if (missesClue || hasOtherSegments) {
+    if (missesClue || missesFull || hasOtherSegments) {
       for (const x of edges) bad.add(x);
     }
+  }
+  return bad;
+}
+
+/**
+ * On full-board puzzles, return a Set of non-clue cell indices that have fewer than 2 non-crossed-out exits left
+ * (i.e. trapped / unvisitable intersections, which violate the full-board rule).
+ */
+export function trappedFullCells(P, marks) {
+  const bad = new Set();
+  if (!P.fullBoard) return bad;
+  const e = marks.edges;
+  for (let i = 0; i < P.N; i++) {
+    if (P.clue[i] !== NONE) continue;
+    let avail = 0;
+    for (let d = 0; d < 4; d++) {
+      const x = P.ed[i * 4 + d];
+      if (x >= 0 && e[x] !== 2) avail++;
+    }
+    if (avail < 2) bad.add(i);
   }
   return bad;
 }

@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -304,6 +304,48 @@ if (!isMainThread) {
       budgetSec: 240, perPuzzleMs: 12000,
     },
     { group: 'bonus-gray', pool: 'allgray_10x12', cols: 10, rows: 12, style: 'gray-all', total: 12, budgetSec: 120, perPuzzleMs: 25000 },
+
+    // ---- Full board (top-level section: 8x8 true full-board Masyu + no-circle given lines, walls, and mixed)
+    {
+      group: 'full-board', pool: 'full_masyu_8x8', cols: 8, rows: 8, style: 'full-masyu',
+      buckets: {
+        Beginner: { need: 52, maxScore: 245 },
+        Medium: { need: 204, minScore: 210, maxScore: 295 },
+        Hard: { need: 204, minScore: 265, maxScore: 520 },
+        Expert: { need: 52, minScore: 470, maxScore: 1300 },
+      },
+      budgetSec: 240, perPuzzleMs: 12000,
+    },
+    {
+      group: 'full-board', pool: 'full_lines_8x8', cols: 8, rows: 8, style: 'full-lines',
+      buckets: {
+        Beginner: { need: 52, maxScore: 245 },
+        Medium: { need: 204, minScore: 215, maxScore: 295 },
+        Hard: { need: 204, minScore: 255, maxScore: 480 },
+        Expert: { need: 52, minScore: 430, maxScore: 1200 },
+      },
+      budgetSec: 240, perPuzzleMs: 12000,
+    },
+    {
+      group: 'full-board', pool: 'full_walls_8x8', cols: 8, rows: 8, style: 'full-walls',
+      buckets: {
+        Beginner: { need: 52, maxScore: 255 },
+        Medium: { need: 204, minScore: 220, maxScore: 300 },
+        Hard: { need: 204, minScore: 265, maxScore: 480 },
+        Expert: { need: 52, minScore: 430, maxScore: 1200 },
+      },
+      budgetSec: 240, perPuzzleMs: 12000,
+    },
+    {
+      group: 'full-board', pool: 'full_mixed_8x8', cols: 8, rows: 8, style: 'full-mixed',
+      buckets: {
+        Beginner: { need: 52, maxScore: 255 },
+        Medium: { need: 204, minScore: 220, maxScore: 300 },
+        Hard: { need: 204, minScore: 265, maxScore: 500 },
+        Expert: { need: 52, minScore: 450, maxScore: 1200 },
+      },
+      budgetSec: 240, perPuzzleMs: 12000,
+    },
 
     // ---- Bonus: Black & White Cookie (left/right, top/bottom, and diagonal W/B half-splits)
     {

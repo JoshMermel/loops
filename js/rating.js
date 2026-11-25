@@ -187,6 +187,35 @@ export function oddOpenEnds(P, st) {
 }
 
 /**
+ * Full-board checkerboard (bipartite) parity check: in any connected component of needy cells,
+ * every future segment links one light cell ((r+c)%2===0) to one dark cell ((r+c)%2===1),
+ * so total needed segment ends on light cells must equal total needed segment ends on dark cells.
+ * Returns the smallest imbalanced component or null.
+ */
+export function checkerImbalance(P, st) {
+  if (!P.fullBoard) return null;
+  const { cols } = P;
+  const groups = openEndGroups(P, st);
+  const onc = scratchOnc;
+  let best = null;
+  for (const g of groups) {
+    let needLight = 0, needDark = 0;
+    for (let k = 0; k < g.cells.length; k++) {
+      const u = g.cells[k];
+      const need = 2 - onc[u];
+      if (((((u / cols) | 0) + (u % cols)) & 1) === 0) needLight += need;
+      else needDark += need;
+    }
+    if (needLight !== needDark) {
+      if (!best || g.cells.length < best.cells.length) {
+        best = { cells: g.cells, ends: g.ends, needLight, needDark };
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Check connectivity and 2-vertex-connectivity (chokepoints) of LOOP cells in the active graph
  * (edges that are E_ON or E_UNKNOWN, skipping edges incident to OFF cells or full cells except their E_ON edges).
  * Returns null if OK, or { kind: 'disconnected'|'cutVertex', cut?, area: [cells] }.
@@ -362,10 +391,11 @@ export function chokepointCheck(P, st, boolOnly = false, precomp = null) {
   return { kind: 'cutVertex', cut, area: smallestArea || [] };
 }
 
-/** Full contradiction check: easy contradictions + odd open-end parity + disconnected/chokepoint loop cells. */
+/** Full contradiction check: easy contradictions + odd open-end parity + full-board checkerboard parity + disconnected/chokepoint loop cells. */
 export function contradiction(P, st, skipEasy = false) {
   if (!skipEasy && easyContradiction(P, st)) return true;
   if (oddOpenEnds(P, st)) return true;
+  if (P.fullBoard && checkerImbalance(P, st)) return true;
   if (chokepointCheck(P, st, true)) return true;
   return false;
 }
@@ -1329,6 +1359,148 @@ function findParity(smallOnly) {
   };
 }
 
+/**
+ * Full-board checkerboard (bipartite) parity deductions:
+ *   1. Single-edge seal: if drawing/crossing an edge seals off a component with unequal light/dark needed ends.
+ *   2. Rectangle/band saturation: on a row/col band, corner quadrant, or small rectangle (<= 4x4),
+ *      if `diff = needLight - needDark` equals `kL` (all light exits ON, all dark exits OFF)
+ *      or `-kD` (all dark exits ON, all light exits OFF).
+ */
+function computeAllChecker(P, st) {
+  if (!P.fullBoard) return [];
+  const { rows, cols, N, numEdges, ed, nb, edgeA, edgeB } = P;
+  if (checkerImbalance(P, st) !== null) return [];
+  const onc = new Int8Array(N);
+  for (let x = 0; x < numEdges; x++) if (st.e[x] === E_ON) { onc[edgeA[x]]++; onc[edgeB[x]]++; }
+  for (let i = 0; i < N; i++) if (onc[i] > 2) return [];
+
+  const out = [];
+  const seenSig = new Set();
+  const pushUnique = (sets, info) => {
+    const sig = sets.map(([k, x, v]) => `${k}:${x}:${v}`).sort().join('|');
+    if (seenSig.has(sig)) return;
+    seenSig.add(sig);
+    out.push({ sets, info });
+  };
+
+  // 1. Single-edge seal (mirrors computeAllParities using Tarjan bridges + degree-1 endpoints)
+  const bridge = markUnknownBridges(P, st, onc);
+  const s2 = cloneState(st);
+  for (let x = 0; x < numEdges; x++) {
+    if (st.e[x] !== E_UNKNOWN) continue;
+    const a = edgeA[x];
+    if (a < 0) continue;
+    const b = edgeB[x];
+    if (onc[a] >= 2 || onc[b] >= 2) continue;
+    const isB = !bridge || bridge[x] === 1;
+    if (isB || onc[a] >= 1 || onc[b] >= 1) {
+      s2.e[x] = E_ON;
+      const imb = easyContradiction(P, s2) ? null : checkerImbalance(P, s2);
+      s2.e[x] = E_UNKNOWN;
+      if (imb) {
+        pushUnique([['e', x, E_OFF]], {
+          mode: 'hyp', edge: x, hyp: E_ON, area: imb.cells,
+          needLight: imb.needLight, needDark: imb.needDark,
+        });
+      }
+    }
+    if (isB) {
+      s2.e[x] = E_OFF;
+      const imb = easyContradiction(P, s2) ? null : checkerImbalance(P, s2);
+      s2.e[x] = E_UNKNOWN;
+      if (imb) {
+        pushUnique([['e', x, E_ON]], {
+          mode: 'hyp', edge: x, hyp: E_OFF, area: imb.cells,
+          needLight: imb.needLight, needDark: imb.needDark,
+        });
+      }
+    }
+  }
+
+  // 2. Multi-exit rectangle / band saturation (row cuts, col cuts, corner quadrants, small rects <= 4x4)
+  const checkRect = (r1, r2, c1, c2) => {
+    let needLight = 0, needDark = 0;
+    const lightExits = [], darkExits = [];
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        const u = r * cols + c;
+        const need = 2 - onc[u];
+        if (need <= 0) continue;
+        const isLight = ((r + c) & 1) === 0;
+        if (isLight) needLight += need; else needDark += need;
+        const u4 = u * 4;
+        if (r === r1 && r > 0) {
+          const x = ed[u4 + 0];
+          if (x >= 0 && st.e[x] === E_UNKNOWN && onc[nb[u4 + 0]] < 2) (isLight ? lightExits : darkExits).push(x);
+        }
+        if (r === r2 && r + 1 < rows) {
+          const x = ed[u4 + 2];
+          if (x >= 0 && st.e[x] === E_UNKNOWN && onc[nb[u4 + 2]] < 2) (isLight ? lightExits : darkExits).push(x);
+        }
+        if (c === c1 && c > 0) {
+          const x = ed[u4 + 3];
+          if (x >= 0 && st.e[x] === E_UNKNOWN && onc[nb[u4 + 3]] < 2) (isLight ? lightExits : darkExits).push(x);
+        }
+        if (c === c2 && c + 1 < cols) {
+          const x = ed[u4 + 1];
+          if (x >= 0 && st.e[x] === E_UNKNOWN && onc[nb[u4 + 1]] < 2) (isLight ? lightExits : darkExits).push(x);
+        }
+      }
+    }
+    const kL = lightExits.length, kD = darkExits.length;
+    if (kL + kD === 0) return;
+    const diff = needLight - needDark;
+    if (diff > kL || diff < -kD) return;
+    let sets = null;
+    if (diff === kL) {
+      sets = [
+        ...lightExits.map((x) => ['e', x, E_ON]),
+        ...darkExits.map((x) => ['e', x, E_OFF]),
+      ];
+    } else if (diff === -kD) {
+      sets = [
+        ...darkExits.map((x) => ['e', x, E_ON]),
+        ...lightExits.map((x) => ['e', x, E_OFF]),
+      ];
+    }
+    if (!sets || !sets.length) return;
+    const area = [];
+    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) area.push(r * cols + c);
+    pushUnique(sets, { mode: 'rect', rect: [r1, r2, c1, c2], area, needLight, needDark, diff });
+  };
+
+  for (let r1 = 0; r1 < rows; r1++) {
+    for (let c1 = 0; c1 < cols; c1++) {
+      for (let h = 1; h <= 4 && r1 + h <= rows; h++) {
+        for (let w = 1; w <= 4 && c1 + w <= cols; w++) {
+          if (h === 1 && w === 1) continue;
+          checkRect(r1, r1 + h - 1, c1, c1 + w - 1);
+        }
+      }
+    }
+  }
+  for (let r = 0; r < rows - 1; r++) checkRect(0, r, 0, cols - 1);
+  for (let c = 0; c < cols - 1; c++) checkRect(0, rows - 1, 0, c);
+  for (let r = 0; r < rows - 1; r++) for (let c = 0; c < cols - 1; c++) {
+    checkRect(0, r, 0, c);
+    checkRect(0, r, c + 1, cols - 1);
+    checkRect(r + 1, rows - 1, 0, c);
+    checkRect(r + 1, rows - 1, c + 1, cols - 1);
+  }
+
+  out.sort((p, q) => p.info.area.length - q.info.area.length || p.sets.length - q.sets.length);
+  return out;
+}
+
+function findChecker(smallOnly) {
+  return (P, st, opts) => {
+    if (!P.fullBoard) return [];
+    const cache = opts && opts.stepCache;
+    const all = cache ? (cache.checkers || (cache.checkers = computeAllChecker(P, st))) : computeAllChecker(P, st);
+    return all.filter((f) => (f.info.area.length <= 6) === smallOnly);
+  };
+}
+
 let cpVOn = new Int16Array(0);
 let cpVUnk = new Int16Array(0);
 let cpHOn = new Int16Array(0);
@@ -1559,10 +1731,12 @@ export const RULES = [
   defRule({ id: 'whiteCornerPinch', tier: 'Medium', weight: 17, find: findWhiteCornerPinch, label: 'a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors' }),
   defRule({ id: 'whiteDeadEndPinch', tier: 'Medium', weight: 17, find: findWhiteDeadEndPinch, label: 'a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes' }),
   defRule({ id: 'faceShade', tier: 'Medium', weight: 18, find: findFaceShade, label: 'basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge' }),
+  defRule({ id: 'checkerPocket', tier: 'Medium', weight: 18, find: findChecker(true), label: 'checkerboard light/dark dot counts in a small full-board pocket force its exit segments' }),
   defRule({ id: 'boxStrand', tier: 'Medium', weight: 20, find: findBoxStrand, label: 'closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side' }),
 
   // Hard (circle-diagonal shading, global topology, and short single-thread lookahead)
   defRule({ id: 'corridorNoEarlyClose', tier: 'Hard', weight: 30, find: findCorridorNoEarlyClose, label: 'a forced multi-cell corridor joining the two ends of one path would close the loop early' }),
+  defRule({ id: 'checkerParity', tier: 'Hard', weight: 36, find: findChecker(false), label: 'checkerboard light/dark dot counts in a full-board region force its exit segments' }),
   defRule({ id: 'faceCircle', tier: 'Hard', weight: 38, find: findFaceCircle, extra: extraFaceCircle, label: 'advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge' }),
   defRule({ id: 'twoEndsJoin', tier: 'Hard', weight: 44, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
   defRule({ id: 'chokepoint', tier: 'Hard', weight: 48, costly: true, find: findChokepoint(true), label: 'blocking this segment would cut off a small area or leave a single chokepoint cell' }),

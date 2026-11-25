@@ -166,69 +166,72 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   let changed = true;
   while (changed) {
     changed = false;
-    for (let i = 0; i < N; i++) {
-      if (clue[i] !== NONE || deg[i] !== 0) continue;
-      let avail = 0, lastX = -1;
-      for (let d = 0; d < 4; d++) {
-        const x = ed[i * 4 + d];
-        if (x < 0 || w[x] === 2) continue;
-        avail++;
-        lastX = x;
-      }
-      if (avail === 1 && lastX >= 0) {
-        if (add(lastX)) changed = true;
-      }
-    }
-    if (changed) continue;
-
-    const isCorridorNode = new Uint8Array(N);
-    const nodeExits = new Array(N);
-    for (let i = 0; i < N; i++) {
-      if (clue[i] !== NONE || deg[i] !== 0) continue;
-      const ex = availEdges(i);
-      if (ex.length === 2) { isCorridorNode[i] = 1; nodeExits[i] = ex; }
-    }
-    const visitedEdge = new Uint8Array(numEdges);
-    for (let startNode = 0; startNode < N; startNode++) {
-      if (!isCorridorNode[startNode]) continue;
-      const [eA, eB] = nodeExits[startNode];
-      if (visitedEdge[eA]) continue;
-
-      const walk = (firstEdge) => {
-        const edges = [];
-        let cur = startNode, edge = firstEdge;
-        while (true) {
-          visitedEdge[edge] = 1;
-          edges.push(edge);
-          const nxt = P.edgeA[edge] === cur ? P.edgeB[edge] : P.edgeA[edge];
-          if (nxt === startNode) return { term: startNode, edges, closed: true };
-          if (!isCorridorNode[nxt]) return { term: nxt, edges, closed: false };
-          const [x0, x1] = nodeExits[nxt];
-          edge = x0 === edge ? x1 : x0;
-          cur = nxt;
+    // Rule 4: dead-end intersections & pockets (disabled on fullBoard since every intersection must be visited)
+    if (!P.fullBoard) {
+      for (let i = 0; i < N; i++) {
+        if (clue[i] !== NONE || deg[i] !== 0) continue;
+        let avail = 0, lastX = -1;
+        for (let d = 0; d < 4; d++) {
+          const x = ed[i * 4 + d];
+          if (x < 0 || w[x] === 2) continue;
+          avail++;
+          lastX = x;
         }
-      };
-
-      const w1 = walk(eA);
-      if (w1.closed) {
-        if (hasAnyClueOrSeg) {
-          for (const x of w1.edges) if (add(x)) changed = true;
-        }
-        continue;
-      }
-      const w2 = walk(eB);
-      if (w1.term === w2.term) {
-        const t = w1.term;
-        let impossible = deg[t] >= 1;
-        if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
-        if (!impossible) for (let i = 0; i < N; i++) if (i !== t && deg[i] > 0) { impossible = true; break; }
-        if (impossible) {
-          for (const x of w1.edges) if (add(x)) changed = true;
-          for (const x of w2.edges) if (add(x)) changed = true;
+        if (avail === 1 && lastX >= 0) {
+          if (add(lastX)) changed = true;
         }
       }
+      if (changed) continue;
+
+      const isCorridorNode = new Uint8Array(N);
+      const nodeExits = new Array(N);
+      for (let i = 0; i < N; i++) {
+        if (clue[i] !== NONE || deg[i] !== 0) continue;
+        const ex = availEdges(i);
+        if (ex.length === 2) { isCorridorNode[i] = 1; nodeExits[i] = ex; }
+      }
+      const visitedEdge = new Uint8Array(numEdges);
+      for (let startNode = 0; startNode < N; startNode++) {
+        if (!isCorridorNode[startNode]) continue;
+        const [eA, eB] = nodeExits[startNode];
+        if (visitedEdge[eA]) continue;
+
+        const walk = (firstEdge) => {
+          const edges = [];
+          let cur = startNode, edge = firstEdge;
+          while (true) {
+            visitedEdge[edge] = 1;
+            edges.push(edge);
+            const nxt = P.edgeA[edge] === cur ? P.edgeB[edge] : P.edgeA[edge];
+            if (nxt === startNode) return { term: startNode, edges, closed: true };
+            if (!isCorridorNode[nxt]) return { term: nxt, edges, closed: false };
+            const [x0, x1] = nodeExits[nxt];
+            edge = x0 === edge ? x1 : x0;
+            cur = nxt;
+          }
+        };
+
+        const w1 = walk(eA);
+        if (w1.closed) {
+          if (hasAnyClueOrSeg) {
+            for (const x of w1.edges) if (add(x)) changed = true;
+          }
+          continue;
+        }
+        const w2 = walk(eB);
+        if (w1.term === w2.term) {
+          const t = w1.term;
+          let impossible = deg[t] >= 1;
+          if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
+          if (!impossible) for (let i = 0; i < N; i++) if (i !== t && deg[i] > 0) { impossible = true; break; }
+          if (impossible) {
+            for (const x of w1.edges) if (add(x)) changed = true;
+            for (const x of w2.edges) if (add(x)) changed = true;
+          }
+        }
+      }
+      if (changed) continue;
     }
-    if (changed) continue;
 
     // Rule 5 (when both Auto-X and Auto-Shade are ON): cross out edges separating two identically shaded squares,
     // including outer-border edges bordering an Outside-shaded square (exterior is always Outside).

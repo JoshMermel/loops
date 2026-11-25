@@ -4,7 +4,7 @@ import {
   WHITE, BLACK, E_ON, E_OFF,
   colName, edgeCells,
 } from './logic.js';
-import { ruleLabel, oddOpenEnds, chokepointCheck } from './rating.js';
+import { ruleLabel, oddOpenEnds, checkerImbalance, chokepointCheck } from './rating.js';
 import { replayImagine } from './imagine.js';
 import { faceCoords } from './faceparity.js';
 
@@ -138,6 +138,9 @@ function describeChainStep(P, s) {
       return `inside/outside shading forces ${describeMarks(P, targetsOf(sets))}`;
     case 'twoEndsJoin':
       return `connecting the two open ends forces ${describeMarks(P, targetsOf(sets))}`;
+    case 'checkerPocket':
+    case 'checkerParity':
+      return `full-board checkerboard parity forces ${describeMarks(P, targetsOf(sets))}`;
     case 'crossingParity':
       return `loop crossing parity forces ${describeMarks(P, targetsOf(sets))}`;
     default:
@@ -180,6 +183,14 @@ function describeContradiction(P, broke, finalState) {
             text: `an area is sealed off with ${plural(odd.ends.length, 'open end')} (${joinList(odd.ends.slice(0, 4).map((i) => cellName(P, i)))}), which cannot be paired up`,
             cells: odd.ends,
             area: odd.cells,
+          };
+        }
+        const chk = checkerImbalance(P, finalState);
+        if (chk) {
+          return {
+            text: `an area is sealed off with mismatched full-board checkerboard counts (light needs ${chk.needLight} ends, dark needs ${chk.needDark})`,
+            cells: chk.ends,
+            area: chk.cells,
           };
         }
         const ck = chokepointCheck(P, finalState);
@@ -546,6 +557,28 @@ export function explainStep(P, step, st = null) {
       text = info.kind === 'disconnected'
         ? `Without ${edgeName(P, info.edge)}, loop cells in the highlighted area would be completely cut off from the rest of the loop, so ${edgeName(P, info.edge)} must be drawn.`
         : `Without ${edgeName(P, info.edge)}, ${cellName(P, info.cut)} would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so ${edgeName(P, info.edge)} must be drawn.`;
+      break;
+    }
+    case 'checkerPocket':
+    case 'checkerParity': {
+      roles.area.push(...(info.area || []));
+      nudgeRoles.area.push(...(info.area || []));
+      if (info.mode === 'hyp') {
+        const [a, b] = edgeCells(P, info.edge);
+        roles.focus.push(a, b);
+        nudgeRoles.focus.push(a, b);
+        nudge = `Look at ${edgeName(P, info.edge)} and the highlighted area — on a full board, count checkerboard light vs. dark dots inside it.`;
+        const hypTxt = info.hyp === E_ON ? `drawing ${edgeName(P, info.edge)}` : `crossing out ${edgeName(P, info.edge)}`;
+        const resTxt = info.hyp === E_ON ? `cross out ${edgeName(P, info.edge)}` : `draw ${edgeName(P, info.edge)}`;
+        text = `On a full board, ${hypTxt} would seal off the highlighted area with mismatched checkerboard counts (light dots need ${info.needLight} segment ends, dark dots need ${info.needDark}); therefore ${resTxt}.`;
+      } else {
+        for (const x of [...targets.segOn, ...targets.segOff]) {
+          const [a, b] = edgeCells(P, x);
+          roles.focus.push(a, b);
+        }
+        nudge = `Look at the highlighted full-board region — count how many segment ends its checkerboard light vs. dark dots still need.`;
+        text = `Checkerboard parity on the highlighted full-board region: light dots need ${info.needLight} more segment ends and dark dots need ${info.needDark} (difference ${Math.abs(info.diff)}), which forces ${describeMarks(P, targets)}.`;
+      }
       break;
     }
     case 'parityPocket':

@@ -17,25 +17,37 @@ function isTurn(a, b, c, cols) {
  * Enumerates every undirected simple cycle on the grid and checks Masyu rules directly on the cycle's vertices.
  */
 export function referenceCount(p) {
-  const { rows, cols, clues } = p;
+  const { rows, cols, clues = [], fullBoard = false, givens = [] } = p;
   const N = rows * cols;
   const clueType = new Map();
   for (const cl of clues) clueType.set(cl.r * cols + cl.c, cl.t);
+  const reqEdges = new Set();
+  const banEdges = new Set();
+  const edgeKey = (a, b) => (a < b ? a * N + b : b * N + a);
+  for (const gv of givens) {
+    const a = gv.r * cols + gv.c;
+    const b = gv.dir === 'H' ? a + 1 : a + cols;
+    if (gv.v === 1) reqEdges.add(edgeKey(a, b));
+    else banEdges.add(edgeKey(a, b));
+  }
 
-  // Build plain adjacency list per vertex
+  // Build plain adjacency list per vertex (skipping banned given walls)
   const adj = Array.from({ length: N }, (_, i) => {
     const r = (i / cols) | 0, c = i % cols;
     const out = [];
     for (const [dr, dc] of DIRS) {
       const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nc >= 0 && nr < rows && nc < cols) out.push(nr * cols + nc);
+      if (nr >= 0 && nc >= 0 && nr < rows && nc < cols) {
+        const j = nr * cols + nc;
+        if (!banEdges.has(edgeKey(i, j))) out.push(j);
+      }
     }
     return out;
   });
 
-  // If there are clues, the minimum cell index of any valid cycle must be <= the smallest clue cell index.
-  let maxStart = N - 1;
-  for (const i of clueType.keys()) if (i < maxStart) maxStart = i;
+  // If fullBoard, any cycle must start at 0; else min cell index <= smallest clue cell index.
+  let maxStart = fullBoard ? 0 : N - 1;
+  if (!fullBoard) for (const i of clueType.keys()) if (i < maxStart) maxStart = i;
 
   const visited = new Uint8Array(N);
   const path = [];
@@ -44,8 +56,17 @@ export function referenceCount(p) {
   const checkCycle = () => {
     const L = path.length;
     if (L < 4) return false;
+    if (fullBoard && L !== N) return false;
     // Must visit every clue cell
     for (const ci of clueType.keys()) if (!visited[ci]) return false;
+    // Must include every required given edge
+    if (reqEdges.size > 0) {
+      let seenReq = 0;
+      for (let k = 0; k < L; k++) {
+        if (reqEdges.has(edgeKey(path[k], path[(k + 1) % L]))) seenReq++;
+      }
+      if (seenReq !== reqEdges.size) return false;
+    }
     // Check white and black rules along the cycle
     for (let k = 0; k < L; k++) {
       const cur = path[k];

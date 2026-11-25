@@ -85,6 +85,9 @@ for (const raw of prioritized) {
     grays: new Uint8Array(P.grays.length),
     autoG: new Uint8Array(P.grays.length),
   };
+  if (P.hasGivens) {
+    for (const gv of P.givens) marks.edges[gv.edge] = gv.v ? 1 : 2;
+  }
   for (let step = 0; step < 300; step++) {
     if (isSolved(P, marks.edges)) break;
     const h = computeHint(P, marks);
