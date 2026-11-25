@@ -629,11 +629,6 @@ export class Board {
       ? `<path class="board-bg" fill-rule="evenodd" d="${shape.boardPath}"/>`
       : `<rect class="board-bg" x="1.5" y="1.5" width="${boardW - 3}" height="${boardH - 3}" rx="8"/>`;
 
-    // Subtle recessed cutout fill inside interior holes (visible beneath any Inside/Outside tint)
-    if (shape && shape.voidHatchPath) {
-      g += `<path class="void-cutout" d="${shape.voidHatchPath}"/>`;
-    }
-
     // Dual-face Inside / Outside shading (under grid lines and hint overlays; interior holes render as one unified polygon)
     const fr = P.rows - 1, fc = P.cols - 1;
     const faceExt = P.hasVoids ? P.faceExterior : null;
@@ -704,8 +699,9 @@ export class Board {
       }
     }
 
-    // Crisp inner cutout frame & subtle hatch on top of shading so interior voids stay unmistakable when shaded
+    // Solid cutout fill + crisp frame & subtle hatch on top of shading so shading wraps around holes without tinting inside them
     if (shape && shape.voidHatchPath) {
+      g += `<path class="void-cutout" d="${shape.voidHatchPath}"/>`;
       g += `<path class="void-cutout-frame" d="${shape.voidHatchPath}"/>`;
     }
 
