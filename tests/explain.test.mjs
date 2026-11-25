@@ -622,7 +622,8 @@ test('Slitherlink & hybrid hints: end-to-end solving, explanations, nudges, and 
     info: { edge: Pwrong.faceEdges[0], hyp: E_ON, deduce: E_OFF, steps: [], broke: { kind: 'slitherBroken', face: 0, n: 0, over: true } },
   });
   assert.ok(expOver.text.includes('too many segments'), `expected over-count text, got: ${expOver.text}`);
-  assert.ok(expOver.faces && expOver.faces.clue.includes(0));
+  assert.ok(expOver.faces && expOver.faces.problem && expOver.faces.problem.includes(0));
+  assert.equal(expOver.faces.clue.length, 0, 'imagine* Slitherlink contradiction face must stay hidden in Stage-1 nudge (problem role only)');
 
   const expSing = explainStep(Pwrong, {
     rule: 'imagineLocal', tier: 'Medium', weight: 24,

@@ -178,6 +178,7 @@ let propCellBuf = new Int8Array(0);
 let propEdgeBuf = new Int8Array(0);
 let propClueBuf = new Uint8Array(0);
 let dirtyFlag = new Uint8Array(0);
+let dirtyFaceFlag = new Uint8Array(0);
 
 /**
  * Easy contradiction check (local rule violations + early closed loop).
@@ -320,22 +321,59 @@ export function easyContradiction(P, st, scope = null) {
   // 3c. Slitherlink numbered faces: on <= n <= on + unk
   if (P.hasSlither) {
     const fe = P.faceEdges;
-    for (let si = 0; si < P.slither.length; si++) {
-      const sc = P.slither[si];
+    const sf = scope && scope.faces ? scope.faces : null;
+    const slLen = sf ? sf.length : P.slither.length;
+    for (let k = 0; k < slLen; k++) {
+      const sc = P.slither[sf ? sf[k] : k];
       const f4 = sc.f * 4;
       let on = 0, unk = 0;
-      for (let d = 0; d < 4; d++) {
-        const x = fe[f4 + d];
-        if (x < 0) continue;
-        if (e[x] === E_ON) on++;
-        else if (e[x] === E_UNKNOWN) unk++;
-      }
+      const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
+      if (e0 >= 0) { const v = e[e0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e1 >= 0) { const v = e[e1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e2 >= 0) { const v = e[e2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (e3 >= 0) { const v = e[e3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
       if (on > sc.n || on + unk < sc.n) return { kind: 'slitherBroken', face: sc.f, n: sc.n, over: on > sc.n };
     }
   }
 
   // 4. Early closed loop (or 2 cycles) — skip when no E_ON edge was added in the hypothesis
-  if (scope && !scope.checkCycle) return null;
+  if (scope) {
+    if (!scope.checkCycle) return null;
+    if (scope.newOn) {
+      const newOn = scope.newOn;
+      let closed = false;
+      for (let k = 0; k < newOn.length; k++) {
+        const ex = newOn[k];
+        const a = edgeA[ex], b = edgeB[ex];
+        let prev = b, cur = a;
+        for (let hop = 0; hop <= N; hop++) {
+          const c4 = cur * 4;
+          let nxt = -1;
+          let y = ed[c4];
+          if (y >= 0 && e[y] === E_ON && nb[c4] !== prev) nxt = nb[c4];
+          else {
+            y = ed[c4 + 1];
+            if (y >= 0 && e[y] === E_ON && nb[c4 + 1] !== prev) nxt = nb[c4 + 1];
+            else {
+              y = ed[c4 + 2];
+              if (y >= 0 && e[y] === E_ON && nb[c4 + 2] !== prev) nxt = nb[c4 + 2];
+              else {
+                y = ed[c4 + 3];
+                if (y >= 0 && e[y] === E_ON && nb[c4 + 3] !== prev) nxt = nb[c4 + 3];
+              }
+            }
+          }
+          if (nxt < 0) break;
+          if (nxt === b) { closed = true; break; }
+          prev = cur;
+          cur = nxt;
+        }
+        if (closed) break;
+      }
+      newOn.length = 0;
+      if (!closed) return null;
+    }
+  }
   if (scratchParent.length < N) { scratchParent = new Int16Array(N); scratchSize = new Int32Array(N); }
   const parent = scratchParent;
   for (let i = 0; i < N; i++) parent[i] = i;
@@ -472,8 +510,10 @@ function findEasyStep(P, st, forbid, scope = null) {
   // 0b. Slitherlink direct counts (slitherZero / slitherCount)
   if (P.hasSlither) {
     const fe = P.faceEdges;
-    for (let si = 0; si < P.slither.length; si++) {
-      const sc = P.slither[si];
+    const sf = scope && scope.faces ? scope.faces : null;
+    const slLen = sf ? sf.length : P.slither.length;
+    for (let k = 0; k < slLen; k++) {
+      const sc = P.slither[sf ? sf[k] : k];
       const f4 = sc.f * 4;
       const e0 = fe[f4], e1 = fe[f4 + 1], e2 = fe[f4 + 2], e3 = fe[f4 + 3];
       let on = 0, unk = 0;
@@ -533,6 +573,8 @@ function findEasyStep(P, st, forbid, scope = null) {
   for (let wi = 0; wi < whites.length; wi++) {
     const i = whites[wi];
     const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+    if ((u < 0 || e[u] !== E_UNKNOWN) && (r < 0 || e[r] !== E_UNKNOWN)
+      && (dn < 0 || e[dn] !== E_UNKNOWN) && (l < 0 || e[l] !== E_UNKNOWN)) continue;
     let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
     let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
     if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
@@ -559,6 +601,7 @@ function findEasyStep(P, st, forbid, scope = null) {
       const x1 = ed[i * 4 + d];
       if (x1 < 0 || e[x1] !== E_ON) continue;
       const x2 = ed2[i * 4 + d], opp = ed[i * 4 + (d ^ 2)];
+      if ((x2 < 0 || e[x2] !== E_UNKNOWN) && (opp < 0 || e[opp] !== E_UNKNOWN)) continue;
       const sets = [];
       if (x2 >= 0) sets.push(['e', x2, E_ON]);
       if (opp >= 0) sets.push(['e', opp, E_OFF]);
@@ -571,9 +614,10 @@ function findEasyStep(P, st, forbid, scope = null) {
   for (let bi = 0; bi < blacks.length; bi++) {
     const i = blacks[bi];
     for (let d = 0; d < 4; d++) {
-      const x1 = ed[i * 4 + d], x2 = ed2[i * 4 + d], n1 = nb[i * 4 + d], n2 = step2[i * 4 + d];
-      const opp1 = ed[i * 4 + (d ^ 2)], opp2 = ed2[i * 4 + (d ^ 2)];
+      const x1 = ed[i * 4 + d], opp1 = ed[i * 4 + (d ^ 2)], opp2 = ed2[i * 4 + (d ^ 2)];
       if (opp1 < 0 || opp2 < 0) continue;
+      if (e[opp1] !== E_UNKNOWN && e[opp2] !== E_UNKNOWN && (x1 < 0 || e[x1] !== E_UNKNOWN)) continue;
+      const x2 = ed2[i * 4 + d], n1 = nb[i * 4 + d], n2 = step2[i * 4 + d];
       let reason = null;
       if (x1 < 0 || x2 < 0 || e[x1] === E_OFF || e[x2] === E_OFF || cell[n1] === OFF || cell[n2] === OFF) reason = 'blackWall';
       else if (clue[n1] === BLACK) reason = 'blackAdjacent';
@@ -669,6 +713,8 @@ function findEasyStep(P, st, forbid, scope = null) {
   for (let wi = 0; wi < whites.length; wi++) {
     const i = whites[wi];
     const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+    if ((u < 0 || e[u] !== E_UNKNOWN) && (r < 0 || e[r] !== E_UNKNOWN)
+      && (dn < 0 || e[dn] !== E_UNKNOWN) && (l < 0 || e[l] !== E_UNKNOWN)) continue;
     const u2 = ed2[i * 4 + 0], r2 = ed2[i * 4 + 1], d2 = ed2[i * 4 + 2], l2 = ed2[i * 4 + 3];
     if (u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON && r >= 0 && l >= 0) {
       const sets = [['e', r, E_ON], ['e', l, E_ON]];
@@ -688,32 +734,49 @@ function findEasyStep(P, st, forbid, scope = null) {
 
   // 8. noEarlyClose (skip when no E_ON / LOOP cell has been added in this hypothesis)
   if (scope && !scope.hasOn) return null;
-  if (scratchParent.length < N) { scratchParent = new Int16Array(N); scratchSize = new Int32Array(N); }
-  const parent = scratchParent, size = scratchSize;
-  for (let i = 0; i < N; i++) parent[i] = i;
-  const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
-  let loopCount = 0;
-  for (let i = 0; i < N; i++) if (cell[i] === LOOP) loopCount++;
-  for (let x = 0; x < numEdges; x++) {
-    if (e[x] !== E_ON) continue;
-    const ra = find(edgeA[x]), rb = find(edgeB[x]);
-    if (ra !== rb) parent[ra] = rb;
-  }
-  size.fill(0, 0, N);
-  for (let i = 0; i < N; i++) if (cell[i] === LOOP) size[find(i)]++;
+  let loopCount = -1;
   for (let x = 0; x < numEdges; x++) {
     if (e[x] !== E_UNKNOWN) continue;
     const a = edgeA[x];
     if (a < 0) continue;
     const b = edgeB[x];
     if (cell[a] !== LOOP || cell[b] !== LOOP) continue;
-    const ra = find(a);
-    if (ra === find(b)) {
-      const slFace = size[ra] < loopCount ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
-      if (size[ra] < loopCount || slFace >= 0) {
-        const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], slFace >= 0 ? { edge: x, a, b, slitherFace: slFace } : { edge: x, a, b });
-        if (step) return step;
+    if (onCount(P, st, a) !== 1 || onCount(P, st, b) !== 1) continue;
+    // Trace the simple E_ON path from a; ra === find(b) iff it terminates at b
+    let prev = -1, cur = a, pathVerts = 1;
+    let hitsB = false;
+    for (let hop = 0; hop < N; hop++) {
+      const c4 = cur * 4;
+      let nxt = -1;
+      let y = ed[c4];
+      if (y >= 0 && e[y] === E_ON && nb[c4] !== prev) nxt = nb[c4];
+      else {
+        y = ed[c4 + 1];
+        if (y >= 0 && e[y] === E_ON && nb[c4 + 1] !== prev) nxt = nb[c4 + 1];
+        else {
+          y = ed[c4 + 2];
+          if (y >= 0 && e[y] === E_ON && nb[c4 + 2] !== prev) nxt = nb[c4 + 2];
+          else {
+            y = ed[c4 + 3];
+            if (y >= 0 && e[y] === E_ON && nb[c4 + 3] !== prev) nxt = nb[c4 + 3];
+          }
+        }
       }
+      if (nxt < 0) break;
+      pathVerts++;
+      if (nxt === b) { hitsB = true; break; }
+      prev = cur;
+      cur = nxt;
+    }
+    if (!hitsB) continue;
+    if (loopCount < 0) {
+      loopCount = 0;
+      for (let i = 0; i < N; i++) if (cell[i] === LOOP) loopCount++;
+    }
+    const slFace = pathVerts < loopCount ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
+    if (pathVerts < loopCount || slFace >= 0) {
+      const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], slFace >= 0 ? { edge: x, a, b, slitherFace: slFace } : { edge: x, a, b });
+      if (step) return step;
     }
   }
 
@@ -734,6 +797,23 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
 
   let scope = null;
   let dirtyAdded = false;
+  let dirtyFaceAdded = false;
+  const cols = P.cols, fr = P.rows - 1, fc = cols - 1;
+  const slitherAt = P.hasSlither ? P.slitherAt : null;
+  const markFace = (f) => {
+    const si = slitherAt[f];
+    if (si < 0 || dirtyFaceFlag[si]) return;
+    dirtyFaceFlag[si] = 1;
+    scope.faces.push(si);
+    dirtyFaceAdded = true;
+  };
+  const markCellFaces = (c) => {
+    const r = (c / cols) | 0, col = c - r * cols;
+    if (r > 0 && col > 0) markFace((r - 1) * fc + (col - 1));
+    if (r > 0 && col < fc) markFace((r - 1) * fc + col);
+    if (r < fr && col > 0) markFace(r * fc + (col - 1));
+    if (r < fr && col < fc) markFace(r * fc + col);
+  };
   const markCell = (c) => {
     if (c < 0 || dirtyFlag[c]) return;
     dirtyFlag[c] = 1;
@@ -744,6 +824,7 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
   };
   const touchCell = (i, addedOn) => {
     if (addedOn) { scope.hasOn = true; scope.checkCycle = true; }
+    if (slitherAt) markCellFaces(i);
     markCell(i);
     const b = i * 4;
     for (let d = 0; d < 4; d++) {
@@ -752,20 +833,37 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
     }
   };
   const sortScope = () => {
-    if (!dirtyAdded) return;
-    dirtyAdded = false;
-    insertSortNum(scope.cells);
-    insertSortNum(scope.whites);
-    insertSortNum(scope.blacks);
+    if (dirtyAdded) {
+      dirtyAdded = false;
+      insertSortNum(scope.cells);
+      insertSortNum(scope.whites);
+      insertSortNum(scope.blacks);
+    }
+    if (dirtyFaceAdded) {
+      dirtyFaceAdded = false;
+      insertSortNum(scope.faces);
+    }
   };
   const clearDirty = () => {
     if (!scope) return;
     for (let k = 0; k < scope.cells.length; k++) dirtyFlag[scope.cells[k]] = 0;
+    if (scope.faces) {
+      for (let k = 0; k < scope.faces.length; k++) dirtyFaceFlag[scope.faces[k]] = 0;
+    }
   };
 
   if (scoped) {
     if (dirtyFlag.length < P.N) dirtyFlag = new Uint8Array(P.N);
-    scope = { cells: [], whites: [], blacks: [], hasOn: val === E_ON, checkCycle: val === E_ON };
+    if (slitherAt && dirtyFaceFlag.length < P.slither.length) dirtyFaceFlag = new Uint8Array(P.slither.length);
+    scope = {
+      cells: [],
+      whites: [],
+      blacks: [],
+      faces: slitherAt ? [] : null,
+      newOn: val === E_ON ? [edge] : [],
+      hasOn: val === E_ON,
+      checkCycle: val === E_ON,
+    };
     touchCell(P.edgeA[edge], val === E_ON);
     touchCell(P.edgeB[edge], val === E_ON);
   }
@@ -792,7 +890,7 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
       if (!applySets(st, step.sets)) return { broke: { kind: 'conflict', step }, area: false, steps, state: st };
       steps.push(step);
       touched.length = 0;
-      if (scope) scope.checkCycle = false;
+      if (scope) { scope.checkCycle = false; scope.newOn.length = 0; }
       for (let k = 0; k < step.sets.length; k++) {
         const [kind, idx, v] = step.sets[k];
         if (kind === 'g') {
@@ -803,7 +901,11 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
         } else {
           const a = P.edgeA[idx], b = P.edgeB[idx];
           touched.push(a, b);
-          if (scoped) { touchCell(a, v === E_ON); touchCell(b, v === E_ON); }
+          if (scoped) {
+            if (v === E_ON) scope.newOn.push(idx);
+            touchCell(a, v === E_ON);
+            touchCell(b, v === E_ON);
+          }
         }
       }
       if (!runBookkeeping(P, st, touched, scoped ? touchCell : null)) {

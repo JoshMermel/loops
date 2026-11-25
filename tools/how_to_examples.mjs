@@ -77,13 +77,27 @@ for (const p of candidates) {
   if (prioritized.length >= 1200) break;
   addCand(p);
 }
-// Sort prioritized smallest-first so early-exit never locks in a large board when a smaller example exists
-prioritized.sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols) || (a.score ?? 0) - (b.score ?? 0));
+const variantCount = (p) => (
+  (p.slither && p.slither.length ? 1 : 0)
+  + (p.fullBoard ? 1 : 0)
+  + (p.voids && p.voids.length ? 1 : 0)
+  + (p.clues.some((c) => c.t === 'G') ? 1 : 0)
+  + (p.givens && p.givens.length ? 1 : 0)
+);
+
+// Sort prioritized: plain Masyu boards first, then single-variant boards, then hybrids, smallest-first within each band
+// so core Masyu rules never get crowded out by smaller Slitherlink/Hamilton/Gray examples.
+prioritized.sort((a, b) => (
+  variantCount(a) - variantCount(b)
+  || (a.rows * a.cols) - (b.rows * b.cols)
+  || (a.score ?? 0) - (b.score ?? 0)
+));
 
 const prefer = (prev, cand) => {
   if (!prev) return true;
-  // Prefer smaller board (prefer 6x6 or 8x8), and fewer earlier hints so the board isn't cluttered
-  const score = (e) => e.puzzleObj.rows * e.puzzleObj.cols * 10 + e.hintsCount;
+  // Strongly prefer plain Masyu boards for core rules (and single-variant boards over hybrids),
+  // then smaller boards (6x6 / 8x8), and fewer earlier hints so diagrams stay uncluttered.
+  const score = (e) => variantCount(e.puzzleObj) * 100000 + e.puzzleObj.rows * e.puzzleObj.cols * 10 + e.hintsCount;
   return score(cand) < score(prev);
 };
 

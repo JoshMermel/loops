@@ -12,7 +12,7 @@
 // Cell states: 0 unknown, 1 off (not on the loop), 2 loop (on the loop; all circles start as LOOP).
 import {
   compileSlither, serializeSlither, parseSlitherToken, symmetrySlither,
-  isSlitherSatisfied, propagateSlitherFace,
+  isSlitherSatisfied, propagateSlitherFace, firstUnsatisfiedSlitherOnClose,
 } from './variants/slitherlink.js';
 
 /** Column letters like a spreadsheet: 0 -> A, 25 -> Z, 26 -> AA. */
@@ -687,22 +687,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
               const ex = ed[u4 + d];
               if (e[ex] === E_UNKNOWN) {
                 let forbid = len < loopCount;
-                if (!forbid && hasSlither) {
-                  // Closing ex would end the loop; forbid if any Slitherlink face would still be short of its count
-                  const ef0 = edgeFaces[ex * 2], ef1 = edgeFaces[ex * 2 + 1];
-                  const fe = P.faceEdges;
-                  for (let si = 0; si < P.slither.length; si++) {
-                    const sc = P.slither[si];
-                    if (sc.n === 0) continue;
-                    const f4 = sc.f * 4;
-                    let fon = (sc.f === ef0 || sc.f === ef1) ? 1 : 0;
-                    if (fe[f4] >= 0 && e[fe[f4]] === E_ON) fon++;
-                    if (fe[f4 + 1] >= 0 && e[fe[f4 + 1]] === E_ON) fon++;
-                    if (fe[f4 + 2] >= 0 && e[fe[f4 + 2]] === E_ON) fon++;
-                    if (fe[f4 + 3] >= 0 && e[fe[f4 + 3]] === E_ON) fon++;
-                    if (fon < sc.n) { forbid = true; break; }
-                  }
-                }
+                if (!forbid && hasSlither) forbid = firstUnsatisfiedSlitherOnClose(P, st, ex) >= 0;
                 if (forbid) setEdge(ex, E_OFF);
               }
               break;

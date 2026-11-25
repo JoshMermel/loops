@@ -182,14 +182,13 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     return out;
   };
 
+  // Slitherlink bookkeeping: a 0 face or any face with `n` drawn segments auto-X's its remaining open sides
+  // (only needs one pass since `add` never turns an edge ON)
+  if (P.hasSlither) autoXSlither(P, w, add);
+
   let changed = true;
   while (changed) {
     changed = false;
-    // Slitherlink bookkeeping: a 0 face or any face with `n` drawn segments auto-X's its remaining open sides
-    if (P.hasSlither && autoXSlither(P, w, add)) {
-      changed = true;
-      continue;
-    }
     // Rule 4: dead-end intersections & pockets (disabled on fullBoard since every intersection must be visited)
     if (!P.fullBoard) {
       for (let i = 0; i < N; i++) {
@@ -248,7 +247,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           const t = w1.term;
           let impossible = deg[t] >= 1;
           if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
-          if (!impossible) for (let i = 0; i < N; i++) if (i !== t && deg[i] > 0) { impossible = true; break; }
+          if (!impossible && anyDegGt0) impossible = true;
           if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;

@@ -65,10 +65,13 @@ const settings = {
 const board = new Board($('board'), {
   onStart: () => { state.pending = snapshot(); state.dragStack = []; },
   onBeginDrag: () => {
+    const hadPending = autoGrace.isPending();
     autoGrace.cancel();
     if (state.pending) {
+      const before = hadPending ? cloneMarks(state.pending) : null;
       reconcileAuto(state.P, state.pending);
       state.marks = cloneMarks(state.pending);
+      if (before && !sameMarks(before, state.marks)) save();
     }
     state.dragStack = [];
   },
@@ -248,9 +251,16 @@ function paintFaceStep(f) {
   const val = state.facePaintVal;
   if (val === null || val === undefined || f < 0 || f >= m.faces.length) return;
   if (P.hasVoids && P.faceExterior[f]) return;
-  if (m.faces[f] && m.autoF[f]) return;
-  if (m.faces[f] === val) return;
-  autoGrace.cancel();
+  let flushed = false;
+  if (autoGrace.isPending()) {
+    autoGrace.cancel();
+    reconcileAuto(P, m);
+    flushed = true;
+  }
+  if ((m.faces[f] && m.autoF[f]) || m.faces[f] === val) {
+    if (flushed) refresh();
+    return;
+  }
   setFaceGroup(P, m, f, val, 0);
   reconcileAuto(P, m);
   refresh();
@@ -397,8 +407,8 @@ function fitBoard() {
   const { availW, availH } = viewportSpace();
   const layout = chooseLayout(baseP.rows, baseP.cols, availW, availH, state.rotOverride);
   if (layout.rotated !== state.rotated) {
-    flushAuto();
     if (board.gesture) board.cancel();
+    flushAuto();
     const xf = layout.rotated
       ? (m) => rotateMarksCW(baseP, state.rotP, m)
       : (m) => unrotateMarksCW(baseP, state.rotP, m);
@@ -611,7 +621,7 @@ const ROLE_COLORS = {
   faceOut: 'var(--face-out)',
 };
 
-function showHintToast(meta, text, extraLine, usedRoles, faceLabels = null) {
+function showHintToast(meta, text, extraLine, usedRoles, faceLabels = null, clueLabel = null) {
   clearTimeout(toastTimer);
   const el = $('toast');
   el.className = 'toast hint below';
@@ -633,7 +643,7 @@ function showHintToast(meta, text, extraLine, usedRoles, faceLabels = null) {
     el.append(more);
   }
 
-  const roleLabel = (r) => (r === 'clue' && state.P && !state.P.clues.length ? 'the clue' : (ROLES[r] || r));
+  const roleLabel = (r) => (r === 'clue' && clueLabel ? clueLabel : (r === 'clue' && state.P && !state.P.clues.length ? 'the clue' : (ROLES[r] || r)));
   const legendItems = (usedRoles || []).map((r) => [ROLE_COLORS[r] || 'var(--hint-focus)', roleLabel(r)]);
   if (faceLabels) {
     if (faceLabels.hasIn) legendItems.push([ROLE_COLORS.faceIn, faceLabels.inLabel]);
@@ -705,7 +715,10 @@ function renderCurrentHint() {
   if (activeFaces) {
     if (activeFaces.focus && activeFaces.focus.length && !usedRoles.includes('focus')) usedRoles.push('focus');
     if (activeFaces.clue && activeFaces.clue.length && !usedRoles.includes('clue')) usedRoles.push('clue');
+    if (activeFaces.problem && activeFaces.problem.length && !usedRoles.includes('problem')) usedRoles.push('problem');
   }
+  const hasClueFaces = !!(activeFaces && activeFaces.clue && activeFaces.clue.length);
+  const clueLabel = hasClueFaces ? (roles.clue && roles.clue.length ? 'the clues' : 'the clue') : null;
   const faceLabels = full && item.faces && (item.faces.in.length || item.faces.out.length)
     ? {
         hasIn: item.faces.in.length > 0,
@@ -717,7 +730,7 @@ function renderCurrentHint() {
   const count = h.hints.length > 1 ? ` · ${h.index + 1}/${h.hints.length}` : '';
   if (!full) {
     const meta = `${h.tier} · ${h.rule}${count} · where to look`;
-    showHintToast(meta, item.nudge, 'Press Hint again for the full deduction.', usedRoles, null);
+    showHintToast(meta, item.nudge, 'Press Hint again for the full deduction.', usedRoles, null, clueLabel);
     return;
   }
   const meta = `${h.tier} · ${h.rule} (cost ${h.weight})${count}`;
@@ -725,7 +738,7 @@ function renderCurrentHint() {
   const more = h.hints.length > 1
     ? `Move: ${move}. Press Hint again for another firing of ${h.rule}.`
     : `Move: ${move}.`;
-  showHintToast(meta, item.text, more, usedRoles, faceLabels);
+  showHintToast(meta, item.text, more, usedRoles, faceLabels, clueLabel);
 }
 
 // ------------------------------------------------------------ books & navigation
@@ -763,8 +776,8 @@ function showInfo() {
 function openPuzzle(idx) {
   const book = state.book;
   if (!book || !book.puzzles.length) return;
-  flushAuto();
   if (board.gesture) board.cancel();
+  flushAuto();
   idx = Math.max(0, Math.min(Math.trunc(idx) || 0, book.puzzles.length - 1));
   state.idx = idx;
   const raw = book.puzzles[idx];
@@ -1030,6 +1043,8 @@ function renderBookPicker(path = []) {
   const pick = (b) => { bookModal.close(); if (!isCurrent(b)) openBook(b.id, 0); };
   const show = (nextPath) => {
     renderBookPicker(nextPath);
+    const box = body.closest('.modal-box');
+    if (box) box.scrollTop = 0;
     body.querySelector('.bp-back, .bp-card, .bp-book')?.focus();
   };
 
@@ -1239,6 +1254,7 @@ $('setting-auto-x').addEventListener('change', (e) => {
   store.set('ms_autoX', settings.autoX ? '1' : '0');
   if (state.P) {
     const syncOne = (m) => {
+      reconcileAutoGray(state.P, m);
       applyAutoX(state.P, m, settings.autoX, { useShade: settings.autoShade });
       if (settings.autoShade) {
         reconcileAutoShade(state.P, m, true);
@@ -1259,6 +1275,7 @@ $('setting-auto-shade').addEventListener('change', (e) => {
   store.set('ms_autoShade', settings.autoShade ? '1' : '0');
   if (state.P) {
     const syncOne = (m) => {
+      reconcileAutoGray(state.P, m);
       if (settings.autoX) {
         applyAutoX(state.P, m, true, { useShade: settings.autoShade });
       }

@@ -156,7 +156,7 @@ const pickEvenly = (list, n) => {
  * Apportion `target` evenly across `groups` using largest-remainder + level-fill backfill
  * (same pattern as multiverse-star-battle/tools/build_books.py).
  */
-function pickBalancedAcrossGroups(poolList, target, groups) {
+function pickBalancedAcrossGroups(poolList, target, groups, existingCounts = null) {
   const byG = new Map(groups.map((g) => [g, []]));
   for (const p of poolList) {
     const g = byG.has(p._group) ? p._group : groups[0];
@@ -167,17 +167,17 @@ function pickBalancedAcrossGroups(poolList, target, groups) {
   const want = Math.min(target, totalAvail);
   const alloc = new Map(groups.map((g) => [g, 0]));
 
-  // Level-fill: repeatedly bump whichever available group currently has the smallest allocation
+  // Level-fill: repeatedly bump whichever available group currently has the smallest total (existing + alloc)
   let assigned = 0;
   while (assigned < want) {
-    let bestG = null, bestA = Infinity;
+    let bestG = null, bestTotal = Infinity;
     for (const g of groups) {
       if (alloc.get(g) >= avail.get(g)) continue;
-      const a = alloc.get(g);
-      if (a < bestA) { bestA = a; bestG = g; }
+      const tot = (existingCounts ? (existingCounts.get(g) || 0) : 0) + alloc.get(g);
+      if (tot < bestTotal) { bestTotal = tot; bestG = g; }
     }
     if (!bestG) break;
-    alloc.set(bestG, bestA + 1);
+    alloc.set(bestG, alloc.get(bestG) + 1);
     assigned++;
   }
 
@@ -188,10 +188,15 @@ function pickBalancedAcrossGroups(poolList, target, groups) {
 
 const pickWithLocked = (lockedList, poolList, target) => {
   if (!target) return [...lockedList, ...poolList];
-  if (lockedList.length >= target) return lockedList.slice();
+  if (lockedList.length >= target) return lockedList.slice(0, target);
   const need = target - lockedList.length;
   if (balanceGroups && prefixes.length > 1) {
-    return [...lockedList, ...pickBalancedAcrossGroups(poolList, need, prefixes).picked];
+    const existingCounts = new Map(prefixes.map((g) => [g, 0]));
+    for (const p of lockedList) {
+      const g = existingCounts.has(p._group) ? p._group : prefixes[0];
+      existingCounts.set(g, existingCounts.get(g) + 1);
+    }
+    return [...lockedList, ...pickBalancedAcrossGroups(poolList, need, prefixes, existingCounts).picked];
   }
   return [...lockedList, ...pickEvenly(poolList, need)];
 };

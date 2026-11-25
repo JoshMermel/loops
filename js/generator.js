@@ -1012,10 +1012,12 @@ function generateFullBoardPuzzle({
         cachedRated = rated;
       } else if (removed.length > 0 && Date.now() < deadline) {
         const base = current;
-        let lo = 0, hi = removed.length, bestG = base.concat(removed), bestR = null;
+        let lo = 0, hi = removed.length;
+        const cmpG = (a, b) => ((a.r * cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0));
+        let bestG = base.concat(removed).sort(cmpG), bestR = null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
-          const cand = base.concat(removed.slice(mid));
+          const cand = base.concat(removed.slice(mid)).sort(cmpG);
           const r = rate(compile({ name, rows, cols, clues: [], fullBoard: true, givens: cand }));
           if (isWithin(r)) { lo = mid; bestG = cand; bestR = r; }
           else hi = mid;
@@ -1033,13 +1035,6 @@ function generateFullBoardPuzzle({
     }
     current.sort((a, b) => ((a.r * cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)));
     const P = compile({ name, rows, cols, clues: [], fullBoard: true, givens: current });
-    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
-    if (verify.exceeded || verify.count !== 1) continue;
-    const sol = verify.solutions[0];
-    if (!isSolved(P, sol.e)) continue;
-    // Must genuinely require the full-board rule (non-fullBoard must have >= 2 solutions)
-    const noFull = compile({ name: 'nf', rows, cols, clues: [], givens: current });
-    if (solve(noFull, { limit: 2, maxNodes: 50000, rng: rand }).count < 2) continue;
 
     const rated = cachedRated || rate(P);
     if (wantUnsolved) { if (rated.solved) continue; }
@@ -1048,6 +1043,15 @@ function generateFullBoardPuzzle({
       if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
       if (targetTier && rated.tier !== targetTier) continue;
     }
+
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
+    // Must genuinely require the full-board rule (non-fullBoard must have >= 2 solutions)
+    const noFull = compile({ name: 'nf', rows, cols, clues: [], givens: current });
+    if (solve(noFull, { limit: 2, maxNodes: 50000, rng: rand }).count < 2) continue;
+
     P.solution = encodeSolution(P, sol);
     P.rules = rated.rules;
     P.tier = rated.tier;
@@ -1342,7 +1346,7 @@ function generateShapedPuzzle({
     }
 
     // 2. Strip clues (Pass 1 fast rules + Pass 2 exact solve + binary search back to targetTier)
-    let current = cur.clues.slice();
+    let current = cur.clues.slice().sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
     const fastUpto = beginnerOnly ? RULES.findIndex((r) => r.tier !== 'Beginner') : FIRST_LOOKAHEAD;
     const order1 = shuffle(current.slice(), rand);
     for (const cl of order1) {
@@ -1395,7 +1399,9 @@ function generateShapedPuzzle({
         cachedRated = rated;
       } else if (removed.length > 0 && Date.now() < deadline) {
         const strippedBase = current;
-        let lo = 0, hi = removed.length, bestClues = strippedBase.concat(removed), bestRated = null;
+        let lo = 0, hi = removed.length;
+        let bestClues = strippedBase.concat(removed).sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+        let bestRated = null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
           const cand = strippedBase.concat(removed.slice(mid))
@@ -1414,10 +1420,6 @@ function generateShapedPuzzle({
 
     current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
     const P = compile({ name, rows, cols, voids, clues: current });
-    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
-    if (verify.exceeded || verify.count !== 1) continue;
-    const sol = verify.solutions[0];
-    if (!isSolved(P, sol.e)) continue;
 
     const rated = cachedRated || rate(P);
     if (wantUnsolved) { if (rated.solved) continue; }
@@ -1426,6 +1428,11 @@ function generateShapedPuzzle({
       if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
       if (targetTier && rated.tier !== targetTier) continue;
     }
+
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
 
     P.solution = encodeSolution(P, sol);
     P.rules = rated.rules;
@@ -1597,8 +1604,8 @@ function generateSlitherPuzzle({
         cachedRated = rated;
       } else if (removed.length > 0 && Date.now() < deadline) {
         let lo = 0, hi = removed.length;
-        let bestMid = removed.length;
-        let bestRated = null;
+        let bestMid = 0;
+        let bestRated = (r1Pre && isWithin(r1Pre)) ? r1Pre : null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
           for (let j = mid; j < removed.length; j++) active[removed[j]] = 1;
@@ -1631,9 +1638,10 @@ function generateSlitherPuzzle({
     }
     if (reqQuadItems > 0) {
       const midR = rows >> 1, midC = cols >> 1;
+      const fMidR = (rows - 1) >> 1, fMidC = (cols - 1) >> 1;
       const qCnt = [0, 0, 0, 0];
       for (const c of fin.clues) qCnt[(c.r >= midR ? 2 : 0) + (c.c >= midC ? 1 : 0)]++;
-      for (const s of fin.slither) qCnt[(s.r >= midR ? 2 : 0) + (s.c >= midC ? 1 : 0)]++;
+      for (const s of fin.slither) qCnt[(s.r >= fMidR ? 2 : 0) + (s.c >= fMidC ? 1 : 0)]++;
       if (Math.min(...qCnt) < reqQuadItems) continue;
     }
 
@@ -1656,11 +1664,10 @@ function generateSlitherPuzzle({
     const sol = verify.solutions[0];
     if (!isSolved(P, sol.e)) continue;
 
-    // Hybrid necessity checks (fast randomized search first, fallback to higher cap)
+    // Hybrid necessity checks: fast-reject via propagation, then single capped randomized search
     const hasSecondSol = (altP) => {
-      let alt = solve(altP, { limit: 2, maxNodes: 50000, rng: rand });
-      if (alt.count < 2 && alt.exceeded) alt = solve(altP, { limit: 2, maxNodes: verifyMaxNodes, rng: rand });
-      return alt.count >= 2;
+      if (solvedByPropagate(altP)) return false;
+      return solve(altP, { limit: 2, maxNodes: 30000, rng: rand }).count >= 2;
     };
     if (isHybrid) {
       if (!hasSecondSol(compile({ name: `${name}_s`, rows, cols, clues: [], slither: fin.slither }))) continue;
@@ -1824,6 +1831,9 @@ export function generatePuzzle({
       }
     }
 
+    // Keep canonical cell order so cachedRated matches final compile() even on gray-mixed/gray-all
+    current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+
     const minKeep = keepFrac != null
       ? Math.max(2, Math.floor(current.length * keepFrac))
       : (style === 'sparse' ? 2 : beginnerOnly ? Math.max(4, Math.floor(current.length * 0.22)) : 2);
@@ -1942,7 +1952,7 @@ export function generatePuzzle({
       } else if (removed.length > 0 && Date.now() < deadline) {
         const strippedBase = current;
         let lo = 0, hi = removed.length;
-        let bestClues = strippedBase.concat(...removed);
+        let bestClues = strippedBase.concat(...removed).sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
         let bestRated = null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
@@ -1994,13 +2004,7 @@ export function generatePuzzle({
     current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
     const P = compile({ name, rows, cols, clues: current });
 
-    // Independent verification: complete exact search (never trust exceeded!)
-    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
-    if (verify.exceeded || verify.count !== 1) continue;
-    const sol = verify.solutions[0];
-    if (!isSolved(P, sol.e)) continue;
-
-    // Human-style rating
+    // Human-style rating BEFORE expensive exact verification
     const rated = cachedRated || rate(P);
     if (wantUnsolved) {
       if (rated.solved) continue;
@@ -2010,6 +2014,12 @@ export function generatePuzzle({
       if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
       if (targetTier && rated.tier !== targetTier) continue;
     }
+
+    // Independent verification: complete exact search (never trust exceeded!)
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
 
     P.solution = encodeSolution(P, sol);
     P.rules = rated.rules;

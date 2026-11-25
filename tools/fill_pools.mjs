@@ -268,16 +268,6 @@ if (!isMainThread) {
       },
       budgetSec: 240, perPuzzleMs: 20000,
     },
-    {
-      group: 'bonus', pool: 'full_10x10', cols: 10, rows: 10, minFill: 1.0,
-      buckets: {
-        Beginner: { need: 52, maxScore: 420 },
-        Medium: { need: 204, minScore: 390, maxScore: 465 },
-        Hard: { need: 204, minScore: 450, maxScore: 640 },
-        Expert: { need: 52, minScore: 610, maxScore: 1250 },
-      },
-      budgetSec: 360, perPuzzleMs: 25000,
-    },
 
     // ---- Bonus: Gray pearls (mixed white/black/gray & all-gray 8x8 + Expert+ + Mega finales)
     {
@@ -437,7 +427,6 @@ if (!isMainThread) {
     { group: 'bonus-finales', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
     { group: 'bonus-finales', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
     { group: 'bonus-finales', pool: 'sym_transpose_10x10', cols: 10, rows: 10, layout: 'transpose', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
-    { group: 'bonus-finales', pool: 'full_10x10', cols: 10, rows: 10, minFill: 1.0, tier: 'Expert+', totalTier: 12, budgetSec: 120, perPuzzleMs: 20000 },
 
     // Mega-sized themed boards (2x-3x normal area)
     { group: 'bonus-finales', pool: 'white_12x20', cols: 12, rows: 20, style: 'white', total: 12, budgetSec: 180, perPuzzleMs: 30000 },
@@ -446,7 +435,6 @@ if (!isMainThread) {
     { group: 'bonus-finales', pool: 'sym_rot180_14x14', cols: 14, rows: 14, layout: 'rot180', total: 5, budgetSec: 60, perPuzzleMs: 20000 },
     { group: 'bonus-finales', pool: 'sym_mirror_14x14', cols: 14, rows: 14, layout: 'mirror', total: 5, budgetSec: 60, perPuzzleMs: 20000 },
     { group: 'bonus-finales', pool: 'sym_transpose_14x14', cols: 14, rows: 14, layout: 'transpose', total: 5, budgetSec: 90, perPuzzleMs: 20000 },
-    { group: 'bonus-finales', pool: 'full_12x20', cols: 12, rows: 20, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 20000 },
 
     // ---- Slitherlink & Hybrids (prototype books: 24 puzzles each at 4 B / 8 M / 8 H / 4 E)
     {

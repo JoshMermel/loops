@@ -282,4 +282,33 @@ test('generatePuzzle supports slither, slither-masyu (mutual necessity), and sli
   assert.equal(solve(pFull, { limit: 2, maxNodes: 50000 }).count, 1);
   assert.ok(solve(compile({ name: 'nf', rows: 6, cols: 6, clues: [], slither: pFull.slither, fullBoard: false }), { limit: 2, maxNodes: 50000 }).count >= 2, 'slither-full must require fullBoard');
   assert.equal(rate(pFull).solved, true);
+
+  // Target Medium tier on Slitherlink exercises Pass 2 + binary-search rollback
+  const pMed = generatePuzzle({ rows: 6, cols: 6, seed: 304, style: 'slither', targetTier: 'Medium', budgetMs: 8000 });
+  assert.ok(pMed, 'failed to generate Medium 6x6 Slitherlink puzzle');
+  assert.equal(pMed.tier, 'Medium');
+  const rMed = rate(compile(pMed));
+  assert.equal(rMed.score, pMed.score);
+  assert.equal(rMed.tier, pMed.tier);
+  assert.equal(rMed.rules, pMed.rules);
+});
+
+test('generatePuzzle matches independent rate(compile(p)) across gray, swiss-cheese, full-board, and slither styles', () => {
+  const cases = [
+    { rows: 6, cols: 6, style: 'gray-mixed', seed: 401, budgetMs: 8000 },
+    { rows: 6, cols: 6, style: 'gray-all', seed: 402, budgetMs: 8000 },
+    { rows: 8, cols: 8, style: 'swiss-cheese', seed: 403, budgetMs: 8000 },
+    { rows: 6, cols: 6, style: 'full-mixed', seed: 404, budgetMs: 8000 },
+    { rows: 6, cols: 6, style: 'slither', seed: 405, budgetMs: 8000 },
+    { rows: 6, cols: 6, style: 'slither-masyu', seed: 406, budgetMs: 8000 },
+  ];
+  for (const cfg of cases) {
+    const p = generatePuzzle(cfg);
+    assert.ok(p, `failed to generate ${cfg.style}`);
+    if (cfg.style === 'swiss-cheese') assert.ok(p.voids && p.voids.length >= 1, 'swiss-cheese must have voids');
+    const r = rate(compile(p));
+    assert.equal(r.score, p.score, `${cfg.style} cached score mismatch (${p.score} vs ${r.score})`);
+    assert.equal(r.tier, p.tier, `${cfg.style} cached tier mismatch`);
+    assert.equal(r.rules, p.rules, `${cfg.style} cached rules mismatch`);
+  }
 });

@@ -516,6 +516,14 @@ export function hitTestCoords(P, gx, gy) {
   return { kind: 'cell', cell, edge: -1 };
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  return node;
+}
+
 export class Board {
   constructor(el, handlers) {
     this.el = el;
@@ -525,6 +533,14 @@ export class Board {
     this.hoverCell = -1;
     this.hoverEdge = -1;
     this.hoverFace = -1;
+    this._svg = null;
+    this._faceHoverG = null;
+    this._topHoverG = null;
+    this._colLabels = null;
+    this._rowLabels = null;
+    this._lines = null;
+    this._hc = -1;
+    this._hr = -1;
     this.opts = { colorLines: false, pathColors: null, pathAlike: null };
     this.grace = makeGrace();
     this._badTimer = 0;
@@ -544,6 +560,14 @@ export class Board {
     this.hoverCell = -1;
     this.hoverEdge = -1;
     this.hoverFace = -1;
+    this._svg = null;
+    this._faceHoverG = null;
+    this._topHoverG = null;
+    this._colLabels = null;
+    this._rowLabels = null;
+    this._lines = null;
+    this._hc = -1;
+    this._hr = -1;
     this.colors = null;
     this.grace.reset();
     clearTimeout(this._badTimer);
@@ -591,7 +615,7 @@ export class Board {
 
   render(marks, info, hint = null) {
     const P = this.P;
-    if (!P) { this.el.innerHTML = ''; return; }
+    if (!P) { this.el.innerHTML = ''; this._svg = null; return; }
     this.marks = marks; this.info = info; this.hint = hint;
     this._renderSeq = (this._renderSeq || 0) + 1;
 
@@ -660,16 +684,7 @@ export class Board {
         }
       }
     }
-    const hoverAutoFace = this.hoverFace >= 0 && marks.faces && marks.faces[this.hoverFace] && marks.autoF && marks.autoF[this.hoverFace];
-    if (!this.gesture && this.hoverFace >= 0 && !hoverAutoFace && fr > 0 && fc > 0) {
-      const hid = faceHoleId ? faceHoleId[this.hoverFace] : -1;
-      if (hid >= 0) {
-        g += `<path class="face-hover" fill-rule="evenodd" d="${shape.holeInsetPaths[hid]}"/>`;
-      } else {
-        const r = (this.hoverFace / fc) | 0, c = this.hoverFace % fc;
-        g += `<rect class="face-hover" x="${vx(c) + 3}" y="${vy(r) + 3}" width="${S - 6}" height="${S - 6}" rx="4"/>`;
-      }
-    }
+    g += '<g data-layer="face-hover"></g>';
 
     // Hint dual-tile tints (centered on intersections, under the lattice tracks)
     if (hint) {
@@ -693,6 +708,7 @@ export class Board {
         emitHintFaces(hint.faces.out, 'hint-face-out');
         emitHintFaces(hint.faces.clue, 'hint-clue');
         emitHintFaces(hint.faces.focus, 'hint-focus');
+        emitHintFaces(hint.faces.problem, 'hint-problem');
       }
       const tile = (i, cls, pad = 0) => `<rect class="${cls}" x="${ix(i) - S / 2 + pad}" y="${iy(i) - S / 2 + pad}" width="${S - 2 * pad}" height="${S - 2 * pad}" rx="${pad ? 8 : 0}"/>`;
       for (const i of hint.undecided || []) if (!P.hasVoids || !P.isVoid[i]) g += tile(i, 'hint-undecided', 2);
@@ -814,20 +830,21 @@ export class Board {
       }
     }
 
-    // Small crisp ✕ marks on crossed-out lattice tracks (auto-placed fainter; permanent given walls bolder/darker)
+    // Small crisp ✕ marks on crossed-out lattice tracks (batched by style into <= 6 <path> nodes)
+    let dGiven = '', dManual = '', dAuto = '';
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 2) continue;
       const [x1, y1, x2, y2] = segCoords(x);
       const isGivenWall = givenE && givenE[x] === E_OFF;
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = isGivenWall ? S * 0.105 : S * 0.085;
-      const path = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
-      if (isGivenWall) {
-        g += `<path class="wall-given-halo" d="${path}"/><path class="wall-given" d="${path}"/>`;
-      } else {
-        const autoCls = marks.autoE && marks.autoE[x] ? ' auto' : '';
-        g += `<path class="edge-x-halo${autoCls}" d="${path}"/><path class="edge-x${autoCls}" d="${path}"/>`;
-      }
+      const seg = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
+      if (isGivenWall) dGiven += seg;
+      else if (marks.autoE && marks.autoE[x]) dAuto += seg;
+      else dManual += seg;
     }
+    if (dAuto) g += `<path class="edge-x-halo auto" d="${dAuto}"/><path class="edge-x auto" d="${dAuto}"/>`;
+    if (dManual) g += `<path class="edge-x-halo" d="${dManual}"/><path class="edge-x" d="${dManual}"/>`;
+    if (dGiven) g += `<path class="wall-given-halo" d="${dGiven}"/><path class="wall-given" d="${dGiven}"/>`;
 
     // Hint overlays
     if (hint) {
@@ -865,56 +882,133 @@ export class Board {
       }
     }
 
-    // Hover feedback (track midpoint highlight, tappable gray circle ring, or open line-end diamonds)
-    if (!this.gesture) {
-      const hoverAutoX = this.hoverEdge >= 0 && marks.edges[this.hoverEdge] === 2 && marks.autoE && marks.autoE[this.hoverEdge];
-      const hoverGiven = this.hoverEdge >= 0 && givenE && givenE[this.hoverEdge] !== 0;
-      if (this.hoverEdge >= 0 && !hoverAutoX && !hoverGiven) {
-        const [x1, y1, x2, y2] = segCoords(this.hoverEdge);
-        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-        g += `<circle class="edge-hover" cx="${mx}" cy="${my}" r="${S * 0.16}"/>`;
-      } else if (this.hoverCell >= 0) {
-        if (P.clue[this.hoverCell] === GRAY) {
-          const { auto } = grayLabel(this.hoverCell);
-          if (!auto) g += `<circle class="pearl-hover" cx="${ix(this.hoverCell)}" cy="${iy(this.hoverCell)}" r="${S * 0.29}"/>`;
+    // Hover feedback layer populated incrementally by renderHover()
+    g += '<g data-layer="top-hover"></g>';
+
+    // Axis labels aligned directly with the grid lines ('.here' toggled by renderHover())
+    let colLabels = '<g data-layer="col-labels">';
+    for (let c = 0; c < P.cols; c++) {
+      colLabels += `<text class="axis-label" x="${LABEL + vx(c)}" y="${LABEL - 3}">${colName(c)}</text>`;
+    }
+    colLabels += '</g>';
+    let rowLabels = '<g data-layer="row-labels">';
+    for (let r = 0; r < P.rows; r++) {
+      rowLabels += `<text class="axis-label side" x="${LABEL - 4}" y="${LABEL + vy(r)}">${r + 1}</text>`;
+    }
+    rowLabels += '</g>';
+
+    const defs = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hatch-bg" width="8" height="8"/><line class="hatch-line" x1="0" y1="0" x2="0" y2="8" stroke-width="3"/></pattern><pattern id="void-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="void-hatch-line" x1="0" y1="0" x2="0" y2="10" stroke-width="1.2"/></pattern></defs>`;
+    this.el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${defs}${colLabels}${rowLabels}<g transform="translate(${LABEL} ${LABEL})">${g}</g></svg>`;
+    this._lines = { deg, colorOf, find };
+    this._svg = this.el.firstElementChild || null;
+    if (this._svg && typeof this._svg.querySelector === 'function') {
+      this._faceHoverG = this._svg.querySelector('[data-layer="face-hover"]');
+      this._topHoverG = this._svg.querySelector('[data-layer="top-hover"]');
+      this._colLabels = this._svg.querySelector('[data-layer="col-labels"]')?.children || null;
+      this._rowLabels = this._svg.querySelector('[data-layer="row-labels"]')?.children || null;
+    } else {
+      this._faceHoverG = null;
+      this._topHoverG = null;
+      this._colLabels = null;
+      this._rowLabels = null;
+    }
+    this._hc = -1;
+    this._hr = -1;
+    this.renderHover();
+  }
+
+  renderHover() {
+    if (!this._svg || !this.P || !this.marks || typeof document === 'undefined') return;
+    const P = this.P, marks = this.marks;
+
+    // Update axis highlight classes in O(1)
+    const hc = !this.gesture && this.hoverCell >= 0 ? this.hoverCell % P.cols : -1;
+    const hr = !this.gesture && this.hoverCell >= 0 ? (this.hoverCell / P.cols) | 0 : -1;
+    if (this._colLabels) {
+      if (this._hc !== hc) {
+        if (this._hc >= 0 && this._colLabels[this._hc]) this._colLabels[this._hc].classList.remove('here');
+        if (hc >= 0 && this._colLabels[hc]) this._colLabels[hc].classList.add('here');
+        this._hc = hc;
+      }
+    }
+    if (this._rowLabels) {
+      if (this._hr !== hr) {
+        if (this._hr >= 0 && this._rowLabels[this._hr]) this._rowLabels[this._hr].classList.remove('here');
+        if (hr >= 0 && this._rowLabels[hr]) this._rowLabels[hr].classList.add('here');
+        this._hr = hr;
+      }
+    }
+
+    const vx = (c) => PAD + c * S;
+    const vy = (r) => PAD + r * S;
+    const ix = (i) => PAD + (i % P.cols) * S;
+    const iy = (i) => PAD + ((i / P.cols) | 0) * S;
+
+    // Face hover layer (below void cutouts, grid lines, and hints)
+    if (this._faceHoverG) {
+      const fr = P.rows - 1, fc = P.cols - 1;
+      const hoverAutoFace = this.hoverFace >= 0 && marks.faces && marks.faces[this.hoverFace] && marks.autoF && marks.autoF[this.hoverFace];
+      if (!this.gesture && this.hoverFace >= 0 && !hoverAutoFace && fr > 0 && fc > 0) {
+        const faceHoleId = P.hasVoids ? P.faceHoleId : null;
+        const hid = faceHoleId ? faceHoleId[this.hoverFace] : -1;
+        if (hid >= 0) {
+          const shape = getShapePaths(P);
+          this._faceHoverG.replaceChildren(svgEl('path', { class: 'face-hover', 'fill-rule': 'evenodd', d: shape.holeInsetPaths[hid] }));
+        } else {
+          const r = (this.hoverFace / fc) | 0, c = this.hoverFace % fc;
+          this._faceHoverG.replaceChildren(svgEl('rect', { class: 'face-hover', x: vx(c) + 3, y: vy(r) + 3, width: S - 6, height: S - 6, rx: 4 }));
         }
-        if (deg[this.hoverCell] === 1) {
-          const far = otherEnd(P, marks.edges, this.hoverCell);
-          if (far >= 0) {
-            const strokeStyle = this.opts.colorLines && pc
-              ? ` style="stroke:${pc[colorOf.get(find(this.hoverCell)) % pc.length]}"`
-              : '';
-            for (const i of [this.hoverCell, far]) {
-              const x = ix(i), y = iy(i);
-              const d = P.clue[i] ? S * 0.28 : S * 0.20;
-              const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
-              g += `<path class="line-end-halo" d="${path}"/>`;
-              g += `<path class="line-end"${strokeStyle} d="${path}"/>`;
+      } else {
+        this._faceHoverG.replaceChildren();
+      }
+    }
+
+    // Top hover layer (track midpoint highlight, tappable gray circle ring, or open line-end diamonds)
+    if (this._topHoverG) {
+      const nodes = [];
+      if (!this.gesture) {
+        const givenE = P.hasGivens ? P.givenE : null;
+        const hoverAutoX = this.hoverEdge >= 0 && marks.edges[this.hoverEdge] === 2 && marks.autoE && marks.autoE[this.hoverEdge];
+        const hoverGiven = this.hoverEdge >= 0 && givenE && givenE[this.hoverEdge] !== 0;
+        if (this.hoverEdge >= 0 && !hoverAutoX && !hoverGiven) {
+          const [a, b] = edgeCells(P, this.hoverEdge);
+          const mx = (ix(a) + ix(b)) / 2, my = (iy(a) + iy(b)) / 2;
+          nodes.push(svgEl('circle', { class: 'edge-hover', cx: mx, cy: my, r: S * 0.16 }));
+        } else if (this.hoverCell >= 0) {
+          if (P.clue[this.hoverCell] === GRAY) {
+            const k = P.grayAt ? P.grayAt[this.hoverCell] : -1;
+            const lbl = k >= 0 && marks.grays ? marks.grays[k] : 0;
+            const auto = !!(lbl && marks.autoG && marks.autoG[k]);
+            if (!auto) nodes.push(svgEl('circle', { class: 'pearl-hover', cx: ix(this.hoverCell), cy: iy(this.hoverCell), r: S * 0.29 }));
+          }
+          if (this._lines && this._lines.deg[this.hoverCell] === 1) {
+            const far = otherEnd(P, marks.edges, this.hoverCell);
+            if (far >= 0) {
+              const pc = this.opts.pathColors;
+              const stroke = this.opts.colorLines && pc
+                ? pc[this._lines.colorOf.get(this._lines.find(this.hoverCell)) % pc.length]
+                : null;
+              for (const i of [this.hoverCell, far]) {
+                const x = ix(i), y = iy(i);
+                const d = P.clue[i] ? S * 0.28 : S * 0.20;
+                const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
+                nodes.push(svgEl('path', { class: 'line-end-halo', d: path }));
+                const attrs = { class: 'line-end', d: path };
+                if (stroke) attrs.style = `stroke:${stroke}`;
+                nodes.push(svgEl('path', attrs));
+              }
             }
           }
         }
       }
+      this._topHoverG.replaceChildren(...nodes);
     }
-
-    // Axis labels aligned directly with the grid lines
-    const hc = !this.gesture && this.hoverCell >= 0 ? this.hoverCell % P.cols : -1;
-    const hr = !this.gesture && this.hoverCell >= 0 ? (this.hoverCell / P.cols) | 0 : -1;
-    let labels = '';
-    for (let c = 0; c < P.cols; c++) {
-      labels += `<text class="axis-label${c === hc ? ' here' : ''}" x="${LABEL + vx(c)}" y="${LABEL - 3}">${colName(c)}</text>`;
-    }
-    for (let r = 0; r < P.rows; r++) {
-      labels += `<text class="axis-label side${r === hr ? ' here' : ''}" x="${LABEL - 4}" y="${LABEL + vy(r)}">${r + 1}</text>`;
-    }
-
-    const defs = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hatch-bg" width="8" height="8"/><line class="hatch-line" x1="0" y1="0" x2="0" y2="8" stroke-width="3"/></pattern><pattern id="void-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="void-hatch-line" x1="0" y1="0" x2="0" y2="10" stroke-width="1.2"/></pattern></defs>`;
-    this.el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${defs}${labels}<g transform="translate(${LABEL} ${LABEL})">${g}</g></svg>`;
   }
 
   // ---- pointer handling
 
   coordsFromEvent(e) {
-    const svg = this.el.querySelector('svg');
+    const svg = this._svg || this.el.querySelector('svg');
     if (!svg || !this.P) return null;
     const rect = svg.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
@@ -929,7 +1023,7 @@ export class Board {
     this.hoverCell = cell;
     this.hoverEdge = edge;
     this.hoverFace = face;
-    if (this.marks) this.render(this.marks, this.info, this.hint);
+    this.renderHover();
   }
 
   down(e) {
@@ -964,6 +1058,8 @@ export class Board {
     } else if (hit.kind === 'face') {
       if (e.button === 2) this.h.onFaceRight?.(hit.face);
       else this.h.onFaceTap?.(hit.face);
+    } else {
+      this.renderHover();
     }
   }
 
@@ -1014,7 +1110,7 @@ export class Board {
     }
     const prevRender = this._renderSeq || 0;
     this.h.onEnd(false);
-    if (this.marks && (this._renderSeq || 0) === prevRender) this.render(this.marks, this.info, this.hint);
+    if (this.marks && (this._renderSeq || 0) === prevRender) this.renderHover();
   }
 
   cancel() {
@@ -1022,6 +1118,8 @@ export class Board {
     const id = this.gesture.id;
     this.gesture = null;
     try { this.el.releasePointerCapture(id); } catch { /* ignore */ }
+    const prevRender = this._renderSeq || 0;
     this.h.onEnd(true);
+    if (this.marks && (this._renderSeq || 0) === prevRender) this.renderHover();
   }
 }

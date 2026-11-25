@@ -27,8 +27,12 @@ export const UNDETERMINED_WEIGHT = 100;
 // ------------------------------------------------------------ helpers
 
 export function onCount(P, st, i) {
+  const ed = P.ed, e = st.e, b = i * 4;
   let n = 0;
-  for (let d = 0; d < 4; d++) { const x = P.ed[i * 4 + d]; if (x >= 0 && st.e[x] === E_ON) n++; }
+  let x = ed[b]; if (x >= 0 && e[x] === E_ON) n++;
+  x = ed[b + 1]; if (x >= 0 && e[x] === E_ON) n++;
+  x = ed[b + 2]; if (x >= 0 && e[x] === E_ON) n++;
+  x = ed[b + 3]; if (x >= 0 && e[x] === E_ON) n++;
   return n;
 }
 
@@ -88,7 +92,8 @@ export function applySets(st, sets) {
 }
 
 /** Union-find over E_ON edges. Returns { find, size, loopCount, cycleRoot, cycleCount }. */
-function onComponents(P, st) {
+function onComponents(P, st, opts) {
+  if (opts && opts.stepCache && opts.stepCache.onComp) return opts.stepCache.onComp;
   const { N, numEdges, edgeA, edgeB } = P;
   const parent = new Int16Array(N);
   for (let i = 0; i < N; i++) parent[i] = i;
@@ -104,7 +109,9 @@ function onComponents(P, st) {
   for (let i = 0; i < N; i++) {
     if (st.cell[i] === LOOP) { size[find(i)]++; loopCount++; }
   }
-  return { find, size, loopCount, cycleRoot: cycleRoot >= 0 ? find(cycleRoot) : -1, cycleCount };
+  const res = { find, size, loopCount, cycleRoot: cycleRoot >= 0 ? find(cycleRoot) : -1, cycleCount };
+  if (opts && opts.stepCache) opts.stepCache.onComp = res;
+  return res;
 }
 
 let scratchOnc = new Int8Array(0);
@@ -747,8 +754,8 @@ function findWhiteBothStraight(P, st) {
   return out;
 }
 
-function findNoEarlyClose(P, st) {
-  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+function findNoEarlyClose(P, st, opts) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st, opts);
   if (cycleRoot >= 0) return [];
   const out = [];
   for (let x = 0; x < P.numEdges; x++) {
@@ -766,8 +773,8 @@ function findNoEarlyClose(P, st) {
   return out;
 }
 
-function findSamePathExits(P, st) {
-  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+function findSamePathExits(P, st, opts) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st, opts);
   if (cycleRoot >= 0) return [];
   const out = [];
   for (let i = 0; i < P.N; i++) {
@@ -789,8 +796,8 @@ function findSamePathExits(P, st) {
   return out;
 }
 
-function findClosingCell(P, st) {
-  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+function findClosingCell(P, st, opts) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st, opts);
   if (cycleRoot >= 0) return [];
   const out = [];
   for (let i = 0; i < P.N; i++) {
@@ -1005,10 +1012,10 @@ function findBlackWhiteNoTurn(P, st) {
  * A black circle at one end of an open path cannot extend two cells straight into the other end
  * of that same path while other loop cells lie outside (closing the loop early).
  */
-function findBlackNoEarlyClose(P, st) {
+function findBlackNoEarlyClose(P, st, opts) {
   const blacks = blacksOf(P, st);
   if (!blacks.length) return [];
-  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st, opts);
   if (cycleRoot >= 0) return [];
   const out = [];
   for (const i of blacks) {
@@ -1147,8 +1154,8 @@ function findBoxStrand(P, st) {
  * cells connecting the two ends of one open path while other loop cells lie outside cannot be entered,
  * so every edge and cell in the corridor is off the loop.
  */
-function findCorridorNoEarlyClose(P, st) {
-  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+function findCorridorNoEarlyClose(P, st, opts) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st, opts);
   if (cycleRoot >= 0) return [];
   const isCorr = new Uint8Array(P.N);
   const exitsOf = new Array(P.N);
@@ -1201,8 +1208,8 @@ function findCorridorNoEarlyClose(P, st) {
   return out;
 }
 
-function findTwoEndsJoin(P, st) {
-  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+function findTwoEndsJoin(P, st, opts) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st, opts);
   if (cycleRoot >= 0) return [];
   const out = [];
   for (const g of openEndGroups(P, st)) {
@@ -2157,40 +2164,40 @@ export const RULES = [
 
   // Beginner (single-segment / direct rule violations + iconic three-whites + Slitherlink basics)
   ...SLITHER_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, slitherOnly: true })),
-  defRule({ id: 'grayMustBeBlack', tier: 'Beginner', weight: 2, find: findGrayMustBeBlack, label: 'a gray circle that cannot go straight along either axis must be black' }),
-  defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
-  defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
-  defRule({ id: 'blackWall', tier: 'Beginner', weight: 2, find: findBlackWall, label: 'a black circle blocked within two cells of a wall or cross must extend two cells the opposite way' }),
-  defRule({ id: 'grayMustBeWhite', tier: 'Beginner', weight: 3, find: findGrayMustBeWhite, label: 'a gray circle that cannot extend two straight segments along both axes must be white' }),
-  defRule({ id: 'blackAdjacent', tier: 'Beginner', weight: 3, find: findBlackAdjacent, label: 'two touching black circles cannot connect, so each extends two cells away from the other' }),
-  defRule({ id: 'whiteMustTurn', tier: 'Beginner', weight: 3, find: findWhiteMustTurn, label: 'a white circle that goes straight at one end must turn at the other' }),
+  defRule({ id: 'grayMustBeBlack', tier: 'Beginner', weight: 2, grayOnly: true, find: findGrayMustBeBlack, label: 'a gray circle that cannot go straight along either axis must be black' }),
+  defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, circleOnly: true, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
+  defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, circleOnly: true, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
+  defRule({ id: 'blackWall', tier: 'Beginner', weight: 2, circleOnly: true, find: findBlackWall, label: 'a black circle blocked within two cells of a wall or cross must extend two cells the opposite way' }),
+  defRule({ id: 'grayMustBeWhite', tier: 'Beginner', weight: 3, grayOnly: true, find: findGrayMustBeWhite, label: 'a gray circle that cannot extend two straight segments along both axes must be white' }),
+  defRule({ id: 'blackAdjacent', tier: 'Beginner', weight: 3, circleOnly: true, find: findBlackAdjacent, label: 'two touching black circles cannot connect, so each extends two cells away from the other' }),
+  defRule({ id: 'whiteMustTurn', tier: 'Beginner', weight: 3, circleOnly: true, find: findWhiteMustTurn, label: 'a white circle that goes straight at one end must turn at the other' }),
   defRule({ id: 'deadEnd', tier: 'Beginner', weight: 4, find: findDeadEnd, label: 'an empty cell with fewer than two exits left cannot be on the loop' }),
   defRule({ id: 'forcedExits', tier: 'Beginner', weight: 4, find: findForcedExits, label: 'a loop cell with only two exits left must use both' }),
-  defRule({ id: 'blackPerp', tier: 'Beginner', weight: 5, find: findBlackPerp, label: 'a black circle cannot enter a neighbor that already has a perpendicular segment' }),
+  defRule({ id: 'blackPerp', tier: 'Beginner', weight: 5, circleOnly: true, find: findBlackPerp, label: 'a black circle cannot enter a neighbor that already has a perpendicular segment' }),
   defRule({ id: 'noEarlyClose', tier: 'Beginner', weight: 6, find: findNoEarlyClose, label: 'a segment joining the two ends of one path would close the loop early' }),
-  defRule({ id: 'threeWhites', tier: 'Beginner', weight: 8, find: findThreeWhites, label: 'three white circles in a row must all cross perpendicular to the row' }),
+  defRule({ id: 'threeWhites', tier: 'Beginner', weight: 8, circleOnly: true, find: findThreeWhites, label: 'three white circles in a row must all cross perpendicular to the row' }),
 
   // Medium (local multi-segment inferences, Auto-Shade border parity, and 1-step local lookahead)
   ...SLITHER_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, slitherOnly: true })),
-  defRule({ id: 'whiteBothStraight', tier: 'Medium', weight: 10, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
+  defRule({ id: 'whiteBothStraight', tier: 'Medium', weight: 10, circleOnly: true, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
   defRule({ id: 'closingCell', tier: 'Medium', weight: 11, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
   defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
-  defRule({ id: 'twoWhitesStraight', tier: 'Medium', weight: 12, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
-  defRule({ id: 'grayWhiteNoTurn', tier: 'Medium', weight: 12, find: findGrayWhiteNoTurn, label: 'a gray circle that cannot make a valid white-circle turn on either axis must be black' }),
-  defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 14, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
-  defRule({ id: 'blackNoEarlyClose', tier: 'Medium', weight: 14, find: findBlackNoEarlyClose, label: 'a black circle cannot extend two cells into the other end of its own path and close the loop early' }),
-  defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
-  defRule({ id: 'blackTwoDiagWhites', tier: 'Medium', weight: 15, find: findBlackTwoDiagWhites, label: 'a black circle flanked by two diagonally adjacent white circles cannot extend between them' }),
-  defRule({ id: 'blackWhiteNoTurn', tier: 'Medium', weight: 16, find: findBlackWhiteNoTurn, label: 'a black circle cannot extend into a white circle two cells away whose far side cannot turn' }),
-  defRule({ id: 'whiteCornerPinch', tier: 'Medium', weight: 17, find: findWhiteCornerPinch, label: 'a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors' }),
-  defRule({ id: 'whiteDeadEndPinch', tier: 'Medium', weight: 17, find: findWhiteDeadEndPinch, label: 'a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes' }),
+  defRule({ id: 'twoWhitesStraight', tier: 'Medium', weight: 12, circleOnly: true, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
+  defRule({ id: 'grayWhiteNoTurn', tier: 'Medium', weight: 12, grayOnly: true, find: findGrayWhiteNoTurn, label: 'a gray circle that cannot make a valid white-circle turn on either axis must be black' }),
+  defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 14, circleOnly: true, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
+  defRule({ id: 'blackNoEarlyClose', tier: 'Medium', weight: 14, circleOnly: true, find: findBlackNoEarlyClose, label: 'a black circle cannot extend two cells into the other end of its own path and close the loop early' }),
+  defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, circleOnly: true, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
+  defRule({ id: 'blackTwoDiagWhites', tier: 'Medium', weight: 15, circleOnly: true, find: findBlackTwoDiagWhites, label: 'a black circle flanked by two diagonally adjacent white circles cannot extend between them' }),
+  defRule({ id: 'blackWhiteNoTurn', tier: 'Medium', weight: 16, circleOnly: true, find: findBlackWhiteNoTurn, label: 'a black circle cannot extend into a white circle two cells away whose far side cannot turn' }),
+  defRule({ id: 'whiteCornerPinch', tier: 'Medium', weight: 17, circleOnly: true, find: findWhiteCornerPinch, label: 'a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors' }),
+  defRule({ id: 'whiteDeadEndPinch', tier: 'Medium', weight: 17, circleOnly: true, find: findWhiteDeadEndPinch, label: 'a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes' }),
   defRule({ id: 'faceShade', tier: 'Medium', weight: 18, find: findFaceShade, label: 'basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge' }),
-  defRule({ id: 'checkerPocket', tier: 'Medium', weight: 18, find: findChecker(true), label: 'checkerboard light/dark dot counts in a small full-board pocket force its exit segments' }),
+  defRule({ id: 'checkerPocket', tier: 'Medium', weight: 18, fullBoardOnly: true, find: findChecker(true), label: 'checkerboard light/dark dot counts in a small full-board pocket force its exit segments' }),
   defRule({ id: 'boxStrand', tier: 'Medium', weight: 20, find: findBoxStrand, label: 'closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side' }),
 
   // Hard (circle-diagonal shading, global topology, and short single-thread lookahead)
   defRule({ id: 'corridorNoEarlyClose', tier: 'Hard', weight: 30, find: findCorridorNoEarlyClose, label: 'a forced multi-cell corridor joining the two ends of one path would close the loop early' }),
-  defRule({ id: 'checkerParity', tier: 'Hard', weight: 36, find: findChecker(false), label: 'checkerboard light/dark dot counts in a full-board region force its exit segments' }),
+  defRule({ id: 'checkerParity', tier: 'Hard', weight: 36, fullBoardOnly: true, find: findChecker(false), label: 'checkerboard light/dark dot counts in a full-board region force its exit segments' }),
   defRule({ id: 'faceCircle', tier: 'Hard', weight: 38, find: (P, st, o) => (!P.clueCells.length && P.hasSlither ? [] : findFaceCircle(P, st, o)), extra: extraFaceCircle, label: 'advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge' }),
   defRule({ id: 'faceSlither', tier: 'Hard', weight: 38, slitherOnly: true, find: findFaceSlither, extra: extraFaceCircle, label: 'inside/outside shading around numbered Slitherlink squares (and circles on hybrids) forces an edge' }),
   defRule({ id: 'twoEndsJoin', tier: 'Hard', weight: 44, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
@@ -2225,6 +2232,13 @@ export const ruleLabel = (id) => (id === 'unsolved' ? 'none of the current rules
 
 const IMAGINE_AFTER = 20; // Beginner + local Medium + faceShade + boxStrand (<= 20) always run before searching imagined chains (min cost 22)
 
+const ruleApplies = (rule, P, st) => (
+  (!rule.slitherOnly || P.hasSlither)
+  && (!rule.circleOnly || P.clueCells.length > 0)
+  && (!rule.grayOnly || st.hasGray)
+  && (!rule.fullBoardOnly || P.fullBoard)
+);
+
 /** Apply all non-costly rules below `upto` until fixed point, contradiction, or `maxSteps`. Mutates `st`. */
 export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity, checkContra = true) {
   const allowed = Array.isArray(upto) ? new Set(upto) : null;
@@ -2233,30 +2247,18 @@ export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity, chec
   const trace = [];
   for (let guard = 0; guard < 5000; guard++) {
     // Drain free bookkeeping rules first (they don't affect `steps` or `trace`, avoiding redundant contradiction scans)
-    for (;;) {
-      let freeFired = false;
-      for (let r = 0; r < limit; r++) {
-        const rule = RULES[r];
-        if (!rule.free) continue;
-        const fs = rule.find(P, st, { upto: r, fast: true });
-        if (!fs.length) continue;
-        for (const f of fs) {
-          if (!applySets(st, f.sets)) return { contradiction: true, steps, trace };
-        }
-        freeFired = true;
-      }
-      if (!freeFired) break;
-    }
+    if (!runFreeBookkeeping(P, st, null, limit)) return { contradiction: true, steps, trace };
     if (checkContra && contradiction(P, st)) return { contradiction: true, steps, trace };
     if (steps >= maxSteps) return { contradiction: false, steps, trace };
+    const stepCache = {};
     let fired = false;
     for (let r = 0; r < limit; r++) {
       const rule = RULES[r];
       if (rule.free || rule.usesUniqueness) continue;
-      if (rule.slitherOnly && !P.hasSlither) continue;
+      if (!ruleApplies(rule, P, st)) continue;
       if (allowed && !allowed.has(rule.id)) continue;
       if (!allowed && rule.costly) continue;
-      const fs = rule.find(P, st, { upto: r, fast: true });
+      const fs = rule.find(P, st, { upto: r, fast: true, stepCache });
       if (!fs.length) continue;
       for (const f of fs) {
         if (!applySets(st, f.sets)) return { contradiction: true, steps, trace };
@@ -2271,19 +2273,113 @@ export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity, chec
   return { contradiction: false, steps, trace };
 }
 
-/** Drain all free bookkeeping rules into `st`, returning false on conflict. */
-function runFreeBookkeeping(P, st, bookkeeping = null) {
+/** Drain all free bookkeeping rules in-place into `st`, returning false on conflict. */
+function runFreeBookkeeping(P, st, bookkeeping = null, limit = 6) {
+  const { N, numEdges, ed, edgeA, edgeB } = P;
+  const { cell, e } = st;
+  const maxFree = Math.min(limit, 6);
   for (;;) {
     let any = false;
-    for (const r of RULES) {
-      if (!r.free) continue;
-      let changed = false;
-      for (const f of r.find(P, st, {})) {
-        if (applySets(st, f.sets)) { any = true; changed = true; }
-        else return false;
+
+    // 0. edgesOffCellOff: OFF cell -> all unknown incident edges OFF
+    if (maxFree > 0) {
+      let ch = false;
+      for (let i = 0; i < N; i++) {
+        if (cell[i] !== OFF) continue;
+        const b = i * 4;
+        let x = ed[b]; if (x >= 0 && e[x] === E_UNKNOWN) { e[x] = E_OFF; ch = true; }
+        x = ed[b + 1]; if (x >= 0 && e[x] === E_UNKNOWN) { e[x] = E_OFF; ch = true; }
+        x = ed[b + 2]; if (x >= 0 && e[x] === E_UNKNOWN) { e[x] = E_OFF; ch = true; }
+        x = ed[b + 3]; if (x >= 0 && e[x] === E_UNKNOWN) { e[x] = E_OFF; ch = true; }
       }
-      if (changed && bookkeeping) bookkeeping[r.id] = true;
+      if (ch) { any = true; if (bookkeeping) bookkeeping.edgesOffCellOff = true; }
     }
+
+    // 1. edgeEnds: ON edge -> UNKNOWN endpoints become LOOP
+    let totalOn = 0;
+    if (maxFree > 1) {
+      let ch = false;
+      for (let x = 0; x < numEdges; x++) {
+        if (e[x] !== E_ON) continue;
+        totalOn++;
+        const a = edgeA[x], b = edgeB[x];
+        if (cell[a] === UNKNOWN) { cell[a] = LOOP; ch = true; }
+        if (cell[b] === UNKNOWN) { cell[b] = LOOP; ch = true; }
+      }
+      if (ch) { any = true; if (bookkeeping) bookkeeping.edgeEnds = true; }
+    }
+
+    // 2. fullCell: cell with 2 ON edges -> remaining unknown incident edges OFF
+    let maybeSolved = totalOn >= 4;
+    if (maxFree > 2) {
+      let ch = false;
+      const clue = st.clue || P.clue;
+      for (let i = 0; i < N; i++) {
+        const b = i * 4;
+        const x0 = ed[b], x1 = ed[b + 1], x2 = ed[b + 2], x3 = ed[b + 3];
+        let on = 0;
+        if (x0 >= 0 && e[x0] === E_ON) on++;
+        if (x1 >= 0 && e[x1] === E_ON) on++;
+        if (x2 >= 0 && e[x2] === E_ON) on++;
+        if (x3 >= 0 && e[x3] === E_ON) on++;
+        if (maybeSolved && ((on === 1 || on > 2) || (clue[i] !== 0 && on !== 2))) maybeSolved = false;
+        if (on === 2) {
+          if (x0 >= 0 && e[x0] === E_UNKNOWN) { e[x0] = E_OFF; ch = true; }
+          if (x1 >= 0 && e[x1] === E_UNKNOWN) { e[x1] = E_OFF; ch = true; }
+          if (x2 >= 0 && e[x2] === E_UNKNOWN) { e[x2] = E_OFF; ch = true; }
+          if (x3 >= 0 && e[x3] === E_UNKNOWN) { e[x3] = E_OFF; ch = true; }
+        }
+      }
+      if (ch) { any = true; if (bookkeeping) bookkeeping.fullCell = true; }
+    }
+
+    // 3. isolatedCellOff: UNKNOWN cell with all incident edges OFF -> OFF
+    if (maxFree > 3) {
+      let ch = false;
+      for (let i = 0; i < N; i++) {
+        if (cell[i] !== UNKNOWN) continue;
+        const b = i * 4;
+        const x0 = ed[b], x1 = ed[b + 1], x2 = ed[b + 2], x3 = ed[b + 3];
+        if ((x0 < 0 || e[x0] === E_OFF) && (x1 < 0 || e[x1] === E_OFF)
+          && (x2 < 0 || e[x2] === E_OFF) && (x3 < 0 || e[x3] === E_OFF)) {
+          cell[i] = OFF;
+          ch = true;
+        }
+      }
+      if (ch) { any = true; if (bookkeeping) bookkeeping.isolatedCellOff = true; }
+    }
+
+    // 4. closedLoopRestOff: if solved, all remaining UNKNOWN cells/edges become OFF
+    if (maxFree > 4 && maybeSolved && isSolved(P, e)) {
+      let ch = false;
+      for (let i = 0; i < N; i++) if (cell[i] === UNKNOWN) { cell[i] = OFF; ch = true; }
+      for (let x = 0; x < numEdges; x++) if (edgeA[x] >= 0 && e[x] === E_UNKNOWN) { e[x] = E_OFF; ch = true; }
+      if (ch) { any = true; if (bookkeeping) bookkeeping.closedLoopRestOff = true; }
+    }
+
+    // 5. grayFromShape: unresolved gray circle with 2 ON edges resolves to WHITE or BLACK
+    if (maxFree > 5 && st.hasGray) {
+      let ch = false;
+      const cl = st.clue, grays = P.grays;
+      for (let k = 0; k < grays.length; k++) {
+        const i = grays[k];
+        if (cl[i] !== GRAY) continue;
+        const b = i * 4;
+        const u = ed[b], r = ed[b + 1], dn = ed[b + 2], l = ed[b + 3];
+        let on = 0;
+        if (u >= 0 && e[u] === E_ON) on++;
+        if (r >= 0 && e[r] === E_ON) on++;
+        if (dn >= 0 && e[dn] === E_ON) on++;
+        if (l >= 0 && e[l] === E_ON) on++;
+        if (on !== 2) continue;
+        const straight = (u >= 0 && dn >= 0 && e[u] === E_ON && e[dn] === E_ON)
+          || (r >= 0 && l >= 0 && e[r] === E_ON && e[l] === E_ON);
+        cl[i] = straight ? WHITE : BLACK;
+        ch = true;
+      }
+      if (ch) { any = true; if (bookkeeping) bookkeeping.grayFromShape = true; }
+    }
+
     if (!any) break;
   }
   return true;
@@ -2312,6 +2408,7 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
   const stepCache = {};
   for (const rule of HUMAN_ORDER) {
     if (without && without.includes(rule.id)) continue;
+    if (!ruleApplies(rule, P, st)) continue;
     // Before costly or lookahead rules, search imagine up to the current tier ceiling so cheaper imagine
     // skips expensive Tarjan/parity scans (while Hard ceiling HARD_MAX+1 skips non-frontier & area scans).
     if (rule.costly || rule.lookahead) {
@@ -2355,7 +2452,7 @@ export function rate(P, { without = null } = {}) {
 
   for (let guard = 0; guard < 3000; guard++) {
     if (isSolved(P, st.e)) break;
-    if (contradiction(P, st)) break;
+    if (guard === 0 && contradiction(P, st)) break;
     const bk = {};
     const step = nextStep(P, st, bk, without);
     for (const id of Object.keys(bk)) {

@@ -368,51 +368,54 @@ export function applySlitherParity(P, st, ctx) {
     return false;
   };
 
-  // 1. Direct static laws (0-face all-same, adjacent 3-3, diagonal 3-3)
-  for (let k = 0; k < slither.length && !ctx.hasConflict(); k++) {
-    const sc = slither[k];
-    const { r, c, n } = sc;
-    const f = canonFace(sc.f);
-    if (n === 0) {
-      const r0 = buildGraph ? { kind: 'slither0', face: sc.f } : null;
-      addLink(f, faceAt(r - 1, c), 0, r0);
-      addLink(f, faceAt(r, c + 1), 0, r0);
-      addLink(f, faceAt(r + 1, c), 0, r0);
-      addLink(f, faceAt(r, c - 1), 0, r0);
-    } else if (n === 3) {
-      // Orthogonal adjacent 3-3 (check right and down to avoid duplicate links)
-      if (c + 1 < fc && slitherNum[sc.f + 1] === 3 && hasLoopOutsideAdj3(P, st, r, c, r, c + 1, sc.f, sc.f + 1)) {
-        const f2Raw = sc.f + 1, f2 = canonFace(f2Raw);
-        const r33 = buildGraph ? { kind: 'slither33', face: sc.f, face2: f2Raw } : null;
-        addLink(f, f2, 1, r33);
-        addLink(f, faceAt(r, c - 1), 1, r33);
-        addLink(f2, faceAt(r, c + 2), 1, r33);
-      }
-      if (r + 1 < fr && slitherNum[sc.f + fc] === 3 && hasLoopOutsideAdj3(P, st, r, c, r + 1, c, sc.f, sc.f + fc)) {
-        const f2Raw = sc.f + fc, f2 = canonFace(f2Raw);
-        const r33 = buildGraph ? { kind: 'slither33', face: sc.f, face2: f2Raw } : null;
-        addLink(f, f2, 1, r33);
-        addLink(f, faceAt(r - 1, c), 1, r33);
-        addLink(f2, faceAt(r + 2, c), 1, r33);
-      }
-      // Diagonal adjacent 3-3 (check SE and SW to avoid duplicates)
-      if (r + 1 < fr && c + 1 < fc && slitherNum[(r + 1) * fc + (c + 1)] === 3) {
-        const f2Raw = (r + 1) * fc + (c + 1), f2 = canonFace(f2Raw);
-        const rd = buildGraph ? { kind: 'slitherDiag33', face: sc.f, face2: f2Raw } : null;
-        addLink(faceAt(r, c + 1), faceAt(r + 1, c), 1, rd);
-        addLink(f, faceAt(r - 1, c), 1, rd);
-        addLink(f, faceAt(r, c - 1), 1, rd);
-        addLink(f2, faceAt(r + 2, c + 1), 1, rd);
-        addLink(f2, faceAt(r + 1, c + 2), 1, rd);
-      }
-      if (r + 1 < fr && c - 1 >= 0 && slitherNum[(r + 1) * fc + (c - 1)] === 3) {
-        const f2Raw = (r + 1) * fc + (c - 1), f2 = canonFace(f2Raw);
-        const rd = buildGraph ? { kind: 'slitherDiag33', face: sc.f, face2: f2Raw } : null;
-        addLink(faceAt(r, c - 1), faceAt(r + 1, c), 1, rd);
-        addLink(f, faceAt(r - 1, c), 1, rd);
-        addLink(f, faceAt(r, c + 1), 1, rd);
-        addLink(f2, faceAt(r + 2, c - 1), 1, rd);
-        addLink(f2, faceAt(r + 1, c - 2), 1, rd);
+  // 1. Direct static laws (0-face all-same, adjacent 3-3, diagonal 3-3) — run once per parity build
+  if (!ctx.staticDone) {
+    ctx.staticDone = true;
+    for (let k = 0; k < slither.length && !ctx.hasConflict(); k++) {
+      const sc = slither[k];
+      const { r, c, n } = sc;
+      const f = canonFace(sc.f);
+      if (n === 0) {
+        const r0 = buildGraph ? { kind: 'slither0', face: sc.f } : null;
+        addLink(f, faceAt(r - 1, c), 0, r0);
+        addLink(f, faceAt(r, c + 1), 0, r0);
+        addLink(f, faceAt(r + 1, c), 0, r0);
+        addLink(f, faceAt(r, c - 1), 0, r0);
+      } else if (n === 3) {
+        // Orthogonal adjacent 3-3 (check right and down to avoid duplicate links)
+        if (c + 1 < fc && slitherNum[sc.f + 1] === 3 && hasLoopOutsideAdj3(P, st, r, c, r, c + 1, sc.f, sc.f + 1)) {
+          const f2Raw = sc.f + 1, f2 = canonFace(f2Raw);
+          const r33 = buildGraph ? { kind: 'slither33', face: sc.f, face2: f2Raw } : null;
+          addLink(f, f2, 1, r33);
+          addLink(f, faceAt(r, c - 1), 1, r33);
+          addLink(f2, faceAt(r, c + 2), 1, r33);
+        }
+        if (r + 1 < fr && slitherNum[sc.f + fc] === 3 && hasLoopOutsideAdj3(P, st, r, c, r + 1, c, sc.f, sc.f + fc)) {
+          const f2Raw = sc.f + fc, f2 = canonFace(f2Raw);
+          const r33 = buildGraph ? { kind: 'slither33', face: sc.f, face2: f2Raw } : null;
+          addLink(f, f2, 1, r33);
+          addLink(f, faceAt(r - 1, c), 1, r33);
+          addLink(f2, faceAt(r + 2, c), 1, r33);
+        }
+        // Diagonal adjacent 3-3 (check SE and SW to avoid duplicates)
+        if (r + 1 < fr && c + 1 < fc && slitherNum[(r + 1) * fc + (c + 1)] === 3) {
+          const f2Raw = (r + 1) * fc + (c + 1), f2 = canonFace(f2Raw);
+          const rd = buildGraph ? { kind: 'slitherDiag33', face: sc.f, face2: f2Raw } : null;
+          addLink(faceAt(r, c + 1), faceAt(r + 1, c), 1, rd);
+          addLink(f, faceAt(r - 1, c), 1, rd);
+          addLink(f, faceAt(r, c - 1), 1, rd);
+          addLink(f2, faceAt(r + 2, c + 1), 1, rd);
+          addLink(f2, faceAt(r + 1, c + 2), 1, rd);
+        }
+        if (r + 1 < fr && c - 1 >= 0 && slitherNum[(r + 1) * fc + (c - 1)] === 3) {
+          const f2Raw = (r + 1) * fc + (c - 1), f2 = canonFace(f2Raw);
+          const rd = buildGraph ? { kind: 'slitherDiag33', face: sc.f, face2: f2Raw } : null;
+          addLink(faceAt(r, c - 1), faceAt(r + 1, c), 1, rd);
+          addLink(f, faceAt(r - 1, c), 1, rd);
+          addLink(f, faceAt(r, c + 1), 1, rd);
+          addLink(f2, faceAt(r + 2, c - 1), 1, rd);
+          addLink(f2, faceAt(r + 1, c - 2), 1, rd);
+        }
       }
     }
   }
@@ -572,11 +575,14 @@ export function findSlitherCorner(P, st) {
           const av = (sc.r + adr) * cols + (sc.c + adc);
           const xCont = ed[av * 4 + contDir];
           const xPerp = ed[av * 4 + perpOutDir];
-          if (xCont >= 0 && e[xCont] === E_UNKNOWN) {
-            if (isBlockedDir(P, st, av, perpOutDir)) sets.push(['e', xCont, E_ON]);
+          const blkCont = isBlockedDir(P, st, av, contDir);
+          const blkPerp = isBlockedDir(P, st, av, perpOutDir);
+          if (xCont >= 0 && e[xCont] === E_UNKNOWN && !blkCont) {
+            if (blkPerp) sets.push(['e', xCont, E_ON]);
             else if (xPerp >= 0 && e[xPerp] === E_ON) sets.push(['e', xCont, E_OFF]);
-          } else if (xPerp >= 0 && e[xPerp] === E_UNKNOWN) {
-            if (isBlockedDir(P, st, av, contDir)) sets.push(['e', xPerp, E_ON]);
+          }
+          if (xPerp >= 0 && e[xPerp] === E_UNKNOWN && !blkPerp) {
+            if (blkCont) sets.push(['e', xPerp, E_ON]);
             else if (xCont >= 0 && e[xCont] === E_ON) sets.push(['e', xPerp, E_OFF]);
           }
         }

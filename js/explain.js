@@ -740,7 +740,7 @@ export function explainStep(P, step, st = null) {
       const end = describeContradiction(P, info.broke, finalState);
       roles.problem.push(...end.cells);
       roles.area.push(...end.area);
-      if (end.face !== undefined && end.face >= 0) faces = { in: [], out: [], clue: [end.face], focus: [] };
+      if (end.face !== undefined && end.face >= 0) faces = { in: [], out: [], clue: [], focus: [], problem: [end.face] };
       const chainText = clauses.length
         ? `: then ${clauses.join('; then ')}; and finally ${end.text}.`
         : `: immediately ${end.text}.`;

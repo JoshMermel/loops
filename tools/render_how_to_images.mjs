@@ -82,6 +82,10 @@ for (const ex of examples) {
       const r = (f / fc) | 0, c = f % fc;
       g += `<rect x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4" fill="rgba(244,236,156,0.8)"/>`;
     }
+    for (const f of ex.faces.problem || []) {
+      const r = (f / fc) | 0, c = f % fc;
+      g += `<rect x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4" fill="url(#hatch)"/>`;
+    }
   }
 
   // Role tints

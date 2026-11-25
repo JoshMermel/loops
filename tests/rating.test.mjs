@@ -971,3 +971,24 @@ test('Slitherlink rules & faceSlither fire cleanly and are 100% sound on pure, +
   assert.ok(solvedTotal >= totalChecked * 0.9, `expected rules to solve >= 90% of Slitherlink boards, got ${solvedTotal}/${totalChecked}`);
   assert.ok(slitherRulesSeen.size >= 4, `expected >= 4 Slitherlink rules to fire, saw ${[...slitherRulesSeen].join(', ')}`);
 });
+
+test('findSlitherCorner n=2 handles blocked contDir via OFF cell symmetrically', () => {
+  // 4x4 board with a 2 at top-left corner face (0,0) -> corner vertex (0,0) is blocked on U and L.
+  // Adjacent corner (0,1) has contDir=R -> (0,2), perpOutDir=U (off-board -> blocked).
+  // Adjacent corner (1,0) has contDir=D -> (2,0), perpOutDir=L (off-board -> blocked).
+  // Put a 2 at interior face (1,1) instead and block corner (1,1) via OFF neighbors,
+  // then at adjacent corner (1,2) block contDir (R -> (1,3)) via st.cell[(1,3)] = OFF while keeping edge (1,2)-(1,3) E_UNKNOWN!
+  const P = compile({ name: 'sc2_off', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 2 }] });
+  const st = initialState(P);
+  // Block top-left corner (1,1) of face (1,1): U -> (0,1) and L -> (1,0)
+  st.e[P.ed[(1 * 5 + 1) * 4 + 0]] = E_OFF;
+  st.e[P.ed[(1 * 5 + 1) * 4 + 3]] = E_OFF;
+  // At adjacent corner (1,2): contDir = R -> (1,3), perpOutDir = U -> (0,2).
+  // Mark (1,3) OFF while leaving edge (1,2)-(1,3) E_UNKNOWN -> must force perpOutDir edge (1,2)-(0,2) ON!
+  st.cell[1 * 5 + 3] = OFF;
+  const cornerRule = RULES.find((r) => r.id === 'slitherCorner');
+  const fs = cornerRule.find(P, st);
+  const perpEdge = P.ed[(1 * 5 + 2) * 4 + 0];
+  assert.ok(fs.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === perpEdge && v === E_ON)),
+    'expected blocked-via-OFF contDir to force perpendicular exit ON');
+});
