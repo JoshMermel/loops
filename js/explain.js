@@ -104,6 +104,12 @@ function describeChainStep(P, s) {
       return `the white circle at ${c} cannot turn along its blocked axis and must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
     case 'blackBlockedTarget':
       return `the black circle at ${c} must avoid its blocked side and go two cells ${DIR_WORD[info.dir]}`;
+    case 'blackTwoDiagWhites':
+      return `the black circle at ${c} cannot extend between white circles ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])}, so it goes two cells ${DIR_WORD[info.dir]}`;
+    case 'blackWhiteNoTurn':
+      return `the black circle at ${c} cannot extend into white circle ${cellName(P, info.target)} and goes two cells ${DIR_WORD[info.dir]}`;
+    case 'whiteCornerPinch':
+      return `visiting ${c} would pinch white circle ${cellName(P, info.white)} on both axes`;
     case 'faceShade':
     case 'faceCircle':
       return `inside/outside shading forces ${describeMarks(P, targetsOf(sets))}`;
@@ -291,6 +297,30 @@ export function explainStep(P, step, st = null) {
         ? `the white circle at ${cellName(P, info.target)} cannot continue straight through`
         : `the black circle at ${cellName(P, info.target)} already continues straight out the far side`;
       text = `The black circle at ${cellName(P, info.cell)} cannot extend toward ${cellName(P, info.target)} because ${why}; so it must go two cells ${DIR_WORD[info.dir]}.`;
+      break;
+    }
+    case 'blackTwoDiagWhites': {
+      roles.clue.push(info.cell, ...info.whites);
+      text = `The black circle at ${cellName(P, info.cell)} cannot send a ray ${DIR_WORD[info.blockedDir]} between the two diagonal white circles at ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])} (doing so would block whichever side its second leg takes); so it must go two cells ${DIR_WORD[info.dir]}.`;
+      break;
+    }
+    case 'blackWhiteNoTurn': {
+      roles.clue.push(info.cell, info.target);
+      roles.problem.push(info.farCell);
+      const farNm = cellName(P, info.farCell);
+      const why = info.reason === 'white'
+        ? `${farNm} is another white circle`
+        : info.reason === 'straight'
+          ? `${farNm} already continues straight`
+          : `${farNm} has both turns blocked`;
+      text = `The black circle at ${cellName(P, info.cell)} cannot extend into the white circle at ${cellName(P, info.target)} because ${why}, leaving ${cellName(P, info.target)} unable to turn on either side; so ${cellName(P, info.cell)} must go two cells ${DIR_WORD[info.dir]}.`;
+      break;
+    }
+    case 'whiteCornerPinch': {
+      roles.focus.push(info.cell);
+      roles.clue.push(info.white);
+      roles.problem.push(...info.neighbors);
+      text = `${cellName(P, info.cell)} has only two exits left, pointing to ${cellName(P, info.neighbors[0])} and ${cellName(P, info.neighbors[1])}, which both already have a segment; passing through ${cellName(P, info.cell)} would fill both neighbors and cut off the white circle at ${cellName(P, info.white)} on both axes, so cross out ${joinList(targets.segOff.map((x) => edgeName(P, x)))}.`;
       break;
     }
     case 'faceShade': {

@@ -777,6 +777,98 @@ function findBlackBlockedTarget(P, st) {
   return out;
 }
 
+/**
+ * A black circle flanked by two diagonally adjacent white circles on one side (e.g. NW and NE)
+ * cannot extend between them: doing so would force both whites perpendicular into the black's
+ * side neighbors, leaving no room for the black's second leg. So it extends two cells the opposite way.
+ */
+function findBlackTwoDiagWhites(P, st) {
+  const out = [];
+  for (const i of P.blacks) {
+    for (let d = 0; d < 4; d++) {
+      const mid = P.nb[i * 4 + d];
+      if (mid < 0) continue;
+      const w1 = P.nb[mid * 4 + ((d + 1) & 3)];
+      const w2 = P.nb[mid * 4 + ((d + 3) & 3)];
+      if (w1 < 0 || w2 < 0 || P.clue[w1] !== WHITE || P.clue[w2] !== WHITE) continue;
+      const x = P.ed[i * 4 + d];
+      if (x < 0 || st.e[x] === E_ON) continue;
+      const opp1 = P.ed[i * 4 + (d ^ 2)], opp2 = P.ed2[i * 4 + (d ^ 2)];
+      if (opp1 < 0 || opp2 < 0) continue;
+      const sets = [];
+      if (st.e[x] === E_UNKNOWN) sets.push(['e', x, E_OFF]);
+      if (st.e[opp1] === E_UNKNOWN) sets.push(['e', opp1, E_ON]);
+      if (st.e[opp2] === E_UNKNOWN) sets.push(['e', opp2, E_ON]);
+      if (sets.length) out.push({ sets, info: { cell: i, whites: [w1, w2], blockedDir: d, dir: d ^ 2 } });
+    }
+  }
+  return out;
+}
+
+/**
+ * A black circle cannot send its 2-step ray into a white circle 2 cells away if the intersection
+ * beyond that white cannot turn (e.g. another white circle, already straight, or both turns blocked).
+ */
+function findBlackWhiteNoTurn(P, st) {
+  const out = [];
+  for (const i of P.blacks) {
+    for (let d = 0; d < 4; d++) {
+      const x1 = P.ed[i * 4 + d], x2 = P.ed2[i * 4 + d], n2 = P.step2[i * 4 + d];
+      if (x1 < 0 || x2 < 0 || n2 < 0 || P.clue[n2] !== WHITE) continue;
+      if (st.e[x1] === E_ON || st.e[x1] === E_OFF || st.e[x2] === E_OFF) continue;
+      const nextE = P.ed[n2 * 4 + d];
+      if (nextE < 0 || st.e[nextE] === E_OFF) continue; // handled by blackBlockedTarget
+      const reason = forcedStraightReason(P, st, n2, d);
+      if (!reason) continue;
+      const opp1 = P.ed[i * 4 + (d ^ 2)], opp2 = P.ed2[i * 4 + (d ^ 2)];
+      if (opp1 < 0 || opp2 < 0) continue;
+      const sets = [];
+      if (st.e[x1] === E_UNKNOWN) sets.push(['e', x1, E_OFF]);
+      if (st.e[opp1] === E_UNKNOWN) sets.push(['e', opp1, E_ON]);
+      if (st.e[opp2] === E_UNKNOWN) sets.push(['e', opp2, E_ON]);
+      if (sets.length) {
+        out.push({ sets, info: { cell: i, target: n2, farCell: P.nb[n2 * 4 + d], dir: d ^ 2, reason } });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * White corner pinch: if an empty corner intersection diagonally adjacent to a white circle has only
+ * two exits left — pointing to the white's two orthogonal neighbors — and both of those neighbors
+ * already have a drawn segment (not touching the white), entering the corner would fill both
+ * neighbors to degree 2 and block the white circle on both axes. So the corner cannot be visited.
+ */
+function findWhiteCornerPinch(P, st) {
+  const out = [];
+  for (const w of P.whites) {
+    for (const d1 of [0, 2]) {
+      const u = P.nb[w * 4 + d1];
+      if (u < 0) continue;
+      const wu = P.ed[w * 4 + d1];
+      if (st.e[wu] !== E_UNKNOWN || onCount(P, st, u) < 1) continue;
+      for (const d2 of [1, 3]) {
+        const v = P.nb[w * 4 + d2];
+        if (v < 0) continue;
+        const wv = P.ed[w * 4 + d2];
+        if (st.e[wv] !== E_UNKNOWN || onCount(P, st, v) < 1) continue;
+        const k = P.nb[u * 4 + d2];
+        if (k < 0 || st.cell[k] !== UNKNOWN || onCount(P, st, k) !== 0) continue;
+        const eku = P.ed[k * 4 + (d2 ^ 2)], ekv = P.ed[k * 4 + (d1 ^ 2)];
+        if (st.e[eku] !== E_UNKNOWN || st.e[ekv] !== E_UNKNOWN) continue;
+        const eo1 = P.ed[k * 4 + d1], eo2 = P.ed[k * 4 + d2];
+        if ((eo1 >= 0 && st.e[eo1] !== E_OFF) || (eo2 >= 0 && st.e[eo2] !== E_OFF)) continue;
+        out.push({
+          sets: [['e', eku, E_OFF], ['e', ekv, E_OFF], ['c', k, OFF]],
+          info: { cell: k, white: w, neighbors: [u, v] },
+        });
+      }
+    }
+  }
+  return out;
+}
+
 function findTwoEndsJoin(P, st) {
   const { find, size, loopCount, cycleRoot } = onComponents(P, st);
   if (cycleRoot >= 0) return [];
@@ -1141,6 +1233,9 @@ export const RULES = [
   defRule({ id: 'twoWhitesStraight', tier: 'Medium', weight: 12, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
   defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 14, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
   defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
+  defRule({ id: 'blackTwoDiagWhites', tier: 'Medium', weight: 15, find: findBlackTwoDiagWhites, label: 'a black circle flanked by two diagonally adjacent white circles cannot extend between them' }),
+  defRule({ id: 'blackWhiteNoTurn', tier: 'Medium', weight: 16, find: findBlackWhiteNoTurn, label: 'a black circle cannot extend into a white circle two cells away whose far side cannot turn' }),
+  defRule({ id: 'whiteCornerPinch', tier: 'Medium', weight: 17, find: findWhiteCornerPinch, label: 'a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors' }),
   defRule({ id: 'faceShade', tier: 'Medium', weight: 18, find: findFaceShade, label: 'basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge' }),
 
   // Hard (circle-diagonal shading, global topology, and short single-thread lookahead)

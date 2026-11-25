@@ -101,15 +101,15 @@
     "weight": 3,
     "puzzle": 4,
     "name": "ARMORY-04",
-    "rows": 6,
-    "cols": 6,
-    "hints": 4,
-    "edges": "000000000002000000101001201010000001000001000000000001000000000000000000",
-    "text": "The touching black circles at C4 and D4 cannot connect (each must go straight through its neighbor), so C4 goes two cells left.",
+    "rows": 8,
+    "cols": 8,
+    "hints": 6,
+    "edges": "11100200000000000120111000000000210001000000000000000000000000000000000000000000000000000000000000000002000000000000101000000000",
+    "text": "The touching black circles at F3 and F4 cannot connect (each must go straight through its neighbor), so F3 goes two cells up.",
     "roles": {
       "clue": [
-        20,
-        21
+        21,
+        29
       ],
       "area": [],
       "focus": [],
@@ -119,11 +119,11 @@
     },
     "targets": {
       "segOn": [
-        38,
-        36
+        27,
+        11
       ],
       "segOff": [
-        40
+        43
       ]
     },
     "chain": [],
@@ -326,8 +326,6 @@
       "segOff": [
         16,
         14,
-        14,
-        12,
         12,
         10
       ]
@@ -343,12 +341,12 @@
     "name": "ARMORY-09",
     "rows": 6,
     "cols": 6,
-    "hints": 11,
-    "edges": "000000001001000000002001000000000001000200002001111202001002101010002000",
-    "text": "If the white circle at D5 went horizontally, both ends would go straight without turning; so it must go straight vertically.",
+    "hints": 22,
+    "edges": "111210102102101212010102111212200000101200000000111200020102101010102000",
+    "text": "If the white circle at E4 went vertically, both ends would go straight without turning; so it must go straight horizontally.",
     "roles": {
       "clue": [
-        27
+        22
       ],
       "area": [],
       "focus": [],
@@ -358,12 +356,12 @@
     },
     "targets": {
       "segOn": [
-        43,
-        55
+        44,
+        42
       ],
       "segOff": [
-        54,
-        52
+        33,
+        45
       ]
     },
     "chain": [],
@@ -377,27 +375,27 @@
     "name": "ARMORY-10",
     "rows": 6,
     "cols": 6,
-    "hints": 8,
-    "edges": "000102010000000100010000201010000000101001111000000001010000000000000000",
-    "text": "C1 has only two exits left, and both lead to the ends of one path (D1 and B1): using it would close the loop early, so cross out C1–D1 and B1–C1.",
+    "hints": 17,
+    "edges": "111021222002010201111001000000000001000000001200000000121201000010101000",
+    "text": "E3 has only two exits left, and both lead to the ends of one path (E4 and D3): using it would close the loop early, so cross out E3–E4 and D3–E3.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        2
+        16
       ],
       "problem": [],
       "exit": [],
       "path": [
-        3,
-        1
+        22,
+        15
       ]
     },
     "targets": {
       "segOn": [],
       "segOff": [
-        4,
-        2
+        33,
+        30
       ]
     },
     "chain": [],
@@ -409,15 +407,15 @@
     "weight": 12,
     "puzzle": 11,
     "name": "ARMORY-11",
-    "rows": 6,
-    "cols": 6,
-    "hints": 6,
-    "edges": "000000002002000000001001000001012101002021212101000000000000000000000000",
-    "text": "The touching white circles at D2 and C2 cannot join because E2–F2 already continues straight past D2; both must go vertically.",
+    "rows": 8,
+    "cols": 8,
+    "hints": 17,
+    "edges": "00000000000000000000000000000000000000000000000202000000000010011100000001002001210000010100000101000001121010021010102020202000",
+    "text": "The touching white circles at C5 and D5 cannot join because A5–B5 already continues straight past C5; both must go vertically.",
     "roles": {
       "clue": [
-        9,
-        8
+        34,
+        35
       ],
       "area": [],
       "focus": [],
@@ -427,16 +425,15 @@
     },
     "targets": {
       "segOn": [
-        7,
-        19,
-        5,
-        17
+        69,
+        53,
+        71,
+        55
       ],
       "segOff": [
-        16,
-        18,
-        14,
-        16
+        66,
+        68,
+        70
       ]
     },
     "chain": [],
@@ -480,22 +477,129 @@
     "faces": null
   },
   {
+    "rule": "blackTwoDiagWhites",
+    "tier": "Medium",
+    "weight": 15,
+    "puzzle": 13,
+    "name": "ARMORY-13",
+    "rows": 8,
+    "cols": 8,
+    "hints": 18,
+    "edges": "00000200111210011010210001220001000001002011100002202100000100001100020000000000210000010000000001000001000000001010000000000000",
+    "text": "The black circle at F6 cannot send a ray up between the two diagonal white circles at G5 and E5 (doing so would block whichever side its second leg takes); so it must go two cells down.",
+    "roles": {
+      "clue": [
+        45,
+        38,
+        36
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        91,
+        107
+      ],
+      "segOff": [
+        75
+      ]
+    },
+    "chain": [],
+    "faces": null
+  },
+  {
+    "rule": "blackWhiteNoTurn",
+    "tier": "Medium",
+    "weight": 16,
+    "puzzle": 14,
+    "name": "ARMORY-14",
+    "rows": 8,
+    "cols": 8,
+    "hints": 13,
+    "edges": "00000200010000001010210001000000010001001010200021000000000000001010201010000000000000000102010200000000010001020000000010102000",
+    "text": "The black circle at G3 cannot extend into the white circle at G5 because G6 already continues straight, leaving G5 unable to turn on either side; so G3 must go two cells up.",
+    "roles": {
+      "clue": [
+        22,
+        38
+      ],
+      "area": [],
+      "focus": [],
+      "problem": [
+        46
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [
+        29,
+        13
+      ],
+      "segOff": [
+        45
+      ]
+    },
+    "chain": [],
+    "faces": null
+  },
+  {
+    "rule": "whiteCornerPinch",
+    "tier": "Medium",
+    "weight": 17,
+    "puzzle": 15,
+    "name": "ARMORY-15",
+    "rows": 8,
+    "cols": 8,
+    "hints": 16,
+    "edges": "00000001101200000000000101000001201010002100200100000100001010020000010000001001101000101000000100000200001010020010100000202000",
+    "text": "G6 has only two exits left, pointing to F6 and G5, which both already have a segment; passing through G6 would fill both neighbors and cut off the white circle at F5 on both axes, so cross out F6–G6 and G5–G6.",
+    "roles": {
+      "clue": [
+        37
+      ],
+      "area": [],
+      "focus": [
+        46
+      ],
+      "problem": [
+        45,
+        38
+      ],
+      "exit": [],
+      "path": []
+    },
+    "targets": {
+      "segOn": [],
+      "segOff": [
+        90,
+        77
+      ]
+    },
+    "chain": [],
+    "faces": null
+  },
+  {
     "rule": "faceShade",
     "tier": "Medium",
     "weight": 18,
-    "puzzle": 13,
-    "name": "ARMORY-13",
-    "rows": 6,
-    "cols": 6,
-    "hints": 5,
-    "edges": "000000000000010000000000210002000001001012002001001012000000001010000000",
-    "text": "Inside/outside shading puts Inside on both sides of B3–B4, so the loop cannot pass between them (cross out B3–B4).",
+    "puzzle": 16,
+    "name": "ARMORY-16",
+    "rows": 8,
+    "cols": 8,
+    "hints": 16,
+    "edges": "00101200000200000000001010210101101000000021210100000000000000000000101020101000201010000000000002010202010000002010101020000000",
+    "text": "Inside/outside shading puts Outside on both sides of F1–G1, so the loop cannot pass between them (cross out F1–G1).",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        13,
-        19
+        5,
+        6
       ],
       "problem": [],
       "exit": [],
@@ -504,18 +608,17 @@
     "targets": {
       "segOn": [],
       "segOff": [
-        27
+        10
       ]
     },
     "chain": [],
     "faces": {
       "in": [
-        10,
-        21,
-        11
+        13
       ],
       "out": [
-        16
+        12,
+        5
       ],
       "anchored": true
     }
@@ -524,23 +627,21 @@
     "rule": "faceCircle",
     "tier": "Hard",
     "weight": 38,
-    "puzzle": 14,
-    "name": "ARMORY-14",
-    "rows": 6,
-    "cols": 6,
-    "hints": 2,
-    "edges": "000000000000000000000000000000000000000000101000000000020000000010100000",
-    "text": "Circle shading: flipping diagonally across white circle E2 makes D1–E2 Side B; flipping diagonally across white circle D2 makes C2–D3 Side A; flipping diagonally across white circle D3 makes D3–E4 Side B; crossing ✕ at E3–E4 keeps E3–F4 Side B. That puts opposite sides (Side A and Side B) across E3–F3, so draw E3–F3.",
+    "puzzle": 13,
+    "name": "ARMORY-13",
+    "rows": 8,
+    "cols": 8,
+    "hints": 19,
+    "edges": "00000200111210011010210001220001000001002011100002202100000100001100020000020000210000010001000001000001000100001010000000000000",
+    "text": "Circle shading: crossing ✕ at H3–H4 keeps G3–H4 Outside; crossing ✕ at G3–G4 keeps F3–G4 Outside; crossing ✕ at F4–G4 keeps F4–G5 Outside; flipping diagonally across white circle G5 makes G5–H6 Inside. That puts opposite sides (Inside and Outside) across H5–H6, so draw H5–H6.",
     "roles": {
       "clue": [
-        10,
-        9,
-        15
+        38
       ],
       "area": [],
       "focus": [
-        16,
-        17
+        39,
+        47
       ],
       "problem": [],
       "exit": [],
@@ -548,59 +649,56 @@
     },
     "targets": {
       "segOn": [
-        32
+        79
       ],
       "segOff": []
     },
     "chain": [],
     "faces": {
       "in": [
-        9,
-        7
+        34
       ],
       "out": [
-        3,
-        13,
-        14
+        20,
+        19,
+        26
       ],
-      "anchored": false
+      "anchored": true
     }
   },
   {
     "rule": "twoEndsJoin",
     "tier": "Hard",
     "weight": 44,
-    "puzzle": 15,
-    "name": "ARMORY-15",
-    "rows": 6,
-    "cols": 6,
-    "hints": 9,
-    "edges": "000210120000010100000000212110102000002001000000000001000000002010100000",
-    "text": "The highlighted area has only two open ends (A4 and B4), so they must connect inside it; that makes A2 and B2 ends of one path, so A2–B2 cannot close them early.",
+    "puzzle": 16,
+    "name": "ARMORY-16",
+    "rows": 8,
+    "cols": 8,
+    "hints": 20,
+    "edges": "00101221202200000000001010210101101000000021210100000000000000000000101020101000201010000000000002010202010000002010101020000000",
+    "text": "The highlighted area has only two open ends (G2 and H2), so they must connect inside it; that makes G4 and H4 ends of one path, so G4–H4 cannot close them early.",
     "roles": {
       "clue": [],
       "area": [
-        18,
-        24,
-        30,
-        31,
-        25,
-        19
+        6,
+        14,
+        15,
+        7
       ],
       "focus": [],
       "problem": [],
       "exit": [],
       "path": [
-        18,
-        19,
-        6,
-        7
+        14,
+        15,
+        30,
+        31
       ]
     },
     "targets": {
       "segOn": [],
       "segOff": [
-        12
+        60
       ]
     },
     "chain": [],
@@ -610,38 +708,38 @@
     "rule": "chokepoint",
     "tier": "Hard",
     "weight": 48,
-    "puzzle": 16,
-    "name": "ARMORY-16",
-    "rows": 6,
-    "cols": 6,
-    "hints": 6,
-    "edges": "000000111201000000010000000000020000000000101000010200000000101000000000",
-    "text": "Without C3–D3, F3 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so C3–D3 must be drawn.",
+    "puzzle": 17,
+    "name": "ARMORY-17",
+    "rows": 8,
+    "cols": 8,
+    "hints": 17,
+    "edges": "00000110120010010000010000002001000000000000000010100000000000020000000000001101101001101020210100000100001200010000000010101000",
+    "text": "Without A5–A6, C8 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so A5–A6 must be drawn.",
     "roles": {
       "clue": [],
       "area": [
-        11,
-        10,
-        16,
-        15,
-        9,
-        3,
-        4,
-        5
+        50,
+        42,
+        41,
+        40,
+        48,
+        56,
+        57,
+        49
       ],
       "focus": [
-        14,
-        15
+        32,
+        40
       ],
       "problem": [
-        17
+        58
       ],
       "exit": [],
       "path": []
     },
     "targets": {
       "segOn": [
-        28
+        65
       ],
       "segOff": []
     },
@@ -652,39 +750,39 @@
     "rule": "parityPocket",
     "tier": "Hard",
     "weight": 52,
-    "puzzle": 17,
-    "name": "ARMORY-17",
-    "rows": 6,
-    "cols": 6,
-    "hints": 20,
-    "edges": "221110102102020111010102000020212102000200000200111202101200101010000000",
-    "text": "If you tried drawing D4–D5, the highlighted area would be sealed off with 3 open ends (odd, so they can't all pair up); therefore cross out D4–D5.",
+    "puzzle": 18,
+    "name": "ARMORY-18",
+    "rows": 8,
+    "cols": 8,
+    "hints": 46,
+    "edges": "22111000012022020201000001001101000210102220210110120002022121010201021121122201222122212102110202010001010001022010102010102000",
+    "text": "If you tried drawing C3–C4, the highlighted area would be sealed off with 3 open ends (odd, so they can't all pair up); therefore cross out C3–C4.",
     "roles": {
       "clue": [],
       "area": [
-        22,
-        23,
-        29,
-        35,
+        16,
+        24,
+        32,
+        33,
         34,
-        33
+        17
       ],
       "focus": [
-        21,
-        27
+        18,
+        26
       ],
       "problem": [],
       "exit": [],
       "path": [
-        22,
-        29,
-        33
+        24,
+        33,
+        17
       ]
     },
     "targets": {
       "segOn": [],
       "segOff": [
-        43
+        37
       ]
     },
     "chain": [],
@@ -694,44 +792,55 @@
     "rule": "chokepointArea",
     "tier": "Hard",
     "weight": 64,
-    "puzzle": 18,
-    "name": "ARMORY-18",
-    "rows": 6,
-    "cols": 6,
-    "hints": 9,
-    "edges": "000101010000202121210000202101010000010200010000012020121000101000000000",
-    "text": "Without C1–D1, F5 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so C1–D1 must be drawn.",
+    "puzzle": 19,
+    "name": "ARMORY-19",
+    "rows": 8,
+    "cols": 8,
+    "hints": 19,
+    "edges": "00000001000000000200000100000000110100000000000021010000010000002110102001020000120100201012100002010000000200002010100010100000",
+    "text": "Without D4–D5, H7 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so D4–D5 must be drawn.",
     "roles": {
       "clue": [],
       "area": [
-        23,
-        22,
+        63,
+        62,
+        61,
+        60,
+        59,
+        58,
+        57,
+        49,
+        41,
+        40,
+        32,
+        24,
         16,
-        10,
-        11,
-        5,
-        4,
-        3,
-        9,
-        15,
-        21,
-        27,
-        28,
-        17
+        17,
+        25,
+        33,
+        34,
+        35,
+        43,
+        42,
+        50,
+        51,
+        52,
+        53,
+        54
       ],
       "focus": [
-        2,
-        3
+        27,
+        35
       ],
       "problem": [
-        29
+        55
       ],
       "exit": [],
       "path": []
     },
     "targets": {
       "segOn": [
-        4
+        55
       ],
       "segOff": []
     },
@@ -742,8 +851,8 @@
     "rule": "parityForces",
     "tier": "Hard",
     "weight": 68,
-    "puzzle": 19,
-    "name": "ARMORY-19",
+    "puzzle": 20,
+    "name": "ARMORY-20",
     "rows": 10,
     "cols": 10,
     "hints": 53,
@@ -790,29 +899,29 @@
     "rule": "tryEdge",
     "tier": "Expert",
     "weight": 120,
-    "puzzle": 20,
-    "name": "ARMORY-20",
-    "rows": 6,
-    "cols": 6,
-    "hints": 10,
-    "edges": "111212000000121000000000111000000000010000000000010000000000101000000000",
-    "text": "Imagine a segment at C3–C4 and follow the forced deductions (starting with: the black circle at D3 is blocked left and goes two cells right; then C2 must use C2–D2; then the black circle at D3 cannot enter D2 and goes two cells down; reaching a contradiction after 3 steps). So cross out C3–C4.",
+    "puzzle": 4,
+    "name": "ARMORY-04",
+    "rows": 8,
+    "cols": 8,
+    "hints": 15,
+    "edges": "11101210000100000122111000010000210201000002000012000000000100000000000000010000000000000002000000000002000000000000101000000000",
+    "text": "Imagine no segment at B6–C6 and follow the forced deductions (starting with: the black circle at C6 is blocked left and goes two cells right; then the white circle at D5 must go horizontally; then the black circle at C6 cannot enter C5 and goes two cells down; reaching a contradiction after 3 steps). So draw B6–C6.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        14,
-        20
+        41,
+        42
       ],
       "problem": [],
       "exit": [],
       "path": []
     },
     "targets": {
-      "segOn": [],
-      "segOff": [
-        29
-      ]
+      "segOn": [
+        82
+      ],
+      "segOff": []
     },
     "chain": [],
     "faces": null
@@ -823,20 +932,20 @@
     "weight": 25,
     "puzzle": 21,
     "name": "ARMORY-21",
-    "rows": 6,
-    "cols": 6,
-    "hints": 8,
-    "edges": "110010120000210100000000000000000000020000000000110200000000101000000000",
-    "text": "Imagine a segment at A3–B3: then A4 becomes a dead end; and finally the white circle at B4 cannot be satisfied. So cross out A3–B3.",
+    "rows": 8,
+    "cols": 8,
+    "hints": 32,
+    "edges": "11211112101210012100000010120101210200001021210112120000200110022220201010000000111000202200000001220010120000001010001010000000",
+    "text": "Imagine a segment at B2–C2: then B3 becomes a dead end; and finally the white circle at C3 cannot be satisfied. So cross out B2–C2.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        12,
-        13
+        9,
+        10
       ],
       "problem": [
-        19
+        18
       ],
       "exit": [],
       "path": []
@@ -844,34 +953,34 @@
     "targets": {
       "segOn": [],
       "segOff": [
-        24
+        18
       ]
     },
     "chain": [
-      24
+      18
     ],
     "faces": null
   },
   {
     "rule": "imagineTrace",
     "tier": "Hard",
-    "weight": 58,
+    "weight": 44,
     "puzzle": 22,
     "name": "ARMORY-22",
-    "rows": 6,
-    "cols": 6,
-    "hints": 5,
-    "edges": "000000000000000200000000101200000001101200000001101200101002000000202000",
-    "text": "Imagine a segment at D3–E3: then the black circle at D3 must go two cells right; then the white circle at E2 must go horizontally; then the black circle at D3 cannot enter D2 and goes two cells down; and finally the loop closes early while D2 is still outside it. So cross out D3–E3.",
+    "rows": 8,
+    "cols": 8,
+    "hints": 16,
+    "edges": "00000100000200000000010000010000000000000001000020111010001010002021110000020000202121000001020110020100000100010000000000101000",
+    "text": "Imagine a segment at F6–G6: then the black circle at F6 is blocked left and goes two cells right; and finally the loop closes early while C1 is still outside it. So cross out F6–G6.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        15,
-        16
+        45,
+        46
       ],
       "problem": [
-        9
+        2
       ],
       "exit": [],
       "path": []
@@ -879,16 +988,12 @@
     "targets": {
       "segOn": [],
       "segOff": [
-        30
+        90
       ]
     },
     "chain": [
-      30,
-      18,
-      20,
-      31,
-      32,
-      43
+      90,
+      92
     ],
     "faces": null
   },
@@ -898,38 +1003,38 @@
     "weight": 96,
     "puzzle": 23,
     "name": "ARMORY-23",
-    "rows": 6,
-    "cols": 6,
-    "hints": 4,
-    "edges": "222000000000111000000000010000000000000000000000000000000000000000000000",
-    "text": "Imagine a segment at C3–D3: then the black circle at D3 must go two cells left; then B3 must use B3–B4; then the black circle at C4 cannot enter B4 and goes two cells right; then the white circle at D5 must go horizontally; and finally the black circle at C4 has no room for two straight segments. So cross out C3–D3.",
+    "rows": 8,
+    "cols": 8,
+    "hints": 11,
+    "edges": "00002011121010010000000000000001101000000000000000020000000000002011100000000001000100010001200100000001000100000000000000000000",
+    "text": "Imagine no segment at E4–E5: then the black circle at E5 is blocked up and goes two cells down; then E7 must use E7–E8; then the black circle at F8 cannot enter E8 and goes two cells right; then the black circle at D8 is blocked right and goes two cells left; and finally E8 is left with only one way out. So draw E4–E5.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        14,
-        15
+        28,
+        36
       ],
       "problem": [
-        20
+        60
       ],
       "exit": [],
       "path": []
     },
     "targets": {
-      "segOn": [],
-      "segOff": [
-        28
-      ]
+      "segOn": [
+        57
+      ],
+      "segOff": []
     },
     "chain": [
-      28,
-      26,
-      27,
-      40,
-      42,
-      52,
-      54
+      73,
+      89,
+      105,
+      114,
+      116,
+      122,
+      124
     ],
     "faces": null
   }

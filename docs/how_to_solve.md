@@ -81,9 +81,9 @@ Two touching black circles cannot connect, so each extends two cells away from t
 
 <a href="../index.html?book=armory&puzzle=4"><img src="images/blackAdjacent.svg" width="480" alt="blackAdjacent hint example"></a>
 
-*ARMORY-04 (6×6, after 4 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-04 (8×8, after 6 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The touching black circles at C4 and D4 cannot connect (each must go straight through its neighbor), so C4 goes two cells left."
+> Hint says: "The touching black circles at F3 and F4 cannot connect (each must go straight through its neighbor), so F3 goes two cells up."
 
 ---
 
@@ -183,9 +183,9 @@ A white circle cannot use an axis where both neighbors already continue straight
 
 <a href="../index.html?book=armory&puzzle=9"><img src="images/whiteBothStraight.svg" width="480" alt="whiteBothStraight hint example"></a>
 
-*ARMORY-09 (6×6, after 11 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-09 (6×6, after 22 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "If the white circle at D5 went horizontally, both ends would go straight without turning; so it must go straight vertically."
+> Hint says: "If the white circle at E4 went vertically, both ends would go straight without turning; so it must go straight horizontally."
 
 ---
 
@@ -197,9 +197,9 @@ An empty cell whose only two exits meet one path cannot be on the loop.
 
 <a href="../index.html?book=armory&puzzle=10"><img src="images/closingCell.svg" width="480" alt="closingCell hint example"></a>
 
-*ARMORY-10 (6×6, after 8 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-10 (6×6, after 17 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "C1 has only two exits left, and both lead to the ends of one path (D1 and B1): using it would close the loop early, so cross out C1–D1 and B1–C1."
+> Hint says: "E3 has only two exits left, and both lead to the ends of one path (E4 and D3): using it would close the loop early, so cross out E3–E4 and D3–E3."
 
 ---
 
@@ -221,9 +221,9 @@ Two touching white circles with a straight segment entering one cannot connect, 
 
 <a href="../index.html?book=armory&puzzle=11"><img src="images/twoWhitesStraight.svg" width="480" alt="twoWhitesStraight hint example"></a>
 
-*ARMORY-11 (6×6, after 6 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-11 (8×8, after 17 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The touching white circles at D2 and C2 cannot join because E2–F2 already continues straight past D2; both must go vertically."
+> Hint says: "The touching white circles at C5 and D5 cannot join because A5–B5 already continues straight past C5; both must go vertically."
 
 ---
 
@@ -251,17 +251,59 @@ A black circle cannot extend toward a circle two cells away that cannot accept a
 
 ---
 
+### blackTwoDiagWhites
+
+*Medium, cost 15*
+
+A black circle flanked by two diagonally adjacent white circles cannot extend between them.
+
+<a href="../index.html?book=armory&puzzle=13"><img src="images/blackTwoDiagWhites.svg" width="480" alt="blackTwoDiagWhites hint example"></a>
+
+*ARMORY-13 (8×8, after 18 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "The black circle at F6 cannot send a ray up between the two diagonal white circles at G5 and E5 (doing so would block whichever side its second leg takes); so it must go two cells down."
+
+---
+
+### blackWhiteNoTurn
+
+*Medium, cost 16*
+
+A black circle cannot extend into a white circle two cells away whose far side cannot turn.
+
+<a href="../index.html?book=armory&puzzle=14"><img src="images/blackWhiteNoTurn.svg" width="480" alt="blackWhiteNoTurn hint example"></a>
+
+*ARMORY-14 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "The black circle at G3 cannot extend into the white circle at G5 because G6 already continues straight, leaving G5 unable to turn on either side; so G3 must go two cells up."
+
+---
+
+### whiteCornerPinch
+
+*Medium, cost 17*
+
+A two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors.
+
+<a href="../index.html?book=armory&puzzle=15"><img src="images/whiteCornerPinch.svg" width="480" alt="whiteCornerPinch hint example"></a>
+
+*ARMORY-15 (8×8, after 16 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "G6 has only two exits left, pointing to F6 and G5, which both already have a segment; passing through G6 would fill both neighbors and cut off the white circle at F5 on both axes, so cross out F6–G6 and G5–G6."
+
+---
+
 ### faceShade
 
 *Medium, cost 18*
 
 Basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge.
 
-<a href="../index.html?book=armory&puzzle=13"><img src="images/faceShade.svg" width="480" alt="faceShade hint example"></a>
+<a href="../index.html?book=armory&puzzle=16"><img src="images/faceShade.svg" width="480" alt="faceShade hint example"></a>
 
-*ARMORY-13 (6×6, after 5 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-16 (8×8, after 16 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Inside/outside shading puts Inside on both sides of B3–B4, so the loop cannot pass between them (cross out B3–B4)."
+> Hint says: "Inside/outside shading puts Outside on both sides of F1–G1, so the loop cannot pass between them (cross out F1–G1)."
 
 ---
 
@@ -273,9 +315,9 @@ Imagine a segment on or off at a circle or open end: one local step immediately 
 
 <a href="../index.html?book=armory&puzzle=21"><img src="images/imagineLocal.svg" width="480" alt="imagineLocal hint example"></a>
 
-*ARMORY-21 (6×6, after 8 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-21 (8×8, after 32 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine a segment at A3–B3: then A4 becomes a dead end; and finally the white circle at B4 cannot be satisfied. So cross out A3–B3."
+> Hint says: "Imagine a segment at B2–C2: then B3 becomes a dead end; and finally the white circle at C3 cannot be satisfied. So cross out B2–C2."
 
 ---
 
@@ -289,11 +331,11 @@ A puzzle is rated **Hard** when its hardest required step is in this tier: circl
 
 Advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge.
 
-<a href="../index.html?book=armory&puzzle=14"><img src="images/faceCircle.svg" width="480" alt="faceCircle hint example"></a>
+<a href="../index.html?book=armory&puzzle=13"><img src="images/faceCircle.svg" width="480" alt="faceCircle hint example"></a>
 
-*ARMORY-14 (6×6, after 2 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-13 (8×8, after 19 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Circle shading: flipping diagonally across white circle E2 makes D1–E2 Side B; flipping diagonally across white circle D2 makes C2–D3 Side A; flipping diagonally across white circle D3 makes D3–E4 Side B; crossing ✕ at E3–E4 keeps E3–F4 Side B. That puts opposite sides (Side A and Side B) across E3–F3, so draw E3–F3."
+> Hint says: "Circle shading: crossing ✕ at H3–H4 keeps G3–H4 Outside; crossing ✕ at G3–G4 keeps F3–G4 Outside; crossing ✕ at F4–G4 keeps F4–G5 Outside; flipping diagonally across white circle G5 makes G5–H6 Inside. That puts opposite sides (Inside and Outside) across H5–H6, so draw H5–H6."
 
 ---
 
@@ -303,11 +345,11 @@ Advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, o
 
 A sealed area with just two open ends must connect them, so their far ends cannot join early.
 
-<a href="../index.html?book=armory&puzzle=15"><img src="images/twoEndsJoin.svg" width="480" alt="twoEndsJoin hint example"></a>
+<a href="../index.html?book=armory&puzzle=16"><img src="images/twoEndsJoin.svg" width="480" alt="twoEndsJoin hint example"></a>
 
-*ARMORY-15 (6×6, after 9 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-16 (8×8, after 20 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The highlighted area has only two open ends (A4 and B4), so they must connect inside it; that makes A2 and B2 ends of one path, so A2–B2 cannot close them early."
+> Hint says: "The highlighted area has only two open ends (G2 and H2), so they must connect inside it; that makes G4 and H4 ends of one path, so G4–H4 cannot close them early."
 
 ---
 
@@ -317,11 +359,11 @@ A sealed area with just two open ends must connect them, so their far ends canno
 
 Blocking this segment would cut off a small area or leave a single chokepoint cell.
 
-<a href="../index.html?book=armory&puzzle=16"><img src="images/chokepoint.svg" width="480" alt="chokepoint hint example"></a>
+<a href="../index.html?book=armory&puzzle=17"><img src="images/chokepoint.svg" width="480" alt="chokepoint hint example"></a>
 
-*ARMORY-16 (6×6, after 6 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-17 (8×8, after 17 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Without C3–D3, F3 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so C3–D3 must be drawn."
+> Hint says: "Without A5–A6, C8 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so A5–A6 must be drawn."
 
 ---
 
@@ -331,11 +373,11 @@ Blocking this segment would cut off a small area or leave a single chokepoint ce
 
 The other choice would seal off a small pocket with an odd number of open ends.
 
-<a href="../index.html?book=armory&puzzle=17"><img src="images/parityPocket.svg" width="480" alt="parityPocket hint example"></a>
+<a href="../index.html?book=armory&puzzle=18"><img src="images/parityPocket.svg" width="480" alt="parityPocket hint example"></a>
 
-*ARMORY-17 (6×6, after 20 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-18 (8×8, after 46 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "If you tried drawing D4–D5, the highlighted area would be sealed off with 3 open ends (odd, so they can't all pair up); therefore cross out D4–D5."
+> Hint says: "If you tried drawing C3–C4, the highlighted area would be sealed off with 3 open ends (odd, so they can't all pair up); therefore cross out C3–C4."
 
 ---
 
@@ -347,9 +389,9 @@ Imagine a segment on or off and trace one single thread 2–3 steps ahead until 
 
 <a href="../index.html?book=armory&puzzle=22"><img src="images/imagineTrace.svg" width="480" alt="imagineTrace hint example"></a>
 
-*ARMORY-22 (6×6, after 5 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-22 (8×8, after 16 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine a segment at D3–E3: then the black circle at D3 must go two cells right; then the white circle at E2 must go horizontally; then the black circle at D3 cannot enter D2 and goes two cells down; and finally the loop closes early while D2 is still outside it. So cross out D3–E3."
+> Hint says: "Imagine a segment at F6–G6: then the black circle at F6 is blocked left and goes two cells right; and finally the loop closes early while C1 is still outside it. So cross out F6–G6."
 
 ---
 
@@ -369,11 +411,11 @@ The loop crosses the border of any rectangle or band an even number of times.
 
 Blocking this segment would cut off a large area or leave a single chokepoint cell.
 
-<a href="../index.html?book=armory&puzzle=18"><img src="images/chokepointArea.svg" width="480" alt="chokepointArea hint example"></a>
+<a href="../index.html?book=armory&puzzle=19"><img src="images/chokepointArea.svg" width="480" alt="chokepointArea hint example"></a>
 
-*ARMORY-18 (6×6, after 9 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-19 (8×8, after 19 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Without C1–D1, F5 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so C1–D1 must be drawn."
+> Hint says: "Without D4–D5, H7 would be the only cell connecting the highlighted area to the rest of the loop (a single loop cannot pass through it twice), so D4–D5 must be drawn."
 
 ---
 
@@ -383,9 +425,9 @@ Blocking this segment would cut off a large area or leave a single chokepoint ce
 
 The other choice would seal off an area with an odd number of open ends.
 
-<a href="../index.html?book=armory&puzzle=19"><img src="images/parityForces.svg" width="480" alt="parityForces hint example"></a>
+<a href="../index.html?book=armory&puzzle=20"><img src="images/parityForces.svg" width="480" alt="parityForces hint example"></a>
 
-*ARMORY-19 (10×10, after 53 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-20 (10×10, after 53 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "If you tried drawing E3–E4, the highlighted area would be sealed off with 5 open ends (odd, so they can't all pair up); therefore cross out E3–E4."
 
@@ -403,9 +445,9 @@ Imagine a segment on or off and follow a long, multi-front, or area-parity chain
 
 <a href="../index.html?book=armory&puzzle=23"><img src="images/imagineChain.svg" width="480" alt="imagineChain hint example"></a>
 
-*ARMORY-23 (6×6, after 4 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-23 (8×8, after 11 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine a segment at C3–D3: then the black circle at D3 must go two cells left; then B3 must use B3–B4; then the black circle at C4 cannot enter B4 and goes two cells right; then the white circle at D5 must go horizontally; and finally the black circle at C4 has no room for two straight segments. So cross out C3–D3."
+> Hint says: "Imagine no segment at E4–E5: then the black circle at E5 is blocked up and goes two cells down; then E7 must use E7–E8; then the black circle at F8 cannot enter E8 and goes two cells right; then the black circle at D8 is blocked right and goes two cells left; and finally E8 is left with only one way out. So draw E4–E5."
 
 ---
 
@@ -415,9 +457,9 @@ Imagine a segment on or off and follow a long, multi-front, or area-parity chain
 
 Trying a segment one way leads to a contradiction.
 
-<a href="../index.html?book=armory&puzzle=20"><img src="images/tryEdge.svg" width="480" alt="tryEdge hint example"></a>
+<a href="../index.html?book=armory&puzzle=4"><img src="images/tryEdge.svg" width="480" alt="tryEdge hint example"></a>
 
-*ARMORY-20 (6×6, after 10 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-04 (8×8, after 15 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine a segment at C3–C4 and follow the forced deductions (starting with: the black circle at D3 is blocked left and goes two cells right; then C2 must use C2–D2; then the black circle at D3 cannot enter D2 and goes two cells down; reaching a contradiction after 3 steps). So cross out C3–C4."
+> Hint says: "Imagine no segment at B6–C6 and follow the forced deductions (starting with: the black circle at C6 is blocked left and goes two cells right; then the white circle at D5 must go horizontally; then the black circle at C6 cannot enter C5 and goes two cells down; reaching a contradiction after 3 steps). So draw B6–C6."
 

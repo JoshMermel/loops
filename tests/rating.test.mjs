@@ -277,6 +277,9 @@ test('difficulty tier assignments match the calibrated rule ladder', () => {
   assert.equal(tier('samePathExits'), 'Medium');
   assert.equal(tier('twoWhitesStraight'), 'Medium');
   assert.equal(tier('whiteNoTurnAxis'), 'Medium');
+  assert.equal(tier('blackTwoDiagWhites'), 'Medium');
+  assert.equal(tier('blackWhiteNoTurn'), 'Medium');
+  assert.equal(tier('whiteCornerPinch'), 'Medium');
   assert.equal(tier('faceShade'), 'Medium');
   assert.equal(tier('imagineLocal'), 'Medium');
   assert.equal(tier('faceCircle'), 'Hard');
@@ -286,4 +289,40 @@ test('difficulty tier assignments match the calibrated rule ladder', () => {
   assert.equal(tier('imagineTrace'), 'Hard');
   assert.equal(tier('imagineChain'), 'Expert');
   assert.equal(tier('tryEdge'), 'Expert');
+});
+
+test('new Medium circle patterns fire cleanly (blackTwoDiagWhites, blackWhiteNoTurn, whiteCornerPinch)', () => {
+  // 1. blackTwoDiagWhites: 6x6 with Black at (2,2) and NW/NE Whites at (1,1) & (1,3) -> cannot go Up, forces Down 2 cells
+  const P2 = compile({
+    name: 'b2dw', rows: 6, cols: 6,
+    clues: [{ r: 2, c: 2, t: 'B' }, { r: 1, c: 1, t: 'W' }, { r: 1, c: 3, t: 'W' }],
+  });
+  const s2 = nextSteps(P2, initialState(P2));
+  assert.equal(s2.rule, 'blackTwoDiagWhites');
+  assert.ok(s2.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P2.ed[(2 * 6 + 2) * 4 + 0] && v === E_OFF));
+  assert.ok(s2.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P2.ed[(2 * 6 + 2) * 4 + 2] && v === E_ON));
+  assert.ok(s2.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P2.ed2[(2 * 6 + 2) * 4 + 2] && v === E_ON));
+
+  // 2. blackWhiteNoTurn: 7x7 with W(2,1), W(2,2), B(2,4) -> B cannot go Left into W(2,2) because W(2,1) can't turn -> goes Right 2 cells
+  const P3 = compile({
+    name: 'bwnt', rows: 7, cols: 7,
+    clues: [{ r: 2, c: 1, t: 'W' }, { r: 2, c: 2, t: 'W' }, { r: 2, c: 4, t: 'B' }],
+  });
+  const s3 = nextSteps(P3, initialState(P3));
+  assert.equal(s3.rule, 'blackWhiteNoTurn');
+  assert.ok(s3.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P3.ed[(2 * 7 + 4) * 4 + 3] && v === E_OFF));
+  assert.ok(s3.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P3.ed[(2 * 7 + 4) * 4 + 1] && v === E_ON));
+
+  // 3. whiteCornerPinch: 6x6 with White at (3,1); corner (2,2) has only exits to (2,1) and (3,2), which both have 1 segment
+  const P4 = compile({ name: 'wcp', rows: 6, cols: 6, clues: [{ r: 3, c: 1, t: 'W' }] });
+  const st4 = initialState(P4);
+  // Corner k=(2,2): block Up (1,2)-(2,2) and Right (2,2)-(2,3); active segments at u=(2,1) going Up and v=(3,2) going Right
+  st4.e[P4.ed[(2 * 6 + 2) * 4 + 0]] = E_OFF;
+  st4.e[P4.ed[(2 * 6 + 2) * 4 + 1]] = E_OFF;
+  st4.e[P4.ed[(2 * 6 + 1) * 4 + 0]] = E_ON;
+  st4.e[P4.ed[(3 * 6 + 2) * 4 + 1]] = E_ON;
+  const s4 = nextSteps(P4, st4);
+  assert.equal(s4.rule, 'whiteCornerPinch');
+  assert.ok(s4.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P4.ed[(2 * 6 + 2) * 4 + 3] && v === E_OFF));
+  assert.ok(s4.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P4.ed[(2 * 6 + 2) * 4 + 2] && v === E_OFF));
 });

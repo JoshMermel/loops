@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { compile, parseCsv, toCsv, isSolved, symmetryKey } from '../js/logic.js';
-import { RULES } from '../js/rating.js';
+import { RULES, rate } from '../js/rating.js';
 import { computeHint } from '../js/hintstep.js';
 import { repoRoot } from './_cli.mjs';
 
@@ -118,7 +118,14 @@ for (const r of RULES) {
   const sk = symmetryKey(ex.puzzleObj);
   let num = puzzleNumByKey.get(sk);
   if (!num) {
-    const copy = { ...ex.puzzleObj, name: `ARMORY-${String(armoryPuzzles.length + 1).padStart(2, '0')}` };
+    const rated = rate(compile({ ...ex.puzzleObj }));
+    const copy = {
+      ...ex.puzzleObj,
+      name: `ARMORY-${String(armoryPuzzles.length + 1).padStart(2, '0')}`,
+      rules: rated.rules,
+      tier: rated.tier,
+      score: rated.score,
+    };
     armoryPuzzles.push(copy);
     num = armoryPuzzles.length;
     puzzleNumByKey.set(sk, num);

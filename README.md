@@ -15,10 +15,10 @@ A browser game and puzzle toolkit for **Masyu**, built in the same puzzle-toolki
 | Part | State |
 | --- | --- |
 | Exact solver / uniqueness counter (`js/logic.js`) | done: worklist-driven incremental `propagate()` with CSR edge-clue wakeups and direct cycle tracing, cross-checked against a brute-force reference (`tests/reference_solver.mjs`) |
-| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 33 rules (5 bookkeeping + 28 solving rules) across Beginner, Medium, Hard, and Expert (including dual-face Inside/Outside parity and dynamically priced lookahead); soundness-tested against exact solutions and `data/armory.csv` |
+| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 36 rules (5 bookkeeping + 31 solving rules) across Beginner, Medium, Hard, and Expert (including dual-face Inside/Outside parity and dynamically priced lookahead); soundness-tested against exact solutions and `data/armory.csv` |
 | Hint button (`js/explain.js`, `js/hintstep.js`) | done: replays the scorer's next step, explains imagined chains step by step, draws ghost marks and dashed chains, cycles firings; tested end-to-end on Beginner/Medium puzzles |
 | Generator (`js/generator.js`, `tools/generate.mjs`, `tools/fill_pools.mjs`, `tools/overnight.mjs`) | done: dual-face `tightLoop` (all-4-border + four-quadrant coverage and two-pass clue stripping) + guided `W↔B` mask hill-climber, verified by complete search; supports `--size`, `--seed`, `--budget`, `--style` (`balanced`, `white`, `black`, `sparse`), `--layout` (symmetry/region filters: `checkerboard`, `interior`, `frame`, `stripes`, `rot180`, `mirror`, `transpose`, `rot90`, `yinyang`, `yinyang-mirror`, `yinyang-transpose`, `cookie`, `cookie-horiz`, `cookie-diag`; fixed geometric/wallpaper masks: `lattice`, `blocks2x2`, `quilt2x2`, `circle-ring`, `honeycomb`, `pillars`, `hourglass`, `brackets`, `x-bracket`, `spiral`, `stairs`, `small-x`, `bricks`, `dominoes`, `ltiles`, `mirror-ltiles`, `herringbone`, `slashes`, `zigzags`), `--min-fill`, `--tier`, `--max-tier`, `--keep` |
-| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/build_all_books.mjs`, `tools/audit_books.mjs`) | 28 visible books (**13,566 audited puzzles**): Gentle intro (100: 50 `5×5` + 50 `6×6`); Default across 5 sizes (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`), each with 4 score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert = 2,010 per size); Bonus (6 fixed-size 520-puzzle books split 10% B / 40% M / 40% H / 10% E + 10 `Expert+` + 10 Mega finale puzzles each: All white `8×8`+`12×20`, All black `10×10`+`12×20`, Black & White Cookie `10×10`+`12×20` balanced across vertical/horizontal/diagonal splits, Skyscraper `6×20`+`6×40`, Exact symmetry `10×10`+`14×14` balanced across mirror/diagonal/180°, Full board `10×10`+`12×20`; plus **Patterns** with 296 all-square `9×9`–`13×13` puzzles across 19 shapes & wallpapers) and hidden `armory` (23) |
+| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/build_all_books.mjs`, `tools/audit_books.mjs`) | 28 visible books (**13,567 audited puzzles**): Gentle intro (100: 50 `5×5` + 50 `6×6`); Default across 5 sizes (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`), each with 4 score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert = 2,010 per size); Bonus (6 fixed-size 520-puzzle books split 10% B / 40% M / 40% H / 10% E + 10 `Expert+` + 10 Mega finale puzzles each: All white `8×8`+`12×20`, All black `10×10`+`12×20`, Black & White Cookie `10×10`+`12×20` balanced across vertical/horizontal/diagonal splits, Skyscraper `6×20`+`6×40`, Exact symmetry `10×10`+`14×14` balanced across mirror/diagonal/180°, Full board `10×10`+`12×20`; plus **Patterns** with 297 all-square `9×9`–`13×13` puzzles across 19 shapes & wallpapers) and hidden `armory` (23) |
 | Browser GUI (`index.html`, `style.css`, `js/board.js`, `js/main.js`, `js/rotate.js`) | playable: intersection-grid edge controls (tap segment to cycle empty/line/✕, drag to draw/erase loop, right-click/drag for ✕, tap/right-click square center to shade Inside/Outside), auto-rotation + manual `↻ Turn` for tall boards, undo/redo, localStorage saves by canonical puzzle hash, "Correct so far?", Hint, Book picker modal, Browse grid, dark mode, line-color palettes, locked Auto-X and Auto-Shade modes, `?book=<id>&puzzle=N` deep links |
 | Printing (`js/print.js`, Settings → Print puzzles) | done: fixed black-and-white SVG booklet for any range (`1-10, 15`), optional answer key, laid out by cell size for A4 and Letter, every page header linking to the site |
 | Docs (`docs/how_to_solve.md`, `docs/how_to_solve.html`) | generated from `js/rating.js` with illustrations from the hidden `armory` book |
@@ -128,18 +128,21 @@ The human-style solver (`js/rating.js`) always applies the cheapest applicable r
 | 19 | `twoWhitesStraight` | two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular | Medium | 12 |
 | 20 | `whiteNoTurnAxis` | a white circle cannot use an axis whose two neighbors are both unable to turn | Medium | 14 |
 | 21 | `blackBlockedTarget` | a black circle cannot extend toward a circle two cells away that cannot accept a straight segment | Medium | 15 |
-| 22 | `faceShade` | basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge | Medium | 18 |
-| 23 | `faceCircle` | advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge | Hard | 38 |
-| 24 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Hard | 44 |
-| 25 | `chokepoint` | blocking this segment would cut off a small area or leave a single chokepoint cell | Hard | 48 |
-| 26 | `parityPocket` | the other choice would seal off a small pocket with an odd number of open ends | Hard | 52 |
-| 27 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 58 |
-| 28 | `chokepointArea` | blocking this segment would cut off a large area or leave a single chokepoint cell | Hard | 64 |
-| 29 | `parityForces` | the other choice would seal off an area with an odd number of open ends | Hard | 68 |
-| 30 | `tryEdge` | trying a segment one way leads to a contradiction | Expert | 120 |
-| 31 | `imagineLocal` | imagine a segment on or off at a circle or open end: one local step immediately breaks a rule | Medium | 22–28 |
-| 32 | `imagineTrace` | imagine a segment on or off and trace one single thread 2–3 steps ahead until something breaks | Hard | 36–75 |
-| 33 | `imagineChain` | imagine a segment on or off and follow a long, multi-front, or area-parity chain until something breaks | Expert | ≥80 |
+| 22 | `blackTwoDiagWhites` | a black circle flanked by two diagonally adjacent white circles cannot extend between them | Medium | 15 |
+| 23 | `blackWhiteNoTurn` | a black circle cannot extend into a white circle two cells away whose far side cannot turn | Medium | 16 |
+| 24 | `whiteCornerPinch` | a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors | Medium | 17 |
+| 25 | `faceShade` | basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge | Medium | 18 |
+| 26 | `faceCircle` | advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge | Hard | 38 |
+| 27 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Hard | 44 |
+| 28 | `chokepoint` | blocking this segment would cut off a small area or leave a single chokepoint cell | Hard | 48 |
+| 29 | `parityPocket` | the other choice would seal off a small pocket with an odd number of open ends | Hard | 52 |
+| 30 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 58 |
+| 31 | `chokepointArea` | blocking this segment would cut off a large area or leave a single chokepoint cell | Hard | 64 |
+| 32 | `parityForces` | the other choice would seal off an area with an odd number of open ends | Hard | 68 |
+| 33 | `tryEdge` | trying a segment one way leads to a contradiction | Expert | 120 |
+| 34 | `imagineLocal` | imagine a segment on or off at a circle or open end: one local step immediately breaks a rule | Medium | 22–28 |
+| 35 | `imagineTrace` | imagine a segment on or off and trace one single thread 2–3 steps ahead until something breaks | Hard | 36–75 |
+| 36 | `imagineChain` | imagine a segment on or off and follow a long, multi-front, or area-parity chain until something breaks | Expert | ≥80 |
 
 ## License
 
