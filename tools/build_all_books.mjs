@@ -274,10 +274,10 @@ const recipes = [
   },
   {
     id: 'bonus-cookie', name: 'Black & White Cookie', label: '🍪 Black & White Cookie (10×10)', group: 'Bonus',
-    glob: 'cookie_vert_10x10,cookie_horiz_10x10,cookie_diag_10x10',
-    tiers: '50,200,200,50', tierBands: '0:375,345:430,415:625,600:1200', balanceGroups: true, interleaveGroups: true, maxRun: 3,
-    expertPlus: 10, bonusGlob: 'cookie_vert_12x20,cookie_horiz_12x20,cookie_diag_12x20', bonusCount: 10,
-    blurb: 'Half white circles, half black circles.',
+    glob: 'cookie_angle_10x10',
+    tiers: '50,200,200,50', tierBands: '0:375,345:430,415:625,600:1200',
+    expertPlus: 10, bonusGlob: 'cookie_angle_12x20', bonusCount: 10,
+    blurb: 'The board is split in half with black dots on one side and white dots on the other.',
   },
   {
     id: 'bonus-skyscraper', name: 'Skyscraper', label: '🏙️ Skyscraper (6×20)', group: 'Bonus',

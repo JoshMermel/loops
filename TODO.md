@@ -13,7 +13,6 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 ## Rules, books & generator
 
 - [ ] **Consider promoting other Bonus books to top-level sections:** review whether any remaining Bonus themes (e.g., All white / All black, Black & White Cookie, Skyscraper, Symmetry, Patterns) merit their own top-level section with multiple sizes or variations.
-- [ ] **Black & White Cookie arbitrary-angle splits:** allow the dividing line between white and black halves to be placed at arbitrary angles (not just vertical, horizontal, and main diagonal).
 - [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (remaining ideas:
   - diagonally adjacent black and white circles near a wall,
   - two white circles diagonally adjacent forcing a corridor,

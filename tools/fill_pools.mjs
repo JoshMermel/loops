@@ -393,37 +393,19 @@ if (!isMainThread) {
       budgetSec: 360, perPuzzleMs: 25000,
     },
 
-    // ---- Bonus: Black & White Cookie (left/right, top/bottom, and diagonal W/B half-splits)
+    // ---- Bonus: Black & White Cookie (arbitrary-angle W/B half-splits through board center)
     {
-      group: 'bonus-cookie', pool: 'cookie_vert_10x10', cols: 10, rows: 10, layout: 'cookie',
+      group: 'bonus-cookie', pool: 'cookie_angle_10x10', cols: 10, rows: 10, layout: 'cookie-angle',
       buckets: {
-        Beginner: { need: 18, maxScore: 375 },
-        Medium: { need: 68, minScore: 345, maxScore: 430 },
-        Hard: { need: 68, minScore: 415, maxScore: 625 },
-        Expert: { need: 18, minScore: 600, maxScore: 1200 },
+        Beginner: { need: 52, maxScore: 375 },
+        Medium: { need: 204, minScore: 345, maxScore: 430 },
+        Hard: { need: 204, minScore: 415, maxScore: 625 },
+        Expert: { need: 52, minScore: 600, maxScore: 1200 },
+        'Expert+': { need: 12 },
       },
       budgetSec: 240, perPuzzleMs: 20000,
     },
-    {
-      group: 'bonus-cookie', pool: 'cookie_horiz_10x10', cols: 10, rows: 10, layout: 'cookie-horiz',
-      buckets: {
-        Beginner: { need: 18, maxScore: 375 },
-        Medium: { need: 68, minScore: 345, maxScore: 430 },
-        Hard: { need: 68, minScore: 415, maxScore: 625 },
-        Expert: { need: 18, minScore: 600, maxScore: 1200 },
-      },
-      budgetSec: 240, perPuzzleMs: 20000,
-    },
-    {
-      group: 'bonus-cookie', pool: 'cookie_diag_10x10', cols: 10, rows: 10, layout: 'cookie-diag',
-      buckets: {
-        Beginner: { need: 18, maxScore: 375 },
-        Medium: { need: 68, minScore: 345, maxScore: 430 },
-        Hard: { need: 68, minScore: 415, maxScore: 625 },
-        Expert: { need: 18, minScore: 600, maxScore: 1200 },
-      },
-      budgetSec: 240, perPuzzleMs: 20000,
-    },
+    { group: 'bonus-cookie', pool: 'cookie_angle_12x20', cols: 12, rows: 20, layout: 'cookie-angle', total: 12, budgetSec: 120, perPuzzleMs: 30000 },
 
     // ---- Bonus: Geometric Patterns & Wallpapers (all-square 9x9 / 10x10 / 13x13 masks for `bonus-patterns`)
     { group: 'bonus-patterns', pool: 'lattice_9x9', cols: 9, rows: 9, layout: 'lattice', total: 25, budgetSec: 45, perPuzzleMs: 12000 },
@@ -451,9 +433,6 @@ if (!isMainThread) {
     // Expert+ (beyond hints) appended into normal-size bonus pools
     { group: 'bonus-finales', pool: 'white_8x8', cols: 8, rows: 8, style: 'white', tier: 'Expert+', totalTier: 12, budgetSec: 90, perPuzzleMs: 15000 },
     { group: 'bonus-finales', pool: 'black_10x10', cols: 10, rows: 10, style: 'black', tier: 'Expert+', totalTier: 12, budgetSec: 120, perPuzzleMs: 20000 },
-    { group: 'bonus-finales', pool: 'cookie_vert_10x10', cols: 10, rows: 10, layout: 'cookie', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
-    { group: 'bonus-finales', pool: 'cookie_horiz_10x10', cols: 10, rows: 10, layout: 'cookie-horiz', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
-    { group: 'bonus-finales', pool: 'cookie_diag_10x10', cols: 10, rows: 10, layout: 'cookie-diag', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
     { group: 'bonus-finales', pool: 'sky_6x20', cols: 6, rows: 20, tier: 'Expert+', totalTier: 12, budgetSec: 120, perPuzzleMs: 20000 },
     { group: 'bonus-finales', pool: 'sym_rot180_10x10', cols: 10, rows: 10, layout: 'rot180', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
     { group: 'bonus-finales', pool: 'sym_mirror_10x10', cols: 10, rows: 10, layout: 'mirror', tier: 'Expert+', totalTier: 5, budgetSec: 60, perPuzzleMs: 15000 },
@@ -463,9 +442,6 @@ if (!isMainThread) {
     // Mega-sized themed boards (2x-3x normal area)
     { group: 'bonus-finales', pool: 'white_12x20', cols: 12, rows: 20, style: 'white', total: 12, budgetSec: 180, perPuzzleMs: 30000 },
     { group: 'bonus-finales', pool: 'black_12x20', cols: 12, rows: 20, style: 'black', total: 12, budgetSec: 120, perPuzzleMs: 25000 },
-    { group: 'bonus-finales', pool: 'cookie_vert_12x20', cols: 12, rows: 20, layout: 'cookie', total: 5, budgetSec: 120, perPuzzleMs: 30000 },
-    { group: 'bonus-finales', pool: 'cookie_horiz_12x20', cols: 12, rows: 20, layout: 'cookie-horiz', total: 5, budgetSec: 120, perPuzzleMs: 30000 },
-    { group: 'bonus-finales', pool: 'cookie_diag_12x20', cols: 12, rows: 20, layout: 'cookie-diag', total: 5, budgetSec: 120, perPuzzleMs: 30000 },
     { group: 'bonus-finales', pool: 'tallsky_6x40', cols: 6, rows: 40, total: 12, budgetSec: 60, perPuzzleMs: 15000 },
     { group: 'bonus-finales', pool: 'sym_rot180_14x14', cols: 14, rows: 14, layout: 'rot180', total: 5, budgetSec: 60, perPuzzleMs: 20000 },
     { group: 'bonus-finales', pool: 'sym_mirror_14x14', cols: 14, rows: 14, layout: 'mirror', total: 5, budgetSec: 60, perPuzzleMs: 20000 },

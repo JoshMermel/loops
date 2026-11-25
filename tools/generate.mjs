@@ -29,7 +29,7 @@ if (!Number.isFinite(count) || count < 1 || !Number.isFinite(seed) || !Number.is
   process.exit(1);
 }
 const style = arg('style', 'balanced'); // balanced | white | black | sparse | gray-mixed | gray-all | full-masyu | full-lines | full-walls | full-mixed
-const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | lattice
+const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | cookie-angle | cookie:<deg> | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
 if (minFill !== null && (!Number.isFinite(minFill) || minFill <= 0 || minFill > 1)) {
   console.error(`Invalid --min-fill "${arg('min-fill')}" (must be in (0, 1])`);

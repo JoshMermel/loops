@@ -180,13 +180,14 @@ export function allowedClues(rows, cols, edges, grid = null) {
  *   'transpose'    exact diagonal-mirror symmetry (r, c) <-> (c, r) (square boards)
  *   'rot90'        exact 90° 4-fold rotational symmetry (loop and circle colors; square boards)
  *   'yinyang' / 'yinyang-mirror' / 'yinyang-transpose'  opposite-color symmetry (W <-> B)
- *   'cookie' / 'cookie-horiz' / 'cookie-diag'           half white, half black split
+ *   'cookie' / 'cookie-horiz' / 'cookie-diag'           half white, half black split (vertical / horizontal / diagonal)
+ *   'cookie-angle' / 'cookie:<deg>'                     arbitrary-angle half white, half black split through board center
  * Fixed-mask layouts (handled by `maskPoints` / `generateMaskPuzzle`):
  *   'lattice', 'blocks2x2', 'quilt2x2', 'circle-ring', 'honeycomb', 'pillars', 'hourglass',
  *   'brackets', 'x-bracket', 'spiral', 'stairs', 'small-x', 'bricks', 'dominoes',
  *   'ltiles', 'mirror-ltiles', 'herringbone', 'slashes', 'zigzags'
  */
-function clueFilterFor(layout, rows, cols) {
+function clueFilterFor(layout, rows, cols, rng = null) {
   if (!layout || layout === 'none') return (cs) => cs;
   if (layout === 'checkerboard') return (cs) => cs.filter((c) => ((c.r + c.c) & 1) === 0);
   if (layout === 'interior') return (cs) => cs.filter((c) => c.r > 0 && c.r < rows - 1 && c.c > 0 && c.c < cols - 1);
@@ -245,6 +246,25 @@ function clueFilterFor(layout, rows, cols) {
     return (cs) => cs.filter((c) => {
       const lhs = c.r * (cols - 1) + c.c * (rows - 1);
       return c.t === 'W' ? lhs < diag : lhs > diag;
+    });
+  }
+  if (layout === 'cookie-angle' || (typeof layout === 'string' && layout.startsWith('cookie:'))) {
+    let theta;
+    if (layout === 'cookie-angle') {
+      theta = (rng ? rng() : 0) * Math.PI * 2;
+    } else {
+      const deg = Number(layout.slice('cookie:'.length));
+      if (!Number.isFinite(deg)) throw new Error(`Invalid cookie angle "${layout}"`);
+      theta = (deg * Math.PI) / 180;
+    }
+    const cx = (cols - 1) / 2;
+    const cy = (rows - 1) / 2;
+    const nx = Math.cos(theta);
+    const ny = Math.sin(theta);
+    const EPS = 1e-6;
+    return (cs) => cs.filter((c) => {
+      const d = (c.c - cx) * nx + (c.r - cy) * ny;
+      return c.t === 'W' ? d < -EPS : d > EPS;
     });
   }
   throw new Error(`Unknown layout "${layout}"`);
@@ -404,7 +424,7 @@ export function tightLoop(rows, cols, rng, {
   const reqQuadFill = rows >= 12 && cols >= 12 ? Math.min(0.50, fillRatio * 0.85)
     : rows >= 8 && cols >= 8 ? Math.min(0.35, fillRatio * 0.8)
     : 0;
-  const filterClues = clueFilterFor(layout, rows, cols);
+  const filterClues = clueFilterFor(layout, rows, cols, rng);
   const stepsLimit = maxSteps ?? Math.max(500, Math.min(6000, F * 5 + (layout !== 'none' ? 300 : 0) + (minFill >= 0.95 ? 700 : 0)));
   // Compile grid topology once and reuse across all annealing evaluations
   const baseGrid = compile({ name: 'tl', rows, cols, clues: [] });
@@ -1675,9 +1695,13 @@ export function generatePuzzle({
     if (Date.now() >= deadline) break;
 
     if (style === 'balanced' && rows >= 5 && cols >= 5) {
-      const hasW = current.some((c) => c.t === 'W');
-      const hasB = current.some((c) => c.t === 'B');
-      if (!hasW || !hasB) continue;
+      const nW = current.filter((c) => c.t === 'W').length;
+      const nB = current.filter((c) => c.t === 'B').length;
+      if (nW < 1 || nB < 1) continue;
+      if (typeof layout === 'string' && layout.startsWith('cookie')) {
+        const minHalf = rows >= 10 && cols >= 10 ? 4 : rows >= 8 && cols >= 8 ? 2 : 1;
+        if (nW < minHalf || nB < minHalf) continue;
+      }
     }
     if (style === 'gray-mixed') {
       let nW = 0, nB = 0, nG = 0, nonCornerG = 0;

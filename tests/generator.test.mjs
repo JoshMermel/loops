@@ -187,6 +187,45 @@ test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yi
     return c.t === 'W' ? lhs < 45 : lhs > 45;
   }));
 
+  // Explicit arbitrary-angle cookie split (e.g. 30° and 115°)
+  for (const deg of [30, 115]) {
+    const pca = generatePuzzle({ rows: 8, cols: 8, seed: 115 + deg, layout: `cookie:${deg}`, budgetMs: 8000 });
+    assert.ok(pca, `failed to generate cookie:${deg} puzzle`);
+    const theta = (deg * Math.PI) / 180;
+    const nx = Math.cos(theta), ny = Math.sin(theta);
+    assert.ok(pca.clues.every((c) => {
+      const d = (c.c - 3.5) * nx + (c.r - 3.5) * ny;
+      return c.t === 'W' ? d < -1e-6 : d > 1e-6;
+    }), `cookie:${deg} clues violated half-plane split`);
+  }
+
+  // Random arbitrary-angle cookie split must be strictly linearly separable through board center
+  const isCenterSeparable = (rows, cols, clues) => {
+    const cx = (cols - 1) / 2, cy = (rows - 1) / 2;
+    const pts = clues.map((c) => ({ x: c.c - cx, y: c.r - cy, s: c.t === 'B' ? 1 : -1 }));
+    // Test mid-angles between all zero-crossing normal angles (atan2(y, x) ± π/2)
+    const angs = [];
+    for (const p of pts) {
+      if (p.x === 0 && p.y === 0) return false;
+      const a = Math.atan2(p.y, p.x);
+      angs.push((a + Math.PI * 2.5) % (Math.PI * 2), (a + Math.PI * 3.5) % (Math.PI * 2));
+    }
+    angs.sort((a, b) => a - b);
+    for (let i = 0; i < angs.length; i++) {
+      const a0 = angs[i], a1 = i + 1 < angs.length ? angs[i + 1] : angs[0] + Math.PI * 2;
+      if (a1 - a0 < 1e-9) continue;
+      const mid = (a0 + a1) / 2;
+      const nx = Math.cos(mid), ny = Math.sin(mid);
+      if (pts.every((p) => (p.x * nx + p.y * ny) * p.s > 1e-6)) return true;
+    }
+    return false;
+  };
+  const pcr = generatePuzzle({ rows: 8, cols: 10, seed: 118, layout: 'cookie-angle', budgetMs: 8000 });
+  assert.ok(pcr, 'failed to generate cookie-angle puzzle');
+  assert.ok(pcr.clues.filter((c) => c.t === 'W').length >= 2);
+  assert.ok(pcr.clues.filter((c) => c.t === 'B').length >= 2);
+  assert.equal(isCenterSeparable(8, 10, pcr.clues), true, 'cookie-angle clues must be linearly separable through center');
+
   const pp = generatePuzzle({ rows: 9, cols: 9, seed: 113, layout: 'pillars', budgetMs: 8000 });
   assert.ok(pp, 'failed to generate pillars geometric pattern puzzle');
   const expectedPts = maskPoints('pillars', 9, 9);
