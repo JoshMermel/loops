@@ -511,9 +511,12 @@ if (!isMainThread) {
             budgetMs: (job.budgetSec || 60) * 1000,
           },
         });
-        worker.on('message', resolve);
-        worker.on('error', reject);
-        worker.on('exit', (code) => { if (code !== 0) reject(new Error(`worker exit ${code}`)); });
+        let settled = false;
+        worker.on('message', (msg) => { settled = true; resolve(msg); });
+        worker.on('error', (err) => { settled = true; reject(err); });
+        worker.on('exit', (code) => {
+          if (!settled) reject(new Error(`worker exited without result (code ${code})`));
+        });
       }));
     }
 

@@ -32,6 +32,9 @@ export const E_UNKNOWN = 0, E_ON = 1, E_OFF = 2;
  */
 export function compile(p) {
   const { rows, cols } = p;
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2) {
+    throw new Error(`invalid board size ${rows}x${cols}`);
+  }
   const N = rows * cols;
   const numEdges = 2 * N;
   const clue = new Uint8Array(N); // 0 none, 1 white, 2 black

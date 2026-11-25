@@ -228,25 +228,107 @@ test('advanceHint implements two-press progression, multi-firing cycling, dismis
   assert.equal(s.stage, 2);
   assert.equal(s.index, 0);
 
-  // Full option jumps directly to stage 2
-  const direct = advanceHint(null, oneFiring, { full: true });
+  // Full option jumps directly to stage 2 and stays at stage 2 while cycling
+  const direct = advanceHint(null, twoFirings, { full: true });
   assert.equal(direct.stage, 2);
+  const directNext = advanceHint(direct, twoFirings, { full: true });
+  assert.equal(directNext.index, 1);
+  assert.equal(directNext.stage, 2);
 
-  // Wrong / stuck always show immediately at stage 2
+  // Dismissing at stage 2 restores stage 2 on the same firing (does not skip to next firing)
+  const restored2 = advanceHint({ ...direct, visible: false }, twoFirings);
+  assert.equal(restored2.stage, 2);
+  assert.equal(restored2.index, 0);
+  assert.equal(restored2.visible, true);
+
+  // { full: true } on a dismissed stage 1 hint jumps to stage 2
+  const jumped = advanceHint({ ...h, stage: 1, visible: false }, twoFirings, { full: true });
+  assert.equal(jumped.stage, 2);
+  assert.equal(jumped.visible, true);
+
+  // Wrong / stuck always show immediately at stage 2 and restore cleanly after dismiss
   const wrong = advanceHint(null, () => ({ kind: 'wrong', wrongEdges: [3], total: 1 }));
   assert.equal(wrong.stage, 2);
   assert.equal(wrong.visible, true);
+  assert.equal(advanceHint({ ...wrong, visible: false }, twoFirings).visible, true);
   const stuck = advanceHint(null, () => ({ kind: 'stuck', undecided: [0, 1] }));
   assert.equal(stuck.stage, 2);
   assert.equal(stuck.visible, true);
 });
 
-test('every armory rule produces a non-spoiling nudge and at least one nudgeRoles highlight', () => {
+test('describeChainStep handles samePathExits & closingCell, and non-armory / unanchored rules explain cleanly', () => {
+  const P = compile({ name: 'tr', rows: 5, cols: 5, clues: [] });
+  const e0 = P.ed[(1 * 5 + 1) * 4 + 1];
+  const e1 = P.ed[(2 * 5 + 2) * 4 + 2];
+
+  // tryEdge trace containing both samePathExits and closingCell must not throw or emit "1–1"
+  const te = explainStep(P, {
+    rule: 'tryEdge', tier: 'Expert', weight: 90,
+    sets: [['e', e0, E_OFF]],
+    info: {
+      edge: e0, hyp: E_ON, steps: 2,
+      trace: [
+        { rule: 'closingCell', info: { cell: 1 * 5 + 2, a: 0 * 5 + 2, b: 1 * 5 + 3 }, sets: [] },
+        { rule: 'samePathExits', info: { cell: 2 * 5 + 2, a: 2 * 5 + 1, b: 1 * 5 + 2, edge: e1 }, sets: [['e', e1, E_ON]] },
+      ],
+    },
+  });
+  assert.ok(te.text.includes('C2') && te.text.includes('C3–C4'), `unexpected tryEdge trace text: ${te.text}`);
+  assert.equal(te.text.includes('1–1'), false, `garbled edge name in trace: ${te.text}`);
+
+  // All 3 rules absent from armory.csv produce valid explanations, nudges, and nudgeRoles
+  for (const step of [
+    { rule: 'samePathExits', tier: 'Medium', weight: 12, sets: [['e', e1, E_ON]], info: { cell: 2 * 5 + 2, a: 2 * 5 + 1, b: 1 * 5 + 2, edge: e1 } },
+    { rule: 'blackBlockedTarget', tier: 'Medium', weight: 14, sets: [['e', e0, E_ON]], info: { cell: 2 * 5 + 2, target: 2 * 5 + 0, dir: 1, reason: 'whiteWall' } },
+    { rule: 'crossingParity', tier: 'Hard', weight: 32, sets: [['e', e0, E_ON]], info: { edge: e0, val: E_ON, on: 1, area: [0, 1, 5, 6] } },
+  ]) {
+    const exp = explainStep(P, step);
+    assert.ok(exp.text.length > 20 && exp.nudge.length > 15);
+    assert.ok(Object.values(exp.nudgeRoles).some((arr) => arr.length > 0), `empty nudgeRoles for ${step.rule}`);
+  }
+
+  // Unanchored faceCircle with empty clues must not mention "highlighted circles"
+  const fc = explainStep(P, {
+    rule: 'faceCircle', tier: 'Hard', weight: 32,
+    sets: [['e', e0, E_OFF]],
+    info: { edge: e0, val: E_OFF, fA: 0, fB: 1, parA: 1, parB: 1, anchored: false, clues: [], chains: [], hops: 1, facesIn: [0, 1], facesOut: [] },
+  });
+  assert.equal(fc.nudge.includes('highlighted circles'), false, `unexpected circle mention: ${fc.nudge}`);
+});
+
+test('computeHint catches wrong Auto-X caused by wrong manual shade and solution-less contradictions', () => {
+  const P = compile({ name: 'b3', rows: 3, cols: 3, clues: [{ r: 0, c: 0, t: 'B' }, { r: 2, c: 2, t: 'B' }] });
+  const sol = solve(P, { limit: 2 }).solutions[0];
+  P.solution = encodeSolution(P, sol);
+
+  // Wrong auto-X on a true solution edge (e.g. triggered by wrong manual Outside shade with Auto-X + Auto-Shade)
+  const marks = { edges: new Uint8Array(P.numEdges), autoE: new Uint8Array(P.numEdges) };
+  const trueEdge = P.ed[0 * 4 + 1]; // (0,0)-(0,1) is ON in solution
+  marks.edges[trueEdge] = 2;
+  marks.autoE[trueEdge] = 1;
+  const h = computeHint(P, marks);
+  assert.equal(h.kind, 'wrong');
+  assert.equal(h.fromShade, true);
+  assert.deepEqual(h.wrongEdges, [trueEdge]);
+
+  // Solution-less puzzle with contradictory marks reports kind: 'wrong', contradiction: true
+  const PnoSol = compile({ name: 'nosol', rows: 3, cols: 3, clues: [{ r: 0, c: 0, t: 'B' }] });
+  const badMarks = { edges: new Uint8Array(PnoSol.numEdges) };
+  badMarks.edges[PnoSol.ed[0 * 4 + 1]] = 2; // cross out right exit of corner black circle -> impossible
+  const h2 = computeHint(PnoSol, badMarks);
+  assert.equal(h2.kind, 'wrong');
+  assert.equal(h2.contradiction, true);
+});
+
+test('every armory rule produces a non-spoiling nudge and at least one nudgeRoles highlight (with imagine chain replay)', () => {
   const armory = parseCsv(fs.readFileSync(path.join(root, 'data', 'armory.csv'), 'utf8'));
   const seenRules = new Set();
+  let sawImagineChain = false;
   for (const raw of armory) {
     const P = compile({ ...raw });
     const r = rate(P);
+    const marks = { edges: new Uint8Array(P.numEdges) };
+    // Also verify real computeHint on armory initial/live steps and imagine chain replay
     for (const s of r.steps) {
       if (s.weight <= 1) continue; // skip free bookkeeping rules
       const exp = explainStep(P, s);
@@ -259,6 +341,15 @@ test('every armory rule produces a non-spoiling nudge and at least one nudgeRole
       assert.equal(exp.nudgeRoles.exit.length, 0, `nudgeRoles.exit should be empty for ${s.rule}`);
       assert.ok(!/\b(So draw|So cross out|must go two cells|must use)\b/.test(exp.nudge), `nudge leaked answer for ${s.rule}: ${exp.nudge}`);
     }
+    if (raw.rules.startsWith('imagine')) {
+      for (let step = 0; step < 200 && !isSolved(P, marks.edges); step++) {
+        const h = computeHint(P, marks);
+        if (h.kind !== 'step') break;
+        if (h.rule.startsWith('imagine') && h.hints[0].chain.length > 0) { sawImagineChain = true; break; }
+        applyHintToMarks(marks, h.hints[0]);
+      }
+    }
   }
   assert.ok(seenRules.size >= 25, `expected >= 25 rules covered across armory, saw ${seenRules.size}`);
+  assert.equal(sawImagineChain, true, 'expected at least one armory imagine step to populate dashed chain edges');
 });

@@ -448,14 +448,15 @@ function toast(msg, ms = 3200) {
   toastTimer = setTimeout(dismissToast, ms);
 }
 
-// Clicking anywhere on the page dismisses an open toast (Hint button is exempt so clicking Hint again cycles firings)
+// Clicking anywhere on the page dismisses an open toast (Hint button is exempt so clicking Hint again advances/cycles)
 document.addEventListener('pointerdown', (e) => {
-  if (!e.target.closest('#hint-btn') && !e.target.closest('#check-btn')) dismissToast();
+  if (!e.target.closest('#hint-btn')) dismissToast();
 }, true);
 $('toast').addEventListener('click', dismissToast);
 
 function checkSoFar() {
   if (!state.P) return;
+  dismissToast();
   if (state.solved) { toast('Solved!'); return; }
   if (!state.P.solution) { toast('No stored solution to check against.'); return; }
   const { total } = checkMarksAgainstSolution(state.P, state.marks);
@@ -527,12 +528,12 @@ function hint(opts = {}) {
 
   if (h.kind === 'wrong') {
     board.render(state.marks, analyse(), { wrongEdges: h.wrongEdges });
-    showHintToast(
-      'Mistake found',
-      `${h.total} mark${h.total === 1 ? '' : 's'} (highlighted in red) disagree${h.total === 1 ? 's' : ''} with the solution. Fix or undo ${h.total === 1 ? 'it' : 'them'} first.`,
-      null,
-      [],
-    );
+    const msg = h.fromShade
+      ? 'Auto-X crossed out a required segment because of a conflicting Inside/Outside shade (highlighted in red). Fix or undo your shaded squares first.'
+      : h.contradiction
+        ? 'The current marks lead to a contradiction. Fix or undo a recent move first.'
+        : `${h.total} mark${h.total === 1 ? '' : 's'} (highlighted in red) disagree${h.total === 1 ? 's' : ''} with the solution. Fix or undo ${h.total === 1 ? 'it' : 'them'} first.`;
+    showHintToast('Mistake found', msg, null, []);
     return;
   }
 
@@ -615,6 +616,7 @@ function showInfo() {
 function openPuzzle(idx) {
   const book = state.book;
   if (!book || !book.puzzles.length) return;
+  if (board.gesture) board.cancel();
   idx = Math.max(0, Math.min(Math.trunc(idx) || 0, book.puzzles.length - 1));
   state.idx = idx;
   const raw = book.puzzles[idx];
@@ -689,6 +691,8 @@ async function init() {
   state.books = manifest.books || [];
   state.groups = manifest.groups || [];
   restoreFileBook();
+  syncBookButton();
+  syncOfflineUI();
   if (!state.books.length) { $('puz-info').textContent = 'No puzzle books found.'; return; }
 
   const params = new URLSearchParams(location.search);
@@ -699,7 +703,7 @@ async function init() {
   if (!known) bookId = manifest.default || state.books[0].id;
   const idx = !known ? 0 : params.has('puzzle') ? +params.get('puzzle') - 1 : (last && last.book === bookId ? last.idx : 0);
   await openBook(bookId, Number.isFinite(idx) ? idx : 0);
-  syncMissingBooks(state.books);
+  queueBackgroundSync();
 }
 
 // ------------------------------------------------------------ UI wiring & modals
@@ -716,6 +720,8 @@ $('check-btn').addEventListener('click', checkSoFar);
 $('hint-btn').addEventListener('click', () => hint());
 
 const modals = [];
+const modalOpen = () => modals.some(({ modal }) => !modal.classList.contains('modal-hidden'));
+const syncModalInert = () => { $('game-container').inert = modalOpen(); };
 function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
   const modal = $(modalId), openBtn = $(openBtnId);
   modal.inert = true;
@@ -724,6 +730,7 @@ function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
     modal.classList.add('modal-hidden');
     modal.inert = true;
     modal.setAttribute('aria-hidden', 'true');
+    syncModalInert();
     $(returnFocusId).focus();
   };
   const open = () => {
@@ -731,6 +738,7 @@ function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
     modal.inert = false;
     modal.removeAttribute('aria-hidden');
     modal.classList.remove('modal-hidden');
+    syncModalInert();
     modal.querySelector('[data-close]').focus();
   };
   openBtn.addEventListener('click', open);
@@ -739,7 +747,6 @@ function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
   modals.push({ modal, close });
   return { open, close };
 }
-const modalOpen = () => modals.some(({ modal }) => !modal.classList.contains('modal-hidden'));
 
 // ---- Browse grid
 function renderBrowse() {
@@ -955,6 +962,7 @@ if (!store.get('ms_seenHelp') && !new URLSearchParams(location.search).has('book
 
 $('setting-dark-mode').addEventListener('change', (e) => {
   document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : 'light');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', e.target.checked ? '#1a1a1a' : '#1976d2');
   store.set('ms_dark', e.target.checked ? '1' : '0');
   board.setOptions(paletteOptions());
   renderPaletteUI();
@@ -1079,8 +1087,9 @@ const offlineDesc = $('offline-desc');
 const offlineActions = $('offline-actions');
 const offlineRefreshBtn = $('offline-refresh-btn');
 let offlineAbort = null;
-let offlineJob = null;
+let offlineQueue = Promise.resolve();
 let offlineBusy = false;
+let offlineSeq = 0;
 
 function renderOfflineStatus(status) {
   const count = status.total ? `all ${status.total} puzzle books` : 'all puzzle books';
@@ -1096,8 +1105,10 @@ function renderOfflineStatus(status) {
   offlineActions.hidden = !status.enabled;
   offlineRefreshBtn.disabled = offlineBusy || navigator.onLine === false;
   if (!status.enabled) {
-    offlineDesc.textContent = `Save the app and ${count} (~6.6 MB) to play without internet`;
-  } else if (status.total > 0 && status.cached >= status.total) {
+    offlineDesc.textContent = `Save the app and ${count} (~7 MB) to play without internet`;
+  } else if (status.total === 0) {
+    offlineDesc.textContent = 'Ready offline';
+  } else if (status.cached >= status.total) {
     offlineDesc.textContent = `Ready offline — all ${status.total} books saved`;
   } else {
     offlineDesc.textContent = `${status.cached} of ${status.total} books saved — connect to finish downloading`;
@@ -1109,70 +1120,95 @@ async function syncOfflineUI() {
   renderOfflineStatus(await getOfflineStatus(state.books));
 }
 
-async function runOfflineSync(force) {
-  if (!isOfflineSupported()) return;
+function queueOfflineOp(fn) {
+  const seq = ++offlineSeq;
   if (offlineAbort) offlineAbort.abort();
-  if (offlineJob) await offlineJob.catch(() => {});
-
   const ctrl = new AbortController();
   offlineAbort = ctrl;
-  offlineBusy = true;
-  offlineToggle.checked = true;
-  offlineActions.hidden = false;
-  offlineRefreshBtn.disabled = true;
-  const verb = force ? 'Updating offline copy' : 'Downloading books';
-  offlineDesc.textContent = force ? 'Updating offline copy…' : 'Setting up offline play…';
-
-  const job = enableOffline(state.books, {
-    force,
-    signal: ctrl.signal,
-    onProgress: (done, total) => {
-      if (ctrl.signal.aborted) return;
-      offlineDesc.textContent = total ? `${verb}… ${done} / ${total}` : `${verb}…`;
-    },
+  const run = offlineQueue.catch(() => {}).then(() => {
+    if (seq !== offlineSeq || ctrl.signal.aborted) return null;
+    return fn(ctrl.signal, seq);
   });
-  offlineJob = job;
-
-  let res = null;
-  let failed = false;
-  try {
-    res = await job;
-  } catch {
-    failed = true;
-  } finally {
-    if (offlineJob === job) {
-      offlineJob = null;
-      offlineAbort = null;
-      offlineBusy = false;
-    }
-  }
-
-  if (ctrl.signal.aborted) return;
-  await syncOfflineUI();
-  if (failed) {
-    toast('Could not enable offline play.');
-  } else if (force) {
-    toast(res?.ok ? 'Offline copy updated.' : 'Some books could not be updated.');
-  }
+  offlineQueue = run.catch(() => {});
+  return run;
 }
 
-offlineToggle.addEventListener('change', async () => {
+async function refreshManifestBooks(signal) {
+  try {
+    const res = await fetch(new Request('data/manifest.json', { cache: 'reload' }), { signal });
+    if (!res.ok) return;
+    const manifest = await res.json();
+    if (!Array.isArray(manifest.books) || !manifest.books.length) return;
+    const customBooks = state.books.filter((b) => !b.file);
+    state.books = [...manifest.books, ...customBooks];
+    if (Array.isArray(manifest.groups)) state.groups = manifest.groups;
+  } catch { /* keep current manifest */ }
+}
+
+function runOfflineSync(force) {
+  if (!isOfflineSupported()) return;
+  queueOfflineOp(async (signal, seq) => {
+    offlineBusy = true;
+    offlineToggle.checked = true;
+    offlineActions.hidden = false;
+    offlineRefreshBtn.disabled = true;
+    const verb = force ? 'Updating offline copy' : 'Downloading books';
+    offlineDesc.textContent = force ? 'Updating offline copy…' : 'Setting up offline play…';
+
+    let res = null;
+    let failed = false;
+    try {
+      if (force) await refreshManifestBooks(signal);
+      if (signal.aborted) return;
+      res = await enableOffline(state.books, {
+        force,
+        signal,
+        onProgress: (done, total) => {
+          if (signal.aborted) return;
+          offlineDesc.textContent = total ? `${verb}… ${done} / ${total}` : `${verb}…`;
+        },
+      });
+    } catch {
+      failed = true;
+    } finally {
+      if (seq === offlineSeq) offlineBusy = false;
+    }
+
+    if (signal.aborted || seq !== offlineSeq) return;
+    await syncOfflineUI();
+    if (failed) {
+      toast(force ? 'Could not update offline copy.' : 'Could not enable offline play.');
+    } else if (force) {
+      toast(res?.ok ? 'Offline copy updated.' : 'Some files could not be updated.');
+    }
+  });
+}
+
+function queueBackgroundSync() {
+  if (offlineBusy || !state.books.length || !isOfflineSupported() || navigator.onLine === false) return;
+  queueOfflineOp(async (signal, seq) => {
+    const res = await syncMissingBooks(state.books, { signal });
+    if (res && !signal.aborted && seq === offlineSeq) await syncOfflineUI();
+  });
+}
+
+offlineToggle.addEventListener('change', () => {
   if (offlineToggle.checked) {
-    await runOfflineSync(false);
+    runOfflineSync(false);
     return;
   }
-  if (offlineAbort) offlineAbort.abort();
-  if (offlineJob) await offlineJob.catch(() => {});
-  offlineBusy = true;
-  offlineRefreshBtn.disabled = true;
-  offlineActions.hidden = true;
-  offlineDesc.textContent = 'Removing offline copy…';
-  try {
-    await disableOffline();
-  } finally {
-    offlineBusy = false;
-  }
-  await syncOfflineUI();
+  queueOfflineOp(async (signal, seq) => {
+    offlineBusy = true;
+    offlineRefreshBtn.disabled = true;
+    offlineActions.hidden = true;
+    offlineDesc.textContent = 'Removing offline copy…';
+    try {
+      await disableOffline();
+    } finally {
+      if (seq === offlineSeq) offlineBusy = false;
+    }
+    if (!signal.aborted && seq === offlineSeq) await syncOfflineUI();
+  });
 });
 
 offlineRefreshBtn.addEventListener('click', () => {
@@ -1183,9 +1219,8 @@ offlineRefreshBtn.addEventListener('click', () => {
   runOfflineSync(true);
 });
 
-window.addEventListener('online', () => { syncOfflineUI(); syncMissingBooks(state.books); });
+window.addEventListener('online', () => { syncOfflineUI(); queueBackgroundSync(); });
 window.addEventListener('offline', () => { syncOfflineUI(); });
-syncOfflineUI();
 $('csv-file').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
@@ -1258,10 +1293,13 @@ function setupPrint() {
   go.addEventListener('click', () => {
     const r = update();
     if (!r) return;
-    const compiled = r.puzzles.map((p) => (p.N ? p : compile(p)));
+    for (const id of r.ids) {
+      const p = r.puzzles[id - 1];
+      if (p && !p.N) r.puzzles[id - 1] = compile(p);
+    }
     buildPrintRoot({
       book: { title: state.book.name },
-      puzzles: compiled,
+      puzzles: r.puzzles,
       ids: r.ids,
       size: r.size,
       includeKey: keyBox.checked,
@@ -1278,10 +1316,9 @@ document.addEventListener('keydown', (e) => {
     if (board.gesture) { board.cancel(); return; }
     const openModal = modals.find(({ modal }) => !modal.classList.contains('modal-hidden'));
     if (openModal) { openModal.close(); return; }
-    if (state.hint || !$('toast').hidden) {
-      state.hint = null;
-      hideToast();
-      if (state.P) board.render(state.marks, analyse());
+    const toastEl = $('toast');
+    if ((state.hint && state.hint.visible) || (!toastEl.hidden && !toastEl.classList.contains('ghost'))) {
+      dismissToast();
     }
     return;
   }

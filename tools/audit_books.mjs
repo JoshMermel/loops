@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import {
   parseCsv, compile, solve, decodeSolution, encodeSolution, isSolved, symmetryKey,
@@ -140,7 +141,7 @@ await new Promise((resolve) => {
     while (running < jobs && tasks.length) {
       const t = tasks.shift();
       running++;
-      const args = [new URL(import.meta.url).pathname, '--worker', t.id, '--range', t.range, ...(withRating ? ['--rate'] : [])];
+      const args = [fileURLToPath(import.meta.url), '--worker', t.id, '--range', t.range, ...(withRating ? ['--rate'] : [])];
       const child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'inherit'] });
       let buf = '';
       child.stdout.on('data', (d) => { buf += d; });

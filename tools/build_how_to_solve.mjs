@@ -9,7 +9,7 @@ import { repoRoot } from './_cli.mjs';
 
 const imagineCostLabel = (r) => (
   r.id === 'imagineLocal' ? `cost 22–${MEDIUM_MAX} (dynamic)`
-    : r.id === 'imagineTrace' ? `cost 42–${HARD_MAX} (dynamic)`
+    : r.id === 'imagineTrace' ? `cost 36–${HARD_MAX} (dynamic)`
       : r.id === 'imagineChain' ? `cost ≥ 80 (dynamic)`
         : `cost ${r.cost}`
 );

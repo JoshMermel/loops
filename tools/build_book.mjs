@@ -77,6 +77,7 @@ for (const ef of excludeFiles) {
 const seen = new Set(excluded);
 const locked = [];
 const lockedExpertPlus = [];
+const lockedBySk = new Map();
 const existingBookPath = path.join(root, 'data', `${id}.csv`);
 if (preserveExisting && fs.existsSync(existingBookPath)) {
   for (const p of parseCsv(fs.readFileSync(existingBookPath, 'utf8'))) {
@@ -84,6 +85,7 @@ if (preserveExisting && fs.existsSync(existingBookPath)) {
     const sk = symmetryKey(p);
     if (seen.has(sk)) continue;
     seen.add(sk);
+    lockedBySk.set(sk, p);
     if (p.rules === 'unsolved') lockedExpertPlus.push(p);
     else locked.push(p);
   }
@@ -100,6 +102,11 @@ if (fs.existsSync(dir)) {
     for (const p of parseCsv(fs.readFileSync(path.join(dir, f), 'utf8'))) {
       if (!matchesBand(p)) continue;
       const sk = symmetryKey(p);
+      if (lockedBySk.has(sk)) {
+        const lp = lockedBySk.get(sk);
+        if (!lp._group) lp._group = grp;
+        continue;
+      }
       if (seen.has(sk)) continue;
       seen.add(sk);
       p._group = grp;

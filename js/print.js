@@ -129,13 +129,20 @@ export function buildPrintRoot({ book, puzzles, ids, size = 'comfortable', inclu
         const P = puzzles[id - 1];
         const fig = div('print-item', grid);
         div('print-caption', fig, `#${id}${!withSolution && P.tier ? ` · ${P.tier}` : ''}`);
-        fig.insertAdjacentHTML('beforeend', boardSvg(P, withSolution ? solutionOf(P) : null));
+        fig.insertAdjacentHTML('beforeend', boardSvg(P, withSolution ? solutions.get(id) : null));
         fig.lastElementChild.style.width = `${boardUnits(P)[0] * layout.cellMm}mm`;
       }
     }
   };
 
-  const keyIds = includeKey ? ids.filter((id) => solutionOf(puzzles[id - 1])) : [];
+  const solutions = new Map();
+  const keyIds = [];
+  if (includeKey) {
+    for (const id of ids) {
+      const sol = solutionOf(puzzles[id - 1]);
+      if (sol) { solutions.set(id, sol); keyIds.push(id); }
+    }
+  }
   const plan = planPrint({ puzzles, ids, keyIds, size });
   addPages(ids, plan.puzzleLayout, false, null);
   if (keyIds.length) addPages(keyIds, plan.keyLayout, true, 'Answers');

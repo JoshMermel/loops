@@ -339,7 +339,8 @@ export class Board {
     el.addEventListener('pointerdown', (e) => this.down(e));
     el.addEventListener('pointermove', (e) => this.move(e));
     el.addEventListener('pointerup', (e) => this.up(e));
-    el.addEventListener('pointercancel', () => this.cancel());
+    el.addEventListener('pointercancel', (e) => { if (this.gesture && e.pointerId === this.gesture.id) this.cancel(); });
+    el.addEventListener('lostpointercapture', (e) => { if (this.gesture && e.pointerId === this.gesture.id) this.cancel(); });
     el.addEventListener('pointerleave', () => { if (!this.gesture) this.setHover(-1, -1, -1); });
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -612,6 +613,7 @@ export class Board {
     const svg = this.el.querySelector('svg');
     if (!svg || !this.P) return null;
     const rect = svg.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
     const { W, H } = this.size();
     const sx = ((e.clientX - rect.left) / rect.width) * W;
     const sy = ((e.clientY - rect.top) / rect.height) * H;
@@ -665,6 +667,7 @@ export class Board {
     if (!this.P) return;
     const c = this.coordsFromEvent(e);
     if (!this.gesture) {
+      if (e.pointerType === 'touch') return;
       const hit = c ? hitTestCoords(this.P, c.gx, c.gy) : null;
       if (!hit) this.setHover(-1, -1, -1);
       else if (hit.kind === 'face') this.setHover(-1, -1, hit.face);
@@ -697,7 +700,9 @@ export class Board {
 
   cancel() {
     if (!this.gesture) return;
+    const id = this.gesture.id;
     this.gesture = null;
+    try { this.el.releasePointerCapture(id); } catch { /* ignore */ }
     this.h.onEnd(true);
   }
 }

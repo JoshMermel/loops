@@ -5,7 +5,7 @@
 //   marks.autoE: optional Uint8Array(numEdges) — 1 where an X was placed automatically by Auto-X
 import {
   E_UNKNOWN, E_ON, E_OFF,
-  initialState, decodeSolution,
+  initialState, cloneState, propagate, decodeSolution,
 } from './logic.js';
 import { nextSteps } from './rating.js';
 import { explainStep } from './explain.js';
@@ -47,7 +47,22 @@ export function computeHint(P, marks) {
   const wrong = checkMarksAgainstSolution(P, marks);
   if (wrong.total > 0) return { kind: 'wrong', ...wrong };
 
+  if (P.solution && P.solution.length === P.N) {
+    const sol = decodeSolution(P, P.solution);
+    const wrongAuto = [];
+    for (let x = 0; x < P.numEdges; x++) {
+      if (P.edgeA[x] < 0) continue;
+      if (marks.edges[x] === 2 && marks.autoE && marks.autoE[x] && sol.e[x] === E_ON) wrongAuto.push(x);
+    }
+    if (wrongAuto.length > 0) {
+      return { kind: 'wrong', wrongEdges: wrongAuto, total: wrongAuto.length, fromShade: true };
+    }
+  }
+
   const st = stateFromMarks(P, marks);
+  if ((!P.solution || P.solution.length !== P.N) && !propagate(P, cloneState(st))) {
+    return { kind: 'wrong', wrongEdges: [], total: 0, contradiction: true };
+  }
   const res = nextSteps(P, st);
   if (!res) {
     const undecided = [];

@@ -367,18 +367,20 @@ function findFaceParityCore(P, st, opts, { useCircles, anchoredOnly }) {
     if (anchored) {
       const pA = extractPath(extTree, EXT, fA) || [];
       const pB = extractPath(extTree, EXT, fB) || [];
-      const maxDirect = pA.length + pB.length - 3;
-      const direct = maxDirect >= 1 ? shortestPath(adj, fA, fB, maxDirect) : null;
-      chains = direct ? [pA, direct] : [pA, pB];
+      const [near, far, pNear, pFar, parNear] = pA.length <= pB.length
+        ? [fA, fB, pA, pB, parA]
+        : [fB, fA, pB, pA, parA ^ rel];
+      const direct = pFar.length > 1 ? shortestPath(adj, near, far, pFar.length - 1) : null;
+      chains = direct ? [pNear, direct] : [pA, pB];
       let curP = 0;
-      for (const s of pA) { curP ^= s.xor; recordFace(s.to, curP); }
+      for (const s of pNear) { curP ^= s.xor; recordFace(s.to, curP); }
       if (direct) {
-        curP = parA;
-        recordFace(fA, parA);
+        curP = parNear;
+        recordFace(near, parNear);
         for (const s of direct) { curP ^= s.xor; recordFace(s.to, curP); }
       } else {
         curP = 0;
-        for (const s of pB) { curP ^= s.xor; recordFace(s.to, curP); }
+        for (const s of pFar) { curP ^= s.xor; recordFace(s.to, curP); }
       }
       recordFace(fA, parA);
       recordFace(fB, parA ^ rel);

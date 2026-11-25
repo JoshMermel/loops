@@ -251,4 +251,9 @@ test('incremental propagate(P, st, seedEdge) matches full propagate() and compil
   raw.clues = [{ r: 1, c: 1, t: 'B' }];
   compile(raw);
   assert.equal(raw._ecOff, null, 'compile() must reset cached CSR edge-clue table');
+
+  // Invalid board dimensions must throw cleanly
+  for (const bad of [{ rows: NaN, cols: 4 }, { rows: 1, cols: 4 }, { rows: 4, cols: 0 }, { rows: 3.5, cols: 4 }]) {
+    assert.throws(() => compile({ name: 'bad', ...bad, clues: [] }), /invalid board size/);
+  }
 });

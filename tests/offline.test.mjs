@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { CACHE_PREFIX, BOOK_CACHE, bookUrlsOf } from '../js/offline.js';
+import {
+  CACHE_PREFIX, BOOK_CACHE, isOfflineSupported, bookUrlsOf,
+  getOfflineStatus, cacheBooks, enableOffline, disableOffline, syncMissingBooks,
+} from '../js/offline.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SW_SRC = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
@@ -216,6 +219,8 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   const navOnline = await env.dispatchFetch(navReq);
   assert.equal(navOnline.handled, true);
   assert.match(await navOnline.response.text(), /^v1:/);
+  const appKeysAfterNav = [...env.store.get(env.exports.APP_CACHE).keys()];
+  assert.equal(appKeysAfterNav.some((u) => u.includes('?book=')), false, 'query-string URL should not be cached');
 
   // Non-root navigation (solving guide) caches under its own URL
   const guideReq = { url: 'https://example.com/masyu/docs/how_to_solve.html', method: 'GET', mode: 'navigate' };
@@ -267,13 +272,15 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   assert.equal(await csvOffline.response.text(), `v3:${csvUrl}`);
   await Promise.all(csvOffline.waits); // background SWR error swallowed cleanly
 
-  // Cross-origin and non-GET requests are not intercepted
+  // Cross-origin, out-of-scope same-origin, and non-GET requests are not intercepted
   const xOrigin = await env.dispatchFetch(new Request('https://other.example/foo.js'));
   assert.equal(xOrigin.handled, false);
+  const outScope = await env.dispatchFetch(new Request('https://example.com/other/app.js'));
+  assert.equal(outScope.handled, false);
   const postReq = await env.dispatchFetch(new Request('https://example.com/masyu/data/intro.csv', { method: 'POST' }));
   assert.equal(postReq.handled, false);
 
-  // REFRESH_APP message refreshes app shell when online
+  // REFRESH_APP message refreshes app shell when online and reports error when offline
   online = true;
   version = 4;
   const reply = await env.dispatchMessage({ type: 'REFRESH_APP' });
@@ -281,6 +288,242 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   online = false;
   const jsRefreshed = await env.dispatchFetch(new Request('https://example.com/masyu/js/main.js'));
   assert.equal(await jsRefreshed.response.text(), 'v4:https://example.com/masyu/js/main.js');
+  const failReply = await env.dispatchMessage({ type: 'REFRESH_APP' });
+  assert.equal(failReply?.ok, false);
+  assert.ok(failReply?.error);
+});
+
+test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededError, and atomic precache rollback', async () => {
+  let mode = 'ok';
+  let quotaFail = false;
+  const env = makeMockEnv({
+    fetchImpl: async (req) => {
+      const url = typeof req === 'string' ? req : req.url;
+      if (mode === 'fail-one' && url.endsWith('js/rotate.js')) {
+        return new Response('err', { status: 500 });
+      }
+      if (mode === 'status-500') return new Response('server error', { status: 500 });
+      if (mode === 'status-206') return new Response('partial', { status: 206 });
+      if (mode === 'redirect') {
+        const res = new Response('redirected-body', { status: 200 });
+        Object.defineProperty(res, 'redirected', { value: true });
+        return res;
+      }
+      return new Response(`fresh:${url}`, { status: 200 });
+    },
+  });
+
+  // Initial clean install
+  await env.dispatchLifecycle('install');
+
+  // Atomic precacheAppShell: if 1 file fails during REFRESH_APP, prior APP_CACHE stays intact
+  mode = 'fail-one';
+  const failedRefresh = await env.dispatchMessage({ type: 'REFRESH_APP' });
+  assert.equal(failedRefresh?.ok, false);
+  const cachedMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/masyu/js/main.js');
+  assert.equal(await cachedMain.text(), 'fresh:https://example.com/masyu/js/main.js');
+
+  // Redirected navigation response is cleaned before returning and caching
+  mode = 'redirect';
+  const redNav = await env.dispatchFetch({ url: 'https://example.com/masyu/', method: 'GET', mode: 'navigate' });
+  assert.equal(redNav.response.redirected, false);
+  assert.equal(await redNav.response.text(), 'redirected-body');
+
+  // Non-200 / 206 responses never overwrite good cached entries and never fail online fetches
+  mode = 'ok';
+  const csvUrl = 'https://example.com/masyu/data/intro.csv';
+  await env.dispatchFetch(new Request(csvUrl));
+  mode = 'status-500';
+  const badAsset = await env.dispatchFetch(new Request('https://example.com/masyu/js/main.js'));
+  assert.equal(badAsset.response.status, 500);
+  const stillGoodMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/masyu/js/main.js');
+  assert.equal(await stillGoodMain.text(), 'fresh:https://example.com/masyu/js/main.js');
+
+  mode = 'status-206';
+  const partialRes = await env.dispatchFetch(new Request('https://example.com/masyu/data/other.csv'));
+  assert.equal(partialRes.response.status, 206);
+  assert.equal(await (await env.caches.open(BOOK_CACHE)).match('https://example.com/masyu/data/other.csv'), undefined);
+
+  // QuotaExceededError during cache.put must not break online fetch
+  const origOpen = env.caches.open.bind(env.caches);
+  env.caches.open = async (name) => {
+    const c = await origOpen(name);
+    return {
+      ...c,
+      async put(k, v) {
+        if (quotaFail) throw new Error('QuotaExceededError');
+        return c.put(k, v);
+      },
+    };
+  };
+  mode = 'ok';
+  quotaFail = true;
+  const onlineRes = await env.dispatchFetch(new Request('https://example.com/masyu/data/new.csv'));
+  assert.equal(onlineRes.response.status, 200);
+  assert.equal(await onlineRes.response.text(), 'fresh:https://example.com/masyu/data/new.csv');
+});
+
+test('js/offline.js controller handles status, cacheBooks pruning/abort, enableOffline, disableOffline, and syncMissingBooks', async () => {
+  const base = 'https://example.com/masyu/';
+  const books = [
+    { id: 'intro', file: 'data/intro.csv' },
+    { id: '8x8-beginner', file: 'data/8x8-beginner.csv' },
+    { id: 'armory', file: 'data/armory.csv', hidden: true },
+  ];
+
+  // Build in-memory browser globals for js/offline.js
+  const store = new Map();
+  const getMap = (name) => { if (!store.has(name)) store.set(name, new Map()); return store.get(name); };
+  const makeCache = (name) => ({
+    async put(req, res) { getMap(name).set(typeof req === 'string' ? req : req.url, res.clone()); },
+    async match(req) { const h = getMap(name).get(typeof req === 'string' ? req : req.url); return h ? h.clone() : undefined; },
+    async delete(req) { return getMap(name).delete(typeof req === 'string' ? req : req.url); },
+    async keys() { return [...getMap(name).keys()].map((u) => new Request(u)); },
+  });
+  const mockCaches = {
+    async open(name) { return makeCache(name); },
+    async has(name) { return store.has(name); },
+    async keys() { return [...store.keys()]; },
+    async delete(name) { return store.delete(name); },
+  };
+
+  let currentReg = null;
+  let refreshReply = { ok: true };
+  let online = true;
+  const makeReg = (scriptURL = `${base}sw.js`, initialState = 'activated') => {
+    const listeners = new Set();
+    const worker = {
+      scriptURL,
+      state: initialState,
+      addEventListener(t, fn) { if (t === 'statechange') listeners.add(fn); },
+      removeEventListener(t, fn) { if (t === 'statechange') listeners.delete(fn); },
+      postMessage(msg, [port]) {
+        if (msg?.type === 'REFRESH_APP') setTimeout(() => port?.postMessage(refreshReply), 0);
+      },
+      _setState(next) { worker.state = next; for (const fn of [...listeners]) fn(); },
+    };
+    const reg = {
+      active: initialState === 'activated' ? worker : null,
+      installing: initialState === 'installing' ? worker : null,
+      waiting: null,
+      async update() {},
+      async unregister() { if (currentReg === reg) currentReg = null; return true; },
+      _worker: worker,
+    };
+    return reg;
+  };
+
+  const mockNav = {
+    get onLine() { return online; },
+    serviceWorker: {
+      controller: null,
+      async getRegistration() { return currentReg; },
+      async register(path) {
+        currentReg = makeReg(new URL(path, base).href, 'activated');
+        return currentReg;
+      },
+    },
+  };
+
+  let fetchFailUrl = null;
+  const orig = {
+    window: globalThis.window,
+    location: globalThis.location,
+    caches: globalThis.caches,
+    fetch: globalThis.fetch,
+    navigatorDesc: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
+  };
+
+  Object.defineProperty(globalThis, 'window', { value: { isSecureContext: true, caches: mockCaches }, configurable: true });
+  Object.defineProperty(globalThis, 'location', { value: new URL(`${base}index.html`), configurable: true });
+  Object.defineProperty(globalThis, 'caches', { value: mockCaches, configurable: true });
+  Object.defineProperty(globalThis, 'navigator', { value: mockNav, configurable: true });
+  globalThis.fetch = async (req, opts) => {
+    if (opts?.signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    const url = typeof req === 'string' ? req : req.url;
+    if (fetchFailUrl && url === fetchFailUrl) return new Response('err', { status: 500 });
+    return new Response(`csv:${url}`, { status: 200 });
+  };
+
+  try {
+    assert.equal(isOfflineSupported(), true);
+
+    // Disabled by default
+    let st = await getOfflineStatus(books);
+    assert.deepEqual(st, { supported: true, enabled: false, cached: 0, total: 2 });
+
+    // Foreign SW scriptURL must not count as enabled
+    currentReg = makeReg('https://example.com/other-sw.js');
+    st = await getOfflineStatus(books);
+    assert.equal(st.enabled, false);
+    currentReg = null;
+
+    // Enable offline: caches all 3 files (2 visible + hidden armory) and reports visible progress
+    const progress = [];
+    const res = await enableOffline(books, { onProgress: (d, t) => progress.push([d, t]) });
+    assert.equal(res.ok, true);
+    assert.equal(res.cached, 2);
+    assert.equal(res.total, 2);
+    assert.deepEqual(progress[progress.length - 1], [2, 2]);
+    assert.equal(getMap(BOOK_CACHE).size, 3);
+
+    st = await getOfflineStatus(books);
+    assert.deepEqual(st, { supported: true, enabled: true, cached: 2, total: 2 });
+
+    // Empty books array must NEVER prune BOOK_CACHE
+    const emptyRes = await cacheBooks([]);
+    assert.equal(emptyRes.total, 0);
+    assert.equal(getMap(BOOK_CACHE).size, 3);
+
+    // Retired book gets pruned when manifest drops it
+    await (await mockCaches.open(BOOK_CACHE)).put(`${base}data/retired.csv`, new Response('old'));
+    assert.equal(getMap(BOOK_CACHE).size, 4);
+    await syncMissingBooks(books);
+    assert.equal(getMap(BOOK_CACHE).has(`${base}data/retired.csv`), false);
+    assert.equal(getMap(BOOK_CACHE).size, 3);
+
+    // Force refresh propagates REFRESH_APP failure into res.ok === false
+    refreshReply = { ok: false, error: 'offline' };
+    const failRefresh = await enableOffline(books, { force: true });
+    assert.equal(failRefresh.appOk, false);
+    assert.equal(failRefresh.ok, false);
+    refreshReply = { ok: true };
+
+    // Book fetch failure increments failed count cleanly
+    fetchFailUrl = `${base}data/intro.csv`;
+    const partial = await enableOffline(books, { force: true });
+    assert.equal(partial.ok, false);
+    assert.equal(partial.failed, 1);
+    fetchFailUrl = null;
+
+    // AbortSignal cancels enableOffline cleanly
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const aborted = await enableOffline(books, { force: true, signal: ctrl.signal });
+    assert.equal(aborted.aborted, true);
+    assert.ok(currentReg !== null, 'aborting a force-refresh must keep offline enabled');
+
+    // disableOffline unregisters SW and deletes all masyu-* caches (preserving unrelated caches)
+    await (await mockCaches.open('masyu-app-v1')).put(`${base}index.html`, new Response('html'));
+    await (await mockCaches.open('unrelated-v1')).put(`${base}x`, new Response('x'));
+    await disableOffline();
+    assert.equal(currentReg, null);
+    assert.equal(await mockCaches.has(BOOK_CACHE), false);
+    assert.equal(await mockCaches.has('masyu-app-v1'), false);
+    assert.equal(await mockCaches.has('unrelated-v1'), true);
+
+    // syncMissingBooks is a no-op when offline or disabled
+    online = false;
+    assert.equal(await syncMissingBooks(books), null);
+    online = true;
+    assert.equal(await syncMissingBooks(books), null);
+  } finally {
+    Object.defineProperty(globalThis, 'window', { value: orig.window, configurable: true });
+    Object.defineProperty(globalThis, 'location', { value: orig.location, configurable: true });
+    Object.defineProperty(globalThis, 'caches', { value: orig.caches, configurable: true });
+    if (orig.navigatorDesc) Object.defineProperty(globalThis, 'navigator', orig.navigatorDesc);
+    globalThis.fetch = orig.fetch;
+  }
 });
 
 test('bookUrlsOf separates visible and hidden books and ignores file uploads', () => {

@@ -97,9 +97,9 @@ function describeChainStep(P, s) {
     case 'twoWhitesStraight':
       return `the adjacent white circles at ${cellName(P, info.w1)} and ${cellName(P, info.w2)} must cross ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
     case 'closingCell':
-      return `${edgeName(P, info.edge)} would leave ${c} with only one way out`;
+      return `visiting ${c} would join ${cellName(P, info.a)} and ${cellName(P, info.b)} and close the loop early`;
     case 'samePathExits':
-      return `the loop must extend out of ${cellName(P, info.ends[0])} and ${cellName(P, info.ends[1])} without closing early`;
+      return `${c} cannot connect ${cellName(P, info.a)} and ${cellName(P, info.b)} early, so it must use ${edgeName(P, info.edge)}`;
     case 'whiteNoTurnAxis':
       return `the white circle at ${c} cannot turn along its blocked axis and must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
     case 'blackBlockedTarget':
@@ -430,7 +430,9 @@ export function explainStep(P, step, st = null) {
       roles.clue.push(...(info.clues || []));
       nudgeRoles.focus.push(a, b);
       nudgeRoles.clue.push(...(info.clues || []));
-      nudge = `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`;
+      nudge = info.clues && info.clues.length
+        ? `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`
+        : `Look at ${edgeName(P, info.edge)} — use relative Inside/Outside shading to compare the squares on either side.`;
       faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: !!info.anchored };
       const label = (par) => (info.anchored ? (par === 1 ? 'Inside' : 'Outside') : (par === 1 ? 'Side A' : 'Side B'));
       const describeLink = (s, destPar) => {

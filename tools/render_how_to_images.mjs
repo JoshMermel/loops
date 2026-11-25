@@ -5,8 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compile, parseCsv, colName, edgeCells } from '../js/logic.js';
 import { describeMarks } from '../js/explain.js';
+import { repoRoot } from './_cli.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = repoRoot(import.meta.url);
 const examples = JSON.parse(fs.readFileSync(path.join(root, 'docs', 'examples', 'examples.json'), 'utf8'));
 const armory = parseCsv(fs.readFileSync(path.join(root, 'data', 'armory.csv'), 'utf8'));
 const outDir = path.join(root, 'docs', 'images');
@@ -171,6 +172,13 @@ for (const ex of examples) {
     + `</svg>\n`;
 
   fs.writeFileSync(path.join(outDir, `${ex.rule}.svg`), svg, 'utf8');
+}
+
+const activeSvgs = new Set(examples.map((ex) => `${ex.rule}.svg`));
+for (const file of fs.readdirSync(outDir)) {
+  if (file.endsWith('.svg') && !activeSvgs.has(file)) {
+    fs.unlinkSync(path.join(outDir, file));
+  }
 }
 
 console.log(`Rendered ${examples.length} hint illustrations into docs/images/*.svg`);

@@ -460,6 +460,11 @@ export function tightLoop(rows, cols, rng, {
     };
   };
 
+  const finalize = (res) => {
+    res.P = compile({ name: 'tl', rows, cols, clues: res.clues });
+    return res;
+  };
+
   let cur = evaluate();
   if (isExactHamSeed) {
     // Re-sample O(N) spanning-tree Hamiltonian cycles until one is 100% tight (usually <10 tries, ~10ms)
@@ -468,7 +473,7 @@ export function tightLoop(rows, cols, rng, {
       const nxt = evaluate();
       if (nxt.score < cur.score) cur = nxt;
     }
-    return cur;
+    return finalize(cur);
   }
   const fMidR = fr >> 1, fMidC = fc >> 1;
   for (let step = 0; step < stepsLimit && cur.score > 0; step++) {
@@ -510,7 +515,7 @@ export function tightLoop(rows, cols, rng, {
       undoToggle(orb);
     }
   }
-  return cur;
+  return finalize(cur);
 }
 
 const BEGINNER_UPTO = RULES.findIndex((r) => r.tier !== 'Beginner');

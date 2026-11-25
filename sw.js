@@ -35,18 +35,39 @@ const APP_SHELL = [
 
 const scopeUrl = () => new URL('./', self.registration.scope);
 const resolveAsset = (path) => new URL(path, self.registration.scope).href;
-const cleanResponse = (res) => (res.redirected
-  ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers })
-  : res);
+const isCacheable = (res) => Boolean(res && res.status === 200 && res.type !== 'opaque');
+
+async function cleanResponse(res) {
+  if (!res.redirected) return res;
+  const buf = await res.arrayBuffer();
+  return new Response(buf, { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
+async function safePut(cache, key, res) {
+  if (!isCacheable(res)) return;
+  try {
+    await cache.put(key, res);
+  } catch { /* ignore storage quota or non-cacheable errors */ }
+}
 
 async function precacheAppShell() {
-  const cache = await caches.open(APP_CACHE);
-  await Promise.all(APP_SHELL.map(async (path) => {
+  // Fetch all shell assets before writing so a transient failure never leaves a mixed-version cache
+  const fetched = await Promise.all(APP_SHELL.map(async (path) => {
     const url = resolveAsset(path);
     const res = await fetch(new Request(url, { cache: 'reload' }));
-    if (!res.ok) throw new Error(`Failed to cache ${path}: HTTP ${res.status}`);
-    await cache.put(url, cleanResponse(res));
+    if (!isCacheable(res)) throw new Error(`Failed to cache ${path}: HTTP ${res.status}`);
+    return [url, await cleanResponse(res)];
   }));
+  const cache = await caches.open(APP_CACHE);
+  await Promise.all(fetched.map(([url, res]) => cache.put(url, res)));
+  const keep = new Set(fetched.map(([url]) => url));
+  const docsPrefix = `${scopeUrl().href}docs/`;
+  const keys = await cache.keys();
+  await Promise.all(
+    keys
+      .filter((req) => !keep.has(req.url) && !req.url.startsWith(docsPrefix))
+      .map((req) => cache.delete(req)),
+  );
 }
 
 self.addEventListener('install', (event) => {
@@ -79,7 +100,7 @@ async function handleBookRequest(event, request) {
   const cache = await caches.open(BOOK_CACHE);
   const cached = request.cache === 'reload' ? null : await cache.match(request);
   const networkPromise = fetch(request).then(async (res) => {
-    if (res && res.ok) await cache.put(request, res.clone());
+    if (isCacheable(res)) await safePut(cache, request, res.clone());
     return res;
   });
   if (cached) {
@@ -94,9 +115,10 @@ async function handleNavigation(request, url) {
   const indexUrl = resolveAsset('index.html');
   const rootNav = isAppRootNavigation(url);
   try {
-    const res = await fetch(request);
-    if (res && res.ok) {
-      await cache.put(rootNav ? indexUrl : request, cleanResponse(res.clone()));
+    const raw = await fetch(request);
+    const res = raw.redirected ? await cleanResponse(raw) : raw;
+    if (isCacheable(res)) {
+      await safePut(cache, rootNav ? indexUrl : request, res.clone());
     }
     return res;
   } catch (err) {
@@ -112,8 +134,8 @@ async function handleAsset(request) {
   const cache = await caches.open(APP_CACHE);
   try {
     const res = await fetch(request);
-    if (res && res.ok) {
-      await cache.put(request, res.clone());
+    if (isCacheable(res)) {
+      await safePut(cache, request, res.clone());
     }
     return res;
   } catch (err) {

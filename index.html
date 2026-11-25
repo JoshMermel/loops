@@ -22,6 +22,8 @@
       var dark = false;
       try { dark = localStorage.getItem('ms_dark') === '1'; } catch (e) {}
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', dark ? '#1a1a1a' : '#1976d2');
     })();
   </script>
   <link rel="stylesheet" href="style.css">
@@ -254,7 +256,7 @@
             <label class="settings-row" id="offline-row">
               <div class="settings-row-text">
                 <span class="settings-label">Offline play</span>
-                <span class="settings-desc" id="offline-desc">Save the app and all puzzle books (~6.6 MB) to play without internet</span>
+                <span class="settings-desc" id="offline-desc">Save the app and all puzzle books (~7 MB) to play without internet</span>
               </div>
               <div class="toggle-switch">
                 <input type="checkbox" id="setting-offline" role="switch">

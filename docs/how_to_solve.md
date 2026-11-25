@@ -439,7 +439,7 @@ The other choice would seal off a small pocket with an odd number of open ends.
 
 ### imagineTrace
 
-*Hard, cost 42–75 (dynamic)*
+*Hard, cost 36–75 (dynamic)*
 
 Imagine a segment on or off and trace one single thread 2–3 steps ahead until something breaks.
 

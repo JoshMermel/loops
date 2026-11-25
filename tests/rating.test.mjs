@@ -66,13 +66,7 @@ test('threeWhites fires on three consecutive white circles', () => {
 });
 
 test('blackAdjacent fires on two touching black circles', () => {
-  // 5x5 board with two black circles in the center (2,2) and (2,3)
-  const P = compile({
-    name: 'bb_mid', rows: 5, cols: 5,
-    clues: [{ r: 2, c: 2, t: 'B' }, { r: 2, c: 3, t: 'B' }],
-  });
-  const st = initialState(P);
-  // First step should be blackWall (since (2,3) is 1 cell from right edge c=4!) -> let's use 5x6 so neither is near edge
+  // 5x6 board so neither center black circle is within 1 cell of a border (avoids blackWall firing first)
   const P2 = compile({
     name: 'bb_mid6', rows: 5, cols: 6,
     clues: [{ r: 2, c: 2, t: 'B' }, { r: 2, c: 3, t: 'B' }],
@@ -262,6 +256,8 @@ test('armory soundness sweep verifies 20+ human rules against unique solutions a
           assert.equal(seenEdges.has(idx), false, `duplicate edge ${idx} emitted by ${s.rule} on ${raw.name}`);
           seenEdges.add(idx);
           assert.equal(sol.e[idx], v, `unsound edge deduction by ${s.rule} on ${raw.name}`);
+        } else if (k === 'c') {
+          assert.equal(sol.cell[idx], v, `unsound cell deduction by ${s.rule} on ${raw.name}`);
         }
       }
     }
@@ -295,7 +291,7 @@ test('difficulty tier assignments match the calibrated rule ladder', () => {
   assert.equal(tier('tryEdge'), 'Expert');
 });
 
-test('new Medium circle patterns fire cleanly (blackTwoDiagWhites, blackWhiteNoTurn, whiteCornerPinch)', () => {
+test('named Medium/Hard pattern rules fire cleanly and respect negative/boundary guards', () => {
   // 1. blackTwoDiagWhites: 6x6 with Black at (2,2) and NW/NE Whites at (1,1) & (1,3) -> cannot go Up, forces Down 2 cells
   const P2 = compile({
     name: 'b2dw', rows: 6, cols: 6,
@@ -387,4 +383,64 @@ test('new Medium circle patterns fire cleanly (blackTwoDiagWhites, blackWhiteNoT
   const s8 = nextSteps(P8, st8);
   assert.equal(s8.rule, 'corridorNoEarlyClose');
   assert.ok(s8.firings[0].sets.some(([k, x, v]) => k === 'e' && x === eBetween(P8, 3, 2, 3, 3) && v === E_OFF));
+
+  // Negative/boundary guards:
+  // 8. blackNoEarlyClose must NOT fire when closing the final loop (no extra loop cells outside)
+  const P5final = compile({ name: 'bnec_final', rows: 7, cols: 7, clues: [{ r: 2, c: 2, t: 'B' }] });
+  const st5f = initialState(P5final);
+  for (const [r1, c1, r2, c2] of [
+    [2, 2, 2, 3], [2, 3, 2, 4], [2, 4, 2, 5], [2, 5, 3, 5], [3, 5, 4, 5], [4, 5, 4, 4], [4, 4, 4, 3], [4, 3, 4, 2],
+  ]) st5f.e[eBetween(P5final, r1, c1, r2, c2)] = E_ON;
+  st5f.e[eBetween(P5final, 2, 2, 2, 1)] = E_OFF;
+  st5f.cell[3 * 7 + 3] = OFF;
+  st5f.cell[3 * 7 + 4] = OFF;
+  const rBnecFinal = RULES.find((r) => r.id === 'blackNoEarlyClose').find(P5final, st5f);
+  assert.equal(rBnecFinal.length, 0, 'blackNoEarlyClose must not fire on final loop close');
+
+  // 9. corridorNoEarlyClose must NOT fire when closing final loop or on length-1 corridor
+  const P8final = compile({ name: 'cnec_final', rows: 6, cols: 6, clues: [] });
+  const st8f = initialState(P8final);
+  for (const [r1, c1, r2, c2] of [[2, 2, 1, 2], [1, 2, 1, 3], [1, 3, 2, 3]]) st8f.e[eBetween(P8final, r1, c1, r2, c2)] = E_ON;
+  for (const [r1, c1, r2, c2] of [[2, 2, 2, 3], [3, 2, 3, 1], [3, 2, 4, 2], [3, 3, 3, 4], [3, 3, 4, 3]]) {
+    st8f.e[eBetween(P8final, r1, c1, r2, c2)] = E_OFF;
+  }
+  assert.equal(RULES.find((r) => r.id === 'corridorNoEarlyClose').find(P8final, st8f).length, 0);
+
+  // 10. boxStrand must NOT fire when both c and d have on===1, or when c has 3 unknown exits, or when c is OFF
+  const boxRule = RULES.find((r) => r.id === 'boxStrand');
+  const st7both = { cell: st7.cell.slice(), e: st7.e.slice(), cycle: false };
+  st7both.e[eBetween(P7, 3, 2, 3, 1)] = E_ON; // now both c and d have on===1
+  assert.equal(boxRule.find(P7, st7both).length, 0);
+  const st7three = { cell: st7.cell.slice(), e: st7.e.slice(), cycle: false };
+  st7three.e[eBetween(P7, 3, 2, 3, 1)] = 0; // c now has 3 unknown exits
+  assert.equal(boxRule.find(P7, st7three).length, 0);
+  const st7off = { cell: st7.cell.slice(), e: st7.e.slice(), cycle: false };
+  st7off.cell[3 * 6 + 2] = OFF; // standalone OFF cell guard
+  assert.equal(boxRule.find(P7, st7off).length, 0);
+
+  // 11. whiteDeadEndPinch deduplicates when two white circles flank the same edge vk
+  const P6dup = compile({ name: 'wdep_dup', rows: 6, cols: 6, clues: [{ r: 3, c: 2, t: 'W' }, { r: 3, c: 4, t: 'W' }] });
+  const st6d = initialState(P6dup);
+  st6d.e[eBetween(P6dup, 2, 2, 1, 2)] = E_OFF;
+  st6d.e[eBetween(P6dup, 2, 2, 2, 1)] = E_OFF;
+  st6d.e[eBetween(P6dup, 2, 4, 1, 4)] = E_OFF;
+  st6d.e[eBetween(P6dup, 2, 4, 2, 5)] = E_OFF;
+  st6d.e[eBetween(P6dup, 2, 3, 1, 3)] = E_ON;
+  st6d.e[eBetween(P6dup, 3, 3, 4, 3)] = E_ON;
+  const wdepHits = RULES.find((r) => r.id === 'whiteDeadEndPinch').find(P6dup, st6d);
+  assert.equal(wdepHits.length, 1, 'duplicate vk firing should be deduplicated');
+
+  // 12. blackWhiteNoTurn fires on 'straight' and 'blocked' reasons as well as 'white'
+  const P3s = compile({ name: 'bwnt_str', rows: 7, cols: 7, clues: [{ r: 2, c: 2, t: 'W' }, { r: 2, c: 4, t: 'B' }] });
+  const st3s = initialState(P3s);
+  st3s.e[eBetween(P3s, 2, 1, 2, 0)] = E_ON; // far cell (2,1) already continues straight left
+  const s3s = RULES.find((r) => r.id === 'blackWhiteNoTurn').find(P3s, st3s);
+  assert.equal(s3s.length, 1);
+  assert.equal(s3s[0].info.reason, 'straight');
+  const st3b = initialState(P3s);
+  st3b.e[eBetween(P3s, 2, 1, 1, 1)] = E_OFF;
+  st3b.e[eBetween(P3s, 2, 1, 3, 1)] = E_OFF; // far cell (2,1) has both turns blocked
+  const s3b = RULES.find((r) => r.id === 'blackWhiteNoTurn').find(P3s, st3b);
+  assert.equal(s3b.length, 1);
+  assert.equal(s3b[0].info.reason, 'blocked');
 });

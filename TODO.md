@@ -33,13 +33,12 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 - [x] **Code review:** full pass over `js/`, `tools/`, `tests/`, `index.html`, and `style.css`; fixed all High & Medium findings across the core engine (`rate()` final bookkeeping, Pass 2 clue sorting, `faceparity` shortcut shading, `threeWhites`/`twoWhitesStraight` edge deduplication, `tightLoop` topology reuse, `imagine`/`logic`/`explain` edge cases), UI/interaction (multi-touch guard, drag backtrack deadzone, hover/gesture reset on switch/rotate/keys, `load()` Auto-X sync, modal `inert`/`visibility` + focus, dark-mode hint tokens, `marks.js` stateless `autoXForced`), CLI tools (`audit_books`, `rescore`, `build_book`, `fill_pools`, `generate`, `capture_how_to_images`), and added unit tests (`imagine.test.mjs`, `armory` soundness sweep, incremental `propagate()`, backtrack/white-clue regressions).
 - [x] **Grow `16×16`, `12×20`, and `16×24` corpora for per-difficulty books:** expanded all three giant pools to 500 puzzles per tier across all 4 tiers (`Beginner`, `Medium`, `Hard`, `Expert` + 10 `Expert+` in Expert), giving `Default` 5 uniform size cards (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`) and bringing the total shipped corpus to **13,566 visible audited puzzles across 28 visible books** (`13,589` including hidden `armory`).
 - [x] **Re-evaluate dismissing Auto-X marks:** locked Auto-X edges to match Auto-Shade (tapping, right-clicking, or dragging over an Auto-X edge is now a no-op; clearing a manual `✕` reveals any underlying Auto-X, which unwinds automatically when its cause is erased or Auto-X is toggled off) and simplified `reconcileAutoX` / `reconcileAutoShade` in `js/marks.js` into stateless recomputes.
-- [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (for example:
+- [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (added `blackTwoDiagWhites`, `blackWhiteNoTurn`, `whiteCornerPinch`, `blackNoEarlyClose`, `whiteDeadEndPinch`, `boxStrand`, and `corridorNoEarlyClose`; remaining ideas:
   - diagonally adjacent black and white circles near a wall,
   - two white circles diagonally adjacent forcing a corridor,
-  - black circle forcing a white circle two cells away to turn at its far end,
   - paired open ends with 4 or 6 ends (`pairedEnds`),
   - uniqueness-assuming shortcuts (`uniqueRoute`) if desired for Hint only).
-- [x] **Rescore & regenerate books after tier/cost updates:** rescored all pools, topped up Hard/Expert pools, rebuilt all 31 visible books + `armory`, regenerated `docs/how_to_solve.md`, and audited with `audit_books.mjs --rate --all`.
+- [x] **Rescore & regenerate books after tier/cost updates:** rescored all pools, topped up Hard/Expert pools, rebuilt all 28 visible books + `armory`, regenerated `docs/how_to_solve.{md,html}`, and audited with `audit_books.mjs --rate --all`.
 
 ## Books & scaling
 
@@ -54,7 +53,7 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 
 - [x] **Board rotation** (`js/rotate.js`) for tall rectangular boards (auto-landscape + Turn button).
 - [x] **Two-press step-by-step hints** (`js/explain.js`, `js/hintstep.js`, `js/main.js`): first press highlights where to look (`nudge` + spoiler-free `nudgeRoles`, no ghost marks/chains/shading), second press reveals the full deduction and ghost marks, and further presses cycle alternate firings starting with a fresh nudge.
-- [x] **Offline play** (`sw.js`, `js/offline.js`, `manifest.webmanifest`): opt-in **Offline play** toggle in Settings that registers the service worker, precaches the app shell (`masyu-app-v1`) and all shipped puzzle books (`masyu-books-v1`, ~6.6 MB) with live download progress, supports on-demand updates and full cache cleanup when turned off, and silently syncs newly added books when online.
+- [x] **Offline play** (`sw.js`, `js/offline.js`, `manifest.webmanifest`): opt-in **Offline play** toggle in Settings that registers the service worker, precaches the app shell (`masyu-app-v1`) and all shipped puzzle books (`masyu-books-v1`, ~7 MB) with live download progress, supports on-demand updates and full cache cleanup when turned off, and silently syncs newly added books when online.
 - [ ] **Playwright PNG screenshots** (`tools/capture_how_to_images.py`) once Playwright is installed, to compare against the pure-Node SVG illustrations.
 - [ ] **Phone / touch testing** of edge-tap vs cell-drag hit margins (`EDGE_MARGIN` in `js/board.js`).
 - [ ] **Variants (separate branches, reusing topology + rule table + book machinery):**

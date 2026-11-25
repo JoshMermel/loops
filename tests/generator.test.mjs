@@ -2,7 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
 import { rate } from '../js/rating.js';
-import { randomLoop, allowedClues, generatePuzzle, makeRng, maskPoints, quadrantStats } from '../js/generator.js';
+import { randomLoop, allowedClues, tightLoop, generatePuzzle, makeRng, maskPoints, quadrantStats } from '../js/generator.js';
+
+test('tightLoop returns cur.P.clue and cur.P.clueAt matching cur.clues even when final annealing steps reject', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const res = tightLoop(8, 8, makeRng(seed), { style: 'black', maxSteps: 40 });
+    const fresh = compile({ name: 'check', rows: 8, cols: 8, clues: res.clues });
+    assert.deepEqual(res.P.clue, fresh.clue, `seed ${seed}: cur.P.clue diverged from cur.clues`);
+    assert.deepEqual(res.P.clueAt, fresh.clueAt, `seed ${seed}: cur.P.clueAt diverged from cur.clues`);
+  }
+});
 
 test('randomLoop always produces a single valid closed loop across sizes', () => {
   const rng = makeRng(101);

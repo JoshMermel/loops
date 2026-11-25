@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { compile, parseCsv, isSolved } from '../js/logic.js';
 import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('manifest.json matches every shipped CSV file and count', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'data', 'manifest.json'), 'utf8'));
@@ -22,7 +23,7 @@ test('manifest.json matches every shipped CSV file and count', () => {
 });
 
 test('following hints from an empty board solves shipped Beginner and Medium puzzles across sizes', () => {
-  for (const id of ['intro', '8x8-beginner', '8x8-medium', '12x12-beginner', '12x12-medium', '16x16-beginner', '16x16-medium']) {
+  for (const id of ['intro', '8x8-beginner', '8x8-medium', '12x12-beginner', '12x12-medium', '16x16-beginner', '16x16-medium', '12x20-beginner', '12x20-medium', '16x24-beginner', '16x24-medium']) {
     const ps = parseCsv(fs.readFileSync(path.join(root, 'data', `${id}.csv`), 'utf8'));
     const sample = [
       ps.find((p) => p.tier === 'Beginner'),
@@ -58,8 +59,11 @@ test('docs/how_to_solve.md and docs/how_to_solve.html exist with all referenced 
   assert.ok(fs.existsSync(path.join(root, 'og-image.png')));
   assert.ok(fs.existsSync(path.join(root, 'apple-touch-icon.png')));
   const md = fs.readFileSync(mdPath, 'utf8');
+  const html = fs.readFileSync(htmlPath, 'utf8');
   const imgs = [...md.matchAll(/src="(images\/[^"]+)"/g)].map((m) => m[1]);
-  assert.ok(imgs.length >= 18, `expected >= 18 rule illustrations, got ${imgs.length}`);
+  const htmlImgs = [...html.matchAll(/src="(images\/[^"]+)"/g)].map((m) => m[1]);
+  assert.ok(imgs.length >= 30, `expected >= 30 rule illustrations, got ${imgs.length}`);
+  assert.deepEqual(htmlImgs, imgs, 'docs/how_to_solve.html and .md image lists should match');
   for (const rel of imgs) {
     assert.ok(fs.existsSync(path.join(root, 'docs', rel)), `missing doc image docs/${rel}`);
   }

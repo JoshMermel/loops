@@ -25,7 +25,7 @@ const perPuzzleMs = +arg('per-puzzle-ms', 15000);
 const style = arg('style', 'balanced'); // balanced | white | black | sparse
 const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
-const tier = arg('tier', 'any');        // any | Beginner | Medium | Hard
+const tier = arg('tier', 'any');        // any | Beginner | Medium | Hard | Expert | Expert+
 const maxTier = arg('max-tier', 'Expert');
 const keepFrac = arg('keep', null) !== null ? +arg('keep') : null;
 const prefix = arg('prefix', `${layout !== 'none' ? layout : style}_${cols}x${rows}`);

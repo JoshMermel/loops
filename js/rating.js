@@ -909,6 +909,7 @@ function findWhiteCornerPinch(P, st) {
  */
 function findWhiteDeadEndPinch(P, st) {
   const out = [];
+  const seen = new Set();
   for (const w of P.whites) {
     for (let d1 = 0; d1 < 4; d1++) {
       const u = P.nb[w * 4 + d1];
@@ -924,6 +925,8 @@ function findWhiteDeadEndPinch(P, st) {
         if (k < 0 || onCount(P, st, k) !== 1) continue;
         const uk = P.ed[u * 4 + d2], vk = P.ed[v * 4 + d1];
         if (st.e[uk] !== E_UNKNOWN || st.e[vk] !== E_UNKNOWN) continue;
+        if (seen.has(vk)) continue;
+        seen.add(vk);
         out.push({
           sets: [['e', vk, E_OFF]],
           info: { edge: vk, white: w, dead: u, active: [v, k] },
@@ -951,7 +954,7 @@ function findBoxStrand(P, st) {
     const pds = horiz ? [0, 2] : [1, 3];
     for (const pd of pds) {
       const c = P.nb[a * 4 + pd], d = P.nb[b * 4 + pd];
-      if (c < 0 || d < 0) continue;
+      if (c < 0 || d < 0 || st.cell[c] === OFF || st.cell[d] === OFF) continue;
       const eac = P.ed[a * 4 + pd], ebd = P.ed[b * 4 + pd];
       const ecd = horiz ? P.ed[c * 4 + 1] : P.ed[c * 4 + 2];
       if (eac < 0 || ebd < 0 || ecd < 0) continue;

@@ -66,6 +66,8 @@ for (const p of candidates) {
   pickedKey.add(sk);
   prioritized.push(p);
 }
+// Sort prioritized smallest-first so early-exit never locks in a large board when a smaller example exists
+prioritized.sort((a, b) => (a.rows * a.cols) - (b.rows * b.cols) || (a.score ?? 0) - (b.score ?? 0));
 
 const prefer = (prev, cand) => {
   if (!prev) return true;
