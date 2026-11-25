@@ -606,6 +606,73 @@ export function explainStep(P, step, st = null) {
       text = `The loop must cross the border of the highlighted rectangle an even number of times (${info.on} crossings so far, 1 undecided), so ${edgeName(P, info.edge)} ${act}.`;
       break;
     }
+    case 'symmetry': {
+      const symName = info.sym === 'flipH' ? 'left-right mirror symmetry'
+        : info.sym === 'flipV' ? 'top-bottom mirror symmetry'
+          : info.sym === 'rot180' ? '180° rotational symmetry'
+            : info.sym === 'transpose' ? 'diagonal symmetry'
+              : info.sym === 'antiTranspose' ? 'anti-diagonal symmetry'
+                : info.sym === 'rot90' ? '90° rotational symmetry'
+                  : 'exact symmetry';
+      if (info.kind === 'copy') {
+        if (info.src !== undefined) {
+          const [a, b] = edgeCells(P, info.src);
+          const [c, d] = edgeCells(P, info.dst);
+          roles.clue.push(a, b);
+          roles.focus.push(c, d);
+          nudgeRoles.clue.push(a, b);
+          nudgeRoles.focus.push(c, d);
+          nudge = `This puzzle has ${symName} — compare ${edgeName(P, info.src)} with its symmetric partner ${edgeName(P, info.dst)}.`;
+          text = `Because this puzzle has ${symName} and a unique solution, the loop must share that symmetry: matching ${edgeName(P, info.src)}, ${describeMarks(P, targets)}.`;
+        } else {
+          roles.clue.push(info.srcCell);
+          roles.focus.push(info.dstCell);
+          nudgeRoles.clue.push(info.srcCell);
+          nudgeRoles.focus.push(info.dstCell);
+          nudge = `This puzzle has ${symName} — compare ${cellName(P, info.srcCell)} with its symmetric partner ${cellName(P, info.dstCell)}.`;
+          text = `Because this puzzle has ${symName} and a unique solution, matching ${cellName(P, info.srcCell)}, ${describeMarks(P, targets)}.`;
+        }
+      } else if (info.kind === 'center') {
+        roles.focus.push(...(info.cells || []));
+        nudgeRoles.focus.push(...(info.cells || []));
+        nudge = `This puzzle has 180° rotational symmetry — a single symmetric closed loop can never pass through the exact center.`;
+        text = `Because this puzzle has 180° rotational symmetry and a unique solution, the loop must wrap around the center without passing through it, so ${describeMarks(P, targets)}.`;
+      } else if (info.kind === 'axisEdge') {
+        roles.focus.push(...(info.cells || []));
+        nudgeRoles.focus.push(...(info.cells || []));
+        nudge = `This puzzle has ${symName} — look along the center mirror line (the loop can cross it, but never travel along it).`;
+        text = `Because this puzzle has ${symName} and a unique solution, the loop cannot run along the mirror line without branching, so ${describeMarks(P, targets)}.`;
+      } else if (info.kind === 'diagPair') {
+        roles.focus.push(info.cell);
+        nudgeRoles.focus.push(info.cell);
+        nudge = `This puzzle has ${symName} — look at ${cellName(P, info.cell)} on the diagonal axis (its exits must be mirror images).`;
+        text = `Because this puzzle has ${symName} and a unique solution, any loop turn at diagonal intersection ${cellName(P, info.cell)} must use a mirror-image pair of exits, so ${describeMarks(P, targets)}.`;
+      } else if (info.kind === 'twoCrossings') {
+        roles.clue.push(...(info.onCells || []));
+        roles.focus.push(...(info.cells || []));
+        nudgeRoles.clue.push(...(info.onCells || []));
+        nudgeRoles.focus.push(...(info.cells || []));
+        nudge = `This puzzle has ${symName} — count how many times the loop crosses the mirror axis (a single symmetric loop must cross it exactly twice).`;
+        text = `Because this puzzle has ${symName} and a unique solution, the single loop must cross the mirror axis exactly twice (${info.onCount} crossings already known), so ${describeMarks(P, targets)}.`;
+      } else if (info.kind === 'orbitClose') {
+        const [a, b] = edgeCells(P, info.edge);
+        roles.focus.push(a, b);
+        for (const oe of info.orbit || []) {
+          const [u, v] = edgeCells(P, oe);
+          if (oe !== info.edge) roles.path.push(u, v);
+        }
+        nudgeRoles.focus.push(a, b);
+        if (info.reason === 'branch') {
+          roles.problem.push(info.branchCell);
+          nudge = `This puzzle has ${symName} — imagine drawing ${edgeName(P, info.edge)} together with its symmetric twin.`;
+          text = `Because this puzzle has ${symName} and a unique solution, drawing ${edgeName(P, info.edge)} would also force its symmetric twin, creating a 3-way branch at ${cellName(P, info.branchCell)}; therefore ${describeMarks(P, targets)}.`;
+        } else {
+          nudge = `This puzzle has ${symName} — imagine drawing ${edgeName(P, info.edge)} together with its symmetric twin${(info.orbit || []).length > 2 ? 's' : ''}.`;
+          text = `Because this puzzle has ${symName} and a unique solution, drawing ${edgeName(P, info.edge)} together with its symmetric twin${(info.orbit || []).length > 2 ? 's' : ''} would close a loop early without visiting the rest of the board; therefore ${describeMarks(P, targets)}.`;
+        }
+      }
+      break;
+    }
     case 'imagineLocal':
     case 'imagineTrace':
     case 'imagineChain': {

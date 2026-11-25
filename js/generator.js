@@ -995,6 +995,9 @@ function generateFullBoardPuzzle({
     if (verify.exceeded || verify.count !== 1) continue;
     const sol = verify.solutions[0];
     if (!isSolved(P, sol.e)) continue;
+    // Must genuinely require the full-board rule (non-fullBoard must have >= 2 solutions)
+    const noFull = compile({ name: 'nf', rows, cols, clues: [], givens: current });
+    if (solve(noFull, { limit: 2, maxNodes: 50000, rng: rand }).count < 2) continue;
 
     const rated = cachedRated || rate(P);
     if (wantUnsolved) { if (rated.solved) continue; }

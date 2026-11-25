@@ -7,7 +7,8 @@ import {
   compile, parseCsv, solve, initialState, isSolved, decodeSolution, encodeSolution,
   E_ON, E_OFF, OFF, LOOP, WHITE, BLACK,
 } from '../js/logic.js';
-import { RULES, rate, solvedByRules, nextSteps, applySets, TIERS } from '../js/rating.js';
+import { RULES, rate, solvedByRules, nextSteps, applySets, TIERS, detectSymmetries, findSymmetry } from '../js/rating.js';
+import { explainStep } from '../js/explain.js';
 import { findFaceShade, findFaceCircle } from '../js/faceparity.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -717,4 +718,88 @@ test('shaped / cutout boards: faceParity across holes & cutouts and soundness fu
   assert.ok(checked >= 25, `expected >= 25 unique shaped boards, got ${checked}`);
   assert.ok(solvedCount >= checked * 0.85, `expected rules to solve most shaped boards, got ${solvedCount}/${checked}`);
   assert.ok(rulesSeen.size >= 5, `expected >= 5 rules on shaped fuzz, saw ${[...rulesSeen].join(', ')}`);
+});
+
+test('symmetry uniqueness inference: copy, center, axisEdge, diagPair, twoCrossings, orbitClose, and safety', () => {
+  // 1. Direct copy on flipH 4x4
+  const pMirror = compile({
+    name: 'sym_m', rows: 4, cols: 4,
+    clues: [{ r: 0, c: 0, t: 'B' }, { r: 0, c: 3, t: 'B' }],
+  });
+  assert.ok(detectSymmetries(pMirror).some((s) => s.id === 'flipH'));
+  const st1 = initialState(pMirror);
+  st1.e[pMirror.ed[0 * 4 + 1]] = E_ON; // (0,0)-(0,1)
+  const f1 = findSymmetry(pMirror, st1);
+  assert.ok(f1.some((x) => x.info.kind === 'copy' && x.info.dst === pMirror.ed[3 * 4 + 3] && x.sets[0][2] === E_ON));
+
+  // 2. rot180 oddxodd center avoidance (5x5 center (2,2) cannot be on the loop)
+  const pRot = compile({
+    name: 'sym_r', rows: 5, cols: 5,
+    clues: [{ r: 0, c: 1, t: 'W' }, { r: 4, c: 3, t: 'W' }],
+  });
+  const fRot = findSymmetry(pRot, initialState(pRot));
+  assert.ok(fRot.some((x) => x.info.kind === 'center' && x.sets.length === 4 && x.sets.every((s) => s[2] === E_OFF)));
+
+  // 3. Odd-width flipH axisEdge (5x5 center column c=2 vertical edges cannot be ON)
+  const pOddH = compile({
+    name: 'sym_oh', rows: 5, cols: 5,
+    clues: [{ r: 0, c: 1, t: 'W' }, { r: 0, c: 3, t: 'W' }],
+  });
+  const fOddH = findSymmetry(pOddH, initialState(pOddH));
+  assert.ok(fOddH.some((x) => x.info.kind === 'axisEdge' && x.sets.length === 4));
+
+  // 4. Diagonal transpose: diagPair + twoCrossings + orbitClose:earlyLoop
+  const pDiag = compile({
+    name: 'sym_d', rows: 6, cols: 6,
+    clues: [{ r: 0, c: 0, t: 'B' }, { r: 5, c: 5, t: 'B' }, { r: 1, c: 4, t: 'W' }, { r: 4, c: 1, t: 'W' }],
+  });
+  // Two diagonal corners (0,0) and (5,5) are already LOOP -> twoCrossings forces all other 4 diagonal vertices OFF!
+  const fDiag = findSymmetry(pDiag, initialState(pDiag));
+  assert.ok(fDiag.some((x) => x.info.kind === 'twoCrossings' && x.info.onCount === 2 && x.sets.length >= 4));
+
+  // Diagonal orbitClose:earlyLoop — draw (0,0)-(0,1)-(0,2) and its transpose (0,0)-(1,0)-(2,0);
+  // adding (0,2)-(1,2) + its transpose (2,0)-(2,1) and then (1,2)-(2,2) + (2,1)-(2,2) closes a 3x3 box early!
+  const pDiag2 = compile({
+    name: 'sym_d2', rows: 6, cols: 6,
+    clues: [{ r: 0, c: 0, t: 'B' }, { r: 4, c: 5, t: 'W' }, { r: 5, c: 4, t: 'W' }],
+  });
+  const stD = initialState(pDiag2);
+  // Symmetric L-paths from (0,0): (0,0)-(0,1)-(0,2)-(1,2) and (0,0)-(1,0)-(2,0)-(2,1)
+  const onD = [
+    pDiag2.ed[(0 * 6 + 0) * 4 + 1], pDiag2.ed[(0 * 6 + 1) * 4 + 1], pDiag2.ed[(0 * 6 + 2) * 4 + 2],
+    pDiag2.ed[(0 * 6 + 0) * 4 + 2], pDiag2.ed[(1 * 6 + 0) * 4 + 2], pDiag2.ed[(2 * 6 + 0) * 4 + 1],
+  ];
+  for (const x of onD) stD.e[x] = E_ON;
+  // Leave other diagonal cells (2..5) open so twoCrossings does not fire first; (1,2)-(2,2) + (2,1)-(2,2) closes early!
+  const fEarly = findSymmetry(pDiag2, stD);
+  const hitEarly = fEarly.find((x) => x.info.kind === 'orbitClose' && x.info.reason === 'earlyLoop');
+  assert.ok(hitEarly, 'expected symmetry orbitClose:earlyLoop to reject early closing across diagonal');
+  assert.ok(hitEarly.sets.every((s) => s[2] === E_OFF));
+  const expEarly = explainStep(pDiag2, { rule: 'symmetry', sets: hitEarly.sets, info: hitEarly.info });
+  assert.ok(expEarly.text.includes('close a loop early'));
+
+  // 5. Safety: solvedByRules MUST skip uniqueness-assuming symmetry rules
+  const pAmbig = compile({ name: 'ambig_sym', rows: 4, cols: 4, clues: [] });
+  assert.equal(findSymmetry(pAmbig, initialState(pAmbig), { noUniqueness: true }).length, 0);
+  assert.equal(solvedByRules(pAmbig).solved, false);
+
+  // 6. Soundness check on a sample of real bonus-symmetry puzzles where symmetry fires
+  const symBook = parseCsv(fs.readFileSync(path.join(root, 'data', 'bonus-symmetry.csv'), 'utf8'));
+  let symFired = 0;
+  for (const raw of symBook.slice(440, 480)) {
+    const P = compile({ ...raw });
+    const sol = decodeSolution(P, raw.solution);
+    const r = rate(P);
+    for (const s of r.steps) {
+      if (s.rule !== 'symmetry') continue;
+      symFired++;
+      for (const [k, idx, val] of s.sets) {
+        if (k === 'e') assert.equal(val, sol.e[idx], `unsound symmetry edge on ${raw.name}`);
+        else if (k === 'c') assert.equal(val, sol.cell[idx], `unsound symmetry cell on ${raw.name}`);
+      }
+      const exp = explainStep(P, s);
+      assert.ok(exp.nudge && exp.text, `symmetry explanation missing on ${raw.name}`);
+    }
+  }
+  assert.ok(symFired >= 5, `expected symmetry to fire on real bonus-symmetry puzzles, got ${symFired}`);
 });

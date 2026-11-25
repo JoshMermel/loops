@@ -212,7 +212,7 @@ export function compile(p) {
     faceExterior, faceHoleId, faceRep, holeList,
     fullBoard, givens, hasGivens: givens.length > 0, givenE,
     nb, ed, step2, ed2, edgeA, edgeB,
-    _ecOff: null, _ecData: null,
+    _ecOff: null, _ecData: null, _syms: null,
   });
 }
 

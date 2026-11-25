@@ -13,7 +13,7 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## Rules, books & generator
 
-- [ ] **Audit full-board necessity across all Full-board books:** verify that every shipped `fullBoard` puzzle (`full-masyu-8x8`, `full-lines-8x8`, `full-walls-8x8`, `full-mixed-8x8`) is NOT uniquely solvable without the full-board condition (i.e., has >1 solution when `fullBoard` is dropped), and consider enforcing this check in `tools/audit_books.mjs`.
+- [ ] **Consider promoting other Bonus books to top-level sections:** review whether any remaining Bonus themes (e.g., All white / All black, Black & White Cookie, Skyscraper, Symmetry, Patterns) merit their own top-level section with multiple sizes or variations.
 - [ ] **Black & White Cookie arbitrary-angle splits:** allow the dividing line between white and black halves to be placed at arbitrary angles (not just vertical, horizontal, and main diagonal).
 - [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (remaining ideas:
   - diagonally adjacent black and white circles near a wall,

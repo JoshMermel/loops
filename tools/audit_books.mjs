@@ -22,6 +22,7 @@ import {
   parseCsv, compile, solve, decodeSolution, encodeSolution, isSolved, symmetryKey,
 } from '../js/logic.js';
 import { rate, solvedByRules, FIRST_LOOKAHEAD } from '../js/rating.js';
+import { makeRng } from '../js/generator.js';
 import { repoRoot, arg } from './_cli.mjs';
 
 const root = repoRoot(import.meta.url);
@@ -91,6 +92,25 @@ if (process.argv.includes('--worker')) {
       if (q.tier !== raw.tier || q.score !== raw.score || q.rules !== raw.rules) {
         return fail(`stored ${raw.tier}/${raw.rules}/${raw.score} but rates ${q.tier}/${q.rules}/${q.score}`);
       }
+    }
+
+    // Verify full-board necessity: dropping `fullBoard` must leave >= 2 valid solutions
+    if (P.fullBoard && !entry.hidden) {
+      const noFull = compile({
+        name: raw.name,
+        rows: raw.rows,
+        cols: raw.cols,
+        clues: raw.clues,
+        ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
+        ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
+        fullBoard: false,
+      });
+      let alt = solve(noFull, { limit: 2, maxNodes: 50000 });
+      if (alt.count < 2 && alt.exceeded) {
+        alt = solve(noFull, { limit: 2, maxNodes: 500000, rng: makeRng(12345 + from + k) });
+      }
+      if (alt.exceeded && alt.count < 2) return fail('fullBoard necessity not proved: hit node cap');
+      if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
     }
   });
 

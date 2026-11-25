@@ -1607,6 +1607,431 @@ function findCrossingParity(P, st) {
   return out;
 }
 
+// ------------------------------------------------------------ Symmetry uniqueness inference
+
+const SYM_DEFS = [
+  { id: 'flipH', refl: true, square: false, map: (r, c, R, C) => [r, C - 1 - c] },
+  { id: 'flipV', refl: true, square: false, map: (r, c, R, C) => [R - 1 - r, c] },
+  { id: 'rot180', refl: false, square: false, map: (r, c, R, C) => [R - 1 - r, C - 1 - c] },
+  { id: 'transpose', refl: true, square: true, map: (r, c) => [c, r] },
+  { id: 'antiTranspose', refl: true, square: true, map: (r, c, R, C) => [C - 1 - c, R - 1 - r] },
+  { id: 'rot90', refl: false, square: true, map: (r, c, R) => [c, R - 1 - r] },
+];
+
+/**
+ * Detect all non-identity dihedral automorphisms of puzzle `P` (preserving dimensions, voids,
+ * circle positions & colors, and permanent givens). Cached on `P._syms`.
+ */
+export function detectSymmetries(P) {
+  if (P._syms) return P._syms;
+  const { rows, cols, N, numEdges, clue, isVoid, hasGivens, givenE, edgeA, edgeB, nb, ed } = P;
+  const out = [];
+
+  for (const def of SYM_DEFS) {
+    if (def.square && rows !== cols) continue;
+    const cellMap = new Int16Array(N);
+    let ok = true;
+    for (let r = 0; r < rows && ok; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const [r2, c2] = def.map(r, c, rows, cols);
+        const j = r2 * cols + c2;
+        if (isVoid[i] !== isVoid[j] || clue[i] !== clue[j]) { ok = false; break; }
+        cellMap[i] = j;
+      }
+    }
+    if (!ok) continue;
+
+    const edgeMap = new Int16Array(numEdges).fill(-1);
+    for (let x = 0; x < numEdges && ok; x++) {
+      const a = edgeA[x];
+      if (a < 0) continue;
+      const b = edgeB[x];
+      const a2 = cellMap[a], b2 = cellMap[b];
+      let tx = -1;
+      for (let d = 0; d < 4; d++) {
+        if (nb[a2 * 4 + d] === b2) { tx = ed[a2 * 4 + d]; break; }
+      }
+      if (tx < 0) { ok = false; break; }
+      if (hasGivens && givenE[x] !== givenE[tx]) { ok = false; break; }
+      edgeMap[x] = tx;
+    }
+    if (!ok) continue;
+    out.push({ id: def.id, refl: def.refl, cellMap, edgeMap });
+  }
+
+  P._syms = out;
+  return out;
+}
+
+/**
+ * Uniqueness-based symmetry inference: on a puzzle with exact dihedral symmetry and a unique solution,
+ * the unique solution must have the exact same symmetry (otherwise reflecting/rotating it yields a second solution).
+ * Deduces:
+ *   1. Direct symmetry copy of known edges / resolved gray circles
+ *   2. 180° rotational center avoidance (odd×odd center vertex, even×odd center edge)
+ *   3. Odd-axis reflection edges (cannot run along the mirror line) & diagonal vertex exit pairing
+ *   4. Reflection exact-2-crossings law (a single symmetric closed loop crosses any mirror axis exactly twice)
+ *   5. Symmetric early-loop / degree-3 rejection (adding an edge together with its symmetry orbit)
+ */
+export function findSymmetry(P, st, opts) {
+  if (opts && opts.noUniqueness) return [];
+  const syms = detectSymmetries(P);
+  if (!syms.length) return [];
+
+  const { rows, cols, N, numEdges, ed, edgeA, edgeB, isVoid } = P;
+  const out = [];
+  const seenEdge = new Set();
+
+  // 1. Direct mirror/rotation copy of known edges and resolved gray pearls
+  for (const sym of syms) {
+    const { edgeMap, cellMap } = sym;
+    for (let x = 0; x < numEdges; x++) {
+      if (edgeA[x] < 0) continue;
+      const v = st.e[x];
+      if (v === E_UNKNOWN) continue;
+      const tx = edgeMap[x];
+      if (tx >= 0 && tx !== x && st.e[tx] === E_UNKNOWN && !seenEdge.has(tx)) {
+        seenEdge.add(tx);
+        out.push({
+          sets: [['e', tx, v]],
+          info: { kind: 'copy', sym: sym.id, src: x, dst: tx, val: v },
+        });
+      }
+    }
+    if (st.hasGray) {
+      for (const i of P.grays) {
+        const cv = st.clue[i];
+        if (cv !== WHITE && cv !== BLACK) continue;
+        const ti = cellMap[i];
+        if (ti !== i && st.clue[ti] === GRAY) {
+          out.push({
+            sets: [['g', ti, cv]],
+            info: { kind: 'copy', sym: sym.id, srcCell: i, dstCell: ti, grayVal: cv },
+          });
+        }
+      }
+    }
+  }
+  if (out.length) return out;
+
+  // 2. Center & reflection axis laws
+  for (const sym of syms) {
+    const { id, cellMap, edgeMap } = sym;
+
+    // 2a. rot180 center avoidance
+    if (id === 'rot180') {
+      if ((rows & 1) && (cols & 1)) {
+        const mid = ((rows - 1) >> 1) * cols + ((cols - 1) >> 1);
+        if (!isVoid[mid]) {
+          const sets = [];
+          for (let d = 0; d < 4; d++) {
+            const x = ed[mid * 4 + d];
+            if (x >= 0 && st.e[x] === E_UNKNOWN) sets.push(['e', x, E_OFF]);
+          }
+          if (sets.length) {
+            out.push({ sets, info: { kind: 'center', sym: id, cells: [mid] } });
+          }
+        }
+      } else if ((rows & 1) !== (cols & 1)) {
+        for (let x = 0; x < numEdges; x++) {
+          if (edgeA[x] >= 0 && edgeMap[x] === x && st.e[x] === E_UNKNOWN) {
+            out.push({
+              sets: [['e', x, E_OFF]],
+              info: { kind: 'center', sym: id, cells: [edgeA[x], edgeB[x]], edge: x },
+            });
+          }
+        }
+      }
+      continue;
+    }
+
+    if (!sym.refl) continue;
+
+    // 2b. Odd flipH / flipV: edges running along the mirror axis cannot be on the loop
+    if ((id === 'flipH' && (cols & 1)) || (id === 'flipV' && (rows & 1))) {
+      const axisEdges = [];
+      const axisCells = [];
+      for (let x = 0; x < numEdges; x++) {
+        const a = edgeA[x];
+        if (a < 0 || edgeMap[x] !== x) continue;
+        const b = edgeB[x];
+        if (cellMap[a] === a && cellMap[b] === b && st.e[x] === E_UNKNOWN) {
+          axisEdges.push(['e', x, E_OFF]);
+          axisCells.push(a, b);
+        }
+      }
+      if (axisEdges.length) {
+        out.push({ sets: axisEdges, info: { kind: 'axisEdge', sym: id, cells: axisCells } });
+      }
+    }
+
+    // 2c. Diagonal reflection (transpose / antiTranspose): exit pairing on each diagonal vertex
+    if (id === 'transpose' || id === 'antiTranspose') {
+      const pair1 = id === 'transpose' ? [0, 3] : [0, 1];
+      const pair2 = id === 'transpose' ? [2, 1] : [2, 3];
+      for (let k = 0; k < rows; k++) {
+        const v = id === 'transpose' ? k * cols + k : k * cols + (cols - 1 - k);
+        if (isVoid[v]) continue;
+        const e1a = ed[v * 4 + pair1[0]], e1b = ed[v * 4 + pair1[1]];
+        const e2a = ed[v * 4 + pair2[0]], e2b = ed[v * 4 + pair2[1]];
+        const p1On = (e1a >= 0 && st.e[e1a] === E_ON) || (e1b >= 0 && st.e[e1b] === E_ON);
+        const p2On = (e2a >= 0 && st.e[e2a] === E_ON) || (e2b >= 0 && st.e[e2b] === E_ON);
+        const p1Off = e1a < 0 || e1b < 0 || st.e[e1a] === E_OFF || st.e[e1b] === E_OFF;
+        const p2Off = e2a < 0 || e2b < 0 || st.e[e2a] === E_OFF || st.e[e2b] === E_OFF;
+        const sets = [];
+        const pushE = (x, val) => { if (x >= 0 && st.e[x] === E_UNKNOWN) sets.push(['e', x, val]); };
+        if (p1On) {
+          pushE(e1a, E_ON); pushE(e1b, E_ON);
+          pushE(e2a, E_OFF); pushE(e2b, E_OFF);
+        } else if (p2On) {
+          pushE(e2a, E_ON); pushE(e2b, E_ON);
+          pushE(e1a, E_OFF); pushE(e1b, E_OFF);
+        } else {
+          if (p1Off) { pushE(e1a, E_OFF); pushE(e1b, E_OFF); }
+          if (p2Off) { pushE(e2a, E_OFF); pushE(e2b, E_OFF); }
+          if (st.cell[v] === LOOP) {
+            if (p1Off && !p2Off) { pushE(e2a, E_ON); pushE(e2b, E_ON); }
+            else if (p2Off && !p1Off) { pushE(e1a, E_ON); pushE(e1b, E_ON); }
+          }
+        }
+        if (sets.length) {
+          out.push({ sets, info: { kind: 'diagPair', sym: id, cell: v } });
+        }
+      }
+    }
+
+    // 2d. Reflection exact-2-crossings law across the mirror axis
+    const slots = [];
+    if ((id === 'flipH' && (cols & 1) === 0) || (id === 'flipV' && (rows & 1) === 0)) {
+      for (let x = 0; x < numEdges; x++) {
+        if (edgeA[x] >= 0 && edgeMap[x] === x) {
+          const ev = st.e[x];
+          slots.push({
+            status: ev === E_ON ? 1 : ev === E_OFF ? -1 : 0,
+            cells: [edgeA[x], edgeB[x]],
+            setOn: () => [['e', x, E_ON]],
+            setOff: () => [['e', x, E_OFF]],
+          });
+        }
+      }
+    } else if (id === 'flipH' || id === 'flipV') {
+      const dA = id === 'flipH' ? 3 : 0;
+      const dB = id === 'flipH' ? 1 : 2;
+      const len = id === 'flipH' ? rows : cols;
+      const mid = (id === 'flipH' ? cols : rows) >> 1;
+      for (let k = 0; k < len; k++) {
+        const v = id === 'flipH' ? k * cols + mid : mid * cols + k;
+        if (isVoid[v]) continue;
+        const eA = ed[v * 4 + dA], eB = ed[v * 4 + dB];
+        const isOn = st.cell[v] === LOOP || (eA >= 0 && st.e[eA] === E_ON) || (eB >= 0 && st.e[eB] === E_ON);
+        const isOff = st.cell[v] === OFF || eA < 0 || eB < 0 || st.e[eA] === E_OFF || st.e[eB] === E_OFF;
+        slots.push({
+          status: isOn ? 1 : isOff ? -1 : 0,
+          cells: [v],
+          setOn: () => {
+            const s = [];
+            if (eA >= 0 && st.e[eA] === E_UNKNOWN) s.push(['e', eA, E_ON]);
+            if (eB >= 0 && st.e[eB] === E_UNKNOWN) s.push(['e', eB, E_ON]);
+            return s;
+          },
+          setOff: () => {
+            const s = [];
+            if (eA >= 0 && st.e[eA] === E_UNKNOWN) s.push(['e', eA, E_OFF]);
+            if (eB >= 0 && st.e[eB] === E_UNKNOWN) s.push(['e', eB, E_OFF]);
+            return s;
+          },
+        });
+      }
+    } else if (id === 'transpose' || id === 'antiTranspose') {
+      const pair1 = id === 'transpose' ? [0, 3] : [0, 1];
+      const pair2 = id === 'transpose' ? [2, 1] : [2, 3];
+      for (let k = 0; k < rows; k++) {
+        const v = id === 'transpose' ? k * cols + k : k * cols + (cols - 1 - k);
+        if (isVoid[v]) continue;
+        const e1a = ed[v * 4 + pair1[0]], e1b = ed[v * 4 + pair1[1]];
+        const e2a = ed[v * 4 + pair2[0]], e2b = ed[v * 4 + pair2[1]];
+        const p1Off = e1a < 0 || e1b < 0 || st.e[e1a] === E_OFF || st.e[e1b] === E_OFF;
+        const p2Off = e2a < 0 || e2b < 0 || st.e[e2a] === E_OFF || st.e[e2b] === E_OFF;
+        const anyOn = (e1a >= 0 && st.e[e1a] === E_ON) || (e1b >= 0 && st.e[e1b] === E_ON)
+          || (e2a >= 0 && st.e[e2a] === E_ON) || (e2b >= 0 && st.e[e2b] === E_ON);
+        const isOn = st.cell[v] === LOOP || anyOn;
+        const isOff = st.cell[v] === OFF || (p1Off && p2Off);
+        slots.push({
+          status: isOn ? 1 : isOff ? -1 : 0,
+          cells: [v],
+          setOn: () => {
+            const s = [];
+            if (st.cell[v] === UNKNOWN) s.push(['c', v, LOOP]);
+            if (p1Off && !p2Off) {
+              if (e2a >= 0 && st.e[e2a] === E_UNKNOWN) s.push(['e', e2a, E_ON]);
+              if (e2b >= 0 && st.e[e2b] === E_UNKNOWN) s.push(['e', e2b, E_ON]);
+            } else if (p2Off && !p1Off) {
+              if (e1a >= 0 && st.e[e1a] === E_UNKNOWN) s.push(['e', e1a, E_ON]);
+              if (e1b >= 0 && st.e[e1b] === E_UNKNOWN) s.push(['e', e1b, E_ON]);
+            }
+            return s;
+          },
+          setOff: () => {
+            const s = [];
+            for (let d = 0; d < 4; d++) {
+              const x = ed[v * 4 + d];
+              if (x >= 0 && st.e[x] === E_UNKNOWN) s.push(['e', x, E_OFF]);
+            }
+            return s;
+          },
+        });
+      }
+    }
+
+    if (slots.length) {
+      const onSlots = slots.filter((s) => s.status === 1);
+      const unkSlots = slots.filter((s) => s.status === 0);
+      if (onSlots.length === 2 && unkSlots.length > 0) {
+        const sets = [];
+        const axisCells = [];
+        for (const s of unkSlots) {
+          const add = s.setOff();
+          if (add.length) { sets.push(...add); axisCells.push(...s.cells); }
+        }
+        if (sets.length) {
+          out.push({
+            sets,
+            info: { kind: 'twoCrossings', sym: id, onCount: 2, onCells: onSlots.flatMap((s) => s.cells), cells: axisCells },
+          });
+        }
+      } else if (onSlots.length + unkSlots.length === 2 && unkSlots.length > 0) {
+        const sets = [];
+        const axisCells = [];
+        for (const s of unkSlots) {
+          const add = s.setOn();
+          if (add.length) { sets.push(...add); axisCells.push(...s.cells); }
+        }
+        if (sets.length) {
+          out.push({
+            sets,
+            info: { kind: 'twoCrossings', sym: id, onCount: onSlots.length, onCells: onSlots.flatMap((s) => s.cells), cells: axisCells },
+          });
+        }
+      }
+    }
+  }
+  if (out.length) return out;
+
+  // 3. Symmetric orbit early-loop / degree-3 rejection (adding an edge together with its symmetric twins)
+  const baseDeg = new Uint8Array(N);
+  const basePar = new Int32Array(N);
+  const baseLoopInComp = new Int32Array(N);
+  const baseEdgesInComp = new Int32Array(N);
+  let totalLoopCells = 0, totalOnEdges = 0;
+  for (let i = 0; i < N; i++) {
+    basePar[i] = i;
+    if (st.cell[i] === LOOP) { totalLoopCells++; baseLoopInComp[i] = 1; }
+  }
+  const bFind = (a) => { while (basePar[a] !== a) { basePar[a] = basePar[basePar[a]]; a = basePar[a]; } return a; };
+  for (let x = 0; x < numEdges; x++) {
+    if (st.e[x] !== E_ON) continue;
+    const a = edgeA[x], b = edgeB[x];
+    baseDeg[a]++; baseDeg[b]++;
+    totalOnEdges++;
+    const ra = bFind(a), rb = bFind(b);
+    if (ra !== rb) {
+      basePar[rb] = ra;
+      baseLoopInComp[ra] += baseLoopInComp[rb];
+      baseEdgesInComp[ra] += baseEdgesInComp[rb] + 1;
+    } else {
+      baseEdgesInComp[ra]++;
+    }
+  }
+  const needLoopCount = P.fullBoard ? P.activeCount : totalLoopCells;
+
+  const orbVisited = new Uint8Array(numEdges);
+  for (let x = 0; x < numEdges; x++) {
+    if (edgeA[x] < 0 || st.e[x] !== E_UNKNOWN || orbVisited[x]) continue;
+    const orbit = [x];
+    orbVisited[x] = 1;
+    for (let qi = 0; qi < orbit.length; qi++) {
+      const cur = orbit[qi];
+      for (const sym of syms) {
+        const nxt = sym.edgeMap[cur];
+        if (nxt >= 0 && !orbVisited[nxt]) {
+          orbVisited[nxt] = 1;
+          orbit.push(nxt);
+        }
+      }
+    }
+    if (orbit.length < 2) continue;
+    if (orbit.some((e) => st.e[e] !== E_UNKNOWN)) continue;
+
+    const touchedDeg = new Map();
+    let branchCell = -1;
+    for (const oe of orbit) {
+      const a = edgeA[oe], b = edgeB[oe];
+      const da = (touchedDeg.get(a) ?? baseDeg[a]) + 1;
+      const db = (touchedDeg.get(b) ?? baseDeg[b]) + 1;
+      touchedDeg.set(a, da);
+      touchedDeg.set(b, db);
+      if (da > 2) { branchCell = a; break; }
+      if (db > 2) { branchCell = b; break; }
+    }
+    if (branchCell >= 0) {
+      out.push({
+        sets: orbit.map((oe) => ['e', oe, E_OFF]),
+        info: { kind: 'orbitClose', reason: 'branch', sym: syms[0].id, edge: x, orbit, branchCell },
+      });
+      continue;
+    }
+
+    const locPar = new Map();
+    const locLoop = new Map();
+    const locEdges = new Map();
+    const lFind = (r) => {
+      let cur = r;
+      while (locPar.has(cur) && locPar.get(cur) !== cur) cur = locPar.get(cur);
+      return cur;
+    };
+    const initRoot = (u) => {
+      const r = bFind(u);
+      if (!locPar.has(r)) {
+        locPar.set(r, r);
+        locLoop.set(r, baseLoopInComp[r]);
+        locEdges.set(r, baseEdgesInComp[r]);
+      }
+      return lFind(r);
+    };
+
+    let earlyClose = false;
+    let cycCells = [];
+    for (const oe of orbit) {
+      const a = edgeA[oe], b = edgeB[oe];
+      const ra = initRoot(a), rb = initRoot(b);
+      if (ra === rb) {
+        const edgeCnt = locEdges.get(ra) + 1;
+        locEdges.set(ra, edgeCnt);
+        const loopCnt = locLoop.get(ra);
+        const missesLoop = loopCnt < needLoopCount;
+        const leavesOtherSegs = edgeCnt < totalOnEdges + orbit.length;
+        if (missesLoop || leavesOtherSegs) {
+          earlyClose = true;
+          cycCells = orbit.flatMap((e) => [edgeA[e], edgeB[e]]);
+          break;
+        }
+      } else {
+        locPar.set(rb, ra);
+        locLoop.set(ra, locLoop.get(ra) + locLoop.get(rb));
+        locEdges.set(ra, locEdges.get(ra) + locEdges.get(rb) + 1);
+      }
+    }
+    if (earlyClose) {
+      out.push({
+        sets: orbit.map((oe) => ['e', oe, E_OFF]),
+        info: { kind: 'orbitClose', reason: 'earlyLoop', sym: syms[0].id, edge: x, orbit, cells: cycCells },
+      });
+    }
+  }
+  return out;
+}
+
 function findTryEdge(P, st, { upto }) {
   // Prefer edges touching LOOP cells first, then any undecided edge
   const edges = [];
@@ -1750,6 +2175,7 @@ export const RULES = [
   defRule({ id: 'crossingParity', tier: 'Hard', weight: 58, find: findCrossingParity, label: 'the loop crosses the border of any rectangle or band an even number of times' }),
   defRule({ id: 'chokepointArea', tier: 'Hard', weight: 64, costly: true, find: findChokepoint(false), label: 'blocking this segment would cut off a large area or leave a single chokepoint cell' }),
   defRule({ id: 'parityForces', tier: 'Hard', weight: 68, costly: true, find: findParity(false), extra: extraParity, label: 'the other choice would seal off an area with an odd number of open ends' }),
+  defRule({ id: 'symmetry', tier: 'Hard', weight: 70, usesUniqueness: true, find: findSymmetry, label: 'a puzzle with exact symmetry and a unique solution must have a symmetric loop' }),
 
   // Expert (long/multi-front lookahead chains and full trial-and-error)
   defRule({ id: 'tryEdge', tier: 'Expert', weight: 120, lookahead: true, find: findTryEdge, extra: extraTrial, label: 'trying a segment one way leads to a contradiction' }),
@@ -1802,7 +2228,7 @@ export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity, chec
     let fired = false;
     for (let r = 0; r < limit; r++) {
       const rule = RULES[r];
-      if (rule.free) continue;
+      if (rule.free || rule.usesUniqueness) continue;
       if (allowed && !allowed.has(rule.id)) continue;
       if (!allowed && rule.costly) continue;
       const fs = rule.find(P, st, { upto: r, fast: true });

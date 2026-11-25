@@ -360,9 +360,9 @@ Closing two active corners of a 2×2 square cannot seal off both escapes of an o
 
 Imagine a segment on or off at a circle or open end: one local step immediately breaks a rule.
 
-<a href="../index.html?book=armory&puzzle=31"><img src="images/imagineLocal.svg" width="480" alt="imagineLocal hint example"></a>
+<a href="../index.html?book=armory&puzzle=32"><img src="images/imagineLocal.svg" width="480" alt="imagineLocal hint example"></a>
 
-*ARMORY-31 (8×8, after 11 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-32 (8×8, after 11 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "Imagine a segment at C6–C7: then C8 must use C8–D8; and finally D7 is left with only one way out. So cross out C6–C7."
 
@@ -448,9 +448,9 @@ The other choice would seal off a small pocket with an odd number of open ends.
 
 Imagine a segment on or off and trace one single thread 2–3 steps ahead until something breaks.
 
-<a href="../index.html?book=armory&puzzle=32"><img src="images/imagineTrace.svg" width="480" alt="imagineTrace hint example"></a>
+<a href="../index.html?book=armory&puzzle=33"><img src="images/imagineTrace.svg" width="480" alt="imagineTrace hint example"></a>
 
-*ARMORY-32 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-33 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "Imagine a segment at B8–C8: then B7 must use A7–B7; and finally the loop closes early while A1 is still outside it. So cross out B8–C8."
 
@@ -494,6 +494,20 @@ The other choice would seal off an area with an odd number of open ends.
 
 ---
 
+### symmetry
+
+*Hard, cost 70*
+
+A puzzle with exact symmetry and a unique solution must have a symmetric loop.
+
+<a href="../index.html?book=armory&puzzle=30"><img src="images/symmetry.svg" width="480" alt="symmetry hint example"></a>
+
+*ARMORY-30 (10×10, after 32 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "Because this puzzle has diagonal symmetry and a unique solution, the single loop must cross the mirror axis exactly twice (2 crossings already known), so cross out 24 edges."
+
+---
+
 ## Expert
 
 A puzzle is rated **Expert** when its hardest required step is in this tier: long or multi-front lookahead chains, full multi-rule trial and error, or beyond what Hint can explain.
@@ -504,9 +518,9 @@ A puzzle is rated **Expert** when its hardest required step is in this tier: lon
 
 Imagine a segment on or off and follow a long, multi-front, or area-parity chain until something breaks.
 
-<a href="../index.html?book=armory&puzzle=33"><img src="images/imagineChain.svg" width="480" alt="imagineChain hint example"></a>
+<a href="../index.html?book=armory&puzzle=34"><img src="images/imagineChain.svg" width="480" alt="imagineChain hint example"></a>
 
-*ARMORY-33 (8×8, after 20 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-34 (8×8, after 20 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "Imagine a segment at F4–G4: then G5 becomes a dead end; then G6 becomes a dead end; then H6 must use H6–H7; then the white circle at H5 must turn at its other end; and finally H4 is left with only one way out. So cross out F4–G4."
 
@@ -518,9 +532,9 @@ Imagine a segment on or off and follow a long, multi-front, or area-parity chain
 
 Trying a segment one way leads to a contradiction.
 
-<a href="../index.html?book=armory&puzzle=30"><img src="images/tryEdge.svg" width="480" alt="tryEdge hint example"></a>
+<a href="../index.html?book=armory&puzzle=31"><img src="images/tryEdge.svg" width="480" alt="tryEdge hint example"></a>
 
-*ARMORY-30 (8×8, after 15 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-31 (8×8, after 15 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "Imagine no segment at B6–C6 and follow the forced deductions (starting with: the black circle at C6 is blocked left and goes two cells right; then the white circle at D5 must go horizontally; then the black circle at C6 cannot enter C5 and goes two cells down; reaching a contradiction after 3 steps). So draw B6–C6."
 
