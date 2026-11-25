@@ -12,7 +12,7 @@ const loadFirst = (file) => {
 };
 
 test('rotatePuzzleCW produces a valid rotated puzzle with matching solution and stable hashKey', () => {
-  const baseP = loadFirst('12x20.csv');
+  const baseP = loadFirst('12x20-medium.csv');
   const rotP = rotatePuzzleCW(baseP);
 
   assert.equal(rotP.rows, baseP.cols);
@@ -65,7 +65,7 @@ test('rotateMarksCW and unrotateMarksCW round-trip edges, autoE, faces, and auto
 });
 
 test('hints and auto-marks work identically on rotated puzzles', () => {
-  const baseP = loadFirst('12x20.csv');
+  const baseP = loadFirst('12x20-medium.csv');
   const rotP = rotatePuzzleCW(baseP);
   const m = {
     edges: new Uint8Array(rotP.numEdges),

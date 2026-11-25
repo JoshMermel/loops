@@ -18,6 +18,18 @@
         "12×12": {
           "icon": "🔷",
           "blurb": "Classic boards across all four difficulties."
+        },
+        "16×16": {
+          "icon": "🟦",
+          "blurb": "Big square boards across all four difficulties."
+        },
+        "12×20": {
+          "icon": "📏",
+          "blurb": "Tall magazine-page boards across all four difficulties."
+        },
+        "16×24": {
+          "icon": "📄",
+          "blurb": "Full-page 2:3 boards across all four difficulties."
         }
       }
     },
@@ -118,31 +130,124 @@
       "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
-      "id": "16x16",
-      "name": "16×16",
-      "label": "16×16",
-      "file": "data/16x16.csv",
-      "count": 200,
+      "id": "16x16-beginner",
+      "name": "16×16 Beginner",
+      "label": "Beginner",
+      "file": "data/16x16-beginner.csv",
+      "count": 500,
       "group": "Default",
-      "blurb": "Big square boards, easiest first."
+      "sub": "16×16",
+      "blurb": "Warm-up puzzles using the core circle rules."
     },
     {
-      "id": "12x20",
-      "name": "12×20 Giant",
-      "label": "12×20 Giant",
-      "file": "data/12x20.csv",
-      "count": 100,
+      "id": "16x16-medium",
+      "name": "16×16 Medium",
+      "label": "Medium",
+      "file": "data/16x16-medium.csv",
+      "count": 500,
       "group": "Default",
-      "blurb": "Tall magazine-page boards, easiest first."
+      "sub": "16×16",
+      "blurb": "Local patterns, basic shading, and 1-step lookahead."
     },
     {
-      "id": "16x24",
-      "name": "16×24 Full Page",
-      "label": "16×24 Full Page",
-      "file": "data/16x24.csv",
-      "count": 100,
+      "id": "16x16-hard",
+      "name": "16×16 Hard",
+      "label": "Hard",
+      "file": "data/16x16-hard.csv",
+      "count": 500,
       "group": "Default",
-      "blurb": "Large 2:3 boards — full printer page and comfortable on laptop screens."
+      "sub": "16×16",
+      "blurb": "Circle shading, topology, and short single-thread lookahead."
+    },
+    {
+      "id": "16x16-expert",
+      "name": "16×16 Expert",
+      "label": "Expert",
+      "file": "data/16x16-expert.csv",
+      "count": 510,
+      "group": "Default",
+      "sub": "16×16",
+      "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
+    },
+    {
+      "id": "12x20-beginner",
+      "name": "12×20 Beginner",
+      "label": "Beginner",
+      "file": "data/12x20-beginner.csv",
+      "count": 500,
+      "group": "Default",
+      "sub": "12×20",
+      "blurb": "Warm-up puzzles using the core circle rules."
+    },
+    {
+      "id": "12x20-medium",
+      "name": "12×20 Medium",
+      "label": "Medium",
+      "file": "data/12x20-medium.csv",
+      "count": 500,
+      "group": "Default",
+      "sub": "12×20",
+      "blurb": "Local patterns, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "12x20-hard",
+      "name": "12×20 Hard",
+      "label": "Hard",
+      "file": "data/12x20-hard.csv",
+      "count": 500,
+      "group": "Default",
+      "sub": "12×20",
+      "blurb": "Circle shading, topology, and short single-thread lookahead."
+    },
+    {
+      "id": "12x20-expert",
+      "name": "12×20 Expert",
+      "label": "Expert",
+      "file": "data/12x20-expert.csv",
+      "count": 510,
+      "group": "Default",
+      "sub": "12×20",
+      "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
+    },
+    {
+      "id": "16x24-beginner",
+      "name": "16×24 Beginner",
+      "label": "Beginner",
+      "file": "data/16x24-beginner.csv",
+      "count": 500,
+      "group": "Default",
+      "sub": "16×24",
+      "blurb": "Warm-up puzzles using the core circle rules."
+    },
+    {
+      "id": "16x24-medium",
+      "name": "16×24 Medium",
+      "label": "Medium",
+      "file": "data/16x24-medium.csv",
+      "count": 500,
+      "group": "Default",
+      "sub": "16×24",
+      "blurb": "Local patterns, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "16x24-hard",
+      "name": "16×24 Hard",
+      "label": "Hard",
+      "file": "data/16x24-hard.csv",
+      "count": 500,
+      "group": "Default",
+      "sub": "16×24",
+      "blurb": "Circle shading, topology, and short single-thread lookahead."
+    },
+    {
+      "id": "16x24-expert",
+      "name": "16×24 Expert",
+      "label": "Expert",
+      "file": "data/16x24-expert.csv",
+      "count": 510,
+      "group": "Default",
+      "sub": "16×24",
+      "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
       "id": "bonus-white",

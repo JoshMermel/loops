@@ -172,33 +172,39 @@ if (!isMainThread) {
       budgetSec: 600, perPuzzleMs: 25000,
     },
 
-    // ---- Giants: 16x16 (200: 60 M / 70 H / 70 E) and 12x20 (100: 30 M / 35 H / 35 E) — no Beginner on Giants
+    // ---- Giants: 16x16, 12x20, and 16x24 (500 per tier across all 4 tiers + 10 Expert+, matching 8x8 & 12x12)
     {
       group: 'giants', pool: 'balanced_16x16', cols: 16, rows: 16,
       buckets: {
-        Medium: { need: 62, maxScore: 1020 },
-        Hard: { need: 72, minScore: 990, maxScore: 1380 },
-        Expert: { need: 72, minScore: 1350, maxScore: 2900 },
+        Beginner: { need: 505, maxScore: 950 },
+        Medium: { need: 505, minScore: 870, maxScore: 1050 },
+        Hard: { need: 505, minScore: 990, maxScore: 1450 },
+        Expert: { need: 505, minScore: 1350, maxScore: 3000 },
+        'Expert+': { need: 12 },
       },
-      budgetSec: 300, perPuzzleMs: 30000,
+      budgetSec: 900, perPuzzleMs: 30000,
     },
     {
       group: 'giants', pool: 'balanced_12x20', cols: 12, rows: 20,
       buckets: {
-        Medium: { need: 32, maxScore: 970 },
-        Hard: { need: 36, minScore: 950, maxScore: 1260 },
-        Expert: { need: 36, minScore: 1240, maxScore: 2700 },
+        Beginner: { need: 505, maxScore: 890 },
+        Medium: { need: 505, minScore: 815, maxScore: 980 },
+        Hard: { need: 505, minScore: 940, maxScore: 1350 },
+        Expert: { need: 505, minScore: 1240, maxScore: 2800 },
+        'Expert+': { need: 12 },
       },
-      budgetSec: 300, perPuzzleMs: 35000,
+      budgetSec: 900, perPuzzleMs: 35000,
     },
     {
       group: 'giants', pool: 'balanced_16x24', cols: 16, rows: 24,
       buckets: {
-        Medium: { need: 34, maxScore: 1550 },
-        Hard: { need: 38, minScore: 1480, maxScore: 2150 },
-        Expert: { need: 38, minScore: 2050, maxScore: 3900 },
+        Beginner: { need: 505, maxScore: 1420 },
+        Medium: { need: 505, minScore: 1310, maxScore: 1550 },
+        Hard: { need: 505, minScore: 1480, maxScore: 2150 },
+        Expert: { need: 505, minScore: 2050, maxScore: 3900 },
+        'Expert+': { need: 12 },
       },
-      budgetSec: 300, perPuzzleMs: 30000,
+      budgetSec: 900, perPuzzleMs: 30000,
     },
 
     // ---- Bonus pools (500 at 10/40/40/10 with score bands + oversized bonus tails + Lattice showcase)

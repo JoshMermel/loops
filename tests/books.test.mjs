@@ -22,7 +22,7 @@ test('manifest.json matches every shipped CSV file and count', () => {
 });
 
 test('following hints from an empty board solves shipped Beginner and Medium puzzles across sizes', () => {
-  for (const id of ['intro', '8x8-beginner', '8x8-medium', '12x12-beginner', '12x12-medium', '16x16']) {
+  for (const id of ['intro', '8x8-beginner', '8x8-medium', '12x12-beginner', '12x12-medium', '16x16-beginner', '16x16-medium']) {
     const ps = parseCsv(fs.readFileSync(path.join(root, 'data', `${id}.csv`), 'utf8'));
     const sample = [
       ps.find((p) => p.tier === 'Beginner'),

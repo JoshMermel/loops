@@ -41,6 +41,18 @@ const manifest = {
           icon: '🔷',
           blurb: 'Classic boards across all four difficulties.',
         },
+        '16×16': {
+          icon: '🟦',
+          blurb: 'Big square boards across all four difficulties.',
+        },
+        '12×20': {
+          icon: '📏',
+          blurb: 'Tall magazine-page boards across all four difficulties.',
+        },
+        '16×24': {
+          icon: '📄',
+          blurb: 'Full-page 2:3 boards across all four difficulties.',
+        },
       },
     },
     {
@@ -105,21 +117,70 @@ const recipes = [
     blurb: 'Complex lookahead chains, plus 10 Expert+ puzzles beyond hints.',
   },
 
-  // ---- Default: larger single-book boards (Medium/Hard/Expert — no Beginner on Giant boards)
+  // ---- Default: 16×16 (4 separate books × 500, + 10 Expert+ in Expert)
   {
-    id: '16x16', name: '16×16', label: '16×16', group: 'Default',
-    glob: 'balanced_16x16', tiers: '0,60,70,70', tierBands: '0:0,0:1020,990:1380,1350:2900',
-    blurb: 'Big square boards, easiest first.',
+    id: '16x16-beginner', name: '16×16 Beginner', label: 'Beginner', group: 'Default', sub: '16×16',
+    glob: 'balanced_16x16', limit: 500, onlyTier: 'Beginner', maxScore: 950,
+    blurb: 'Warm-up puzzles using the core circle rules.',
   },
   {
-    id: '12x20', name: '12×20 Giant', label: '12×20 Giant', group: 'Default',
-    glob: 'balanced_12x20', tiers: '0,30,35,35', tierBands: '0:0,0:970,950:1260,1240:2700',
-    blurb: 'Tall magazine-page boards, easiest first.',
+    id: '16x16-medium', name: '16×16 Medium', label: 'Medium', group: 'Default', sub: '16×16',
+    glob: 'balanced_16x16', limit: 500, onlyTier: 'Medium', minScore: 870, maxScore: 1050,
+    blurb: 'Local patterns, basic shading, and 1-step lookahead.',
   },
   {
-    id: '16x24', name: '16×24 Full Page', label: '16×24 Full Page', group: 'Default',
-    glob: 'balanced_16x24', tiers: '0,30,35,35', tierBands: '0:0,0:1550,1480:2150,2050:3900',
-    blurb: 'Large 2:3 boards — full printer page and comfortable on laptop screens.',
+    id: '16x16-hard', name: '16×16 Hard', label: 'Hard', group: 'Default', sub: '16×16',
+    glob: 'balanced_16x16', limit: 500, onlyTier: 'Hard', minScore: 990, maxScore: 1450,
+    blurb: 'Circle shading, topology, and short single-thread lookahead.',
+  },
+  {
+    id: '16x16-expert', name: '16×16 Expert', label: 'Expert', group: 'Default', sub: '16×16',
+    glob: 'balanced_16x16', limit: 500, onlyTier: 'Expert', minScore: 1350, maxScore: 3000, expertPlus: 10,
+    blurb: 'Complex lookahead chains, plus 10 Expert+ puzzles beyond hints.',
+  },
+
+  // ---- Default: 12×20 (4 separate books × 500, + 10 Expert+ in Expert)
+  {
+    id: '12x20-beginner', name: '12×20 Beginner', label: 'Beginner', group: 'Default', sub: '12×20',
+    glob: 'balanced_12x20', limit: 500, onlyTier: 'Beginner', maxScore: 890,
+    blurb: 'Warm-up puzzles using the core circle rules.',
+  },
+  {
+    id: '12x20-medium', name: '12×20 Medium', label: 'Medium', group: 'Default', sub: '12×20',
+    glob: 'balanced_12x20', limit: 500, onlyTier: 'Medium', minScore: 815, maxScore: 980,
+    blurb: 'Local patterns, basic shading, and 1-step lookahead.',
+  },
+  {
+    id: '12x20-hard', name: '12×20 Hard', label: 'Hard', group: 'Default', sub: '12×20',
+    glob: 'balanced_12x20', limit: 500, onlyTier: 'Hard', minScore: 940, maxScore: 1350,
+    blurb: 'Circle shading, topology, and short single-thread lookahead.',
+  },
+  {
+    id: '12x20-expert', name: '12×20 Expert', label: 'Expert', group: 'Default', sub: '12×20',
+    glob: 'balanced_12x20', limit: 500, onlyTier: 'Expert', minScore: 1240, maxScore: 2800, expertPlus: 10,
+    blurb: 'Complex lookahead chains, plus 10 Expert+ puzzles beyond hints.',
+  },
+
+  // ---- Default: 16×24 (4 separate books × 500, + 10 Expert+ in Expert)
+  {
+    id: '16x24-beginner', name: '16×24 Beginner', label: 'Beginner', group: 'Default', sub: '16×24',
+    glob: 'balanced_16x24', limit: 500, onlyTier: 'Beginner', maxScore: 1420,
+    blurb: 'Warm-up puzzles using the core circle rules.',
+  },
+  {
+    id: '16x24-medium', name: '16×24 Medium', label: 'Medium', group: 'Default', sub: '16×24',
+    glob: 'balanced_16x24', limit: 500, onlyTier: 'Medium', minScore: 1310, maxScore: 1550,
+    blurb: 'Local patterns, basic shading, and 1-step lookahead.',
+  },
+  {
+    id: '16x24-hard', name: '16×24 Hard', label: 'Hard', group: 'Default', sub: '16×24',
+    glob: 'balanced_16x24', limit: 500, onlyTier: 'Hard', minScore: 1480, maxScore: 2150,
+    blurb: 'Circle shading, topology, and short single-thread lookahead.',
+  },
+  {
+    id: '16x24-expert', name: '16×24 Expert', label: 'Expert', group: 'Default', sub: '16×24',
+    glob: 'balanced_16x24', limit: 500, onlyTier: 'Expert', minScore: 2050, maxScore: 3900, expertPlus: 10,
+    blurb: 'Complex lookahead chains, plus 10 Expert+ puzzles beyond hints.',
   },
 
   // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 Expert+ + 10 Mega finale) + Patterns
