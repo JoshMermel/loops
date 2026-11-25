@@ -308,7 +308,7 @@
       "name": "Patterns",
       "label": "💠 Patterns (9×9 – 13×13)",
       "file": "data/bonus-patterns.csv",
-      "count": 297,
+      "count": 294,
       "group": "Bonus",
       "blurb": "Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more."
     },
@@ -318,7 +318,7 @@
       "label": "Armory",
       "group": "Hidden",
       "file": "data/armory.csv",
-      "count": 23,
+      "count": 28,
       "hidden": true
     }
   ]

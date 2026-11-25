@@ -277,11 +277,15 @@ test('difficulty tier assignments match the calibrated rule ladder', () => {
   assert.equal(tier('samePathExits'), 'Medium');
   assert.equal(tier('twoWhitesStraight'), 'Medium');
   assert.equal(tier('whiteNoTurnAxis'), 'Medium');
+  assert.equal(tier('blackNoEarlyClose'), 'Medium');
   assert.equal(tier('blackTwoDiagWhites'), 'Medium');
   assert.equal(tier('blackWhiteNoTurn'), 'Medium');
   assert.equal(tier('whiteCornerPinch'), 'Medium');
+  assert.equal(tier('whiteDeadEndPinch'), 'Medium');
   assert.equal(tier('faceShade'), 'Medium');
+  assert.equal(tier('boxStrand'), 'Medium');
   assert.equal(tier('imagineLocal'), 'Medium');
+  assert.equal(tier('corridorNoEarlyClose'), 'Hard');
   assert.equal(tier('faceCircle'), 'Hard');
   assert.equal(tier('twoEndsJoin'), 'Hard');
   assert.equal(tier('chokepoint'), 'Hard');
@@ -325,4 +329,62 @@ test('new Medium circle patterns fire cleanly (blackTwoDiagWhites, blackWhiteNoT
   assert.equal(s4.rule, 'whiteCornerPinch');
   assert.ok(s4.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P4.ed[(2 * 6 + 2) * 4 + 3] && v === E_OFF));
   assert.ok(s4.firings[0].sets.some(([k, x, v]) => k === 'e' && x === P4.ed[(2 * 6 + 2) * 4 + 2] && v === E_OFF));
+
+  // 4. blackNoEarlyClose: 7x7 with Black at (2,2), path going out to col 5 and back to (4,2), extra interior clue at (5,1)
+  const P5 = compile({ name: 'bnec', rows: 7, cols: 7, clues: [{ r: 2, c: 2, t: 'B' }, { r: 5, c: 1, t: 'W' }] });
+  const st5 = initialState(P5);
+  const eBetween = (P, r1, c1, r2, c2) => {
+    const a = r1 * P.cols + c1, b = r2 * P.cols + c2;
+    for (let d = 0; d < 4; d++) if (P.nb[a * 4 + d] === b) return P.ed[a * 4 + d];
+    return -1;
+  };
+  for (const [r1, c1, r2, c2] of [
+    [2, 2, 2, 3], [2, 3, 2, 4], [2, 4, 2, 5], [2, 5, 3, 5], [3, 5, 4, 5], [4, 5, 4, 4], [4, 4, 4, 3], [4, 3, 4, 2],
+  ]) {
+    st5.e[eBetween(P5, r1, c1, r2, c2)] = E_ON;
+  }
+  st5.e[eBetween(P5, 2, 2, 2, 1)] = E_OFF;
+  st5.cell[3 * 7 + 3] = OFF;
+  st5.cell[3 * 7 + 4] = OFF;
+  const s5 = nextSteps(P5, st5);
+  assert.equal(s5.rule, 'blackNoEarlyClose');
+  assert.ok(s5.firings[0].sets.some(([k, x, v]) => k === 'e' && x === eBetween(P5, 2, 2, 3, 2) && v === E_OFF));
+  assert.ok(s5.firings[0].sets.some(([k, x, v]) => k === 'e' && x === eBetween(P5, 2, 2, 1, 2) && v === E_ON));
+
+  // 5. whiteDeadEndPinch: 6x6 with White at (3,2); u=(2,2) has only exits to (3,2) & (2,3); v=(3,3) & k=(2,3) each have 1 segment
+  const P6 = compile({ name: 'wdep', rows: 6, cols: 6, clues: [{ r: 3, c: 2, t: 'W' }] });
+  const st6 = initialState(P6);
+  st6.e[eBetween(P6, 2, 2, 1, 2)] = E_OFF;
+  st6.e[eBetween(P6, 2, 2, 2, 1)] = E_OFF;
+  st6.e[eBetween(P6, 2, 3, 2, 4)] = E_ON;
+  st6.e[eBetween(P6, 3, 3, 4, 3)] = E_ON;
+  const s6 = nextSteps(P6, st6);
+  assert.equal(s6.rule, 'whiteDeadEndPinch');
+  assert.deepEqual(s6.firings[0].sets, [['e', eBetween(P6, 2, 3, 3, 3), E_OFF]]);
+
+  // 6. boxStrand: 6x6 with a=(2,2), b=(2,3) each having 1 segment; c=(3,2) has on=0,avail=2; d=(3,3) has on=1,avail=2
+  const P7 = compile({ name: 'bstr', rows: 6, cols: 6, clues: [] });
+  const st7 = initialState(P7);
+  st7.e[eBetween(P7, 2, 2, 2, 1)] = E_ON;
+  st7.e[eBetween(P7, 2, 3, 2, 4)] = E_ON;
+  st7.e[eBetween(P7, 3, 2, 3, 1)] = E_OFF;
+  st7.e[eBetween(P7, 3, 2, 4, 2)] = E_OFF;
+  st7.e[eBetween(P7, 3, 3, 3, 4)] = E_ON;
+  st7.e[eBetween(P7, 3, 3, 4, 3)] = E_OFF;
+  const s7 = nextSteps(P7, st7);
+  assert.equal(s7.rule, 'boxStrand');
+  assert.deepEqual(s7.firings[0].sets, [['e', eBetween(P7, 2, 2, 2, 3), E_OFF]]);
+
+  // 7. corridorNoEarlyClose: 6x6 with open path (2,2)-(1,2)-(1,3)-(2,3), 2-cell forced corridor (3,2)-(3,3), extra clue at (4,4)
+  const P8 = compile({ name: 'cnec', rows: 6, cols: 6, clues: [{ r: 4, c: 4, t: 'W' }] });
+  const st8 = initialState(P8);
+  for (const [r1, c1, r2, c2] of [[2, 2, 1, 2], [1, 2, 1, 3], [1, 3, 2, 3]]) st8.e[eBetween(P8, r1, c1, r2, c2)] = E_ON;
+  st8.e[eBetween(P8, 2, 2, 2, 3)] = E_OFF;
+  st8.e[eBetween(P8, 3, 2, 3, 1)] = E_OFF;
+  st8.e[eBetween(P8, 3, 2, 4, 2)] = E_OFF;
+  st8.e[eBetween(P8, 3, 3, 3, 4)] = E_OFF;
+  st8.e[eBetween(P8, 3, 3, 4, 3)] = E_OFF;
+  const s8 = nextSteps(P8, st8);
+  assert.equal(s8.rule, 'corridorNoEarlyClose');
+  assert.ok(s8.firings[0].sets.some(([k, x, v]) => k === 'e' && x === eBetween(P8, 3, 2, 3, 3) && v === E_OFF));
 });

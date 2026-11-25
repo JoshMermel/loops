@@ -835,6 +835,38 @@ function findBlackWhiteNoTurn(P, st) {
 }
 
 /**
+ * A black circle at one end of an open path cannot extend two cells straight into the other end
+ * of that same path while other loop cells lie outside (closing the loop early).
+ */
+function findBlackNoEarlyClose(P, st) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+  if (cycleRoot >= 0) return [];
+  const out = [];
+  for (const i of P.blacks) {
+    if (onCount(P, st, i) !== 1) continue;
+    const ra = find(i);
+    if (size[ra] < 2) continue;
+    for (let d = 0; d < 4; d++) {
+      const x1 = P.ed[i * 4 + d], x2 = P.ed2[i * 4 + d];
+      const n1 = P.nb[i * 4 + d], n2 = P.step2[i * 4 + d];
+      if (x1 < 0 || x2 < 0 || n1 < 0 || n2 < 0) continue;
+      if (st.e[x1] !== E_UNKNOWN || st.e[x2] !== E_UNKNOWN) continue;
+      if (onCount(P, st, n1) !== 0 || onCount(P, st, n2) !== 1) continue;
+      if (find(n2) !== ra) continue;
+      const covered = size[ra] + (st.cell[n1] === LOOP ? 1 : 0);
+      if (covered >= loopCount) continue;
+      const opp1 = P.ed[i * 4 + (d ^ 2)], opp2 = P.ed2[i * 4 + (d ^ 2)];
+      if (opp1 < 0 || opp2 < 0) continue;
+      const sets = [['e', x1, E_OFF]];
+      if (st.e[opp1] === E_UNKNOWN) sets.push(['e', opp1, E_ON]);
+      if (st.e[opp2] === E_UNKNOWN) sets.push(['e', opp2, E_ON]);
+      out.push({ sets, info: { cell: i, target: n2, mid: n1, blockedDir: d, dir: d ^ 2 } });
+    }
+  }
+  return out;
+}
+
+/**
  * White corner pinch: if an empty corner intersection diagonally adjacent to a white circle has only
  * two exits left — pointing to the white's two orthogonal neighbors — and both of those neighbors
  * already have a drawn segment (not touching the white), entering the corner would fill both
@@ -865,6 +897,134 @@ function findWhiteCornerPinch(P, st) {
         });
       }
     }
+  }
+  return out;
+}
+
+/**
+ * White dead-end pinch (twin of whiteCornerPinch): in a 2x2 square (w, u, v, k) around white circle w,
+ * if v and diagonal corner k each already have 1 segment while empty neighbor u has only 2 exits left
+ * (u-k and u-w), drawing v-k fills v (blocking w on one axis) and turns u into a dead end (blocking w
+ * on the other axis). So v-k must be crossed out.
+ */
+function findWhiteDeadEndPinch(P, st) {
+  const out = [];
+  for (const w of P.whites) {
+    for (let d1 = 0; d1 < 4; d1++) {
+      const u = P.nb[w * 4 + d1];
+      if (u < 0 || st.cell[u] !== UNKNOWN || onCount(P, st, u) !== 0 || availCount(P, st, u) !== 2) continue;
+      const wu = P.ed[w * 4 + d1];
+      if (st.e[wu] !== E_UNKNOWN) continue;
+      for (const d2 of [(d1 + 1) & 3, (d1 + 3) & 3]) {
+        const v = P.nb[w * 4 + d2];
+        if (v < 0 || onCount(P, st, v) !== 1) continue;
+        const wv = P.ed[w * 4 + d2];
+        if (st.e[wv] !== E_UNKNOWN) continue;
+        const k = P.nb[u * 4 + d2];
+        if (k < 0 || onCount(P, st, k) !== 1) continue;
+        const uk = P.ed[u * 4 + d2], vk = P.ed[v * 4 + d1];
+        if (st.e[uk] !== E_UNKNOWN || st.e[vk] !== E_UNKNOWN) continue;
+        out.push({
+          sets: [['e', vk, E_OFF]],
+          info: { edge: vk, white: w, dead: u, active: [v, k] },
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 2x2 box strand: for an unknown edge a-b where a and b each already have 1 segment, look at an adjacent
+ * 2x2 square (a, b, c, d) whose opposite cells c and d each have only 2 unknown exits left (a-c, c-d, b-d)
+ * and exactly one of {c, d} already has 1 segment. Drawing a-b fills both a and b, cutting off both escapes
+ * a-c and b-d simultaneously and stranding the open end inside {c, d}. So a-b must be crossed out.
+ */
+function findBoxStrand(P, st) {
+  const out = [];
+  for (let x = 0; x < P.numEdges; x++) {
+    if (st.e[x] !== E_UNKNOWN) continue;
+    const a = P.edgeA[x], b = P.edgeB[x];
+    if (a < 0) continue;
+    if (onCount(P, st, a) !== 1 || onCount(P, st, b) !== 1) continue;
+    const horiz = (x & 1) === 0;
+    const pds = horiz ? [0, 2] : [1, 3];
+    for (const pd of pds) {
+      const c = P.nb[a * 4 + pd], d = P.nb[b * 4 + pd];
+      if (c < 0 || d < 0) continue;
+      const eac = P.ed[a * 4 + pd], ebd = P.ed[b * 4 + pd];
+      const ecd = horiz ? P.ed[c * 4 + 1] : P.ed[c * 4 + 2];
+      if (eac < 0 || ebd < 0 || ecd < 0) continue;
+      if (st.e[eac] !== E_UNKNOWN || st.e[ebd] !== E_UNKNOWN || st.e[ecd] !== E_UNKNOWN) continue;
+      const onc = onCount(P, st, c), ond = onCount(P, st, d);
+      if ((onc === 1 && ond === 0) || (onc === 0 && ond === 1)) {
+        if (availCount(P, st, c) - onc !== 2 || availCount(P, st, d) - ond !== 2) continue;
+        out.push({
+          sets: [['e', x, E_OFF]],
+          info: { edge: x, a, b, active: onc === 1 ? c : d, stranded: onc === 1 ? d : c },
+        });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Forced corridor early close (multi-cell generalization of closingCell): a chain of 2+ empty 2-exit
+ * cells connecting the two ends of one open path while other loop cells lie outside cannot be entered,
+ * so every edge and cell in the corridor is off the loop.
+ */
+function findCorridorNoEarlyClose(P, st) {
+  const { find, size, loopCount, cycleRoot } = onComponents(P, st);
+  if (cycleRoot >= 0) return [];
+  const isCorr = new Uint8Array(P.N);
+  const exitsOf = new Array(P.N);
+  for (let i = 0; i < P.N; i++) {
+    if (st.cell[i] !== UNKNOWN || onCount(P, st, i) !== 0) continue;
+    const ex = [];
+    for (let d = 0; d < 4; d++) {
+      const x = P.ed[i * 4 + d];
+      if (x >= 0 && st.e[x] === E_UNKNOWN && st.cell[P.nb[i * 4 + d]] !== OFF) ex.push([x, P.nb[i * 4 + d]]);
+    }
+    if (ex.length === 2) { isCorr[i] = 1; exitsOf[i] = ex; }
+  }
+
+  const visited = new Uint8Array(P.N);
+  const out = [];
+  for (let start = 0; start < P.N; start++) {
+    if (!isCorr[start] || visited[start]) continue;
+    const walk = (firstEdge, firstNbr) => {
+      const cells = [], edges = [firstEdge];
+      let prev = start, cur = firstNbr;
+      while (isCorr[cur]) {
+        if (cur === start) return { closed: true, term: start, cells, edges };
+        visited[cur] = 1;
+        cells.push(cur);
+        const [e0, e1] = exitsOf[cur];
+        const next = e0[1] === prev ? e1 : e0;
+        edges.push(next[0]);
+        prev = cur;
+        cur = next[1];
+      }
+      return { closed: false, term: cur, cells, edges };
+    };
+    visited[start] = 1;
+    const w1 = walk(exitsOf[start][0][0], exitsOf[start][0][1]);
+    if (w1.closed) continue;
+    const w2 = walk(exitsOf[start][1][0], exitsOf[start][1][1]);
+    if (w2.closed) continue;
+    const cells = [...w1.cells.reverse(), start, ...w2.cells];
+    if (cells.length < 2) continue; // length 1 handled by closingCell
+    const t1 = w1.term, t2 = w2.term;
+    if (t1 === t2 || onCount(P, st, t1) !== 1 || onCount(P, st, t2) !== 1) continue;
+    const ra = find(t1);
+    if (ra !== find(t2) || size[ra] < 2 || size[ra] >= loopCount) continue;
+    const edges = [...w1.edges.reverse(), ...w2.edges];
+    const sets = [];
+    for (const c of cells) sets.push(['c', c, OFF]);
+    for (const x of edges) sets.push(['e', x, E_OFF]);
+    out.push({ sets, info: { cells, edges, a: t1, b: t2 } });
   }
   return out;
 }
@@ -1232,13 +1392,17 @@ export const RULES = [
   defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
   defRule({ id: 'twoWhitesStraight', tier: 'Medium', weight: 12, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
   defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 14, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
+  defRule({ id: 'blackNoEarlyClose', tier: 'Medium', weight: 14, find: findBlackNoEarlyClose, label: 'a black circle cannot extend two cells into the other end of its own path and close the loop early' }),
   defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
   defRule({ id: 'blackTwoDiagWhites', tier: 'Medium', weight: 15, find: findBlackTwoDiagWhites, label: 'a black circle flanked by two diagonally adjacent white circles cannot extend between them' }),
   defRule({ id: 'blackWhiteNoTurn', tier: 'Medium', weight: 16, find: findBlackWhiteNoTurn, label: 'a black circle cannot extend into a white circle two cells away whose far side cannot turn' }),
   defRule({ id: 'whiteCornerPinch', tier: 'Medium', weight: 17, find: findWhiteCornerPinch, label: 'a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors' }),
+  defRule({ id: 'whiteDeadEndPinch', tier: 'Medium', weight: 17, find: findWhiteDeadEndPinch, label: 'a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes' }),
   defRule({ id: 'faceShade', tier: 'Medium', weight: 18, find: findFaceShade, label: 'basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge' }),
+  defRule({ id: 'boxStrand', tier: 'Medium', weight: 20, find: findBoxStrand, label: 'closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side' }),
 
   // Hard (circle-diagonal shading, global topology, and short single-thread lookahead)
+  defRule({ id: 'corridorNoEarlyClose', tier: 'Hard', weight: 30, find: findCorridorNoEarlyClose, label: 'a forced multi-cell corridor joining the two ends of one path would close the loop early' }),
   defRule({ id: 'faceCircle', tier: 'Hard', weight: 38, find: findFaceCircle, extra: extraFaceCircle, label: 'advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge' }),
   defRule({ id: 'twoEndsJoin', tier: 'Hard', weight: 44, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
   defRule({ id: 'chokepoint', tier: 'Hard', weight: 48, costly: true, find: findChokepoint(true), label: 'blocking this segment would cut off a small area or leave a single chokepoint cell' }),
@@ -1269,7 +1433,7 @@ export const ruleLabel = (id) => (id === 'unsolved' ? 'none of the current rules
 
 // ------------------------------------------------------------ closure / stepping / rating
 
-const IMAGINE_AFTER = 18; // Beginner + local Medium + faceShade (<= 18) always run before searching imagined chains
+const IMAGINE_AFTER = 20; // Beginner + local Medium + faceShade + boxStrand (<= 20) always run before searching imagined chains (min cost 22)
 
 /** Apply all non-costly rules below `upto` until fixed point, contradiction, or `maxSteps`. Mutates `st`. */
 export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity, checkContra = true) {

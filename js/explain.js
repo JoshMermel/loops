@@ -104,12 +104,20 @@ function describeChainStep(P, s) {
       return `the white circle at ${c} cannot turn along its blocked axis and must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
     case 'blackBlockedTarget':
       return `the black circle at ${c} must avoid its blocked side and go two cells ${DIR_WORD[info.dir]}`;
+    case 'blackNoEarlyClose':
+      return `the black circle at ${c} cannot extend two cells ${DIR_WORD[info.blockedDir]} into ${cellName(P, info.target)} without closing the loop early, so it goes two cells ${DIR_WORD[info.dir]}`;
     case 'blackTwoDiagWhites':
       return `the black circle at ${c} cannot extend between white circles ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])}, so it goes two cells ${DIR_WORD[info.dir]}`;
     case 'blackWhiteNoTurn':
       return `the black circle at ${c} cannot extend into white circle ${cellName(P, info.target)} and goes two cells ${DIR_WORD[info.dir]}`;
     case 'whiteCornerPinch':
       return `visiting ${c} would pinch white circle ${cellName(P, info.white)} on both axes`;
+    case 'whiteDeadEndPinch':
+      return `drawing ${edgeName(P, info.edge)} would pinch white circle ${cellName(P, info.white)} on both axes`;
+    case 'boxStrand':
+      return `drawing ${edgeName(P, info.edge)} would strand ${cellName(P, info.active)} inside the 2×2 box`;
+    case 'corridorNoEarlyClose':
+      return `the forced corridor between ${cellName(P, info.a)} and ${cellName(P, info.b)} would close the loop early`;
     case 'faceShade':
     case 'faceCircle':
       return `inside/outside shading forces ${describeMarks(P, targetsOf(sets))}`;
@@ -299,6 +307,13 @@ export function explainStep(P, step, st = null) {
       text = `The black circle at ${cellName(P, info.cell)} cannot extend toward ${cellName(P, info.target)} because ${why}; so it must go two cells ${DIR_WORD[info.dir]}.`;
       break;
     }
+    case 'blackNoEarlyClose': {
+      roles.clue.push(info.cell);
+      roles.path.push(info.cell, info.target);
+      roles.focus.push(info.mid);
+      text = `${cellName(P, info.cell)} and ${cellName(P, info.target)} are the two ends of one open path while other loop cells lie outside it, so the black circle at ${cellName(P, info.cell)} cannot extend two cells ${DIR_WORD[info.blockedDir]} into ${cellName(P, info.target)}; it must go two cells ${DIR_WORD[info.dir]}.`;
+      break;
+    }
     case 'blackTwoDiagWhites': {
       roles.clue.push(info.cell, ...info.whites);
       text = `The black circle at ${cellName(P, info.cell)} cannot send a ray ${DIR_WORD[info.blockedDir]} between the two diagonal white circles at ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])} (doing so would block whichever side its second leg takes); so it must go two cells ${DIR_WORD[info.dir]}.`;
@@ -321,6 +336,25 @@ export function explainStep(P, step, st = null) {
       roles.clue.push(info.white);
       roles.problem.push(...info.neighbors);
       text = `${cellName(P, info.cell)} has only two exits left, pointing to ${cellName(P, info.neighbors[0])} and ${cellName(P, info.neighbors[1])}, which both already have a segment; passing through ${cellName(P, info.cell)} would fill both neighbors and cut off the white circle at ${cellName(P, info.white)} on both axes, so cross out ${joinList(targets.segOff.map((x) => edgeName(P, x)))}.`;
+      break;
+    }
+    case 'whiteDeadEndPinch': {
+      roles.focus.push(...info.active);
+      roles.clue.push(info.white);
+      roles.problem.push(info.dead);
+      text = `Drawing ${edgeName(P, info.edge)} would fill both ${cellName(P, info.active[0])} and ${cellName(P, info.active[1])}, turning ${cellName(P, info.dead)} into a dead end and cutting off the white circle at ${cellName(P, info.white)} on both axes; so cross out ${edgeName(P, info.edge)}.`;
+      break;
+    }
+    case 'boxStrand': {
+      roles.focus.push(info.a, info.b);
+      roles.problem.push(info.active, info.stranded);
+      text = `Drawing ${edgeName(P, info.edge)} would fill both ${cellName(P, info.a)} and ${cellName(P, info.b)}, sealing both escapes of the adjacent pair ${cellName(P, info.active)}–${cellName(P, info.stranded)} and stranding the open end at ${cellName(P, info.active)}; so cross out ${edgeName(P, info.edge)}.`;
+      break;
+    }
+    case 'corridorNoEarlyClose': {
+      roles.area.push(...info.cells);
+      roles.path.push(info.a, info.b);
+      text = `The forced corridor (${joinList(info.cells.map((k) => cellName(P, k)))}) only connects the two ends of one open path (${cellName(P, info.a)} and ${cellName(P, info.b)}) while other loop cells lie outside it: entering it would close the loop early, so ${describeMarks(P, targets)}.`;
       break;
     }
     case 'faceShade': {
