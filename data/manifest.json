@@ -49,11 +49,6 @@
       "blurb": "Boards punched with random interior holes across four sizes — each hole is entirely Inside or Outside the loop."
     },
     {
-      "name": "Mazes",
-      "icon": "🏛️",
-      "blurb": "Boards with permanent solid walls — prototype books for Rooms, Braided mazes, and Barrier walls."
-    },
-    {
       "name": "Bonus",
       "icon": "🎁",
       "blurb": "Themed variations with the same Masyu rules."
@@ -308,11 +303,11 @@
     {
       "id": "full-walls-8x8",
       "name": "Given walls (8×8)",
-      "label": "🚧 Given walls (8×8)",
+      "label": "✕ Given walls (8×8)",
       "file": "data/full-walls-8x8.csv",
       "count": 500,
       "group": "Full board",
-      "blurb": "No circles — just permanent solid walls and the full-board rule."
+      "blurb": "No circles — just permanent blocked walls (✕) and the full-board rule."
     },
     {
       "id": "full-mixed-8x8",
@@ -358,33 +353,6 @@
       "count": 510,
       "group": "Swiss cheese",
       "blurb": "Tall 12×20 boards with 8–13 scattered cutout holes across all four difficulties, plus Expert+."
-    },
-    {
-      "id": "maze-rooms",
-      "name": "Rooms & doorways (10×10)",
-      "label": "🚪 Rooms & doorways (10×10)",
-      "file": "data/maze-rooms.csv",
-      "count": 24,
-      "group": "Mazes",
-      "blurb": "Architectural floorplans of 4–6 rooms linked by doorways (prototype: 24 puzzles across Beginner–Expert)."
-    },
-    {
-      "id": "maze-braided",
-      "name": "Braided maze (10×10)",
-      "label": "🌀 Braided maze (10×10)",
-      "file": "data/maze-braided.csv",
-      "count": 24,
-      "group": "Mazes",
-      "blurb": "Winding labyrinth corridors with zero dead ends (prototype: 24 puzzles across Beginner–Expert)."
-    },
-    {
-      "id": "maze-barriers",
-      "name": "Barrier walls (10×10)",
-      "label": "🚧 Barrier walls (10×10)",
-      "file": "data/maze-barriers.csv",
-      "count": 24,
-      "group": "Mazes",
-      "blurb": "Open grids with bold internal divider bars (prototype: 24 puzzles across Beginner–Expert)."
     },
     {
       "id": "bonus-white",

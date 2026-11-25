@@ -36,8 +36,8 @@ const VARIANT_GROUPS = [
   {
     id: 'variant-full',
     title: 'Full board',
-    intro: 'The loop must visit **every** intersection on the grid (none may be left empty). Dark pre-filled segments and solid walls are permanent givens.',
-    htmlIntro: 'The loop must visit <b>every</b> intersection on the grid (none may be left empty). Dark pre-filled segments and solid walls are permanent givens.',
+    intro: 'The loop must visit **every** intersection on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens.',
+    htmlIntro: 'The loop must visit <b>every</b> intersection on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.',
     ruleIds: ['checkerPocket', 'checkerParity'],
   },
   {
@@ -45,13 +45,6 @@ const VARIANT_GROUPS = [
     title: 'Swiss cheese',
     intro: 'Cutout holes cannot be entered. Every enclosed hole lies entirely **Inside** or entirely **Outside** the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, `chokepoint`, `faceShade`, and `faceCircle` — work naturally around and across interior holes.',
     htmlIntro: 'Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, <code>chokepoint</code>, <code>faceShade</code>, and <code>faceCircle</code> — work naturally around and across interior holes.',
-    ruleIds: [],
-  },
-  {
-    id: 'variant-mazes',
-    title: 'Mazes',
-    intro: 'Solid walls permanently block the loop from crossing between adjacent intersections, carving the grid into rooms, braided corridors, or barrier-divided chambers. Every room or walled region must be entered and exited an **even** number of times (`parity` / `chokepoint`), and Auto-Shade flows naturally around walls.',
-    htmlIntro: 'Solid walls permanently block the loop from crossing between adjacent intersections, carving the grid into rooms, braided corridors, or barrier-divided chambers. Every room or walled region must be entered and exited an <b>even</b> number of times (<code>parity</code> / <code>chokepoint</code>), and Auto-Shade flows naturally around walls.',
     ruleIds: [],
   },
 ];
@@ -104,7 +97,7 @@ say(
   '- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.',
   '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.',
   '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).',
-  '- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, Swiss cheese, and Mazes).',
+  '- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, and Swiss cheese).',
   '',
   '## How the examples work',
   '',
@@ -249,7 +242,7 @@ htmlParts.push(`<!DOCTYPE html>
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, Swiss cheese, and Mazes).</li>
+      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, and Swiss cheese).</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>

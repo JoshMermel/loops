@@ -112,23 +112,6 @@ if (process.argv.includes('--worker')) {
       if (alt.exceeded && alt.count < 2) return fail('fullBoard necessity not proved: hit node cap');
       if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
     }
-
-    // Verify wall necessity on pre-walled maze puzzles: dropping all givens must leave >= 2 valid solutions
-    if (P.hasGivens && !P.fullBoard && !entry.hidden) {
-      const noWalls = compile({
-        name: raw.name,
-        rows: raw.rows,
-        cols: raw.cols,
-        clues: raw.clues,
-        ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
-      });
-      let alt = solve(noWalls, { limit: 2, maxNodes: 50000 });
-      if (alt.count < 2 && alt.exceeded) {
-        alt = solve(noWalls, { limit: 2, maxNodes: 500000, rng: makeRng(54321 + from + k) });
-      }
-      if (alt.exceeded && alt.count < 2) return fail('wall necessity not proved: hit node cap');
-      if (alt.count < 2) return fail('walls are redundant (uniquely solvable without walls)');
-    }
   });
 
   process.stdout.write(JSON.stringify(out) + '\n');

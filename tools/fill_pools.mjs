@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | mazes | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -471,38 +471,6 @@ if (!isMainThread) {
     { group: 'bonus-finales', pool: 'sym_mirror_14x14', cols: 14, rows: 14, layout: 'mirror', total: 5, budgetSec: 60, perPuzzleMs: 20000 },
     { group: 'bonus-finales', pool: 'sym_transpose_14x14', cols: 14, rows: 14, layout: 'transpose', total: 5, budgetSec: 90, perPuzzleMs: 20000 },
     { group: 'bonus-finales', pool: 'full_12x20', cols: 12, rows: 20, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 20000 },
-
-    // ---- Mazes (prototype books: 24 puzzles each = 4 B / 8 M / 8 H / 4 E; over-generate slightly for clean selection)
-    {
-      group: 'mazes', pool: 'maze_rooms_10x10', cols: 10, rows: 10, style: 'maze-rooms',
-      buckets: {
-        Beginner: { need: 6, maxScore: 390 },
-        Medium: { need: 10, minScore: 310, maxScore: 440 },
-        Hard: { need: 10, minScore: 360, maxScore: 680 },
-        Expert: { need: 6, minScore: 520, maxScore: 1500 },
-      },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
-    {
-      group: 'mazes', pool: 'maze_braided_10x10', cols: 10, rows: 10, style: 'maze-braided',
-      buckets: {
-        Beginner: { need: 6, maxScore: 420 },
-        Medium: { need: 10, minScore: 330, maxScore: 480 },
-        Hard: { need: 10, minScore: 370, maxScore: 700 },
-        Expert: { need: 6, minScore: 500, maxScore: 1500 },
-      },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
-    {
-      group: 'mazes', pool: 'maze_barriers_10x10', cols: 10, rows: 10, style: 'maze-barriers',
-      buckets: {
-        Beginner: { need: 6, maxScore: 400 },
-        Medium: { need: 10, minScore: 310, maxScore: 440 },
-        Hard: { need: 10, minScore: 350, maxScore: 720 },
-        Expert: { need: 6, minScore: 480, maxScore: 1500 },
-      },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
   ];
 
   const knownGroups = new Set(JOBS.map((j) => j.group));

@@ -94,11 +94,10 @@ for (const ex of examples) {
     }
   }
 
-  // Lattice lines (skip blocked maze walls so continuous dividers stand cleanly)
-  const givenE = P.hasGivens ? P.givenE : null;
-  if (P.hasVoids || givenE) {
+  // Lattice lines
+  if (P.hasVoids) {
     for (let x = 0; x < P.numEdges; x++) {
-      if (P.edgeA[x] < 0 || (givenE && givenE[x] === 2)) continue;
+      if (P.edgeA[x] < 0) continue;
       const [x1, y1, x2, y2] = segCoords(x);
       g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#cccccc" stroke-width="1.2"/>`;
     }
@@ -114,6 +113,7 @@ for (const ex of examples) {
   }
 
   // Existing segments (behind all pearls so circles read cleanly; given segments in dark ink)
+  const givenE = P.hasGivens ? P.givenE : null;
   for (let x = 0; x < P.numEdges; x++) {
     if (edges[x] !== 1) continue;
     const [x1, y1, x2, y2] = segCoords(x);
@@ -151,25 +151,14 @@ for (const ex of examples) {
     }
   }
 
-  // Existing edge X marks (non-given) and permanent maze walls (perpendicular bars)
+  // Existing edge X marks (given walls in bold dark ink)
   for (let x = 0; x < P.numEdges; x++) {
-    if (edges[x] !== 2 || (givenE && givenE[x] === 2)) continue;
+    if (edges[x] !== 2) continue;
     const [x1, y1, x2, y2] = segCoords(x);
-    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.085;
+    const isGivenWall = givenE && givenE[x] === 2;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * (isGivenWall ? 0.105 : 0.085);
     const p = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
-    g += `<path d="${p}" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round"/><path d="${p}" stroke="#757575" stroke-width="1.8" stroke-linecap="round"/>`;
-  }
-  if (givenE) {
-    for (let x = 0; x < P.numEdges; x++) {
-      if (givenE[x] !== 2 || P.edgeA[x] < 0) continue;
-      const [x1, y1, x2, y2] = segCoords(x);
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-      if ((x & 1) === 0) {
-        g += `<line x1="${mx}" y1="${my - S / 2}" x2="${mx}" y2="${my + S / 2}" stroke="#222222" stroke-width="4.2" stroke-linecap="round"/>`;
-      } else {
-        g += `<line x1="${mx - S / 2}" y1="${my}" x2="${mx + S / 2}" y2="${my}" stroke="#222222" stroke-width="4.2" stroke-linecap="round"/>`;
-      }
-    }
+    g += `<path d="${p}" stroke="#ffffff" stroke-width="${isGivenWall ? 5.0 : 3.6}" stroke-linecap="round"/><path d="${p}" stroke="${isGivenWall ? '#111111' : '#757575'}" stroke-width="${isGivenWall ? 2.6 : 1.8}" stroke-linecap="round"/>`;
   }
 
   // Hint overlays

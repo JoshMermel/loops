@@ -24,7 +24,6 @@
   --void-hatch-stroke: #e0e0e0;
   --void-hatch-opacity: 0.45;
   --pearl-ink: #111;
-  --wall-ink: #222;
   --pearl-white-fill: #fff;
   --pearl-gray-fill: #b6bcc4;
   --pearl-gray-ring: #5a626c;
@@ -76,7 +75,6 @@
   --void-hatch-stroke: #8c93a1;
   --void-hatch-opacity: 0.35;
   --pearl-ink: #e6e6e6;
-  --wall-ink: #e4e4e7;
   --pearl-white-fill: #222;
   --pearl-gray-fill: #78808a;
   --pearl-gray-ring: #c6cdd6;
@@ -165,7 +163,8 @@ button.ghost { background: transparent; }
 .edge-x.auto { opacity: 0.45; }
 .edge-x-halo { stroke: var(--cell-bg); stroke-width: 3.8; stroke-linecap: round; fill: none; pointer-events: none; }
 .edge-x-halo.auto { opacity: 0.6; }
-.wall-given { stroke: var(--wall-ink); stroke-width: 4.5; stroke-linecap: round; fill: none; pointer-events: none; }
+.wall-given { stroke: var(--pearl-ink); stroke-width: 2.8; stroke-linecap: round; fill: none; pointer-events: none; }
+.wall-given-halo { stroke: var(--cell-bg); stroke-width: 5.2; stroke-linecap: round; fill: none; pointer-events: none; }
 .trapped-cell { fill: none; stroke: var(--color-error); stroke-width: 2.6; pointer-events: none; }
 
 /* Masyu circles (pearls) */
@@ -387,7 +386,7 @@ button.ghost { background: transparent; }
 .hr-line { fill: none; stroke: var(--loop); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
 .hr-line-bad { fill: none; stroke: var(--color-error); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
 .hr-given { fill: none; stroke: var(--pearl-ink); stroke-width: 5; stroke-linecap: round; }
-.hr-wall { fill: none; stroke: var(--wall-ink); stroke-width: 3.4; stroke-linecap: round; }
+.hr-wall { fill: none; stroke: var(--pearl-ink); stroke-width: 2.2; stroke-linecap: round; }
 .help-controls { margin: 4px 0 12px; padding-left: 20px; }
 .help-controls li { margin: 4px 0; font-size: 0.9rem; }
 .help-foot { margin: 0; font-size: 0.83rem; color: var(--text-secondary); }

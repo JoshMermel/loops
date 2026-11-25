@@ -71,11 +71,6 @@ const manifest = {
       blurb: 'Boards punched with random interior holes across four sizes — each hole is entirely Inside or Outside the loop.',
     },
     {
-      name: 'Mazes',
-      icon: '🏛️',
-      blurb: 'Boards with permanent solid walls — prototype books for Rooms, Braided mazes, and Barrier walls.',
-    },
-    {
       name: 'Bonus',
       icon: '🎁',
       blurb: 'Themed variations with the same Masyu rules.',
@@ -228,9 +223,9 @@ const recipes = [
     blurb: 'No circles — just permanent pre-filled loop segments and the full-board rule.',
   },
   {
-    id: 'full-walls-8x8', name: 'Given walls (8×8)', label: '🚧 Given walls (8×8)', group: 'Full board',
+    id: 'full-walls-8x8', name: 'Given walls (8×8)', label: '✕ Given walls (8×8)', group: 'Full board',
     glob: 'full_walls_8x8', tiers: '50,200,200,50', tierBands: '0:255,220:300,265:480,430:1200',
-    blurb: 'No circles — just permanent solid walls and the full-board rule.',
+    blurb: 'No circles — just permanent blocked walls (✕) and the full-board rule.',
   },
   {
     id: 'full-mixed-8x8', name: 'Lines & walls (8×8)', label: '🔀 Lines & walls (8×8)', group: 'Full board',
@@ -262,23 +257,6 @@ const recipes = [
     glob: 'swiss_12x20', tiers: '50,200,200,50', tierBands: '0:810,725:900,800:1250,1020:2700',
     expertPlus: 10,
     blurb: 'Tall 12×20 boards with 8–13 scattered cutout holes across all four difficulties, plus Expert+.',
-  },
-
-  // ---- Mazes (top-level section: prototype books of 24 puzzles across Beginner–Expert)
-  {
-    id: 'maze-rooms', name: 'Rooms & doorways (10×10)', label: '🚪 Rooms & doorways (10×10)', group: 'Mazes',
-    glob: 'maze_rooms_10x10', tiers: '4,8,8,4', tierBands: '0:390,310:440,360:680,520:1500',
-    blurb: 'Architectural floorplans of 4–6 rooms linked by doorways (prototype: 24 puzzles across Beginner–Expert).',
-  },
-  {
-    id: 'maze-braided', name: 'Braided maze (10×10)', label: '🌀 Braided maze (10×10)', group: 'Mazes',
-    glob: 'maze_braided_10x10', tiers: '4,8,8,4', tierBands: '0:420,330:480,370:700,500:1500',
-    blurb: 'Winding labyrinth corridors with zero dead ends (prototype: 24 puzzles across Beginner–Expert).',
-  },
-  {
-    id: 'maze-barriers', name: 'Barrier walls (10×10)', label: '🚧 Barrier walls (10×10)', group: 'Mazes',
-    glob: 'maze_barriers_10x10', tiers: '4,8,8,4', tierBands: '0:400,310:440,350:720,480:1500',
-    blurb: 'Open grids with bold internal divider bars (prototype: 24 puzzles across Beginner–Expert).',
   },
 
   // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 Expert+ + 10 Mega finale) + Patterns

@@ -81,7 +81,7 @@
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, Swiss cheese, and Mazes).</li>
+      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, and Swiss cheese).</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>
@@ -432,7 +432,6 @@
       <a href="#variant-gray">Gray circles</a>
       <a href="#variant-full">Full board</a>
       <a href="#variant-swiss">Swiss cheese</a>
-      <a href="#variant-mazes">Mazes</a>
     </nav>
 
     <h3 class="variant-heading" id="variant-gray">Gray circles</h3>
@@ -470,7 +469,7 @@
     </section>
 
     <h3 class="variant-heading" id="variant-full">Full board</h3>
-    <p>The loop must visit <b>every</b> intersection on the grid (none may be left empty). Dark pre-filled segments and solid walls are permanent givens.</p>
+    <p>The loop must visit <b>every</b> intersection on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.</p>
 
     <section class="rule-card" id="checkerPocket">
       <h3><code>checkerPocket</code></h3>
@@ -492,9 +491,6 @@
 
     <h3 class="variant-heading" id="variant-swiss">Swiss cheese</h3>
     <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, <code>chokepoint</code>, <code>faceShade</code>, and <code>faceCircle</code> — work naturally around and across interior holes.</p>
-
-    <h3 class="variant-heading" id="variant-mazes">Mazes</h3>
-    <p>Solid walls permanently block the loop from crossing between adjacent intersections, carving the grid into rooms, braided corridors, or barrier-divided chambers. Every room or walled region must be entered and exited an <b>even</b> number of times (<code>parity</code> / <code>chokepoint</code>), and Auto-Shade flows naturally around walls.</p>
 
   </main>
 </body>
