@@ -45,6 +45,151 @@ const cellDist = (P, a, b) => (
 );
 
 /**
+ * Trace the exact orthogonal outline of a union of grid tiles as one SVG path (`fill-rule="evenodd"`).
+ * `hasTile(r, c)` returns truthy for tiles in `0 <= r < rows, 0 <= c < cols`.
+ * Tile `(r, c)` occupies `[ox + c*cw, ox + (c+1)*cw] × [oy + r*ch, oy + (r+1)*ch]`.
+ * Handles arbitrary cutouts, interior holes, and diagonal corner touches without self-intersection.
+ */
+export function tilesOutlinePath(rows, cols, hasTile, ox, oy, cw, ch, radius = 0) {
+  const V = cols + 1;
+  const out = new Map();
+  const addSeg = (vr, vc, dir) => {
+    const k = vr * V + vc;
+    let list = out.get(k);
+    if (!list) { list = []; out.set(k, list); }
+    list.push({ dir, used: false });
+  };
+  const DR_S = [-1, 0, 1, 0], DC_S = [0, 1, 0, -1];
+  const inside = (r, c) => r >= 0 && c >= 0 && r < rows && c < cols && !!hasTile(r, c);
+
+  // Keep the 1-region on the RIGHT of each directed boundary edge (CW outer contours, CCW holes)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!inside(r, c)) continue;
+      if (!inside(r - 1, c)) addSeg(r, c, 1);           // top: E
+      if (!inside(r, c + 1)) addSeg(r, c + 1, 2);       // right: S
+      if (!inside(r + 1, c)) addSeg(r + 1, c + 1, 3);   // bottom: W
+      if (!inside(r, c - 1)) addSeg(r + 1, c, 0);       // left: N
+    }
+  }
+
+  const fmt = (n) => (Math.round(n * 100) / 100);
+  const parts = [];
+
+  for (const [startK, list] of out) {
+    for (const seg of list) {
+      if (seg.used) continue;
+      const pts = [];
+      let vr = (startK / V) | 0, vc = startK % V;
+      let cur = seg;
+      while (cur && !cur.used) {
+        cur.used = true;
+        pts.push([vr, vc, cur.dir]);
+        const dir = cur.dir;
+        vr += DR_S[dir];
+        vc += DC_S[dir];
+        const nxtList = out.get(vr * V + vc);
+        if (!nxtList) break;
+        // Prefer tight right turn at diagonal touches so corner-touching tiles stay non-crossing
+        const pref = [(dir + 1) & 3, dir, (dir + 3) & 3];
+        let picked = null;
+        for (const pd of pref) {
+          picked = nxtList.find((s) => !s.used && s.dir === pd);
+          if (picked) break;
+        }
+        cur = picked;
+      }
+      if (pts.length < 4) continue;
+
+      // Collapse collinear edges into corner vertices
+      const corners = [];
+      for (let i = 0; i < pts.length; i++) {
+        const prev = pts[(i - 1 + pts.length) % pts.length];
+        if (prev[2] !== pts[i][2]) {
+          corners.push([ox + pts[i][1] * cw, oy + pts[i][0] * ch]);
+        }
+      }
+      const m = corners.length;
+      if (m < 4) continue;
+
+      if (radius <= 0) {
+        let d = `M${fmt(corners[0][0])} ${fmt(corners[0][1])}`;
+        for (let i = 1; i < m; i++) d += `L${fmt(corners[i][0])} ${fmt(corners[i][1])}`;
+        parts.push(d + 'Z');
+      } else {
+        let d = '';
+        for (let i = 0; i < m; i++) {
+          const p0 = corners[(i - 1 + m) % m];
+          const p1 = corners[i];
+          const p2 = corners[(i + 1) % m];
+          const dx1 = p1[0] - p0[0], dy1 = p1[1] - p0[1];
+          const dx2 = p2[0] - p1[0], dy2 = p2[1] - p1[1];
+          const l1 = Math.hypot(dx1, dy1), l2 = Math.hypot(dx2, dy2);
+          const r = Math.min(radius, l1 * 0.45, l2 * 0.45);
+          const ax = p1[0] - (dx1 / l1) * r, ay = p1[1] - (dy1 / l1) * r;
+          const bx = p1[0] + (dx2 / l2) * r, by = p1[1] + (dy2 / l2) * r;
+          d += (i === 0 ? `M${fmt(ax)} ${fmt(ay)}` : `L${fmt(ax)} ${fmt(ay)}`);
+          d += `Q${fmt(p1[0])} ${fmt(p1[1])} ${fmt(bx)} ${fmt(by)}`;
+        }
+        parts.push(d + 'Z');
+      }
+    }
+  }
+  return parts.join('');
+}
+
+/** Return cached SVG paths for a shaped puzzle's board silhouette, void cutouts, and unified interior holes. */
+function getShapePaths(P) {
+  if (!P.hasVoids) return null;
+  if (P._shapePaths) return P._shapePaths;
+  const { rows, cols, isVoid, holeList } = P;
+  const fr = rows - 1, fc = cols - 1;
+  const inset = 1.5;
+  const ox = PAD - S / 2;
+  const oy = PAD - S / 2;
+  const boardPath = tilesOutlinePath(
+    rows, cols,
+    (r, c) => !isVoid[r * cols + c],
+    ox, oy, S, S, 8,
+  );
+  // Separate interior void cutouts (voids adjacent to at least one interior hole square) for crisp inner framing
+  const interiorVoid = new Uint8Array(P.N);
+  if (holeList && holeList.length) {
+    for (const grp of holeList) {
+      for (const f of grp) {
+        const r = (f / fc) | 0, c = f % fc;
+        for (const u of [r * cols + c, r * cols + c + 1, (r + 1) * cols + c, (r + 1) * cols + c + 1]) {
+          if (isVoid[u]) interiorVoid[u] = 1;
+        }
+      }
+    }
+  }
+  const innerVoidPath = tilesOutlinePath(
+    rows, cols,
+    (r, c) => interiorVoid[r * cols + c],
+    ox + inset, oy + inset, S, S, 0,
+  );
+  // Exact un-shifted inner cutout path (matches the hole in boardPath) for subtle hatch overlay
+  const voidHatchPath = tilesOutlinePath(
+    rows, cols,
+    (r, c) => interiorVoid[r * cols + c],
+    ox, oy, S, S, 6,
+  );
+  const holePaths = (holeList || []).map((grp) => {
+    const inH = new Uint8Array(fr * fc);
+    for (const f of grp) inH[f] = 1;
+    return tilesOutlinePath(fr, fc, (r, c) => inH[r * fc + c], PAD, PAD, S, S, 0);
+  });
+  const holeInsetPaths = (holeList || []).map((grp) => {
+    const inH = new Uint8Array(fr * fc);
+    for (const f of grp) inH[f] = 1;
+    return tilesOutlinePath(fr, fc, (r, c) => inH[r * fc + c], PAD, PAD, S, S, 4);
+  });
+  P._shapePaths = { boardPath, innerVoidPath, voidHatchPath, holePaths, holeInsetPaths };
+  return P._shapePaths;
+}
+
+/**
  * Pure drag-gesture progression helper using raw lattice coordinates (gx, gy).
  * Features:
  *   1. Tighter mid-drag edge targets than tap targets, ignoring dual square centers mid-drag.
@@ -117,15 +262,24 @@ export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = nul
       const tr = (to / P.cols) | 0, tc = to % P.cols;
       const dr = tr - cr, dc = tc - cc;
       const dir = lastDir();
-      let nxt;
+      const cands = [];
       if (dir && ((dir.dr && Math.sign(dr) === dir.dr) || (dir.dc && Math.sign(dc) === dir.dc))) {
-        nxt = (cr + dir.dr) * P.cols + (cc + dir.dc);
-      } else {
-        nxt = Math.abs(dr) >= Math.abs(dc)
-          ? (cr + Math.sign(dr)) * P.cols + cc
-          : cr * P.cols + (cc + Math.sign(dc));
+        cands.push((cr + dir.dr) * P.cols + (cc + dir.dc));
       }
-      fireEdge(cur, nxt);
+      if (Math.abs(dr) >= Math.abs(dc)) {
+        if (dr !== 0) cands.push((cr + Math.sign(dr)) * P.cols + cc);
+        if (dc !== 0) cands.push(cr * P.cols + (cc + Math.sign(dc)));
+      } else {
+        if (dc !== 0) cands.push(cr * P.cols + (cc + Math.sign(dc)));
+        if (dr !== 0) cands.push((cr + Math.sign(dr)) * P.cols + cc);
+      }
+      let nxt = -1, ex = -1;
+      for (const c of cands) {
+        const e = edgeBetween(cur, c);
+        if (e >= 0) { nxt = c; ex = e; break; }
+      }
+      if (nxt < 0) break;
+      fireEdge(cur, nxt, ex);
       cur = nxt;
     }
   };
@@ -170,7 +324,7 @@ export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = nul
       const nc = Math.max(0, Math.min(P.cols - 1, Math.round(px)));
       const nr = Math.max(0, Math.min(P.rows - 1, Math.round(py)));
       const v = nr * P.cols + nc;
-      if (v !== sa && v !== sb && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
+      if ((!P.hasVoids || !P.isVoid[v]) && v !== sa && v !== sb && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
         beginDrag?.();
         if (cellDist(P, sa, v) < cellDist(P, sb, v)) {
           fireEdge(sb, sa, g.startHit.edge);
@@ -197,7 +351,7 @@ export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = nul
   const nr = Math.max(0, Math.min(P.rows - 1, Math.round(py)));
   const v = nr * P.cols + nc;
   const prevBack = g.trail.length ? g.trail[g.trail.length - 1].a : -1;
-  if (v !== g.curCell && v !== prevBack && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
+  if ((!P.hasVoids || !P.isVoid[v]) && v !== g.curCell && v !== prevBack && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
     // Don't let vertex snap bypass 90° turn hysteresis for an immediate neighbor unless very close to that vertex
     walkCells(g.curCell, v);
     return;
@@ -208,17 +362,19 @@ export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = nul
   const fc = Math.floor(px);
   if (fc >= 0 && fc + 1 < P.cols) {
     const t = px - fc, dist = Math.abs(py - nr);
-    if (t >= DRAG_TURN_MIN - EPS && t <= 1 - DRAG_TURN_MIN + EPS && dist <= farDist + EPS) {
+    const cand = 2 * (nr * P.cols + fc);
+    if (P.edgeA[cand] >= 0 && t >= DRAG_TURN_MIN - EPS && t <= 1 - DRAG_TURN_MIN + EPS && dist <= farDist + EPS) {
       farDist = dist;
-      farEdge = 2 * (nr * P.cols + fc);
+      farEdge = cand;
     }
   }
   const fr = Math.floor(py);
   if (fr >= 0 && fr + 1 < P.rows) {
     const t = py - fr, dist = Math.abs(px - nc);
-    if (t >= DRAG_TURN_MIN - EPS && t <= 1 - DRAG_TURN_MIN + EPS && dist <= farDist + EPS) {
+    const cand = 2 * (fr * P.cols + nc) + 1;
+    if (P.edgeA[cand] >= 0 && t >= DRAG_TURN_MIN - EPS && t <= 1 - DRAG_TURN_MIN + EPS && dist <= farDist + EPS) {
       farDist = dist;
-      farEdge = 2 * (fr * P.cols + nc) + 1;
+      farEdge = cand;
     }
   }
   if (farEdge >= 0 && farEdge !== g.lastEdge) {
@@ -256,11 +412,16 @@ export function advanceFaceDrag(P, g, gx, gy, onFace) {
     const fc = Math.floor(x / S);
     const fr = Math.floor(y / S);
     if (fc < 0 || fc >= fcMax || fr < 0 || fr >= frMax) continue;
-    const fx = x / S - fc;
-    const fy = y / S - fr;
-    if (fx < FACE_DRAG_INSET || fx > 1 - FACE_DRAG_INSET || fy < FACE_DRAG_INSET || fy > 1 - FACE_DRAG_INSET) continue;
-    const f = fr * fcMax + fc;
-    if (!g.paintedFaces.has(f)) {
+    const rawF = fr * fcMax + fc;
+    if (P.hasVoids && P.faceExterior[rawF]) continue;
+    const isHole = P.hasVoids && P.faceHoleId[rawF] >= 0;
+    if (!isHole) {
+      const fx = x / S - fc;
+      const fy = y / S - fr;
+      if (fx < FACE_DRAG_INSET || fx > 1 - FACE_DRAG_INSET || fy < FACE_DRAG_INSET || fy > 1 - FACE_DRAG_INSET) continue;
+    }
+    const f = P.hasVoids ? P.faceRep[rawF] : rawF;
+    if (f >= 0 && !g.paintedFaces.has(f)) {
       g.paintedFaces.add(f);
       g.dragged = true;
       onFace(f);
@@ -273,10 +434,10 @@ export function advanceFaceDrag(P, g, gx, gy, onFace) {
 /**
  * Pure hit-testing in lattice coordinates where intersection (r, c) is at (c*S, r*S).
  * Returns:
- *   - { kind: 'edge', edge, cell } when near a track midpoint
- *   - { kind: 'face', face, cell, edge: -1 } when inside the center of a dual square
- *   - { kind: 'cell', cell, edge: -1 } when near an intersection vertex (or outer margin)
- *   - null outside the board.
+ *   - { kind: 'edge', edge, cell } when near an active track midpoint
+ *   - { kind: 'face', face, cell, edge: -1 } when inside a dual square or anywhere inside an interior cutout hole
+ *   - { kind: 'cell', cell, edge: -1 } when near an active intersection vertex (or outer margin)
+ *   - null outside the board or inside an exterior cutout.
  */
 export function hitTestCoords(P, gx, gy) {
   if (!P) return null;
@@ -287,39 +448,69 @@ export function hitTestCoords(P, gx, gy) {
   const nc = Math.max(0, Math.min(P.cols - 1, Math.round(gx / S)));
   const nr = Math.max(0, Math.min(P.rows - 1, Math.round(gy / S)));
   const cell = nr * P.cols + nc;
+  const cellIsVoid = P.hasVoids && P.isVoid[cell];
 
   let bestEdge = -1, bestDist = EDGE_TOL * S;
 
-  // Check nearest horizontal track: row nr, between col fc and fc+1
+  // Check nearest active horizontal track: row nr, between col fc and fc+1
   const fc = Math.floor(gx / S);
   if (fc >= 0 && fc + 1 < P.cols) {
-    const t = gx / S - fc;
-    const dist = Math.abs(gy - nr * S);
-    if (t > END_DEAD && t < 1 - END_DEAD && dist < bestDist) {
-      bestDist = dist;
-      bestEdge = 2 * (nr * P.cols + fc);
+    const cand = 2 * (nr * P.cols + fc);
+    if (P.edgeA[cand] >= 0) {
+      const t = gx / S - fc;
+      const dist = Math.abs(gy - nr * S);
+      if (t > END_DEAD && t < 1 - END_DEAD && dist < bestDist) {
+        bestDist = dist;
+        bestEdge = cand;
+      }
     }
   }
 
-  // Check nearest vertical track: col nc, between row fr and fr+1
+  // Check nearest active vertical track: col nc, between row fr and fr+1
   const fr = Math.floor(gy / S);
   if (fr >= 0 && fr + 1 < P.rows) {
-    const t = gy / S - fr;
-    const dist = Math.abs(gx - nc * S);
-    if (t > END_DEAD && t < 1 - END_DEAD && dist < bestDist) {
-      bestDist = dist;
-      bestEdge = 2 * (fr * P.cols + nc) + 1;
+    const cand = 2 * (fr * P.cols + nc) + 1;
+    if (P.edgeA[cand] >= 0) {
+      const t = gy / S - fr;
+      const dist = Math.abs(gx - nc * S);
+      if (t > END_DEAD && t < 1 - END_DEAD && dist < bestDist) {
+        bestDist = dist;
+        bestEdge = cand;
+      }
     }
   }
 
-  if (bestEdge >= 0) return { kind: 'edge', edge: bestEdge, cell };
+  if (bestEdge >= 0) return { kind: 'edge', edge: bestEdge, cell: cellIsVoid ? P.edgeA[bestEdge] : cell };
 
-  // Check interior of a dual square (disjoint from track bands and intersection circles)
+  const fCols = P.cols - 1;
+  // Inside a dual square: either a normal square center or anywhere in an interior cutout hole (one big click target)
   if (fr >= 0 && fr + 1 < P.rows && fc >= 0 && fc + 1 < P.cols) {
-    const fx = gx / S - fc, fy = gy / S - fr;
-    if (fx >= EDGE_TOL && fx <= 1 - EDGE_TOL && fy >= EDGE_TOL && fy <= 1 - EDGE_TOL) {
-      return { kind: 'face', face: fr * (P.cols - 1) + fc, cell, edge: -1 };
+    const rawF = fr * fCols + fc;
+    if (!P.hasVoids || !P.faceExterior[rawF]) {
+      const isHole = P.hasVoids && P.faceHoleId[rawF] >= 0;
+      if (isHole) {
+        // Keep a small active-vertex pivot around rim intersections so drags & gray-pearl taps still work on the rim
+        if (cellIsVoid || Math.hypot(gx - nc * S, gy - nr * S) >= EDGE_TOL * S) {
+          return { kind: 'face', face: P.faceRep[rawF], cell: -1, edge: -1 };
+        }
+      } else {
+        const fx = gx / S - fc, fy = gy / S - fr;
+        if (fx >= EDGE_TOL && fx <= 1 - EDGE_TOL && fy >= EDGE_TOL && fy <= 1 - EDGE_TOL) {
+          return { kind: 'face', face: rawF, cell, edge: -1 };
+        }
+      }
     }
+  }
+
+  if (cellIsVoid) {
+    // Directly on top of a void intersection: if it belongs to an interior hole, hit that hole; else exterior cutout -> null
+    for (const [dr, dc] of [[-1, -1], [-1, 0], [0, -1], [0, 0]]) {
+      const r2 = nr + dr, c2 = nc + dc;
+      if (r2 < 0 || c2 < 0 || r2 >= P.rows - 1 || c2 >= fCols) continue;
+      const f = r2 * fCols + c2;
+      if (P.faceHoleId[f] >= 0) return { kind: 'face', face: P.faceRep[f], cell: -1, edge: -1 };
+    }
+    return null;
   }
 
   return { kind: 'cell', cell, edge: -1 };
@@ -433,14 +624,37 @@ export class Board {
     const boardW = (P.cols - 1) * S + 2 * PAD;
     const boardH = (P.rows - 1) * S + 2 * PAD;
 
-    let g = `<rect class="board-bg" x="1.5" y="1.5" width="${boardW - 3}" height="${boardH - 3}" rx="8"/>`;
+    const shape = getShapePaths(P);
+    let g = shape
+      ? `<path class="board-bg" fill-rule="evenodd" d="${shape.boardPath}"/>`
+      : `<rect class="board-bg" x="1.5" y="1.5" width="${boardW - 3}" height="${boardH - 3}" rx="8"/>`;
 
-    // Dual-face Inside / Outside shading (under grid lines and hint overlays)
+    // Subtle recessed cutout fill inside interior holes (visible beneath any Inside/Outside tint)
+    if (shape && shape.voidHatchPath) {
+      g += `<path class="void-cutout" d="${shape.voidHatchPath}"/>`;
+    }
+
+    // Dual-face Inside / Outside shading (under grid lines and hint overlays; interior holes render as one unified polygon)
     const fr = P.rows - 1, fc = P.cols - 1;
+    const faceExt = P.hasVoids ? P.faceExterior : null;
+    const faceHoleId = P.hasVoids ? P.faceHoleId : null;
     if (marks.faces && fr > 0 && fc > 0) {
+      const doneHoles = faceHoleId ? new Set() : null;
       for (let f = 0; f < fr * fc; f++) {
+        if (faceExt && faceExt[f]) continue;
         const v = marks.faces[f];
         if (!v) continue;
+        const hid = faceHoleId ? faceHoleId[f] : -1;
+        if (hid >= 0) {
+          if (doneHoles.has(hid)) continue;
+          doneHoles.add(hid);
+          const cls = (v === 1 ? 'face-in' : 'face-out') + (marks.autoF && marks.autoF[f] ? ' auto' : '');
+          g += `<path class="${cls}" fill-rule="evenodd" d="${shape.holePaths[hid]}"/>`;
+          if (show.has(`f${f}`)) {
+            g += `<path class="face-bad" fill-rule="evenodd" d="${shape.holeInsetPaths[hid]}"/>`;
+          }
+          continue;
+        }
         const r = (f / fc) | 0, c = f % fc;
         const cls = (v === 1 ? 'face-in' : 'face-out') + (marks.autoF && marks.autoF[f] ? ' auto' : '');
         g += `<rect class="${cls}" x="${vx(c)}" y="${vy(r)}" width="${S}" height="${S}"/>`;
@@ -451,44 +665,71 @@ export class Board {
     }
     const hoverAutoFace = this.hoverFace >= 0 && marks.faces && marks.faces[this.hoverFace] && marks.autoF && marks.autoF[this.hoverFace];
     if (!this.gesture && this.hoverFace >= 0 && !hoverAutoFace && fr > 0 && fc > 0) {
-      const r = (this.hoverFace / fc) | 0, c = this.hoverFace % fc;
-      g += `<rect class="face-hover" x="${vx(c) + 3}" y="${vy(r) + 3}" width="${S - 6}" height="${S - 6}" rx="4"/>`;
+      const hid = faceHoleId ? faceHoleId[this.hoverFace] : -1;
+      if (hid >= 0) {
+        g += `<path class="face-hover" fill-rule="evenodd" d="${shape.holeInsetPaths[hid]}"/>`;
+      } else {
+        const r = (this.hoverFace / fc) | 0, c = this.hoverFace % fc;
+        g += `<rect class="face-hover" x="${vx(c) + 3}" y="${vy(r) + 3}" width="${S - 6}" height="${S - 6}" rx="4"/>`;
+      }
     }
 
     // Hint dual-tile tints (centered on intersections, under the lattice tracks)
     if (hint) {
       if (hint.faces && fr > 0 && fc > 0) {
-        for (const f of hint.faces.in || []) {
-          const r = (f / fc) | 0, c = f % fc;
-          g += `<rect class="hint-face-in" x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4"/>`;
-        }
-        for (const f of hint.faces.out || []) {
-          const r = (f / fc) | 0, c = f % fc;
-          g += `<rect class="hint-face-out" x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4"/>`;
-        }
+        const emitHintFaces = (list, cls) => {
+          const seenH = faceHoleId ? new Set() : null;
+          for (const f of list || []) {
+            if (faceExt && faceExt[f]) continue;
+            const hid = faceHoleId ? faceHoleId[f] : -1;
+            if (hid >= 0) {
+              if (seenH.has(hid)) continue;
+              seenH.add(hid);
+              g += `<path class="${cls}" fill-rule="evenodd" d="${shape.holeInsetPaths[hid]}"/>`;
+            } else {
+              const r = (f / fc) | 0, c = f % fc;
+              g += `<rect class="${cls}" x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4"/>`;
+            }
+          }
+        };
+        emitHintFaces(hint.faces.in, 'hint-face-in');
+        emitHintFaces(hint.faces.out, 'hint-face-out');
       }
       const tile = (i, cls, pad = 0) => `<rect class="${cls}" x="${ix(i) - S / 2 + pad}" y="${iy(i) - S / 2 + pad}" width="${S - 2 * pad}" height="${S - 2 * pad}" rx="${pad ? 8 : 0}"/>`;
-      for (const i of hint.undecided || []) g += tile(i, 'hint-undecided', 2);
+      for (const i of hint.undecided || []) if (!P.hasVoids || !P.isVoid[i]) g += tile(i, 'hint-undecided', 2);
       const roles = hint.roles || {};
-      for (const i of roles.area || []) g += tile(i, 'hint-area', 0);
+      for (const i of roles.area || []) if (!P.hasVoids || !P.isVoid[i]) g += tile(i, 'hint-area', 0);
       for (const role of ['clue', 'path', 'problem', 'focus']) {
-        for (const i of roles[role] || []) g += tile(i, `hint-${role}`, 3);
+        for (const i of roles[role] || []) if (!P.hasVoids || !P.isVoid[i]) g += tile(i, `hint-${role}`, 3);
       }
     }
 
-    // Lattice tracks (horizontal and vertical lines connecting intersections)
-    for (let r = 0; r < P.rows; r++) {
-      g += `<line class="grid-line" x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}"/>`;
-    }
-    for (let c = 0; c < P.cols; c++) {
-      g += `<line class="grid-line" x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}"/>`;
+    // Crisp inner cutout frame & subtle hatch on top of shading so interior voids stay unmistakable when shaded
+    if (shape && shape.voidHatchPath) {
+      g += `<path class="void-cutout-frame" d="${shape.voidHatchPath}"/>`;
     }
 
-    // Subtle anchor dots at empty intersections (bolder on full-board puzzles to show unvisited dots)
+    // Lattice tracks (only active edges so cutouts have no stray tracks)
+    if (P.hasVoids) {
+      for (let x = 0; x < P.numEdges; x++) {
+        if (P.edgeA[x] < 0) continue;
+        const [x1, y1, x2, y2] = segCoords(x);
+        g += `<line class="grid-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      }
+    } else {
+      for (let r = 0; r < P.rows; r++) {
+        g += `<line class="grid-line" x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}"/>`;
+      }
+      for (let c = 0; c < P.cols; c++) {
+        g += `<line class="grid-line" x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}"/>`;
+      }
+    }
+
+    // Subtle anchor dots at empty active intersections (bolder on full-board puzzles to show unvisited dots)
     const dotR = P.fullBoard ? 2.6 : 1.4;
     const dotCls = P.fullBoard ? 'grid-dot full-board' : 'grid-dot';
     for (let i = 0; i < P.N; i++) {
-      if (P.clue[i] || deg[i] > 0) continue;
+      if ((P.hasVoids && P.isVoid[i]) || P.clue[i] || deg[i] > 0) continue;
       g += `<circle class="${dotCls}" cx="${ix(i)}" cy="${iy(i)}" r="${dotR}"/>`;
     }
 
@@ -656,7 +897,7 @@ export class Board {
       labels += `<text class="axis-label side${r === hr ? ' here' : ''}" x="${LABEL - 4}" y="${LABEL + vy(r)}">${r + 1}</text>`;
     }
 
-    const defs = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hatch-bg" width="8" height="8"/><line class="hatch-line" x1="0" y1="0" x2="0" y2="8" stroke-width="3"/></pattern></defs>`;
+    const defs = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hatch-bg" width="8" height="8"/><line class="hatch-line" x1="0" y1="0" x2="0" y2="8" stroke-width="3"/></pattern><pattern id="void-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="void-hatch-line" x1="0" y1="0" x2="0" y2="10" stroke-width="1.2"/></pattern></defs>`;
     this.el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${defs}${labels}<g transform="translate(${LABEL} ${LABEL})">${g}</g></svg>`;
   }
 

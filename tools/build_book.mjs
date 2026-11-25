@@ -49,6 +49,7 @@ const hidden = hasFlag('hidden');
 const preserveExisting = hasFlag('preserve-existing');
 const balanceGroups = hasFlag('balance-groups');
 const interleaveGroups = hasFlag('interleave-groups');
+const sortByGroup = hasFlag('sort-by-group');
 const maxRun = Math.max(1, +arg('max-run', 3));
 const excludeFiles = arg('exclude', '') ? arg('exclude').split(',').filter(Boolean) : [];
 
@@ -360,6 +361,11 @@ if (expertPlus > 0) {
   if (!interleaveGroups) puzzles.sort(byOrder);
 }
 
+if (sortByGroup) {
+  const gIdx = (g) => { const idx = prefixes.indexOf(g); return idx >= 0 ? idx : prefixes.length; };
+  puzzles.sort((a, b) => gIdx(a._group) - gIdx(b._group) || byOrder(a, b));
+}
+
 let bonusPickedCount = 0;
 if (bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
   const bonusPool = [];
@@ -395,9 +401,20 @@ if (bonusPrefixes.length && bonusCount > 0 && fs.existsSync(dir)) {
 
 const pad = Math.max(2, String(puzzles.length).length);
 const tag = id.toUpperCase().replace(/[^A-Z0-9]+/g, '-');
-puzzles.forEach((p, i) => {
-  p.name = `${tag}-${String(i + 1).padStart(pad, '0')}`;
-});
+if (sortByGroup) {
+  const perGroupCount = new Map();
+  puzzles.forEach((p) => {
+    const rawG = (p._group || id).replace(/^shape_/, '');
+    const gTag = rawG.toUpperCase().replace(/[^A-Z0-9]+/g, '-');
+    const n = (perGroupCount.get(gTag) || 0) + 1;
+    perGroupCount.set(gTag, n);
+    p.name = `${gTag}-${String(n).padStart(2, '0')}`;
+  });
+} else {
+  puzzles.forEach((p, i) => {
+    p.name = `${tag}-${String(i + 1).padStart(pad, '0')}`;
+  });
+}
 
 fs.mkdirSync(path.join(root, 'data'), { recursive: true });
 fs.writeFileSync(path.join(root, 'data', `${id}.csv`), toCsv(puzzles), 'utf8');

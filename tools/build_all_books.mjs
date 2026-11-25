@@ -66,6 +66,11 @@ const manifest = {
       blurb: 'Every single intersection must be visited — with circles or pure given lines & walls.',
     },
     {
+      name: 'Shaped boards',
+      icon: '✂️',
+      blurb: 'Cutout silhouettes and Swiss cheese boards with interior holes.',
+    },
+    {
       name: 'Bonus',
       icon: '🎁',
       blurb: 'Themed variations with the same Masyu rules.',
@@ -228,6 +233,19 @@ const recipes = [
     blurb: 'No circles — a mix of permanent segments and walls with the full-board rule.',
   },
 
+  // ---- Shaped boards (top-level section: Swiss cheese + 12-shape sampler)
+  {
+    id: 'shaped-swiss', name: 'Swiss cheese (10×10)', label: '🧀 Swiss cheese (10×10)', group: 'Shaped boards',
+    glob: 'shaped_swiss_10x10', tiers: '50,200,200,50', tierBands: '0:350,300:410,355:620,520:1300',
+    blurb: 'Boards punched with random scattered interior holes — each hole is either Inside or Outside the loop.',
+  },
+  {
+    id: 'shaped-sampler', name: 'Shape sampler', label: '🍩 Shape sampler', group: 'Shaped boards',
+    glob: 'shape_donut,shape_cross,shape_hourglass,shape_figure8,shape_octagon,shape_staircase,shape_lshape,shape_hshape,shape_window,shape_ushape,shape_pinwheel,shape_twin_islands',
+    sortByGroup: true,
+    blurb: '10 puzzles each across 12 iconic cutout shapes (sorted by shape) — Donut, Cross, Hourglass, Figure-8, Octagon, Staircase, L, H, Window, U, Pinwheel, and Twin Islands.',
+  },
+
   // ---- Bonus: one fixed-size book per gimmick (500 puzzles at 10/40/40/10 + 10 Expert+ + 10 Mega finale) + Patterns
   {
     id: 'bonus-white', name: 'All white', label: '⚪ All white (8×8)', group: 'Bonus',
@@ -292,6 +310,7 @@ for (const r of recipes) {
   if (r.bonusCount) args.push('--bonus-count', String(r.bonusCount));
   if (r.balanceGroups) args.push('--balance-groups');
   if (r.interleaveGroups) args.push('--interleave-groups');
+  if (r.sortByGroup) args.push('--sort-by-group');
   if (r.maxRun) args.push('--max-run', String(r.maxRun));
   if (builtFiles.length) args.push('--exclude', builtFiles.join(','));
   execFileSync(process.execPath, args, { stdio: 'inherit' });

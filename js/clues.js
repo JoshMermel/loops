@@ -106,7 +106,7 @@ export function earlyLoopEdges(P, marks) {
   for (const [r, edges] of compEdges) {
     if (!compClosed.get(r)) continue;
     const missesClue = (compClues.get(r) || 0) < totalClues;
-    const missesFull = P.fullBoard && edges.length < P.N;
+    const missesFull = P.fullBoard && edges.length < P.activeCount;
     const hasOtherSegments = edges.length < totalOn;
     if (missesClue || missesFull || hasOtherSegments) {
       for (const x of edges) bad.add(x);
@@ -124,6 +124,7 @@ export function trappedFullCells(P, marks) {
   if (!P.fullBoard) return bad;
   const e = marks.edges;
   for (let i = 0; i < P.N; i++) {
+    if (P.isVoid && P.isVoid[i]) continue;
     if (P.clue[i] !== NONE) continue;
     let avail = 0;
     for (let d = 0; d < 4; d++) {

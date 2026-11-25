@@ -37,6 +37,30 @@ export function compile(p) {
   }
   const N = rows * cols;
   const numEdges = 2 * N;
+
+  // Optional cutout voids (intersections removed from the board)
+  const rawVoids = Array.isArray(p.voids) ? p.voids : [];
+  const isVoid = new Uint8Array(N);
+  const voids = [];
+  for (const v of rawVoids) {
+    if (!Number.isInteger(v.r) || !Number.isInteger(v.c) || v.r < 0 || v.c < 0 || v.r >= rows || v.c >= cols) {
+      throw new Error(`void out of bounds at ${v.r},${v.c}`);
+    }
+    const i = v.r * cols + v.c;
+    if (isVoid[i]) throw new Error(`duplicate void at ${v.r},${v.c}`);
+    isVoid[i] = 1;
+    voids.push({ r: v.r, c: v.c });
+  }
+  const hasVoids = voids.length > 0;
+  const activeCount = N - voids.length;
+  let activeLight = 0, activeDark = 0;
+  for (let i = 0; i < N; i++) {
+    if (isVoid[i]) continue;
+    const r = (i / cols) | 0, c = i % cols;
+    if (((r + c) & 1) === 0) activeLight++;
+    else activeDark++;
+  }
+
   const clue = new Uint8Array(N); // 0 none, 1 white, 2 black, 3 gray
   const clueAt = new Int16Array(N).fill(-1);
   const grayAt = new Int16Array(N).fill(-1);
@@ -47,6 +71,7 @@ export function compile(p) {
       throw new Error(`clue out of bounds at ${cl.r},${cl.c}`);
     }
     const i = cl.r * cols + cl.c;
+    if (isVoid[i]) throw new Error(`clue on void cell ${cl.r},${cl.c}`);
     if (clueAt[i] >= 0) throw new Error(`two clues on cell ${cl.r},${cl.c}`);
     if (cl.t !== 'W' && cl.t !== 'B' && cl.t !== 'G') throw new Error(`unknown clue type "${cl.t}" at ${cl.r},${cl.c}`);
     clueAt[i] = k;
@@ -62,11 +87,13 @@ export function compile(p) {
   const nb = new Int16Array(N * 4).fill(-1);
   const ed = new Int16Array(N * 4).fill(-1);
   for (let i = 0; i < N; i++) {
+    if (isVoid[i]) continue;
     const r = (i / cols) | 0, c = i % cols;
     for (let d = 0; d < 4; d++) {
       const nr = r + DR[d], nc = c + DC[d];
       if (nr < 0 || nc < 0 || nr >= rows || nc >= cols) continue;
       const j = nr * cols + nc;
+      if (isVoid[j]) continue;
       const x = d === 1 ? 2 * i : d === 2 ? 2 * i + 1 : d === 3 ? 2 * j : 2 * j + 1;
       if (edgeA[x] < 0) { edgeA[x] = Math.min(i, j); edgeB[x] = Math.max(i, j); }
       nb[i * 4 + d] = j;
@@ -78,6 +105,7 @@ export function compile(p) {
   const step2 = new Int16Array(N * 4).fill(-1);
   const ed2 = new Int16Array(N * 4).fill(-1);
   for (let i = 0; i < N; i++) {
+    if (isVoid[i]) continue;
     for (let d = 0; d < 4; d++) {
       const j = nb[i * 4 + d];
       if (j < 0) continue;
@@ -105,14 +133,83 @@ export function compile(p) {
         throw new Error(`given edge out of bounds at ${r},${c},${dir}`);
       }
       const edge = dir === 'H' ? 2 * (r * cols + c) : 2 * (r * cols + c) + 1;
+      if (edgeA[edge] < 0) throw new Error(`given edge touches void at ${r},${c},${dir}`);
       if (givenE[edge] !== 0) throw new Error(`duplicate given on edge ${r},${c},${dir}`);
       givenE[edge] = v ? E_ON : E_OFF;
       givens.push({ r, c, dir, v, edge });
     }
   }
 
+  // Dual-face topology for shaped boards:
+  // Missing (void-incident) edges never carry loop segments, so their flanking dual squares always
+  // share Inside/Outside parity. Components touching the outer boundary collapse into exterior cutouts
+  // (`faceExterior`); enclosed components form interior holes (`holeList`, `faceHoleId`, `faceRep`).
+  let faceExterior = null, faceHoleId = null, faceRep = null, holeList = null;
+  if (hasVoids && rows > 1 && cols > 1) {
+    const fr = rows - 1, fc = cols - 1, F = fr * fc, EXT = F;
+    const par = new Int32Array(F + 1);
+    for (let f = 0; f <= F; f++) par[f] = f;
+    const find = (u) => { while (par[u] !== u) { par[u] = par[par[u]]; u = par[u]; } return u; };
+    const unite = (u, v) => {
+      const ru = find(u), rv = find(v);
+      if (ru === rv) return;
+      if (rv === EXT) par[ru] = rv;
+      else par[rv] = ru;
+    };
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < fc; c++) {
+        if (edgeA[2 * (r * cols + c)] >= 0) continue;
+        const a = r > 0 ? (r - 1) * fc + c : EXT;
+        const b = r < fr ? r * fc + c : EXT;
+        unite(a, b);
+      }
+    }
+    for (let r = 0; r < fr; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (edgeA[2 * (r * cols + c) + 1] >= 0) continue;
+        const a = c > 0 ? r * fc + (c - 1) : EXT;
+        const b = c < fc ? r * fc + c : EXT;
+        unite(a, b);
+      }
+    }
+    faceExterior = new Uint8Array(F);
+    faceHoleId = new Int16Array(F).fill(-1);
+    faceRep = new Int16Array(F);
+    holeList = [];
+    const rootToHole = new Map();
+    const extRoot = find(EXT);
+    for (let f = 0; f < F; f++) {
+      const root = find(f);
+      if (root === extRoot) {
+        faceExterior[f] = 1;
+        faceRep[f] = -1;
+        continue;
+      }
+      const r = (f / fc) | 0, c = f % fc;
+      const touchesVoid = isVoid[r * cols + c] || isVoid[r * cols + c + 1]
+        || isVoid[(r + 1) * cols + c] || isVoid[(r + 1) * cols + c + 1];
+      if (touchesVoid) {
+        let hid = rootToHole.get(root);
+        if (hid === undefined) {
+          hid = holeList.length;
+          rootToHole.set(root, hid);
+          holeList.push([]);
+        }
+        holeList[hid].push(f);
+        faceHoleId[f] = hid;
+      }
+    }
+    for (let f = 0; f < F; f++) {
+      if (faceExterior[f]) continue;
+      const hid = faceHoleId[f];
+      faceRep[f] = hid >= 0 ? holeList[hid][0] : f;
+    }
+  }
+
   return Object.assign(p, {
     N, numEdges, clue, clueAt, grayAt, clueCells, whites, blacks, grays,
+    voids, isVoid, hasVoids, activeCount, activeLight, activeDark,
+    faceExterior, faceHoleId, faceRep, holeList,
     fullBoard, givens, hasGivens: givens.length > 0, givenE,
     nb, ed, step2, ed2, edgeA, edgeB,
     _ecOff: null, _ecData: null,
@@ -122,8 +219,9 @@ export function compile(p) {
 export function initialState(P) {
   const cell = new Int8Array(P.N);
   if (P.fullBoard) {
-    cell.fill(LOOP);
+    for (let i = 0; i < P.N; i++) cell[i] = P.isVoid && P.isVoid[i] ? OFF : LOOP;
   } else {
+    if (P.hasVoids) for (let i = 0; i < P.N; i++) if (P.isVoid[i]) cell[i] = OFF;
     for (const i of P.clueCells) cell[i] = LOOP;
   }
   const e = new Int8Array(P.numEdges);
@@ -223,7 +321,7 @@ function getEdgeClues(P) {
  */
 export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const { N, cols, nb, ed, ed2, edgeA, edgeB, whites, blacks, grays } = P;
-  if (P.fullBoard && (N & 1)) return false;
+  if (P.fullBoard && P.activeLight !== P.activeDark) return false;
   const cell = st.cell, e = st.e;
   const clue = st.clue || P.clue;
 
@@ -769,7 +867,7 @@ export function isSolved(P, edges) {
     if (deg[i] === 2) { loopCells++; if (start < 0) start = i; }
   }
   if (loopCells < 4) return false;
-  if (P.fullBoard && loopCells !== N) return false;
+  if (P.fullBoard && loopCells !== P.activeCount) return false;
 
   // Every given edge/wall must be respected
   if (P.hasGivens) {
@@ -862,21 +960,23 @@ export function cluesToString(clues) {
   return (clues || []).map((c) => `${c.r}:${c.c}:${c.t}`).join(';');
 }
 
-/** Serialize fullBoard flag, circle clues, and given edges/walls into the CSV clues field. */
+/** Serialize fullBoard flag, voids, circle clues, and given edges/walls into the CSV clues field. */
 export function puzzleCluesToString(p) {
   const parts = [];
   if (p.fullBoard) parts.push('full');
+  for (const v of p.voids || []) parts.push(`${v.r}:${v.c}:X`);
   for (const c of p.clues || []) parts.push(`${c.r}:${c.c}:${c.t}`);
   for (const gv of p.givens || []) parts.push(`${gv.r}:${gv.c}:${gv.dir}${gv.v}`);
   return parts.join(';');
 }
 
-/** Parse the CSV clues field into `{ clues, fullBoard, givens }`. */
+/** Parse the CSV clues field into `{ clues, fullBoard, givens, voids }`. */
 export function parseCluesField(s) {
   const clues = [];
   const givens = [];
+  const voids = [];
   let fullBoard = false;
-  if (!s) return { clues, fullBoard, givens };
+  if (!s) return { clues, fullBoard, givens, voids };
   for (const tok of s.split(';')) {
     if (!tok) continue;
     if (tok === 'full') { fullBoard = true; continue; }
@@ -887,13 +987,15 @@ export function parseCluesField(s) {
     const r = +parts[0], c = +parts[1], tag = parts[2];
     if (tag === 'W' || tag === 'B' || tag === 'G') {
       clues.push({ r, c, t: tag });
+    } else if (tag === 'X') {
+      voids.push({ r, c });
     } else if (tag === 'H0' || tag === 'H1' || tag === 'V0' || tag === 'V1') {
       givens.push({ r, c, dir: tag[0], v: tag[1] === '1' ? 1 : 0 });
     } else {
       throw new Error(`bad clue "${tok}"`);
     }
   }
-  return { clues, fullBoard, givens };
+  return { clues, fullBoard, givens, voids };
 }
 
 export function cluesFromString(s) {
@@ -917,7 +1019,7 @@ export function parseCsv(text) {
     const t = line.trim();
     if (!t || t.startsWith('#') || t.startsWith('name,')) continue;
     const [name, rows, cols, cluesStr, solution, rules, tier, score] = t.split(',');
-    const { clues, fullBoard, givens } = parseCluesField(cluesStr);
+    const { clues, fullBoard, givens, voids } = parseCluesField(cluesStr);
     const rec = {
       name,
       rows: +rows,
@@ -930,6 +1032,7 @@ export function parseCsv(text) {
     };
     if (fullBoard) rec.fullBoard = true;
     if (givens.length) rec.givens = givens;
+    if (voids.length) rec.voids = voids;
     out.push(rec);
   }
   return out;
@@ -942,6 +1045,7 @@ export function parseCsv(text) {
 export function symmetryKey(p) {
   const { rows, cols } = p;
   const givens = p.givens || [];
+  const voids = p.voids || [];
   const prefix = p.fullBoard ? 'F|' : '';
   let best = null;
   for (let t = 0; t < 8; t++) {
@@ -957,6 +1061,13 @@ export function symmetryKey(p) {
       const [r, c] = xform(cl.r, cl.c);
       return [r * C + c, `${r}:${c}:${cl.t}`];
     }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
+    let vPart = '';
+    if (voids.length) {
+      vPart = '|X:' + voids.map((v) => {
+        const [r, c] = xform(v.r, v.c);
+        return [r * C + c, `${r}:${c}`];
+      }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
+    }
     let gPart = '';
     if (givens.length) {
       gPart = '|' + givens.map((gv) => {
@@ -967,21 +1078,24 @@ export function symmetryKey(p) {
         return [(r * C + c) * 2 + (dir === 'V' ? 1 : 0), `${r}:${c}:${dir}${gv.v}`];
       }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
     }
-    const key = `${prefix}${R}x${C}|${items}${gPart}`;
+    const key = `${prefix}${R}x${C}|${items}${vPart}${gPart}`;
     if (best === null || key < best) best = key;
   }
   return best;
 }
 
-/** Orientation-specific short stable hash of size + clues (+ fullBoard / givens), for localStorage save keys. */
+/** Orientation-specific short stable hash of size + clues (+ fullBoard / voids / givens), for localStorage save keys. */
 export function puzzleHash(p) {
   if (p.hashKey) return p.hashKey;
   const sorted = [...p.clues].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c));
+  const sortedV = p.voids && p.voids.length
+    ? [...p.voids].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
+    : null;
   const sortedG = p.givens && p.givens.length
     ? [...p.givens].sort((a, b) => ((a.r * p.cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * p.cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)))
     : null;
-  const body = (p.fullBoard || sortedG)
-    ? puzzleCluesToString({ fullBoard: p.fullBoard, clues: sorted, givens: sortedG || [] })
+  const body = (p.fullBoard || sortedV || sortedG)
+    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, givens: sortedG || [] })
     : cluesToString(sorted);
   const s = `${p.rows}x${p.cols}|${body}`;
   let h = 5381;

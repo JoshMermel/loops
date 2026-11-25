@@ -367,3 +367,81 @@ test('fullBoard & given edges/walls: brute-force cross-check, CSV roundtrip, sym
   assert.notEqual(symmetryKey(pA), symmetryKey(pPlain));
   assert.notEqual(puzzleHash(pA), puzzleHash(pPlain));
 });
+
+test('shaped / cutout boards (voids): brute-force cross-check, dual-face topology, CSV roundtrip, and validation', () => {
+  // 1. Dual-face topology on a 6x6 Donut (2x2 center voids -> 1 interior hole of 9 faces, 0 exterior cutout faces)
+  const donut = compile({
+    name: 'donut6', rows: 6, cols: 6, clues: [],
+    voids: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }],
+  });
+  assert.equal(donut.hasVoids, true);
+  assert.equal(donut.activeCount, 32);
+  assert.equal(donut.holeList.length, 1);
+  assert.equal(donut.holeList[0].length, 9);
+  assert.equal(donut.faceExterior.reduce((a, b) => a + b, 0), 0);
+
+  // 2. Dual-face topology on a 6x6 Cross (2x2 corner cutouts -> 16 exterior cutout faces, 0 interior holes)
+  const crossVoids = [];
+  for (const r of [0, 1, 4, 5]) for (const c of [0, 1, 4, 5]) crossVoids.push({ r, c });
+  const cross = compile({ name: 'cross6', rows: 6, cols: 6, clues: [], voids: crossVoids });
+  assert.equal(cross.holeList.length, 0);
+  assert.equal(cross.faceExterior.reduce((a, b) => a + b, 0), 16);
+
+  // 3. Validation rejects clue on void, given touching void, duplicate void, out-of-bounds void
+  assert.throws(() => compile({ name: 'badv1', rows: 4, cols: 4, voids: [{ r: 1, c: 1 }], clues: [{ r: 1, c: 1, t: 'W' }] }), /void/);
+  assert.throws(() => compile({ name: 'badv2', rows: 4, cols: 4, voids: [{ r: 1, c: 1 }], clues: [], givens: [{ r: 1, c: 0, dir: 'H', v: 1 }] }), /void/);
+  assert.throws(() => compile({ name: 'badv3', rows: 4, cols: 4, voids: [{ r: 1, c: 1 }, { r: 1, c: 1 }], clues: [] }), /duplicate void/);
+  assert.throws(() => compile({ name: 'badv4', rows: 4, cols: 4, voids: [{ r: 4, c: 0 }], clues: [] }), /void out of bounds/);
+
+  // 4. 120 random 4x4 and 5x5 shaped boards (exterior cutouts + interior holes, standard + fullBoard)
+  const rng = mulberry32(202611);
+  let checkedNonZero = 0;
+  for (let k = 0; k < 120; k++) {
+    const rows = k < 60 ? 4 : 5, cols = k < 60 ? 4 : 5;
+    const voidCount = 1 + (k % 4);
+    const used = new Set();
+    const voids = [];
+    for (let j = 0; j < voidCount; j++) {
+      const r = (rng() * rows) | 0, c = (rng() * cols) | 0;
+      if (used.has(r * cols + c)) continue;
+      used.add(r * cols + c);
+      voids.push({ r, c });
+    }
+    const clues = [];
+    const nClues = k % 5 === 0 ? 0 : 1 + (k % 4);
+    for (let j = 0; j < nClues; j++) {
+      const r = (rng() * rows) | 0, c = (rng() * cols) | 0;
+      if (used.has(r * cols + c)) continue;
+      used.add(r * cols + c);
+      const t = rng() < 0.45 ? 'W' : rng() < 0.85 ? 'B' : 'G';
+      clues.push({ r, c, t });
+    }
+    const fullBoard = k % 4 === 3;
+    const P = compile({ name: `sh_${k}`, rows, cols, voids, clues, fullBoard });
+    const ref = referenceCount(P);
+    const lim = rows === 4 ? 500 : 10;
+    const fast = solve(P, { limit: lim });
+    assert.equal(fast.exceeded, false);
+    assert.equal(fast.count, Math.min(ref, lim), `shaped mismatch on ${k}: fast=${fast.count} ref=${ref}`);
+    for (const sol of fast.solutions) assert.equal(isSolved(P, sol.e), true);
+    if (ref > 0) checkedNonZero++;
+  }
+  assert.ok(checkedNonZero >= 35, `expected >= 35 solvable shaped boards, got ${checkedNonZero}`);
+
+  // 5. CSV roundtrip + dihedral symmetryKey + puzzleHash
+  const pA = compile({
+    name: 'rt_sh', rows: 5, cols: 6,
+    voids: [{ r: 0, c: 0 }, { r: 2, c: 3 }],
+    clues: [{ r: 1, c: 2, t: 'W' }],
+  });
+  const parsed = parseCsv(toCsv([pA]))[0];
+  assert.deepEqual(parsed.voids, [{ r: 0, c: 0 }, { r: 2, c: 3 }]);
+  assert.deepEqual(parsed.clues, pA.clues);
+  const pFlip = compile({
+    name: 'rt_sh_flip', rows: 5, cols: 6,
+    voids: [{ r: 0, c: 5 }, { r: 2, c: 2 }],
+    clues: [{ r: 1, c: 3, t: 'W' }],
+  });
+  assert.equal(symmetryKey(pA), symmetryKey(pFlip));
+  assert.notEqual(puzzleHash(pA), puzzleHash(pFlip));
+});

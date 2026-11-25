@@ -1424,6 +1424,7 @@ function computeAllChecker(P, st) {
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
         const u = r * cols + c;
+        if (st.cell[u] === OFF) continue;
         const need = 2 - onc[u];
         if (need <= 0) continue;
         const isLight = ((r + c) & 1) === 0;
@@ -1520,7 +1521,8 @@ function findCrossingParity(P, st) {
     cpVOn[base] = 0;
     cpVUnk[base] = 0;
     for (let c = 0; c < cols; c++) {
-      const ev = st.e[ed[(r * cols + c) * 4 + 0]];
+      const x = ed[(r * cols + c) * 4 + 0];
+      const ev = x >= 0 ? st.e[x] : E_OFF;
       if (ev === E_ON) sOn++;
       else if (ev === E_UNKNOWN) sUnk++;
       cpVOn[base + c + 1] = sOn;
@@ -1534,7 +1536,8 @@ function findCrossingParity(P, st) {
     cpHOn[base] = 0;
     cpHUnk[base] = 0;
     for (let r = 0; r < rows; r++) {
-      const ev = st.e[ed[(r * cols + c) * 4 + 3]];
+      const x = ed[(r * cols + c) * 4 + 3];
+      const ev = x >= 0 ? st.e[x] : E_OFF;
       if (ev === E_ON) sOn++;
       else if (ev === E_UNKNOWN) sUnk++;
       cpHOn[base + r + 1] = sOn;
@@ -1556,13 +1559,13 @@ function findCrossingParity(P, st) {
 
     let lastX = -1;
     if (topUnk === 1) {
-      for (let c = c1; c <= c2; c++) { const x = ed[(r1 * cols + c) * 4 + 0]; if (st.e[x] === E_UNKNOWN) { lastX = x; break; } }
+      for (let c = c1; c <= c2; c++) { const x = ed[(r1 * cols + c) * 4 + 0]; if (x >= 0 && st.e[x] === E_UNKNOWN) { lastX = x; break; } }
     } else if (botUnk === 1) {
-      for (let c = c1; c <= c2; c++) { const x = ed[(r2 * cols + c) * 4 + 2]; if (st.e[x] === E_UNKNOWN) { lastX = x; break; } }
+      for (let c = c1; c <= c2; c++) { const x = ed[(r2 * cols + c) * 4 + 2]; if (x >= 0 && st.e[x] === E_UNKNOWN) { lastX = x; break; } }
     } else if (leftUnk === 1) {
-      for (let r = r1; r <= r2; r++) { const x = ed[(r * cols + c1) * 4 + 3]; if (st.e[x] === E_UNKNOWN) { lastX = x; break; } }
+      for (let r = r1; r <= r2; r++) { const x = ed[(r * cols + c1) * 4 + 3]; if (x >= 0 && st.e[x] === E_UNKNOWN) { lastX = x; break; } }
     } else {
-      for (let r = r1; r <= r2; r++) { const x = ed[(r * cols + c2) * 4 + 1]; if (st.e[x] === E_UNKNOWN) { lastX = x; break; } }
+      for (let r = r1; r <= r2; r++) { const x = ed[(r * cols + c2) * 4 + 1]; if (x >= 0 && st.e[x] === E_UNKNOWN) { lastX = x; break; } }
     }
     if (lastX < 0 || seen.has(lastX)) return;
     seen.add(lastX);
@@ -1573,7 +1576,10 @@ function findCrossingParity(P, st) {
       + (c2 < cols - 1 ? cpHOn[(c2 + 1) * H + r2 + 1] - cpHOn[(c2 + 1) * H + r1] : 0);
     const val = (on & 1) ? E_ON : E_OFF;
     const area = [];
-    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) area.push(r * cols + c);
+    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
+      const u = r * cols + c;
+      if (!P.hasVoids || !P.isVoid[u]) area.push(u);
+    }
     out.push({ sets: [['e', lastX, val]], info: { edge: lastX, val, rect: [r1, r2, c1, c2], on, area } });
   };
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile } from '../js/logic.js';
-import { hitTestCoords, advanceDrag, advanceFaceDrag, CELL_SIZE } from '../js/board.js';
+import { hitTestCoords, advanceDrag, advanceFaceDrag, tilesOutlinePath, CELL_SIZE } from '../js/board.js';
 import { clueStates, earlyLoopEdges, trappedFullCells } from '../js/clues.js';
 import { otherEnd } from '../js/lineends.js';
 import { makeColorKeeper, assignPathColors } from '../js/pathcolors.js';
@@ -389,4 +389,54 @@ test('pathcolors keeps colors stable when extending, joining, splitting, or avoi
   const cn2 = assignPathColors(kNear, onN, (x) => x, 3, near);
   assert.equal(cn2.get(0), cn1.get(0));
   assert.equal(alike[cn2.get(0)][cn2.get(2)], 0, 'adjacent path should avoid alike color');
+});
+
+test('shaped boards: unified interior-hole hit-testing, exterior cutout rejection, void-safe drag, and tilesOutlinePath', () => {
+  // 6x6 Donut: 2x2 center voids (2,2),(2,3),(3,2),(3,3) -> hole covers dual squares (1..3, 1..3)
+  const donut = compile({
+    name: 'donut_b', rows: 6, cols: 6, clues: [],
+    voids: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }],
+  });
+  const holeRep = donut.holeList[0][0];
+
+  // Dead center of hole, directly on a void vertex, and on a missing internal track ALL hit the same hole rep!
+  const hCenter = hitTestCoords(donut, 2.5 * S, 2.5 * S);
+  const hOnVoid = hitTestCoords(donut, 2.0 * S, 2.0 * S);
+  const hMissingTrack = hitTestCoords(donut, 2.5 * S, 2.0 * S);
+  const hInnerRimGap = hitTestCoords(donut, 1.5 * S, 2.0 * S);
+  for (const h of [hCenter, hOnVoid, hMissingTrack, hInnerRimGap]) {
+    assert.equal(h?.kind, 'face');
+    assert.equal(h?.face, holeRep, 'entire donut hole must act as one big click target');
+  }
+
+  // Active rim track (1,2)-(1,3) still hits as an edge, and active rim intersection (1,2) still hits as a cell
+  const hRimEdge = hitTestCoords(donut, 2.5 * S, 1.0 * S);
+  assert.equal(hRimEdge.kind, 'edge');
+  assert.equal(hRimEdge.edge, 2 * (1 * 6 + 2));
+  const hRimCell = hitTestCoords(donut, 2.0 * S, 1.0 * S);
+  assert.equal(hRimCell.kind, 'cell');
+  assert.equal(hRimCell.cell, 1 * 6 + 2);
+
+  // Exterior cutout (6x6 Cross): clicking inside a cut-off corner returns null
+  const crossVoids = [];
+  for (const r of [0, 1, 4, 5]) for (const c of [0, 1, 4, 5]) crossVoids.push({ r, c });
+  const cross = compile({ name: 'cross_b', rows: 6, cols: 6, clues: [], voids: crossVoids });
+  assert.equal(hitTestCoords(cross, 0.5 * S, 0.5 * S), null);
+  assert.equal(hitTestCoords(cross, 0.0 * S, 0.0 * S), null);
+
+  // Dragging across the donut hole never fires a nonexistent void edge
+  const startHit = hitTestCoords(donut, 1.0 * S, 2.0 * S); // active cell (2,1) left of hole
+  const g = { startHit, curCell: startHit.cell, dragged: false, firstStep: true, lastEdge: -1, trail: [] };
+  const steps = [];
+  advanceDrag(donut, g, 4.0 * S, 2.0 * S, (a, b) => steps.push([a, b]));
+  for (const [a, b] of steps) {
+    assert.equal(donut.isVoid[a], 0);
+    assert.equal(donut.isVoid[b], 0);
+  }
+
+  // tilesOutlinePath emits 2 closed subpaths (outer + hole) for Donut and 1 subpath for Cross
+  const dDonut = tilesOutlinePath(6, 6, (r, c) => !donut.isVoid[r * 6 + c], 0, 0, S, S, 8);
+  assert.equal((dDonut.match(/Z/g) || []).length, 2, 'donut silhouette should have outer + inner loop');
+  const dCross = tilesOutlinePath(6, 6, (r, c) => !cross.isVoid[r * 6 + c], 0, 0, S, S, 8);
+  assert.equal((dCross.match(/Z/g) || []).length, 1, 'cross silhouette should have 1 single outer loop');
 });

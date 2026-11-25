@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { compile, parseCsv, colName, edgeCells } from '../js/logic.js';
+import { tilesOutlinePath } from '../js/board.js';
 import { describeMarks } from '../js/explain.js';
 import { repoRoot } from './_cli.mjs';
 
@@ -58,7 +59,9 @@ for (const ex of examples) {
     return [ix(a), iy(a), ix(b), iy(b)];
   };
 
-  let g = `<rect x="1" y="1" width="${innerW - 2}" height="${innerH - 2}" rx="8" fill="#ffffff" stroke="#e0e0e0" stroke-width="1.5"/>`;
+  let g = P.hasVoids
+    ? `<path fill="#ffffff" fill-rule="evenodd" stroke="#e0e0e0" stroke-width="1.5" d="${tilesOutlinePath(P.rows, P.cols, (r, c) => !P.isVoid[r * P.cols + c], PAD - S / 2, PAD - S / 2, S, S, 8)}"/>`
+    : `<rect x="1" y="1" width="${innerW - 2}" height="${innerH - 2}" rx="8" fill="#ffffff" stroke="#e0e0e0" stroke-width="1.5"/>`;
 
   // Dual-face Inside/Outside hint shading (for faceParity)
   if (ex.faces && P.rows > 1 && P.cols > 1) {
@@ -92,11 +95,19 @@ for (const ex of examples) {
   }
 
   // Lattice lines
-  for (let r = 0; r < P.rows; r++) g += `<line x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}" stroke="#cccccc" stroke-width="1.2"/>`;
-  for (let c = 0; c < P.cols; c++) g += `<line x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}" stroke="#cccccc" stroke-width="1.2"/>`;
+  if (P.hasVoids) {
+    for (let x = 0; x < P.numEdges; x++) {
+      if (P.edgeA[x] < 0) continue;
+      const [x1, y1, x2, y2] = segCoords(x);
+      g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#cccccc" stroke-width="1.2"/>`;
+    }
+  } else {
+    for (let r = 0; r < P.rows; r++) g += `<line x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}" stroke="#cccccc" stroke-width="1.2"/>`;
+    for (let c = 0; c < P.cols; c++) g += `<line x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}" stroke="#cccccc" stroke-width="1.2"/>`;
+  }
   if (P.fullBoard) {
     for (let i = 0; i < P.N; i++) {
-      if (P.clue[i]) continue;
+      if ((P.hasVoids && P.isVoid[i]) || P.clue[i]) continue;
       g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="2.3" fill="#666666"/>`;
     }
   }

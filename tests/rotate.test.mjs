@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { compile, parseCsv, decodeSolution, isSolved, puzzleHash } from '../js/logic.js';
+import { compile, parseCsv, decodeSolution, encodeSolution, solve, isSolved, puzzleHash } from '../js/logic.js';
 import { facesFromSolvedLoop, numFacesOf, reconcileAutoX, reconcileAutoShade } from '../js/marks.js';
 import { computeHint } from '../js/hintstep.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from '../js/rotate.js';
@@ -139,4 +139,23 @@ test('chooseLayout auto-rotates tall boards on landscape screens without horizon
   // Manual override respected on non-square boards, ignored on square boards
   assert.deepEqual(chooseLayout(20, 6, 1340, 580, false), { rotated: false, px: 28 });
   assert.deepEqual(chooseLayout(16, 16, 1340, 580, true), { rotated: false, px: 35 });
+});
+
+test('rotatePuzzleCW rotates shaped board voids cleanly and preserves exact solution', () => {
+  const base = compile({
+    name: 'sh_rot', rows: 5, cols: 7,
+    voids: [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 2, c: 3 }],
+    clues: [{ r: 0, c: 2, t: 'B' }, { r: 4, c: 6, t: 'B' }, { r: 2, c: 1, t: 'W' }],
+  });
+  const sol = solve(base, { limit: 1 });
+  assert.ok(sol.count >= 1);
+  base.solution = encodeSolution(base, sol.solutions[0]);
+  const rot = rotatePuzzleCW(base);
+  assert.equal(rot.rows, 7);
+  assert.equal(rot.cols, 5);
+  assert.equal(rot.voids.length, 3);
+  assert.equal(rot.isVoid[0 * 5 + 4], 1); // (0,0) -> (0,4)
+  assert.equal(rot.isVoid[1 * 5 + 4], 1); // (0,1) -> (1,4)
+  assert.equal(rot.isVoid[3 * 5 + 2], 1); // (2,3) -> (3,2)
+  assert.equal(isSolved(rot, decodeSolution(rot, rot.solution).e), true);
 });

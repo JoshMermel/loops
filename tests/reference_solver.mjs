@@ -17,8 +17,10 @@ function isTurn(a, b, c, cols) {
  * Enumerates every undirected simple cycle on the grid and checks Masyu rules directly on the cycle's vertices.
  */
 export function referenceCount(p) {
-  const { rows, cols, clues = [], fullBoard = false, givens = [] } = p;
+  const { rows, cols, clues = [], fullBoard = false, givens = [], voids = [] } = p;
   const N = rows * cols;
+  const voidSet = new Set(voids.map((v) => v.r * cols + v.c));
+  const activeCount = N - voidSet.size;
   const clueType = new Map();
   for (const cl of clues) clueType.set(cl.r * cols + cl.c, cl.t);
   const reqEdges = new Set();
@@ -31,22 +33,26 @@ export function referenceCount(p) {
     else banEdges.add(edgeKey(a, b));
   }
 
-  // Build plain adjacency list per vertex (skipping banned given walls)
+  // Build plain adjacency list per vertex (skipping voids and banned given walls)
   const adj = Array.from({ length: N }, (_, i) => {
+    if (voidSet.has(i)) return [];
     const r = (i / cols) | 0, c = i % cols;
     const out = [];
     for (const [dr, dc] of DIRS) {
       const nr = r + dr, nc = c + dc;
       if (nr >= 0 && nc >= 0 && nr < rows && nc < cols) {
         const j = nr * cols + nc;
-        if (!banEdges.has(edgeKey(i, j))) out.push(j);
+        if (!voidSet.has(j) && !banEdges.has(edgeKey(i, j))) out.push(j);
       }
     }
     return out;
   });
 
-  // If fullBoard, any cycle must start at 0; else min cell index <= smallest clue cell index.
-  let maxStart = fullBoard ? 0 : N - 1;
+  // If fullBoard, any cycle must start at the first active cell; else min cell index <= smallest clue cell index.
+  let firstActive = 0;
+  while (firstActive < N && voidSet.has(firstActive)) firstActive++;
+  if (firstActive >= N) return 0;
+  let maxStart = fullBoard ? firstActive : N - 1;
   if (!fullBoard) for (const i of clueType.keys()) if (i < maxStart) maxStart = i;
 
   const visited = new Uint8Array(N);
@@ -56,7 +62,7 @@ export function referenceCount(p) {
   const checkCycle = () => {
     const L = path.length;
     if (L < 4) return false;
-    if (fullBoard && L !== N) return false;
+    if (fullBoard && L !== activeCount) return false;
     // Must visit every clue cell
     for (const ci of clueType.keys()) if (!visited[ci]) return false;
     // Must include every required given edge
@@ -94,7 +100,8 @@ export function referenceCount(p) {
     return true;
   };
 
-  for (let start = 0; start <= maxStart; start++) {
+  for (let start = firstActive; start <= maxStart; start++) {
+    if (voidSet.has(start)) continue;
     visited[start] = 1;
     path.push(start);
     const dfs = (cur) => {

@@ -1,6 +1,7 @@
 // Printable Masyu booklets: fixed black-and-white SVG laid out by cell size to fit both A4 and Letter.
 // Every page header links back to the site. Everything except buildPrintRoot is pure (tested in tests/print.test.mjs).
 import { E_ON } from './logic.js';
+import { tilesOutlinePath } from './board.js';
 
 const INK = '#111', GRID = '#8c8c8c';
 export const MAX_PRINT = 500;
@@ -76,11 +77,22 @@ export function boardSvg(P, sol = null) {
   const pad = 0.55;
   const w = cols - 1, h = rows - 1;
   let g = `<rect x="${-pad}" y="${-pad}" width="${w + 2 * pad}" height="${h + 2 * pad}" fill="#fff"/>`;
-  for (let c = 0; c < cols; c++) g += `<line x1="${c}" y1="0" x2="${c}" y2="${h}" stroke="${GRID}" stroke-width="0.03"/>`;
-  for (let r = 0; r < rows; r++) g += `<line x1="0" y1="${r}" x2="${w}" y2="${r}" stroke="${GRID}" stroke-width="0.03"/>`;
+  if (P.hasVoids) {
+    const outline = tilesOutlinePath(rows, cols, (r, c) => !P.isVoid[r * cols + c], -0.5, -0.5, 1, 1, 0.14);
+    g += `<path class="shape-outline" fill="#fff" fill-rule="evenodd" stroke="#b5b5b5" stroke-width="0.035" d="${outline}"/>`;
+    for (let x = 0; x < P.numEdges; x++) {
+      if (P.edgeA[x] < 0) continue;
+      const a = P.edgeA[x], b = P.edgeB[x];
+      g += `<line x1="${a % cols}" y1="${(a / cols) | 0}" x2="${b % cols}" y2="${(b / cols) | 0}" stroke="${GRID}" stroke-width="0.03"/>`;
+    }
+  } else {
+    for (let c = 0; c < cols; c++) g += `<line x1="${c}" y1="0" x2="${c}" y2="${h}" stroke="${GRID}" stroke-width="0.03"/>`;
+    for (let r = 0; r < rows; r++) g += `<line x1="0" y1="${r}" x2="${w}" y2="${r}" stroke="${GRID}" stroke-width="0.03"/>`;
+  }
 
   if (P.fullBoard) {
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (P.hasVoids && P.isVoid[r * cols + c]) continue;
       g += `<circle class="full-dot" cx="${c}" cy="${r}" r="0.065" fill="#555"/>`;
     }
   }

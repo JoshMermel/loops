@@ -6,7 +6,7 @@ import { TIER_INFO, beyondHints } from './rating.js';
 import { computeHint, advanceHint, checkMarksAgainstSolution } from './hintstep.js';
 import { ROLES, describeMarks } from './explain.js';
 import {
-  cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
+  cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf, setFaceGroup,
   cycleGrayLabel, cycleGrayLabelReverse, reconcileAutoGray,
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
@@ -174,13 +174,12 @@ function toggleEdge(x) {
 
 function cycleFace(f, reverse = false) {
   const P = state.P, m = state.marks;
-  if (f < 0 || f >= m.faces.length || (m.faces[f] && m.autoF[f])) {
+  if (f < 0 || f >= m.faces.length || (P.hasVoids && P.faceExterior[f]) || (m.faces[f] && m.autoF[f])) {
     state.facePaintVal = null;
     return;
   }
   const next = reverse ? cycleFaceMarkReverse(m.faces[f]) : cycleFaceMark(m.faces[f]);
-  m.faces[f] = next;
-  m.autoF[f] = 0;
+  setFaceGroup(P, m, f, next, 0);
   state.facePaintVal = next;
   reconcileAuto(P, m);
   refresh();
@@ -190,10 +189,10 @@ function paintFaceStep(f) {
   const P = state.P, m = state.marks;
   const val = state.facePaintVal;
   if (val === null || val === undefined || f < 0 || f >= m.faces.length) return;
+  if (P.hasVoids && P.faceExterior[f]) return;
   if (m.faces[f] && m.autoF[f]) return;
   if (m.faces[f] === val) return;
-  m.faces[f] = val;
-  m.autoF[f] = 0;
+  setFaceGroup(P, m, f, val, 0);
   reconcileAuto(P, m);
   refresh();
 }

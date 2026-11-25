@@ -649,3 +649,72 @@ test('fullBoard rules (checkerPocket, checkerParity, givens) fire cleanly and ar
   assert.ok(solvedCount >= checked * 0.85, `expected rules to solve most fullBoard boards, got ${solvedCount}/${checked}`);
   assert.ok(rulesSeen.size >= 3, `expected >= 3 rules on fullBoard fuzz, saw ${[...rulesSeen].join(', ')}`);
 });
+
+test('shaped / cutout boards: faceParity across holes & cutouts and soundness fuzz on random unique shaped boards', () => {
+  // 1. faceShade bridges directly across an interior donut hole to force an edge on the far side!
+  const donut = compile({
+    name: 'fp_donut', rows: 6, cols: 6, clues: [],
+    voids: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }],
+  });
+  const st = initialState(donut);
+  // Top border (0,2)-(0,3) ON -> face(0,2)=IN; inner top rim (1,2)-(1,3) OFF -> whole donut hole = IN.
+  // Bottom border (5,2)-(5,3) OFF -> face(4,2)=OUT. So inner bottom rim (4,2)-(4,3) separates IN (hole) from OUT -> forced ON!
+  st.e[2 * (0 * 6 + 2)] = E_ON;
+  st.e[2 * (1 * 6 + 2)] = E_OFF;
+  st.e[2 * (5 * 6 + 2)] = E_OFF;
+  const fs = findFaceShade(donut, st);
+  const eBotRim = 2 * (4 * 6 + 2);
+  const hit = fs.find((x) => x.info.edge === eBotRim);
+  assert.ok(hit, 'faceShade must propagate parity across the donut hole to force far rim edge');
+  assert.deepEqual(hit.sets, [['e', eBotRim, E_ON]]);
+  assert.ok(hit.info.facesIn.length >= 9, 'faceShade hint overlay should include all 9 squares of the donut hole');
+
+  // 2. Soundness fuzz on random unique shaped boards (interior holes + exterior cutouts)
+  const rng = mulberry32(202612);
+  let checked = 0, solvedCount = 0;
+  const rulesSeen = new Set();
+  for (let attempt = 0; attempt < 900 && checked < 35; attempt++) {
+    const rows = 6, cols = 6;
+    const voids = attempt % 2 === 0
+      // Donut / interior holes
+      ? [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }]
+      // Cut-off corners + interior hole
+      : [{ r: 0, c: 0 }, { r: 0, c: 5 }, { r: 5, c: 0 }, { r: 5, c: 5 }, { r: 2, c: 2 }];
+    const empty = compile({ name: 'sh_e', rows, cols, voids, clues: [] });
+    const solRes = solve(empty, { limit: 1, maxNodes: 8000, rng });
+    if (!solRes.count) continue;
+    const truth = solRes.solutions[0];
+    const clues = [];
+    for (let i = 0; i < empty.N; i++) {
+      if (empty.isVoid[i]) continue;
+      const dirs = [];
+      for (let d = 0; d < 4; d++) { const x = empty.ed[i * 4 + d]; if (x >= 0 && truth.e[x] === E_ON) dirs.push(d); }
+      if (dirs.length !== 2) continue;
+      const straight = ((dirs[0] ^ dirs[1]) & 1) === 0;
+      const ext0 = empty.ed2[i * 4 + dirs[0]], ext1 = empty.ed2[i * 4 + dirs[1]];
+      const s0 = ext0 >= 0 && truth.e[ext0] === E_ON, s1 = ext1 >= 0 && truth.e[ext1] === E_ON;
+      if (straight && !(s0 && s1) && rng() < 0.85) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'W' });
+      else if (!straight && s0 && s1 && rng() < 0.85) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'B' });
+    }
+    const P = compile({ name: `shf_${attempt}`, rows, cols, voids, clues });
+    const exact = solve(P, { limit: 2, maxNodes: 25000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    checked++;
+    const exactSol = exact.solutions[0];
+    const r = rate(P);
+    for (const s of r.steps) {
+      if (!s.info?.bookkeeping) rulesSeen.add(s.rule);
+      for (const [k, idx, val] of s.sets) {
+        if (k === 'e') assert.equal(val, exactSol.e[idx], `UNSOUND edge by ${s.rule} on ${P.name}`);
+        else if (k === 'c') assert.equal(val, exactSol.cell[idx], `UNSOUND cell by ${s.rule} on ${P.name}`);
+      }
+    }
+    if (r.solved) {
+      solvedCount++;
+      assert.equal(encodeSolution(P, r.state), encodeSolution(P, exactSol));
+    }
+  }
+  assert.ok(checked >= 25, `expected >= 25 unique shaped boards, got ${checked}`);
+  assert.ok(solvedCount >= checked * 0.85, `expected rules to solve most shaped boards, got ${solvedCount}/${checked}`);
+  assert.ok(rulesSeen.size >= 5, `expected >= 5 rules on shaped fuzz, saw ${[...rulesSeen].join(', ')}`);
+});

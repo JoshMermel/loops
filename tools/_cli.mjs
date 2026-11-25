@@ -35,6 +35,7 @@ export function verifyPuzzle(p, { maxNodes = 500000 } = {}) {
     cols: p.cols,
     clues: p.clues,
     ...(p.fullBoard ? { fullBoard: true } : {}),
+    ...(p.voids && p.voids.length ? { voids: p.voids } : {}),
     ...(p.givens && p.givens.length ? { givens: p.givens } : {}),
   });
   const dec = decodeSolution(fresh, p.solution);

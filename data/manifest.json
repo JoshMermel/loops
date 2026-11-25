@@ -44,6 +44,11 @@
       "blurb": "Every single intersection must be visited — with circles or pure given lines & walls."
     },
     {
+      "name": "Shaped boards",
+      "icon": "✂️",
+      "blurb": "Cutout silhouettes and Swiss cheese boards with interior holes."
+    },
+    {
       "name": "Bonus",
       "icon": "🎁",
       "blurb": "Themed variations with the same Masyu rules."
@@ -312,6 +317,24 @@
       "count": 500,
       "group": "Full board",
       "blurb": "No circles — a mix of permanent segments and walls with the full-board rule."
+    },
+    {
+      "id": "shaped-swiss",
+      "name": "Swiss cheese (10×10)",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/shaped-swiss.csv",
+      "count": 500,
+      "group": "Shaped boards",
+      "blurb": "Boards punched with random scattered interior holes — each hole is either Inside or Outside the loop."
+    },
+    {
+      "id": "shaped-sampler",
+      "name": "Shape sampler",
+      "label": "🍩 Shape sampler",
+      "file": "data/shaped-sampler.csv",
+      "count": 120,
+      "group": "Shaped boards",
+      "blurb": "10 puzzles each across 12 iconic cutout shapes (sorted by shape) — Donut, Cross, Hourglass, Figure-8, Octagon, Staircase, L, H, Window, U, Pinwheel, and Twin Islands."
     },
     {
       "id": "bonus-white",

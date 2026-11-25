@@ -132,16 +132,27 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
     return true;
   };
 
+  const faceExt = P.hasVoids ? P.faceExterior : null;
+  const faceRep = P.hasVoids ? P.faceRep : null;
+  const canonFace = (f) => {
+    if (f < 0 || f >= F) return EXT;
+    if (faceExt) {
+      if (faceExt[f]) return EXT;
+      return faceRep[f];
+    }
+    return f;
+  };
+
   const edgeFaceA = (x) => {
     const cell = x >> 1;
     const r = (cell / cols) | 0, c = cell % cols;
-    if ((x & 1) === 0) return r > 0 && c < fc ? (r - 1) * fc + c : EXT;
-    return r < fr && c > 0 ? r * fc + (c - 1) : EXT;
+    if ((x & 1) === 0) return canonFace(r > 0 && c < fc ? (r - 1) * fc + c : EXT);
+    return canonFace(r < fr && c > 0 ? r * fc + (c - 1) : EXT);
   };
   const edgeFaceB = (x) => {
     const cell = x >> 1;
     const r = (cell / cols) | 0, c = cell % cols;
-    return r < fr && c < fc ? r * fc + c : EXT;
+    return canonFace(r < fr && c < fc ? r * fc + c : EXT);
   };
 
   // 1. Known loop segments (E_ON -> opposite) and crosses (E_OFF -> same)
@@ -162,10 +173,10 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
     for (let wi = 0; wi < whites.length; wi++) {
       const cell = whites[wi];
       const wr = (cell / cols) | 0, wc = cell % cols;
-      const nw = wr > 0 && wc > 0 ? (wr - 1) * fc + (wc - 1) : EXT;
-      const ne = wr > 0 && wc < fc ? (wr - 1) * fc + wc : EXT;
-      const sw = wr < fr && wc > 0 ? wr * fc + (wc - 1) : EXT;
-      const se = wr < fr && wc < fc ? wr * fc + wc : EXT;
+      const nw = canonFace(wr > 0 && wc > 0 ? (wr - 1) * fc + (wc - 1) : EXT);
+      const ne = canonFace(wr > 0 && wc < fc ? (wr - 1) * fc + wc : EXT);
+      const sw = canonFace(wr < fr && wc > 0 ? wr * fc + (wc - 1) : EXT);
+      const se = canonFace(wr < fr && wc < fc ? wr * fc + wc : EXT);
       const reason = buildGraph ? { kind: 'whiteDiag', cell } : null;
       link(nw, se, 1, reason);
       link(ne, sw, 1, reason);
@@ -194,10 +205,10 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
       for (let k = 0; k < blacks.length; k++) {
         const bi = blacks[k];
         const br = (bi / cols) | 0, bc = bi % cols;
-        const nw = br > 0 && bc > 0 ? (br - 1) * fc + (bc - 1) : EXT;
-        const ne = br > 0 && bc < fc ? (br - 1) * fc + bc : EXT;
-        const sw = br < fr && bc > 0 ? br * fc + (bc - 1) : EXT;
-        const se = br < fr && bc < fc ? br * fc + bc : EXT;
+        const nw = canonFace(br > 0 && bc > 0 ? (br - 1) * fc + (bc - 1) : EXT);
+        const ne = canonFace(br > 0 && bc < fc ? (br - 1) * fc + bc : EXT);
+        const sw = canonFace(br < fr && bc > 0 ? br * fc + (bc - 1) : EXT);
+        const se = canonFace(br < fr && bc < fc ? br * fc + bc : EXT);
 
         // 3a. 3-to-1 diagonal law: relate(nw, se) ^ relate(ne, sw) === 1
         const d1 = relate(nw, se);
@@ -364,6 +375,15 @@ function findFaceParityCore(P, st, opts, { useCircles, anchoredOnly }) {
     const recordFace = (f, par) => {
       if (f === EXT || seenFace.has(f)) return;
       seenFace.add(f);
+      const hid = P.hasVoids && P.faceHoleId ? P.faceHoleId[f] : -1;
+      if (hid >= 0) {
+        for (const hf of P.holeList[hid]) {
+          seenFace.add(hf);
+          if (par === 1) facesIn.push(hf);
+          else facesOut.push(hf);
+        }
+        return;
+      }
       if (par === 1) facesIn.push(f);
       else facesOut.push(f);
     };

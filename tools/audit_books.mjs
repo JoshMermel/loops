@@ -39,10 +39,18 @@ if (process.argv.includes('--worker')) {
     const fail = (why) => out.bad.push(`${entry.id} #${from + k + 1} ${name}: ${why}`);
     out.checked++;
 
+    const seenV = new Set();
+    for (const v of raw.voids || []) {
+      if (v.r < 0 || v.c < 0 || v.r >= raw.rows || v.c >= raw.cols) return fail('void outside the board');
+      const idx = v.r * raw.cols + v.c;
+      if (seenV.has(idx)) return fail('duplicate void');
+      seenV.add(idx);
+    }
     const seen = new Set();
     for (const c of raw.clues) {
       if (c.r < 0 || c.c < 0 || c.r >= raw.rows || c.c >= raw.cols) return fail('clue outside the board');
       const idx = c.r * raw.cols + c.c;
+      if (seenV.has(idx)) return fail('clue on void cell');
       if (seen.has(idx)) return fail('two clues on one cell');
       seen.add(idx);
       if (c.t !== 'W' && c.t !== 'B' && c.t !== 'G') return fail(`bad clue type "${c.t}"`);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { compile, WHITE, BLACK } from '../js/logic.js';
 import {
   FACE_BLANK, FACE_IN, FACE_OUT,
-  cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
+  cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf, setFaceGroup, faceGroupOf,
   cycleGrayLabel, cycleGrayLabelReverse, reconcileAutoGray,
   reconcileAutoX, applyAutoX,
   autoShadeCompute, reconcileAutoShade, applyAutoShade, shadeConflicts,
@@ -607,4 +607,53 @@ test('Auto-X skips Rule 4 dead ends on fullBoard puzzles', () => {
   m.edges[P.ed[0 * 4 + 1]] = 2;
   reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[0 * 4 + 2]], 0, 'must never auto-X exits on a fullBoard puzzle');
+});
+
+test('shaped boards: unified interior-hole shading, Auto-Shade propagation across holes & cutouts, and Auto-X + Auto-Shade', () => {
+  // 6x6 Donut with 2x2 center voids (2,2),(2,3),(3,2),(3,3): hole is the 3x3 dual block (1..3, 1..3)
+  const donut = compile({
+    name: 'donut_m', rows: 6, cols: 6, clues: [],
+    voids: [{ r: 2, c: 2 }, { r: 2, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 3 }],
+  });
+  const fc = 5;
+  const f = (r, c) => r * fc + c;
+  const m = blank(donut);
+  // Draw top outer edge (0,2)-(0,3) -> face (0,2) = IN; X inner top rim (1,2)-(1,3) -> whole donut hole = IN!
+  // Also X inner bottom rim (4,2)-(4,3) -> face (4,2) on the opposite side of the donut becomes IN!
+  m.edges[2 * (0 * 6 + 2)] = 1;
+  m.edges[2 * (1 * 6 + 2)] = 2;
+  m.edges[2 * (4 * 6 + 2)] = 2;
+  reconcileAutoShade(donut, m, true);
+  assert.equal(m.faces[f(0, 2)], FACE_IN);
+  for (let r = 1; r <= 3; r++) for (let c = 1; c <= 3; c++) {
+    assert.equal(m.faces[f(r, c)], FACE_IN, `donut hole square (${r},${c}) must auto-shade IN`);
+  }
+  assert.equal(m.faces[f(4, 2)], FACE_IN, 'parity must propagate across donut hole to far rim');
+
+  // Manual click via setFaceGroup on any square of the hole sets all 9 squares together
+  const m2 = blank(donut);
+  assert.equal(faceGroupOf(donut, f(2, 2)).length, 9);
+  setFaceGroup(donut, m2, f(2, 2), FACE_OUT, 0);
+  for (let r = 1; r <= 3; r++) for (let c = 1; c <= 3; c++) {
+    assert.equal(m2.faces[f(r, c)], FACE_OUT);
+    assert.equal(m2.autoF[f(r, c)], 0);
+  }
+
+  // Indented exterior cutout (Cross shape): drawing along indented border seeds Inside, and Auto-X+Auto-Shade crosses OUT edges
+  const crossVoids = [];
+  for (const r of [0, 1, 4, 5]) for (const c of [0, 1, 4, 5]) crossVoids.push({ r, c });
+  const cross = compile({ name: 'cross_m', rows: 6, cols: 6, clues: [], voids: crossVoids });
+  const mc = blank(cross);
+  // Indented top horizontal edge (2,0)-(2,1) separates exterior cutout face (1,0) from active face (2,0)
+  mc.edges[2 * (2 * 6 + 0)] = 1;
+  reconcileAutoShade(cross, mc, true);
+  assert.equal(mc.faces[f(2, 0)], FACE_IN, 'indented cutout border line must seed FACE_IN');
+  assert.equal(mc.faces[f(1, 0)], FACE_BLANK, 'exterior cutout face must stay blank');
+
+  // If face (2,0) is manually OUT, Auto-X + Auto-Shade crosses out indented border edge (2,0)-(2,1)
+  const mc2 = blank(cross);
+  setFaceGroup(cross, mc2, f(2, 0), FACE_OUT, 0);
+  reconcileAutoX(cross, mc2, true, { useShade: true });
+  assert.equal(mc2.edges[2 * (2 * 6 + 0)], 2, 'Auto-X+Auto-Shade must cross indented border next to OUT face');
+  assert.equal(mc2.edges[2 * (0 * 6 + 0)], 0, 'missing void edges must never be marked');
 });

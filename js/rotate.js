@@ -22,6 +22,7 @@ const rotDirMaskCW = (m) => ((m << 1) | (m >> 3)) & 15;
 export function rotatePuzzleCW(P) {
   const R = P.rows, C = P.cols;
   const clues = P.clues.map((cl) => ({ r: cl.c, c: R - 1 - cl.r, t: cl.t }));
+  const voids = (P.voids || []).map((v) => ({ r: v.c, c: R - 1 - v.r }));
   const givens = (P.givens || []).map((gv) => (
     gv.dir === 'H'
       ? { r: gv.c, c: R - 1 - gv.r, dir: 'V', v: gv.v }
@@ -47,6 +48,7 @@ export function rotatePuzzleCW(P) {
     cols: R,
     clues,
     ...(P.fullBoard ? { fullBoard: true } : {}),
+    ...(voids.length ? { voids } : {}),
     ...(givens.length ? { givens } : {}),
     solution,
     rules: P.rules,

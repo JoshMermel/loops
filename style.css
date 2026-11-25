@@ -135,6 +135,9 @@ button.ghost { background: transparent; }
 #board svg { width: 100%; height: auto; display: block; }
 .board-bg { fill: var(--cell-bg); stroke: var(--border-light); stroke-width: 1.5; }
 #board.solved .board-bg { stroke: var(--color-solved); stroke-width: 2.5; }
+.void-cutout { fill: var(--bg); pointer-events: none; }
+.void-cutout-frame { fill: url(#void-hatch); stroke: var(--border-light); stroke-width: 1.5; pointer-events: none; }
+.void-hatch-line { stroke: var(--border-light); opacity: 0.45; }
 .face-in { fill: var(--face-in); pointer-events: none; }
 .face-out { fill: var(--face-out); pointer-events: none; }
 .face-in.auto, .face-out.auto { opacity: 0.72; }

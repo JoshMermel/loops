@@ -1012,12 +1012,436 @@ function generateFullBoardPuzzle({
   return null;
 }
 
+// ------------------------------------------------------------ Shaped / Cutout boards
+
+/** Catalog of iconic shaped-board silhouettes for the Shape sampler & shaped generator. */
+export const SHAPED_SPECS = [
+  {
+    id: 'donut', label: 'Donut', rows: 10, cols: 10,
+    isVoid: (r, c) => r >= 3 && r <= 6 && c >= 3 && c <= 6,
+  },
+  {
+    id: 'cross', label: 'Cross', rows: 10, cols: 10,
+    isVoid: (r, c) => (r < 3 || r > 6) && (c < 3 || c > 6),
+  },
+  {
+    id: 'hourglass', label: 'Hourglass', rows: 11, cols: 11,
+    isVoid: (r, c) => ((r === 3 || r === 7) && (c <= 1 || c >= 9)) || (r >= 4 && r <= 6 && (c <= 2 || c >= 8)),
+  },
+  {
+    id: 'figure8', label: 'Figure-8', rows: 9, cols: 12,
+    isVoid: (r, c) => (
+      (r >= 3 && r <= 4 && ((c >= 2 && c <= 3) || (c >= 8 && c <= 9)))
+      || ((r === 0 || r === 8) && (c === 5 || c === 6))
+    ),
+  },
+  {
+    id: 'octagon', label: 'Octagon', rows: 10, cols: 10,
+    isVoid: (r, c) => (r + c < 3) || (r + (9 - c) < 3) || ((9 - r) + c < 3) || ((9 - r) + (9 - c) < 3),
+  },
+  {
+    id: 'staircase', label: 'Staircase', rows: 10, cols: 10,
+    isVoid: (r, c) => (r < 2 && c >= 5) || (r < 4 && c >= 7) || (r >= 8 && c < 5) || (r >= 6 && c < 3),
+  },
+  {
+    id: 'lshape', label: 'L-Shape', rows: 10, cols: 10,
+    isVoid: (r, c) => r < 5 && c >= 5,
+  },
+  {
+    id: 'hshape', label: 'H-Shape', rows: 10, cols: 10,
+    isVoid: (r, c) => (r < 3 || r >= 7) && c >= 3 && c <= 6,
+  },
+  {
+    id: 'window', label: 'Window', rows: 11, cols: 11,
+    isVoid: (r, c) => ((r >= 2 && r <= 3) || (r >= 7 && r <= 8)) && ((c >= 2 && c <= 3) || (c >= 7 && c <= 8)),
+  },
+  {
+    id: 'ushape', label: 'U-Shape', rows: 10, cols: 10,
+    isVoid: (r, c) => r < 6 && c >= 3 && c <= 6,
+  },
+  {
+    id: 'pinwheel', label: 'Pinwheel', rows: 10, cols: 10,
+    isVoid: (r, c) => (
+      (r < 3 && (c === 5 || c === 6))
+      || (c >= 7 && (r === 5 || r === 6))
+      || (r >= 7 && (c === 3 || c === 4))
+      || (c < 3 && (r === 3 || r === 4))
+    ),
+  },
+  {
+    id: 'twin-islands', label: 'Twin Islands', rows: 9, cols: 11,
+    isVoid: (r, c) => r >= 2 && r <= 6 && c >= 4 && c <= 6,
+  },
+];
+
+/** Build `{ rows, cols, voids }` for a named shape from `SHAPED_SPECS`. */
+export function shapeSpec(id) {
+  const spec = SHAPED_SPECS.find((s) => s.id === id);
+  if (!spec) return null;
+  const voids = [];
+  for (let r = 0; r < spec.rows; r++) {
+    for (let c = 0; c < spec.cols; c++) {
+      if (spec.isVoid(r, c)) voids.push({ r, c });
+    }
+  }
+  return { id: spec.id, label: spec.label, rows: spec.rows, cols: spec.cols, voids };
+}
+
+/** Generate organic random interior cutouts ("Swiss cheese") on `rows x cols` with no dead ends. */
+export function swissCheeseVoids(rows, cols, rng, { minHoles = 3, maxHoles = 5 } = {}) {
+  const stamps = [
+    [[0, 0]],                                       // 1x1 pinhole
+    [[0, 0]],                                       // 1x1 pinhole (higher weight)
+    [[0, 0], [0, 1]],                               // 1x2 bar
+    [[0, 0], [1, 0]],                               // 2x1 bar
+    [[0, 0], [0, 1], [1, 0], [1, 1]],               // 2x2 pocket
+    [[0, 0], [0, 1], [1, 0]],                       // 3-cell L pocket
+  ];
+  const grid = new Uint8Array(rows * cols);
+  const targetHoles = minHoles + ((rng() * (maxHoles - minHoles + 1)) | 0);
+  const voids = [];
+  let holes = 0;
+  for (let tries = 0; tries < 120 && holes < targetHoles; tries++) {
+    const stamp = stamps[(rng() * stamps.length) | 0];
+    const r0 = 1 + ((rng() * (rows - 2)) | 0);
+    const c0 = 1 + ((rng() * (cols - 2)) | 0);
+    let ok = true;
+    const cells = [];
+    for (const [dr, dc] of stamp) {
+      const r = r0 + dr, c = c0 + dc;
+      if (r < 1 || r >= rows - 1 || c < 1 || c >= cols - 1) { ok = false; break; }
+      cells.push([r, c]);
+    }
+    if (!ok) continue;
+    // Keep at least 1 active cell separating distinct holes (orthogonal & diagonal) so every hole is crisp
+    for (const [r, c] of cells) {
+      for (let nr = r - 1; nr <= r + 1 && ok; nr++) {
+        for (let nc = c - 1; nc <= c + 1; nc++) {
+          if (grid[nr * cols + nc]) { ok = false; break; }
+        }
+      }
+      if (!ok) break;
+    }
+    if (!ok) continue;
+    for (const [r, c] of cells) {
+      grid[r * cols + c] = 1;
+      voids.push({ r, c });
+    }
+    holes++;
+  }
+  voids.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+  return voids;
+}
+
+/**
+ * Dual-face loop representation for any shaped board (supporting exterior cutouts and interior holes).
+ * - Exterior cutout faces (`P.faceExterior`) are pinned to 0.
+ * - Regular 4-active-corner faces toggle in O(1) via `canToggle(r, c)`.
+ * - Interior hole super-faces (`P.holeList[h]`) toggle all together via an exact single-cycle check.
+ */
+function makeShapedDualGrid(P) {
+  const { rows, cols, N, isVoid, faceExterior, faceHoleId, holeList } = P;
+  const fr = rows - 1, fc = cols - 1, F = fr * fc;
+  const inS = new Uint8Array(F);
+  const regFaces = [];
+  for (let f = 0; f < F; f++) {
+    if (faceExterior && faceExterior[f]) continue;
+    if (faceHoleId && faceHoleId[f] >= 0) continue;
+    regFaces.push(f);
+  }
+  const at = (r, c) => {
+    if (r < 0 || c < 0 || r >= fr || c >= fc) return 0;
+    return inS[r * fc + c];
+  };
+  const canToggleReg = (r, c) => {
+    const a0 = at(r - 1, c), a1 = at(r - 1, c + 1), a2 = at(r, c + 1), a3 = at(r + 1, c + 1);
+    const a4 = at(r + 1, c), a5 = at(r + 1, c - 1), a6 = at(r, c - 1), a7 = at(r - 1, c - 1);
+    const orth = a0 + a2 + a4 + a6;
+    if (orth === 0 || orth === 4) return false;
+    const trans = (a0 !== a1) + (a1 !== a2) + (a2 !== a3) + (a3 !== a4)
+      + (a4 !== a5) + (a5 !== a6) + (a6 !== a7) + (a7 !== a0);
+    return trans === 2;
+  };
+  const toEdges = () => {
+    const edges = new Int8Array(2 * N);
+    edges.fill(E_OFF);
+    const deg = new Uint8Array(N);
+    let loopCells = 0, start = -1, valid = true;
+    for (let x = 0; x < P.numEdges; x++) {
+      const a = P.edgeA[x];
+      if (a < 0) continue;
+      const r = (a / cols) | 0, c = a % cols;
+      const on = (x & 1) === 0
+        ? (at(r - 1, c) ^ at(r, c))
+        : (at(r, c - 1) ^ at(r, c));
+      if (on) {
+        edges[x] = E_ON;
+        const b = P.edgeB[x];
+        deg[a]++; deg[b]++;
+      }
+    }
+    for (let i = 0; i < N; i++) {
+      if (deg[i] === 2) { loopCells++; if (start < 0) start = i; }
+      else if (deg[i] !== 0) valid = false;
+    }
+    if (valid && loopCells >= 4) {
+      let prev = -1, cur = start, steps = 0;
+      do {
+        let nxt = -1;
+        for (let d = 0; d < 4; d++) {
+          const x = P.ed[cur * 4 + d];
+          if (x >= 0 && edges[x] === E_ON) {
+            const j = P.nb[cur * 4 + d];
+            if (j !== prev) { nxt = j; break; }
+          }
+        }
+        if (nxt < 0) { valid = false; break; }
+        prev = cur; cur = nxt; steps++;
+      } while (cur !== start && steps <= loopCells);
+      if (steps !== loopCells) valid = false;
+    } else {
+      valid = false;
+    }
+    return { edges, loopCells, valid };
+  };
+  const tryToggleHole = (hid) => {
+    const grp = holeList[hid];
+    const cur = inS[grp[0]];
+    const next = cur ? 0 : 1;
+    for (let i = 0; i < grp.length; i++) inS[grp[i]] = next;
+    const res = toEdges();
+    if (!res.valid) {
+      for (let i = 0; i < grp.length; i++) inS[grp[i]] = cur;
+      return false;
+    }
+    return true;
+  };
+  return { fr, fc, F, inS, regFaces, holeList: holeList || [], at, canToggleReg, tryToggleHole, toEdges };
+}
+
+/** Generate a random simple closed loop on compiled empty shaped board `P`. */
+export function randomShapedLoop(P, rng, { targetFill = null, steps = null } = {}) {
+  const g = makeShapedDualGrid(P);
+  const { fr, fc, F, inS, regFaces, holeList, at, canToggleReg, tryToggleHole, toEdges } = g;
+  const activeFaces = regFaces.length + holeList.reduce((acc, h) => acc + h.length, 0);
+  if (activeFaces === 0) throw new Error('shaped board has no dual faces');
+
+  // Seed either an interior hole (so loops wrap around donuts!) or a random regular face
+  let faceCount = 0;
+  if (holeList.length > 0 && (regFaces.length === 0 || rng() < 0.55)) {
+    const grp = holeList[(rng() * holeList.length) | 0];
+    for (const f of grp) inS[f] = 1;
+    faceCount = grp.length;
+  } else {
+    const f0 = regFaces[(rng() * regFaces.length) | 0];
+    inS[f0] = 1;
+    faceCount = 1;
+  }
+
+  const wantFrac = targetFill ?? (0.42 + 0.24 * rng());
+  const totalSteps = steps ?? Math.max(120, F * 18);
+  for (let s = 0; s < totalSteps; s++) {
+    if (holeList.length > 0 && rng() < 0.14) {
+      const hid = (rng() * holeList.length) | 0;
+      const grp = holeList[hid];
+      const was = inS[grp[0]];
+      if (was && faceCount <= grp.length) continue;
+      if (tryToggleHole(hid)) faceCount += was ? -grp.length : grp.length;
+      continue;
+    }
+    if (!regFaces.length) continue;
+    const f = regFaces[(rng() * regFaces.length) | 0];
+    const r = (f / fc) | 0, c = f % fc;
+    const cur = inS[f];
+    if (cur && faceCount <= 2) continue;
+    if (!canToggleReg(r, c)) continue;
+    const frac = faceCount / activeFaces;
+    if (!cur && frac > wantFrac + 0.14 && rng() < 0.72) continue;
+    if (cur && frac < wantFrac - 0.14 && rng() < 0.72) continue;
+    const orth = at(r - 1, c) + at(r, c + 1) + at(r + 1, c) + at(r, c - 1);
+    if (!cur && orth === 2 && rng() < 0.3) continue;
+    inS[f] = cur ? 0 : 1;
+    faceCount += cur ? -1 : 1;
+  }
+  const res = toEdges();
+  return { ...res, grid: g };
+}
+
+/**
+ * Generate one verified, rated Shaped / Cutout Masyu puzzle for explicit `voids` (or named shape / swiss-cheese).
+ */
+function generateShapedPuzzle({
+  rows, cols, voids, style, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier,
+  wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minFill,
+}) {
+  const baseGrid = compile({ name: 'sh_empty', rows, cols, voids, clues: [] });
+  const minLoopCells = Math.max(10, Math.floor(baseGrid.activeCount * (minFill ?? 0.58)));
+  const pruneNodeCap = baseGrid.activeCount <= 64 ? 15000 : 25000;
+  const solvedByPropagate = (P) => {
+    const st = initialState(P);
+    if (!propagate(P, st)) return false;
+    for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
+    return isSolved(P, st.e);
+  };
+
+  while (Date.now() < deadline) {
+    // 1. Build and anneal a shaped loop until all allowed clues uniquely determine it
+    const init = randomShapedLoop(baseGrid, rand, { targetFill: 0.45 + 0.25 * rand() });
+    if (!init.valid) continue;
+    const { fr, fc, inS, regFaces, holeList, canToggleReg, tryToggleHole, toEdges } = init.grid;
+
+    const evalCur = () => {
+      const { edges, loopCells, valid } = toEdges();
+      if (!valid) return null;
+      const { whites, blacks } = allowedClues(rows, cols, edges, baseGrid);
+      const clues = whites.concat(blacks);
+      const P = compile({ name: 'sh_a', rows, cols, voids, clues });
+      const st = initialState(P);
+      propagate(P, st);
+      let unk = 0;
+      const unkEdges = [];
+      for (let x = 0; x < P.numEdges; x++) {
+        if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) { unk++; unkEdges.push(x); }
+      }
+      return { edges, loopCells, clues, P, unk, unkEdges };
+    };
+
+    let cur = evalCur();
+    if (!cur) continue;
+    const maxAnneal = Math.max(250, fr * fc * 4);
+    for (let step = 0; step < maxAnneal && Date.now() < deadline; step++) {
+      if (cur.unk === 0 && cur.loopCells >= minLoopCells) break;
+      let toggledReg = -1, toggledHole = -1;
+      if (holeList.length > 0 && rand() < 0.14) {
+        const hid = (rand() * holeList.length) | 0;
+        if (tryToggleHole(hid)) toggledHole = hid;
+      } else if (regFaces.length > 0) {
+        let f = -1;
+        if (cur.unkEdges.length > 0 && rand() < 0.72) {
+          const x = cur.unkEdges[(rand() * cur.unkEdges.length) | 0];
+          const a = baseGrid.edgeA[x];
+          const ar = (a / cols) | 0, ac = a % cols;
+          const cr = Math.max(0, Math.min(fr - 1, ar + ((rand() * 3) | 0) - 1));
+          const cc = Math.max(0, Math.min(fc - 1, ac + ((rand() * 3) | 0) - 1));
+          const cand = cr * fc + cc;
+          if (!baseGrid.faceExterior[cand] && baseGrid.faceHoleId[cand] < 0) f = cand;
+        }
+        if (f < 0) f = regFaces[(rand() * regFaces.length) | 0];
+        const r = (f / fc) | 0, c = f % fc;
+        if (canToggleReg(r, c)) {
+          inS[f] = inS[f] ? 0 : 1;
+          toggledReg = f;
+        }
+      }
+      if (toggledReg < 0 && toggledHole < 0) continue;
+      const next = evalCur();
+      const curDef = Math.max(0, minLoopCells - cur.loopCells);
+      const nextDef = next ? Math.max(0, minLoopCells - next.loopCells) : Infinity;
+      const curScore = cur.unk * 4 + curDef * 3;
+      const nextScore = next ? next.unk * 4 + nextDef * 3 : Infinity;
+      if (next && (nextScore <= curScore || rand() < 0.05)) {
+        cur = next;
+      } else {
+        if (toggledReg >= 0) inS[toggledReg] = inS[toggledReg] ? 0 : 1;
+        else tryToggleHole(toggledHole);
+      }
+    }
+
+    if (cur.unk > 0 || cur.loopCells < minLoopCells || cur.clues.length < 4) continue;
+
+    // 2. Strip clues (Pass 1 fast rules + Pass 2 exact solve + binary search back to targetTier)
+    let current = cur.clues.slice();
+    const fastUpto = beginnerOnly ? RULES.findIndex((r) => r.tier !== 'Beginner') : FIRST_LOOKAHEAD;
+    const order1 = shuffle(current.slice(), rand);
+    for (const cl of order1) {
+      if (Date.now() >= deadline || current.length <= 4) break;
+      const trial = current.filter((x) => x !== cl);
+      const P = compile({ name, rows, cols, voids, clues: trial });
+      if (beginnerOnly ? solvedByRules(P, fastUpto).solved : solvedByPropagate(P)) current = trial;
+    }
+    if (!beginnerOnly && Date.now() < deadline) {
+      const order1b = shuffle(current.slice(), rand);
+      for (const cl of order1b) {
+        if (Date.now() >= deadline || current.length <= 4) break;
+        const trial = current.filter((x) => x !== cl);
+        if (solvedByRules(compile({ name, rows, cols, voids, clues: trial }), fastUpto).solved) current = trial;
+      }
+    }
+
+    let cachedRated = null;
+    let skipPass2 = beginnerOnly;
+    if (!skipPass2 && mediumOnly && Date.now() < deadline) {
+      const r1 = rate(compile({ name, rows, cols, voids, clues: current }));
+      if (r1.solved && r1.tier === 'Medium') { cachedRated = r1; skipPass2 = true; }
+    }
+    if (!skipPass2 && Date.now() < deadline) {
+      const order2 = shuffle(current.slice(), rand);
+      const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
+      const maxStrips = deepStrip ? order2.length : Math.max(3, Math.min(10, Math.ceil(order2.length * 0.38)));
+      const removed = [];
+      for (const cl of order2) {
+        if (Date.now() >= deadline || current.length <= 4 || removed.length >= maxStrips) break;
+        const trial = current.filter((x) => x !== cl);
+        const ex = solve(compile({ name, rows, cols, voids, clues: trial }), { limit: 2, maxNodes: pruneNodeCap });
+        if (ex.exceeded || ex.count !== 1) continue;
+        current = trial;
+        removed.push(cl);
+      }
+      const isWithin = (r) => (allowUnsolved && !r.solved) || (r.solved && TIERS.indexOf(r.tier) <= effectiveMaxTier);
+      const rated = rate(compile({ name, rows, cols, voids, clues: current }));
+      if (wantUnsolved || isWithin(rated)) {
+        cachedRated = rated;
+      } else if (removed.length > 0 && Date.now() < deadline) {
+        const strippedBase = current;
+        let lo = 0, hi = removed.length, bestClues = strippedBase.concat(removed), bestRated = null;
+        while (lo + 1 < hi && Date.now() < deadline) {
+          const mid = (lo + hi) >> 1;
+          const cand = strippedBase.concat(removed.slice(mid))
+            .sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+          const r = rate(compile({ name, rows, cols, voids, clues: cand }));
+          if (isWithin(r)) { lo = mid; bestClues = cand; bestRated = r; }
+          else hi = mid;
+        }
+        current = bestClues;
+        cachedRated = bestRated;
+      }
+    }
+
+    if (Date.now() >= deadline) break;
+    if (!current.some((c) => c.t === 'W') || !current.some((c) => c.t === 'B')) continue;
+
+    current.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+    const P = compile({ name, rows, cols, voids, clues: current });
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
+
+    const rated = cachedRated || rate(P);
+    if (wantUnsolved) { if (rated.solved) continue; }
+    else if (!rated.solved) { if (!allowUnsolved) continue; }
+    else {
+      if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+      if (targetTier && rated.tier !== targetTier) continue;
+    }
+
+    P.solution = encodeSolution(P, sol);
+    P.rules = rated.rules;
+    P.tier = rated.tier;
+    P.score = rated.score;
+    return P;
+  }
+  return null;
+}
+
 /**
  * Generate one verified, rated Masyu puzzle.
  * Options:
  *   rows, cols           board dimensions (each >= 4)
  *   seed                 PRNG seed (or pass `rng` directly)
- *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all' | 'full-masyu' | 'full-lines' | 'full-walls' | 'full-mixed'
+ *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all' | 'full-masyu' | 'full-lines' | 'full-walls' | 'full-mixed' | 'shaped' | 'swiss-cheese'
+ *   voids                optional explicit array of `{ r, c }` cutout voids (or pass `shape` name from SHAPED_SPECS)
+ *   shape                optional named shape from SHAPED_SPECS (overrides rows/cols/voids)
  *   layout               clue filter or geometric pattern mask name (default 'none')
  *   minFill              minimum loop fill fraction (e.g. 1.0 for Full board)
  *   maxTier              'Beginner' | 'Medium' | 'Hard' | 'Expert' (default 'Expert')
@@ -1036,6 +1460,8 @@ export function generatePuzzle({
   rng = null,
   style = 'balanced',
   layout = 'none',
+  voids = null,
+  shape = null,
   minFill = null,
   maxTier = 'Expert',
   targetTier = null,
@@ -1048,6 +1474,15 @@ export function generatePuzzle({
 } = {}) {
   const rand = rng || makeRng(seed);
   const deadline = Date.now() + budgetMs;
+  if (shape) {
+    const spec = shapeSpec(shape);
+    if (!spec) throw new Error(`Unknown shape "${shape}"`);
+    rows = spec.rows;
+    cols = spec.cols;
+    voids = spec.voids;
+  } else if (style === 'swiss-cheese' && (!voids || !voids.length)) {
+    voids = swissCheeseVoids(rows, cols, rand);
+  }
   const N = rows * cols;
   const fillRatio = minFill ?? (N >= 25 ? 0.55 : 0.48);
   const minLoopCells = Math.max(8, Math.floor(N * fillRatio));
@@ -1059,6 +1494,16 @@ export function generatePuzzle({
     : 0;
   const wantUnsolved = targetTier === 'Expert+';
   const maxTierIdx = wantUnsolved ? TIERS.length - 1 : TIERS.indexOf(maxTier);
+  const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
+  const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
+  const mediumOnly = stripMode === 'medium' || (stripMode === null && effectiveMaxTier === 1);
+  if ((voids && voids.length) || style === 'shaped' || style === 'swiss-cheese') {
+    return generateShapedPuzzle({
+      rows, cols, voids: voids || [], style, rand, deadline, maxTierIdx, effectiveMaxTier,
+      targetTier: wantUnsolved ? null : targetTier, wantUnsolved, allowUnsolved, beginnerOnly,
+      mediumOnly, stripMode, verifyMaxNodes, name, minFill,
+    });
+  }
   const pts = maskPoints(layout, rows, cols);
   if (pts) {
     return generateMaskPuzzle({
@@ -1066,9 +1511,6 @@ export function generatePuzzle({
       wantUnsolved, allowUnsolved, verifyMaxNodes, name, minLoopCells,
     });
   }
-  const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
-  const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
-  const mediumOnly = stripMode === 'medium' || (stripMode === null && effectiveMaxTier === 1);
   if (style === 'full-masyu' || style === 'full-lines' || style === 'full-walls' || style === 'full-mixed') {
     return generateFullBoardPuzzle({
       rows, cols, style, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
