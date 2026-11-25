@@ -95,41 +95,40 @@ for (const ex of examples) {
   for (let r = 0; r < P.rows; r++) g += `<line x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}" stroke="#cccccc" stroke-width="1.2"/>`;
   for (let c = 0; c < P.cols; c++) g += `<line x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}" stroke="#cccccc" stroke-width="1.2"/>`;
 
-  // White and gray circle fills (below loop segments)
-  for (const cl of P.clues) {
-    if (cl.t === 'W') {
-      g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.21}" fill="#ffffff"/>`;
-    } else if (cl.t === 'G') {
-      const lbl = grayLabel(cl.r * P.cols + cl.c);
-      if (lbl === 0) g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.215}" fill="#b6bcc4"/>`;
-      else if (lbl === 1) g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.175}" fill="#ffffff"/>`;
-    }
-  }
-
-  // Existing segments
+  // Existing segments (behind all pearls so circles read cleanly)
   for (let x = 0; x < P.numEdges; x++) {
     if (edges[x] !== 1) continue;
     const [x1, y1, x2, y2] = segCoords(x);
     g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1976d2" stroke-width="${S * 0.14}" stroke-linecap="round"/>`;
   }
 
-  // Circle outlines, black discs, and gray / labeled-gray circles
+  // Circles (white, black, unlabeled gray, and 0° 2×2 checkerboard labeled gray) on top of segments
+  const checkerQuads = (cx, cy, r) => (
+    `M${cx} ${cy}V${cy - r}A${r} ${r} 0 0 1 ${cx + r} ${cy}ZM${cx} ${cy}V${cy + r}A${r} ${r} 0 0 1 ${cx - r} ${cy}Z`
+  );
   for (const cl of P.clues) {
+    const cx = vx(cl.c), cy = vy(cl.r);
     if (cl.t === 'W') {
-      g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.21}" fill="none" stroke="#111111" stroke-width="2.2"/>`;
+      g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.21}" fill="#ffffff"/>`;
+      g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.21}" fill="none" stroke="#111111" stroke-width="2.2"/>`;
     } else if (cl.t === 'G') {
       const lbl = grayLabel(cl.r * P.cols + cl.c);
       if (lbl === 0) {
-        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.215}" fill="none" stroke="#5a626c" stroke-width="2.2"/>`;
+        g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.215}" fill="#b6bcc4"/>`;
+        g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.215}" fill="none" stroke="#5a626c" stroke-width="2.2"/>`;
       } else if (lbl === 1) {
-        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.245}" fill="none" stroke="#8c949e" stroke-width="3.6"/>`;
-        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.175}" fill="none" stroke="#111111" stroke-width="1.8"/>`;
+        const r = S * 0.22;
+        g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ffffff"/>`;
+        g += `<path d="${checkerQuads(cx, cy, r)}" fill="#aeb5be"/>`;
+        g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#111111" stroke-width="2.2"/>`;
       } else {
-        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.245}" fill="none" stroke="#8c949e" stroke-width="3.6"/>`;
-        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.175}" fill="#111111"/>`;
+        const r = S * 0.22;
+        g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#111111"/>`;
+        g += `<path d="${checkerQuads(cx, cy, r)}" fill="#969ea8"/>`;
+        g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#111111" stroke-width="2.2"/>`;
       }
     } else {
-      g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.22}" fill="#111111"/>`;
+      g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.22}" fill="#111111"/>`;
     }
   }
 

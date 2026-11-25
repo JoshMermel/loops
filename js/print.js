@@ -79,11 +79,6 @@ export function boardSvg(P, sol = null) {
   for (let c = 0; c < cols; c++) g += `<line x1="${c}" y1="0" x2="${c}" y2="${h}" stroke="${GRID}" stroke-width="0.03"/>`;
   for (let r = 0; r < rows; r++) g += `<line x1="0" y1="${r}" x2="${w}" y2="${r}" stroke="${GRID}" stroke-width="0.03"/>`;
 
-  // White and gray circle fills first so solution line shows cleanly through them
-  for (const cl of P.clues) {
-    if (cl.t === 'W') g += `<circle class="white-fill" cx="${cl.c}" cy="${cl.r}" r="0.21" fill="#fff"/>`;
-    else if (cl.t === 'G') g += `<circle class="gray-fill" cx="${cl.c}" cy="${cl.r}" r="0.215" fill="#b4b4b4"/>`;
-  }
   if (sol) {
     for (let x = 0; x < P.numEdges; x++) {
       if (sol.e[x] !== E_ON) continue;
@@ -91,11 +86,13 @@ export function boardSvg(P, sol = null) {
       g += `<line class="loop" x1="${a % cols}" y1="${(a / cols) | 0}" x2="${b % cols}" y2="${(b / cols) | 0}" stroke="${INK}" stroke-width="0.14" stroke-linecap="round"/>`;
     }
   }
-  // Circle rings / black discs on intersections
+  // Circles on intersections (drawn above loop line so white/gray circles stay unobstructed)
   for (const cl of P.clues) {
     if (cl.t === 'W') {
+      g += `<circle class="white-fill" cx="${cl.c}" cy="${cl.r}" r="0.21" fill="#fff"/>`;
       g += `<circle class="white-circle" cx="${cl.c}" cy="${cl.r}" r="0.21" fill="none" stroke="${INK}" stroke-width="0.065"/>`;
     } else if (cl.t === 'G') {
+      g += `<circle class="gray-fill" cx="${cl.c}" cy="${cl.r}" r="0.215" fill="#b4b4b4"/>`;
       g += `<circle class="gray-circle" cx="${cl.c}" cy="${cl.r}" r="0.215" fill="none" stroke="#444" stroke-width="0.06"/>`;
     } else {
       g += `<circle class="black-circle" cx="${cl.c}" cy="${cl.r}" r="0.225" fill="${INK}"/>`;

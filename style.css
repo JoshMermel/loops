@@ -23,7 +23,8 @@
   --pearl-white-fill: #fff;
   --pearl-gray-fill: #b6bcc4;
   --pearl-gray-ring: #5a626c;
-  --pearl-gray-halo: #8c949e;
+  --pearl-gray-quad-w: #aeb5be;
+  --pearl-gray-quad-b: #969ea8;
   --pearl-bad: #c62828;
   --loop: #1976d2;
   --edge-x: #757575;
@@ -69,7 +70,8 @@
   --pearl-white-fill: #222;
   --pearl-gray-fill: #78808a;
   --pearl-gray-ring: #c6cdd6;
-  --pearl-gray-halo: #8c949e;
+  --pearl-gray-quad-w: #8a929c;
+  --pearl-gray-quad-b: #7c8590;
   --pearl-bad: #ef5350;
   --loop: #64b5f6;
   --edge-x: #aaa;
@@ -157,19 +159,22 @@ button.ghost { background: transparent; }
 .pearl-gray-fill { fill: var(--pearl-gray-fill); pointer-events: none; }
 .pearl-gray-ring { fill: none; stroke: var(--pearl-gray-ring); stroke-width: 2.4; pointer-events: none; }
 .pearl-gray-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }
-.pearl-gray-halo { fill: none; stroke: var(--pearl-gray-halo); stroke-width: 3.8; pointer-events: none; }
-.pearl-gray-halo.auto { opacity: 0.78; }
-.pearl-gray-halo.bad { stroke: var(--pearl-bad); opacity: 0.75; }
-.pearl-white-ring.pearl-gray-inner { stroke-width: 2; }
-.pearl-black.pearl-gray-inner { stroke-width: 0.8; }
+.pearl-black-fill { fill: var(--pearl-ink); pointer-events: none; }
+.pearl-black-fill.bad { fill: var(--pearl-bad); }
+.pearl-black-ring { fill: none; stroke: var(--pearl-ink); stroke-width: 2.2; pointer-events: none; }
+.pearl-black-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }
+.pearl-gray-quad-w { fill: var(--pearl-gray-quad-w); pointer-events: none; }
+.pearl-gray-quad-b { fill: var(--pearl-gray-quad-b); pointer-events: none; }
 /* In dark mode, keep white circles light and black circles dark (rimmed so they pop against #222) so colors always match the rules and hint text. */
 :root[data-theme="dark"] .pearl-white-fill { fill: #f0f3f7; }
 :root[data-theme="dark"] .pearl-white-ring { stroke: #111; stroke-width: 2.4; }
-:root[data-theme="dark"] .pearl-white-ring.pearl-gray-inner { stroke: #111; stroke-width: 1.9; }
 :root[data-theme="dark"] .pearl-white-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.2; }
 :root[data-theme="dark"] .pearl-black { fill: #090a0c; stroke: #8d96a0; stroke-width: 2.2; }
-:root[data-theme="dark"] .pearl-black.pearl-gray-inner { stroke: #181a1e; stroke-width: 1; }
 :root[data-theme="dark"] .pearl-black.bad { stroke: var(--pearl-bad); stroke-width: 3; }
+:root[data-theme="dark"] .pearl-black-fill { fill: #090a0c; }
+:root[data-theme="dark"] .pearl-black-fill.bad { fill: var(--pearl-bad); }
+:root[data-theme="dark"] .pearl-black-ring { stroke: #c6cdd6; stroke-width: 2.2; }
+:root[data-theme="dark"] .pearl-black-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.2; }
 
 .edge-hover { fill: var(--edge-hover); pointer-events: none; }
 .pearl-hover { fill: none; stroke: var(--primary-blue); stroke-width: 2; opacity: 0.55; pointer-events: none; }

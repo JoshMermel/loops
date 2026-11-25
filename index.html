@@ -124,8 +124,8 @@
                   <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
                   <path class="hr-grid" d="M12 22H100M12 44H100M12 66H100M12 22V66M34 22V66M56 22V66M78 22V66M100 22V66"/>
                   <g class="hr-dot"><circle cx="12" cy="22" r="1.5"/><circle cx="34" cy="22" r="1.5"/><circle cx="56" cy="22" r="1.5"/><circle cx="78" cy="22" r="1.5"/><circle cx="100" cy="22" r="1.5"/><circle cx="12" cy="44" r="1.5"/><circle cx="34" cy="44" r="1.5"/><circle cx="78" cy="44" r="1.5"/><circle cx="100" cy="44" r="1.5"/><circle cx="12" cy="66" r="1.5"/><circle cx="34" cy="66" r="1.5"/><circle cx="56" cy="66" r="1.5"/><circle cx="78" cy="66" r="1.5"/><circle cx="100" cy="66" r="1.5"/></g>
-                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
                   <path class="hr-line" d="M12 44H78V22"/>
+                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
                   <circle class="pearl-white-ring" cx="56" cy="44" r="7.5"/>
                 </svg>
                 <figcaption class="ok-text">✓ Turns right after</figcaption>
@@ -135,8 +135,8 @@
                   <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
                   <path class="hr-grid" d="M12 22H100M12 44H100M12 66H100M12 22V66M34 22V66M56 22V66M78 22V66M100 22V66"/>
                   <g class="hr-dot"><circle cx="12" cy="22" r="1.5"/><circle cx="34" cy="22" r="1.5"/><circle cx="56" cy="22" r="1.5"/><circle cx="78" cy="22" r="1.5"/><circle cx="100" cy="22" r="1.5"/><circle cx="12" cy="44" r="1.5"/><circle cx="34" cy="44" r="1.5"/><circle cx="78" cy="44" r="1.5"/><circle cx="100" cy="44" r="1.5"/><circle cx="12" cy="66" r="1.5"/><circle cx="34" cy="66" r="1.5"/><circle cx="56" cy="66" r="1.5"/><circle cx="78" cy="66" r="1.5"/><circle cx="100" cy="66" r="1.5"/></g>
-                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
                   <path class="hr-line-bad" d="M12 44H100"/>
+                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
                   <circle class="pearl-white-ring bad" cx="56" cy="44" r="7.5"/>
                 </svg>
                 <figcaption class="bad-text">✕ Doesn't turn</figcaption>
@@ -247,6 +247,16 @@
             </div>
             <div class="toggle-switch">
               <input type="checkbox" id="setting-auto-shade" role="switch">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </div>
+          </label>
+          <label class="settings-row">
+            <div class="settings-row-text">
+              <span class="settings-label">Two-step hints</span>
+              <span class="settings-desc">First press shows where to look; second press reveals the full deduction (turn off for immediate full hints)</span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="setting-incremental-hints" role="switch">
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
             </div>
           </label>

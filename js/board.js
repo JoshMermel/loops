@@ -494,32 +494,7 @@ export class Board {
       if (deg[i] > 2) g += `<circle class="over" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.30}"/>`;
     }
 
-    // White and unlabeled-gray circle interior fills (below loop segments so segments pass cleanly through)
-    const rWhite = S * 0.21;
-    const rBlack = S * 0.22;
-    const rGray = S * 0.215;
-    const rGrayInner = S * 0.175;
-    const rGrayHalo = S * 0.245;
-    const grayLabel = (cell) => {
-      const k = P.grayAt ? P.grayAt[cell] : -1;
-      if (k < 0) return { lbl: 0, auto: false };
-      const lbl = marks.grays ? marks.grays[k] : 0;
-      const auto = !!(lbl && marks.autoG && marks.autoG[k]);
-      return { lbl, auto };
-    };
-    for (let k = 0; k < P.clues.length; k++) {
-      const cl = P.clues[k];
-      const st = info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
-      if (cl.t === 'W') {
-        g += `<circle class="pearl-white-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
-      } else if (cl.t === 'G') {
-        const { lbl } = grayLabel(cl.r * P.cols + cl.c);
-        if (lbl === 0) g += `<circle class="pearl-gray-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGray}"/>`;
-        else if (lbl === WHITE) g += `<circle class="pearl-white-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayInner}"/>`;
-      }
-    }
-
-    // Drawn loop segments directly along the lattice tracks (with red highlight + glow on early-closed loops)
+    // Drawn loop segments directly along the lattice tracks (behind all pearls so circles read crisply)
     const pc = this.opts.pathColors;
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 1 || !show.has(`l${x}`)) continue;
@@ -537,26 +512,44 @@ export class Board {
       g += `<line class="seg${isBadLoop ? ' bad' : ''}"${style} stroke-width="${S * 0.14}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
     }
 
-    // Circle outlines (white), solid discs (black), and gray/labeled-gray circles on intersections
+    // Circles (white, black, unlabeled gray, and 0° 2×2 checkerboard labeled gray) on top of loop segments
+    const rWhite = S * 0.21;
+    const rBlack = S * 0.22;
+    const rGray = S * 0.215;
+    const rChecker = S * 0.22;
+    const grayLabel = (cell) => {
+      const k = P.grayAt ? P.grayAt[cell] : -1;
+      if (k < 0) return { lbl: 0, auto: false };
+      const lbl = marks.grays ? marks.grays[k] : 0;
+      const auto = !!(lbl && marks.autoG && marks.autoG[k]);
+      return { lbl, auto };
+    };
+    const checkerQuads = (cx, cy, r) => (
+      `M${cx} ${cy}V${cy - r}A${r} ${r} 0 0 1 ${cx + r} ${cy}ZM${cx} ${cy}V${cy + r}A${r} ${r} 0 0 1 ${cx - r} ${cy}Z`
+    );
     for (let k = 0; k < P.clues.length; k++) {
       const cl = P.clues[k];
+      const cx = vx(cl.c), cy = vy(cl.r);
       const st = info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
       if (cl.t === 'W') {
-        g += `<circle class="pearl-white-ring ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
+        g += `<circle class="pearl-white-fill ${st}" cx="${cx}" cy="${cy}" r="${rWhite}"/>`;
+        g += `<circle class="pearl-white-ring ${st}" cx="${cx}" cy="${cy}" r="${rWhite}"/>`;
       } else if (cl.t === 'G') {
-        const { lbl, auto } = grayLabel(cl.r * P.cols + cl.c);
-        const autoCls = auto ? ' auto' : '';
+        const { lbl } = grayLabel(cl.r * P.cols + cl.c);
         if (lbl === 0) {
-          g += `<circle class="pearl-gray-ring ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGray}"/>`;
+          g += `<circle class="pearl-gray-fill ${st}" cx="${cx}" cy="${cy}" r="${rGray}"/>`;
+          g += `<circle class="pearl-gray-ring ${st}" cx="${cx}" cy="${cy}" r="${rGray}"/>`;
         } else if (lbl === WHITE) {
-          g += `<circle class="pearl-gray-halo${autoCls} ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayHalo}"/>`;
-          g += `<circle class="pearl-white-ring pearl-gray-inner ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayInner}"/>`;
+          g += `<circle class="pearl-white-fill ${st}" cx="${cx}" cy="${cy}" r="${rChecker}"/>`;
+          g += `<path class="pearl-gray-quad-w" d="${checkerQuads(cx, cy, rChecker)}"/>`;
+          g += `<circle class="pearl-white-ring ${st}" cx="${cx}" cy="${cy}" r="${rChecker}"/>`;
         } else if (lbl === BLACK) {
-          g += `<circle class="pearl-gray-halo${autoCls} ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayHalo}"/>`;
-          g += `<circle class="pearl-black pearl-gray-inner ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayInner}"/>`;
+          g += `<circle class="pearl-black-fill ${st}" cx="${cx}" cy="${cy}" r="${rChecker}"/>`;
+          g += `<path class="pearl-gray-quad-b" d="${checkerQuads(cx, cy, rChecker)}"/>`;
+          g += `<circle class="pearl-black-ring ${st}" cx="${cx}" cy="${cy}" r="${rChecker}"/>`;
         }
       } else {
-        g += `<circle class="pearl-black ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rBlack}"/>`;
+        g += `<circle class="pearl-black ${st}" cx="${cx}" cy="${cy}" r="${rBlack}"/>`;
       }
     }
 

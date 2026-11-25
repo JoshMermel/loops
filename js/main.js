@@ -58,6 +58,7 @@ const settings = {
   custom: savedCustom,
   autoX: store.get('ms_autoX') !== '0',
   autoShade: store.get('ms_autoShade') !== '0',
+  incrementalHints: store.get('ms_incrementalHints') !== '0',
 };
 
 const board = new Board($('board'), {
@@ -563,7 +564,7 @@ function hint(opts = {}) {
   if (!state.P) return;
   if (state.solved) { toast('Already solved!'); return; }
 
-  state.hint = advanceHint(state.hint, () => computeHint(state.P, state.marks), opts);
+  state.hint = advanceHint(state.hint, () => computeHint(state.P, state.marks), { full: !settings.incrementalHints, ...opts });
   const h = state.hint;
 
   if (h.kind === 'wrong') {
@@ -1058,6 +1059,12 @@ $('setting-auto-shade').addEventListener('change', (e) => {
     if (!sameMarks(before, state.marks)) { save(); refresh(); }
     else board.render(state.marks, analyse());
   }
+});
+
+$('setting-incremental-hints').checked = settings.incrementalHints;
+$('setting-incremental-hints').addEventListener('change', (e) => {
+  settings.incrementalHints = e.target.checked;
+  store.set('ms_incrementalHints', settings.incrementalHints ? '1' : '0');
 });
 
 function renderPaletteUI() {
