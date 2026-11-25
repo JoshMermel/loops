@@ -662,7 +662,7 @@ function updateUrl() {
 
 function showInfo() {
   const P = state.P;
-  const full = P.fullBoard ? ' · Full board' : '';
+  const full = P.fullBoard ? ' · Hamilton cycle' : '';
   const tier = P.tier ? ` · ${P.tier}` : '';
   const extra = beyondHints(P) ? ' (beyond hints)' : '';
   const info = $('puz-info');
@@ -1053,7 +1053,7 @@ function renderHelpModal() {
   if (isFull) {
     const hasGivenLines = Boolean(hasGivens && P.givens.some((g) => g.v === 1));
     const hasWalls = Boolean(hasGivens && P.givens.some((g) => g.v === 0));
-    $('help-full-title').textContent = hasGivens ? 'Full board & givens (special rule)' : 'Full board (special rule)';
+    $('help-full-title').textContent = hasGivens ? 'Hamilton cycle & givens' : 'Hamilton cycle';
     const givenNote = hasGivenLines && hasWalls
       ? 'Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.'
       : hasGivenLines

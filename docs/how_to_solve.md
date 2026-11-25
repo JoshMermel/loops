@@ -11,7 +11,7 @@ The same rule table powers both difficulty grading and live hints (see [README.m
 - The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.
 - **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
 - **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).
-- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, Swiss cheese, and Slitherlink & Hybrids).
+- Some books feature other loop puzzles or hybrids — see **[Variant rules](#variant-rules)** below (Slitherlink, Hamilton cycle, Gray circles, and Swiss cheese).
 
 ## How the examples work
 
@@ -592,9 +592,9 @@ A gray circle that cannot make a valid white-circle turn on either axis must be 
 
 ---
 
-### Full board
+### Hamilton cycle
 
-The loop must visit **every** intersection on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens.
+The loop must visit **every** intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens. Also combines with Masyu or Slitherlink in **Hybrids** books.
 
 #### checkerPocket
 
@@ -630,7 +630,7 @@ Cutout holes cannot be entered. Every enclosed hole lies entirely **Inside** or 
 
 ### Slitherlink & Hybrids
 
-Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrid** books, numbered squares share the same single loop with Masyu circles or the Full-board rule.
+Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrids** books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.
 
 #### slitherZero
 

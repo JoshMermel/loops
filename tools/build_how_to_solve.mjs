@@ -35,9 +35,9 @@ const VARIANT_GROUPS = [
   },
   {
     id: 'variant-full',
-    title: 'Full board',
-    intro: 'The loop must visit **every** intersection on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens.',
-    htmlIntro: 'The loop must visit <b>every</b> intersection on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.',
+    title: 'Hamilton cycle',
+    intro: 'The loop must visit **every** intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens. Also combines with Masyu or Slitherlink in **Hybrids** books.',
+    htmlIntro: 'The loop must visit <b>every</b> intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens. Also combines with Masyu or Slitherlink in <b>Hybrids</b> books.',
     ruleIds: ['checkerPocket', 'checkerParity'],
   },
   {
@@ -50,8 +50,8 @@ const VARIANT_GROUPS = [
   {
     id: 'variant-slitherlink',
     title: 'Slitherlink & Hybrids',
-    intro: 'Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrid** books, numbered squares share the same single loop with Masyu circles or the Full-board rule.',
-    htmlIntro: 'Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrid</b> books, numbered squares share the same single loop with Masyu circles or the Full-board rule.',
+    intro: 'Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrids** books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.',
+    htmlIntro: 'Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrids</b> books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.',
     ruleIds: ['slitherZero', 'slitherCount', 'slitherCorner', 'slitherAdjacent3', 'slitherDiag3', 'slither3LineIn', 'slither1LineIn', 'slitherDiag32', 'faceSlither'],
   },
 ];
@@ -104,7 +104,7 @@ say(
   '- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.',
   '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.',
   '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).',
-  '- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, Swiss cheese, and Slitherlink & Hybrids).',
+  '- Some books feature other loop puzzles or hybrids — see **[Variant rules](#variant-rules)** below (Slitherlink, Hamilton cycle, Gray circles, and Swiss cheese).',
   '',
   '## How the examples work',
   '',
@@ -249,7 +249,7 @@ htmlParts.push(`<!DOCTYPE html>
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, Swiss cheese, and Slitherlink &amp; Hybrids).</li>
+      <li>Some books feature other loop puzzles or hybrids — see <a href="#variant-rules"><b>Variant rules</b></a> below (Slitherlink, Hamilton cycle, Gray circles, and Swiss cheese).</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>
