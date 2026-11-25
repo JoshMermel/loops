@@ -6,9 +6,10 @@
 // Usage: node tools/how_to_examples.mjs
 import fs from 'node:fs';
 import path from 'node:path';
-import { compile, parseCsv, toCsv, isSolved, symmetryKey } from '../js/logic.js';
+import { compile, parseCsv, toCsv, isSolved, symmetryKey, WHITE, BLACK } from '../js/logic.js';
 import { RULES, rate } from '../js/rating.js';
 import { computeHint } from '../js/hintstep.js';
+import { reconcileAutoGray } from '../js/marks.js';
 import { repoRoot } from './_cli.mjs';
 
 const root = repoRoot(import.meta.url);
@@ -79,7 +80,11 @@ const prefer = (prev, cand) => {
 for (const raw of prioritized) {
   if (best.size === targetRules.size) break;
   const P = compile({ ...raw });
-  const marks = { edges: new Uint8Array(P.numEdges) };
+  const marks = {
+    edges: new Uint8Array(P.numEdges),
+    grays: new Uint8Array(P.grays.length),
+    autoG: new Uint8Array(P.grays.length),
+  };
   for (let step = 0; step < 300; step++) {
     if (isSolved(P, marks.edges)) break;
     const h = computeHint(P, marks);
@@ -89,6 +94,7 @@ for (const raw of prioritized) {
       const cand = {
         puzzleObj: raw,
         edgesStr: Array.from(marks.edges).join(''),
+        graysStr: P.grays.length ? Array.from(marks.grays).join('') : '',
         hintsCount: step,
         rule: h.rule,
         tier: h.tier,
@@ -104,6 +110,15 @@ for (const raw of prioritized) {
     let changed = false;
     for (const x of item.targets.segOn) if (marks.edges[x] !== 1) { marks.edges[x] = 1; changed = true; }
     for (const x of item.targets.segOff) if (marks.edges[x] !== 2) { marks.edges[x] = 2; changed = true; }
+    for (const cell of item.targets.grayWhite || []) {
+      const k = P.grayAt[cell];
+      if (k >= 0 && marks.grays[k] !== WHITE) { marks.grays[k] = WHITE; marks.autoG[k] = 0; changed = true; }
+    }
+    for (const cell of item.targets.grayBlack || []) {
+      const k = P.grayAt[cell];
+      if (k >= 0 && marks.grays[k] !== BLACK) { marks.grays[k] = BLACK; marks.autoG[k] = 0; changed = true; }
+    }
+    reconcileAutoGray(P, marks);
     if (!changed) break;
   }
 }
@@ -142,6 +157,7 @@ for (const r of RULES) {
     cols: ex.puzzleObj.cols,
     hints: ex.hintsCount,
     edges: ex.edgesStr,
+    ...(ex.graysStr ? { grays: ex.graysStr } : {}),
     text: ex.text,
     roles: ex.roles,
     targets: ex.targets,

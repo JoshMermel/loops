@@ -27,14 +27,15 @@ test('layoutFor and planPrint fit multiple boards per page for A4/Letter', () =>
   assert.ok(SITE_URL.startsWith('https://'));
 });
 
-test('boardSvg outputs fixed black-and-white SVG with white/black circles and optional solution loop', () => {
-  const P = compile({ name: 'p', rows: 3, cols: 3, clues: [{ r: 0, c: 0, t: 'B' }, { r: 2, c: 2, t: 'B' }, { r: 0, c: 1, t: 'W' }] });
+test('boardSvg outputs fixed black-and-white SVG with white/black/gray circles and optional solution loop', () => {
+  const P = compile({ name: 'p', rows: 3, cols: 3, clues: [{ r: 0, c: 0, t: 'B' }, { r: 2, c: 2, t: 'G' }, { r: 0, c: 1, t: 'W' }] });
   const sol = solve(P, { limit: 2 }).solutions[0];
   P.solution = encodeSolution(P, sol);
 
   const svgBlank = boardSvg(P, null);
   assert.ok(svgBlank.includes('class="white-circle"'));
   assert.ok(svgBlank.includes('class="black-circle"'));
+  assert.ok(svgBlank.includes('class="gray-circle"'));
   assert.ok(!svgBlank.includes('class="loop"'));
 
   const svgSol = boardSvg(P, decodeSolution(P, P.solution));

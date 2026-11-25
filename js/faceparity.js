@@ -15,7 +15,7 @@
 // Any undecided edge whose two flanking faces are in the same parity component is immediately forced:
 //   - same parity     -> E_OFF (cross)
 //   - opposite parity -> E_ON (loop segment)
-import { E_UNKNOWN, E_ON, E_OFF } from './logic.js';
+import { WHITE, BLACK, E_UNKNOWN, E_ON, E_OFF } from './logic.js';
 
 /** Convert dual face index (0..F-1) to { r, c } or null for EXT. */
 export function faceCoords(P, f) {
@@ -154,9 +154,13 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
   }
 
   if (useCircles) {
+    const clue = st.clue || P.clue;
+    const whites = st.hasGray ? P.clueCells.filter((i) => clue[i] === WHITE) : P.whites;
+    const blacks = st.hasGray ? P.clueCells.filter((i) => clue[i] === BLACK) : P.blacks;
+
     // 2. White circles: both diagonal corner pairs have opposite parity
-    for (let wi = 0; wi < P.whites.length; wi++) {
-      const cell = P.whites[wi];
+    for (let wi = 0; wi < whites.length; wi++) {
+      const cell = whites[wi];
       const wr = (cell / cols) | 0, wc = cell % cols;
       const nw = wr > 0 && wc > 0 ? (wr - 1) * fc + (wc - 1) : EXT;
       const ne = wr > 0 && wc < fc ? (wr - 1) * fc + wc : EXT;
@@ -187,8 +191,8 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
     let progress = true;
     while (progress && !conflict) {
       progress = false;
-      for (let k = 0; k < P.blacks.length; k++) {
-        const bi = P.blacks[k];
+      for (let k = 0; k < blacks.length; k++) {
+        const bi = blacks[k];
         const br = (bi / cols) | 0, bc = bi % cols;
         const nw = br > 0 && bc > 0 ? (br - 1) * fc + (bc - 1) : EXT;
         const ne = br > 0 && bc < fc ? (br - 1) * fc + bc : EXT;

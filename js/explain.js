@@ -1,7 +1,7 @@
 // Turns a step of the human-style solver (js/rating.js) into something the Hint button can show:
 // a clear English sentence, the cells to look at (by role), and the ghost marks to draw on the board.
 import {
-  E_ON, E_OFF,
+  WHITE, BLACK, E_ON, E_OFF,
   colName, edgeCells,
 } from './logic.js';
 import { ruleLabel, oddOpenEnds, chokepointCheck } from './rating.js';
@@ -36,22 +36,31 @@ export const ROLES = {
   path: 'the ends of a path',
 };
 
-/** Extract deduplicated ghost edge targets from a firing's `sets` (edge-only interaction: draw segments or cross out edges). */
+/** Extract deduplicated ghost targets from a firing's `sets` (segments, crosses, and gray-pearl labels). */
 export function targetsOf(sets) {
-  const segOn = [], segOff = [];
-  const seenOn = new Set(), seenOff = new Set();
+  const segOn = [], segOff = [], grayWhite = [], grayBlack = [];
+  const seenOn = new Set(), seenOff = new Set(), seenGW = new Set(), seenGB = new Set();
   for (const [kind, idx, v] of sets) {
     if (kind === 'e') {
       if (v === E_ON && !seenOn.has(idx)) { seenOn.add(idx); segOn.push(idx); }
       else if (v === E_OFF && !seenOff.has(idx)) { seenOff.add(idx); segOff.push(idx); }
+    } else if (kind === 'g') {
+      if (v === WHITE && !seenGW.has(idx)) { seenGW.add(idx); grayWhite.push(idx); }
+      else if (v === BLACK && !seenGB.has(idx)) { seenGB.add(idx); grayBlack.push(idx); }
     }
   }
-  return { segOn, segOff };
+  return { segOn, segOff, grayWhite, grayBlack };
 }
 
 /** Short human description of the ghost marks to place. */
 export function describeMarks(P, targets) {
   const parts = [];
+  if (targets.grayWhite && targets.grayWhite.length) {
+    parts.push(`label ${joinList(targets.grayWhite.map((i) => cellName(P, i)))} white`);
+  }
+  if (targets.grayBlack && targets.grayBlack.length) {
+    parts.push(`label ${joinList(targets.grayBlack.map((i) => cellName(P, i)))} black`);
+  }
   if (targets.segOn.length) {
     parts.push(targets.segOn.length <= 3
       ? `draw ${joinList(targets.segOn.map((x) => edgeName(P, x)))}`
@@ -72,6 +81,12 @@ function describeChainStep(P, s) {
   switch (rule) {
     case 'whiteStraight':
       return `the white circle at ${c} must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
+    case 'grayMustBeBlack':
+      return `the gray circle at ${c} cannot go straight through and must be black`;
+    case 'grayMustBeWhite':
+      return `the gray circle at ${c} cannot extend two straight segments both ways and must be white`;
+    case 'grayWhiteNoTurn':
+      return `the gray circle at ${c} cannot make a valid white-circle turn on either axis and must be black`;
     case 'blackExtend':
       return `the black circle at ${c} must go two cells ${DIR_WORD[info.dir]}`;
     case 'blackWall':
@@ -148,6 +163,8 @@ function describeContradiction(P, broke, finalState) {
       return { text: `the black circle at ${cellName(P, broke.cell)} has no room for two straight segments`, cells: [broke.cell], area: [] };
     case 'blackStraight':
       return { text: `the black circle at ${cellName(P, broke.cell)} would go straight instead of turning`, cells: [broke.cell], area: [] };
+    case 'grayBroken':
+      return { text: `the gray circle at ${cellName(P, broke.cell)} cannot be either white or black`, cells: [broke.cell], area: [] };
     case 'earlyClose':
       return { text: `the loop closes early while ${cellName(P, broke.cell)} is still outside it`, cells: [broke.cell], area: [] };
     case 'twoLoops':
@@ -196,6 +213,40 @@ export function explainStep(P, step, st = null) {
   const uniq = (arr) => [...new Set(arr.filter((v) => v >= 0))];
 
   switch (rule) {
+    case 'grayMustBeBlack': {
+      const c = info.cell;
+      roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the gray circle at ${cellName(P, c)} — check whether the loop can go straight through it on either axis.`;
+      const why = info.reason === 'corner'
+        ? 'is in a corner and cannot go straight through'
+        : info.reason === 'inward'
+          ? 'cannot continue straight past its existing segment'
+          : 'cannot go straight along either axis';
+      text = `The gray circle at ${cellName(P, c)} ${why}, so it cannot be white — it must be a black circle.`;
+      break;
+    }
+    case 'grayMustBeWhite': {
+      const c = info.cell;
+      roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the gray circle at ${cellName(P, c)} — check whether it has enough room to extend two straight segments along both axes.`;
+      const why = info.reason === 'shortLeg'
+        ? `its segment going ${DIR_WORD[info.dir]} cannot continue straight two cells`
+        : info.axis === 'both'
+          ? 'it lacks room for two straight segments on either axis'
+          : `it lacks room for two straight segments ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
+      text = `The gray circle at ${cellName(P, c)} cannot be black because ${why} — it must be a white circle.`;
+      break;
+    }
+    case 'grayWhiteNoTurn': {
+      const c = info.cell;
+      roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the gray circle at ${cellName(P, c)} — check whether it could satisfy the white-circle turn rule on either axis.`;
+      text = `If the gray circle at ${cellName(P, c)} were white, it could not make a required 90° turn on either axis; so it must be a black circle.`;
+      break;
+    }
     case 'whiteStraight': {
       const c = info.cell;
       roles.clue.push(c);
@@ -525,18 +576,28 @@ export function explainStep(P, step, st = null) {
     case 'imagineLocal':
     case 'imagineTrace':
     case 'imagineChain': {
-      const [a, b] = edgeCells(P, info.edge);
-      roles.focus.push(a, b);
-      nudgeRoles.focus.push(a, b);
-      nudge = `Look at ${edgeName(P, info.edge)} — try imagining a segment there (or crossing it out) and follow the forced moves.`;
-      const hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;
-      const verdict = info.deduce === E_ON ? `draw ${edgeName(P, info.edge)}` : `cross out ${edgeName(P, info.edge)}`;
+      const isGray = info.grayCell !== undefined && info.grayCell >= 0;
+      let hypStr, verdict;
+      if (isGray) {
+        roles.clue.push(info.grayCell);
+        nudgeRoles.clue.push(info.grayCell);
+        nudge = `Look at the gray circle at ${cellName(P, info.grayCell)} — try imagining whether it is white or black and follow the forced moves.`;
+        hypStr = `the gray circle at ${cellName(P, info.grayCell)} is ${info.hyp === WHITE ? 'white' : 'black'}`;
+        verdict = `label ${cellName(P, info.grayCell)} as a ${info.deduce === WHITE ? 'white' : 'black'} circle`;
+      } else {
+        const [a, b] = edgeCells(P, info.edge);
+        roles.focus.push(a, b);
+        nudgeRoles.focus.push(a, b);
+        nudge = `Look at ${edgeName(P, info.edge)} — try imagining a segment there (or crossing it out) and follow the forced moves.`;
+        hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;
+        verdict = info.deduce === E_ON ? `draw ${edgeName(P, info.edge)}` : `cross out ${edgeName(P, info.edge)}`;
+      }
       let finalState = null;
       if (st) {
         const rep = replayImagine(P, st, info);
         finalState = rep.state;
         // Collect all newly turned-on edges in the imagined chain for dashed orange visualization
-        if (info.hyp === E_ON) chain.push(info.edge);
+        if (!isGray && info.hyp === E_ON) chain.push(info.edge);
         for (let x = 0; x < P.numEdges; x++) {
           if (rep.state.e[x] === E_ON && st.e[x] !== E_ON && x !== info.edge) chain.push(x);
         }
@@ -552,12 +613,22 @@ export function explainStep(P, step, st = null) {
       break;
     }
     case 'tryEdge': {
-      const [a, b] = edgeCells(P, info.edge);
-      roles.focus.push(a, b);
-      nudgeRoles.focus.push(a, b);
-      nudge = `Look at ${edgeName(P, info.edge)} — try imagining a segment there (or crossing it out) and follow the forced moves.`;
-      const hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;
-      const verdict = info.hyp === E_ON ? `cross out ${edgeName(P, info.edge)}` : `draw ${edgeName(P, info.edge)}`;
+      const isGray = info.grayCell !== undefined && info.grayCell >= 0;
+      let hypStr, verdict;
+      if (isGray) {
+        roles.clue.push(info.grayCell);
+        nudgeRoles.clue.push(info.grayCell);
+        nudge = `Look at the gray circle at ${cellName(P, info.grayCell)} — try imagining whether it is white or black and follow the forced moves.`;
+        hypStr = `the gray circle at ${cellName(P, info.grayCell)} is ${info.hyp === WHITE ? 'white' : 'black'}`;
+        verdict = `label ${cellName(P, info.grayCell)} as a ${info.hyp === WHITE ? 'black' : 'white'} circle`;
+      } else {
+        const [a, b] = edgeCells(P, info.edge);
+        roles.focus.push(a, b);
+        nudgeRoles.focus.push(a, b);
+        nudge = `Look at ${edgeName(P, info.edge)} — try imagining a segment there (or crossing it out) and follow the forced moves.`;
+        hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;
+        verdict = info.hyp === E_ON ? `cross out ${edgeName(P, info.edge)}` : `draw ${edgeName(P, info.edge)}`;
+      }
       const traceClauses = (info.trace || []).slice(0, 4).map((t) => describeChainStep(P, t));
       const detail = traceClauses.length
         ? ` (starting with: ${traceClauses.join('; then ')}; reaching a contradiction after ${plural(info.steps, 'step')})`

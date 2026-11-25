@@ -1,12 +1,13 @@
 // App controller: books, deep links, marks, undo/redo, persistence, Correct-so-far, Hint, Browse, Settings, Print.
 import {
-  compile, parseCsv, puzzleHash, isSolved, decodeSolution,
+  compile, parseCsv, puzzleHash, isSolved, decodeSolution, WHITE, BLACK,
 } from './logic.js';
 import { TIER_INFO, beyondHints } from './rating.js';
 import { computeHint, advanceHint, checkMarksAgainstSolution } from './hintstep.js';
 import { ROLES, describeMarks } from './explain.js';
 import {
   cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
+  cycleGrayLabel, cycleGrayLabelReverse, reconcileAutoGray,
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
 } from './marks.js';
@@ -64,6 +65,8 @@ const board = new Board($('board'), {
   onBeginDrag: () => { if (state.pending) state.marks = cloneMarks(state.pending); state.dragStack = []; },
   onEdgeTap: (edge) => cycleEdge(edge),
   onEdgeRight: (edge) => toggleEdge(edge),
+  onCellTap: (cell) => cycleGray(cell, false),
+  onCellRight: (cell) => cycleGray(cell, true),
   onFaceTap: (face) => cycleFace(face, false),
   onFaceRight: (face) => cycleFace(face, true),
   onFaceDrag: (face) => paintFaceStep(face),
@@ -88,6 +91,8 @@ const emptyMarks = (P) => ({
   autoE: new Uint8Array(P.numEdges),
   faces: new Uint8Array(numFacesOf(P)),
   autoF: new Uint8Array(numFacesOf(P)),
+  grays: new Uint8Array(P.grays ? P.grays.length : 0),
+  autoG: new Uint8Array(P.grays ? P.grays.length : 0),
 });
 const freshMarks = (P) => {
   const m = emptyMarks(P);
@@ -99,6 +104,8 @@ const cloneMarks = (m) => ({
   autoE: m.autoE.slice(),
   faces: m.faces.slice(),
   autoF: m.autoF.slice(),
+  grays: m.grays.slice(),
+  autoG: m.autoG.slice(),
 });
 const snapshot = () => cloneMarks(state.marks);
 const sameMarks = (a, b) => (
@@ -106,10 +113,13 @@ const sameMarks = (a, b) => (
   && a.autoE.every((v, i) => v === b.autoE[i])
   && a.faces.every((v, i) => v === b.faces[i])
   && a.autoF.every((v, i) => v === b.autoF[i])
+  && a.grays.every((v, i) => v === b.grays[i])
+  && a.autoG.every((v, i) => v === b.autoG[i])
 );
 const isPristine = (m) => (
   m.edges.every((v, x) => v === 0 || (v === 2 && m.autoE[x]))
   && m.faces.every((v, f) => v === 0 || m.autoF[f])
+  && m.grays.every((v, k) => v === 0 || m.autoG[k])
 );
 
 function edgeBetween(P, a, b) {
@@ -118,11 +128,22 @@ function edgeBetween(P, a, b) {
 }
 
 const reconcileAuto = (P, m) => {
+  reconcileAutoGray(P, m);
   reconcileAutoX(P, m, settings.autoX, { useShade: settings.autoShade });
   reconcileAutoShade(P, m, settings.autoShade);
 };
 
 const isAutoX = (m, x) => m.edges[x] === 2 && !!m.autoE[x];
+
+function cycleGray(cell, reverse = false) {
+  const P = state.P, m = state.marks;
+  const k = P.grayAt ? P.grayAt[cell] : -1;
+  if (k < 0 || (m.grays[k] && m.autoG[k])) return;
+  m.grays[k] = reverse ? cycleGrayLabelReverse(m.grays[k]) : cycleGrayLabel(m.grays[k]);
+  m.autoG[k] = 0;
+  reconcileAuto(P, m);
+  refresh();
+}
 
 function cycleEdge(x) {
   const P = state.P, m = state.marks;
@@ -262,7 +283,7 @@ function reset() {
 
 function analyse() {
   return {
-    clueState: clueStates(state.P, state.marks),
+    clueState: state.solved ? state.P.clues.map(() => '') : clueStates(state.P, state.marks),
     badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
   };
@@ -356,12 +377,17 @@ function save() {
   const baseP = state.baseP, m = state.marks;
   if (isPristine(m)) { store.del(saveKey(baseP)); return; }
   const canon = state.rotated ? unrotateMarksCW(baseP, state.rotP, m) : m;
-  store.set(saveKey(baseP), JSON.stringify({
+  const payload = {
     e: Array.from(canon.edges).join(''),
     ae: Array.from(canon.autoE).join(''),
     f: Array.from(canon.faces).join(''),
     af: Array.from(canon.autoF).join(''),
-  }));
+  };
+  if (canon.grays && canon.grays.length) {
+    payload.g = Array.from(canon.grays).join('');
+    payload.ag = Array.from(canon.autoG).join('');
+  }
+  store.set(saveKey(baseP), JSON.stringify(payload));
 }
 
 function load(P) {
@@ -380,6 +406,14 @@ function load(P) {
       if (s.af && s.af.length === F) {
         for (let f = 0; f < F; f++) m.autoF[f] = +s.af[f];
       }
+      const G = m.grays.length;
+      if (G && s.g && s.g.length === G) {
+        for (let k = 0; k < G; k++) m.grays[k] = +s.g[k];
+      }
+      if (G && s.ag && s.ag.length === G) {
+        for (let k = 0; k < G; k++) m.autoG[k] = +s.ag[k];
+      }
+      reconcileAutoGray(P, m);
       applyAutoX(P, m, settings.autoX, { useShade: settings.autoShade });
       applyAutoShade(P, m, settings.autoShade);
       if (settings.autoShade && isSolved(P, m.edges)) paintSolvedFaces(P, m);
@@ -533,7 +567,7 @@ function hint(opts = {}) {
   const h = state.hint;
 
   if (h.kind === 'wrong') {
-    board.render(state.marks, analyse(), { wrongEdges: h.wrongEdges });
+    board.render(state.marks, analyse(), { wrongEdges: h.wrongEdges, wrongClues: h.wrongClues });
     const msg = h.fromShade
       ? 'Auto-X crossed out a required segment because of a conflicting Inside/Outside shade (highlighted in red). Fix or undo your shaded squares first.'
       : h.contradiction
@@ -1356,6 +1390,14 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
       const item = state.hint.hints[state.hint.index];
       for (const x of item.targets.segOn) { state.marks.edges[x] = 1; state.marks.autoE[x] = 0; }
       for (const x of item.targets.segOff) { state.marks.edges[x] = 2; state.marks.autoE[x] = 0; }
+      for (const cell of item.targets.grayWhite || []) {
+        const k = state.P.grayAt[cell];
+        if (k >= 0) { state.marks.grays[k] = WHITE; state.marks.autoG[k] = 0; }
+      }
+      for (const cell of item.targets.grayBlack || []) {
+        const k = state.P.grayAt[cell];
+        if (k >= 0) { state.marks.grays[k] = BLACK; state.marks.autoG[k] = 0; }
+      }
       reconcileAuto(state.P, state.marks);
       refresh();
       return true;

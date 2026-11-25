@@ -4,20 +4,26 @@
 //   marks.edges: Uint8Array(numEdges) — 0 blank, 1 loop segment (ON), 2 crossed out (X / OFF)
 //   marks.autoE: optional Uint8Array(numEdges) — 1 where an X was placed automatically by Auto-X
 import {
-  E_UNKNOWN, E_ON, E_OFF,
+  WHITE, BLACK, E_UNKNOWN, E_ON, E_OFF,
   initialState, cloneState, propagate, decodeSolution, isSolved,
 } from './logic.js';
 import { nextSteps, contradiction } from './rating.js';
 import { buildFaceParity } from './faceparity.js';
 import { explainStep } from './explain.js';
 
-/** Convert edge-only player board marks into a solver state `st` (circles start as LOOP). */
+/** Convert player board marks (edges + optional gray pearl labels) into a solver state `st`. */
 export function stateFromMarks(P, marks) {
   const st = initialState(P);
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
     if (marks.edges[x] === 1) st.e[x] = E_ON;
     else if (marks.edges[x] === 2) st.e[x] = E_OFF;
+  }
+  if (st.hasGray && marks.grays) {
+    for (let k = 0; k < P.grays.length; k++) {
+      const lbl = marks.grays[k];
+      if (lbl === WHITE || lbl === BLACK) st.clue[P.grays[k]] = lbl;
+    }
   }
   return st;
 }
@@ -29,20 +35,30 @@ function validSolutionState(P, solutionStr = P.solution) {
 }
 
 /**
- * Compare player marks against the stored solution (for "Correct so far?" and Hint's mistake check).
- * Auto-X marks are excluded so error counts only report the player's own mistakes.
- * Returns { wrongEdges: [edgeIdx], total: number }.
+ * Compare player marks (drawn segments, manual X's, and manual gray pearl labels) against the stored solution.
+ * Auto-placed marks (`autoE`, `autoG`) are excluded so error counts only report the player's own mistakes.
+ * Returns { wrongEdges: [edgeIdx], wrongClues: [cellIdx], total: number }.
  */
 export function checkMarksAgainstSolution(P, marks, solutionStr = P.solution) {
   const wrongEdges = [];
+  const wrongClues = [];
   const sol = validSolutionState(P, solutionStr);
-  if (!sol) return { wrongEdges, total: 0 };
+  if (!sol) return { wrongEdges, wrongClues, total: 0 };
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
     if (marks.edges[x] === 1 && sol.e[x] !== E_ON) wrongEdges.push(x);
     else if (marks.edges[x] === 2 && sol.e[x] === E_ON && !(marks.autoE && marks.autoE[x])) wrongEdges.push(x);
   }
-  return { wrongEdges, total: wrongEdges.length };
+  if (P.grays && P.grays.length && marks.grays) {
+    for (let k = 0; k < P.grays.length; k++) {
+      const lbl = marks.grays[k];
+      if ((lbl === WHITE || lbl === BLACK) && !(marks.autoG && marks.autoG[k])) {
+        const i = P.grays[k];
+        if (sol.clue[i] !== lbl) wrongClues.push(i);
+      }
+    }
+  }
+  return { wrongEdges, wrongClues, total: wrongEdges.length + wrongClues.length };
 }
 
 /**
@@ -54,6 +70,7 @@ export function computeHint(P, marks) {
   const sol = validSolutionState(P);
   if (sol) {
     const wrongEdges = [];
+    const wrongClues = [];
     const wrongAuto = [];
     for (let x = 0; x < P.numEdges; x++) {
       if (P.edgeA[x] < 0) continue;
@@ -63,15 +80,25 @@ export function computeHint(P, marks) {
         else wrongEdges.push(x);
       }
     }
-    if (wrongEdges.length > 0) return { kind: 'wrong', wrongEdges, total: wrongEdges.length };
-    if (wrongAuto.length > 0) return { kind: 'wrong', wrongEdges: wrongAuto, total: wrongAuto.length, fromShade: true };
+    if (P.grays && P.grays.length && marks.grays) {
+      for (let k = 0; k < P.grays.length; k++) {
+        const lbl = marks.grays[k];
+        if ((lbl === WHITE || lbl === BLACK) && !(marks.autoG && marks.autoG[k])) {
+          const i = P.grays[k];
+          if (sol.clue[i] !== lbl) wrongClues.push(i);
+        }
+      }
+    }
+    const total = wrongEdges.length + wrongClues.length;
+    if (total > 0) return { kind: 'wrong', wrongEdges, wrongClues, total };
+    if (wrongAuto.length > 0) return { kind: 'wrong', wrongEdges: wrongAuto, wrongClues: [], total: wrongAuto.length, fromShade: true };
   }
 
   const st = stateFromMarks(P, marks);
   if (!sol) {
     const chk = cloneState(st);
     if (!propagate(P, chk) || contradiction(P, chk) || buildFaceParity(P, chk, { buildGraph: false, useCircles: true }).conflict) {
-      return { kind: 'wrong', wrongEdges: [], total: 0, contradiction: true };
+      return { kind: 'wrong', wrongEdges: [], wrongClues: [], total: 0, contradiction: true };
     }
   }
   const res = nextSteps(P, st);

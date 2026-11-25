@@ -62,6 +62,24 @@ test('rotateMarksCW and unrotateMarksCW round-trip edges, autoE, faces, and auto
   assert.deepEqual(backM.autoE, m.autoE);
   assert.deepEqual(backM.faces, m.faces);
   assert.deepEqual(backM.autoF, m.autoF);
+
+  // Also verify grays/autoG round-trip cleanly on a non-square board with gray pearls
+  const gBase = compile({ name: 'grot', rows: 6, cols: 4, clues: [{ r: 0, c: 0, t: 'G' }, { r: 2, c: 3, t: 'G' }, { r: 5, c: 1, t: 'W' }] });
+  const gRot = rotatePuzzleCW(gBase);
+  const gm = {
+    edges: new Uint8Array(gBase.numEdges),
+    autoE: new Uint8Array(gBase.numEdges),
+    faces: new Uint8Array(numFacesOf(gBase)),
+    autoF: new Uint8Array(numFacesOf(gBase)),
+    grays: Uint8Array.from([2, 1]),
+    autoG: Uint8Array.from([0, 1]),
+  };
+  const gRotM = rotateMarksCW(gBase, gRot, gm);
+  assert.deepEqual(gRotM.grays, gm.grays);
+  assert.deepEqual(gRotM.autoG, gm.autoG);
+  const gBackM = unrotateMarksCW(gBase, gRot, gRotM);
+  assert.deepEqual(gBackM.grays, gm.grays);
+  assert.deepEqual(gBackM.autoG, gm.autoG);
 });
 
 test('hints and auto-marks work identically on rotated puzzles', () => {

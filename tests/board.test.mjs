@@ -91,6 +91,28 @@ test('clueStates marks broken (bad) circles and leaves valid/satisfied circles u
   const mBW = { edges: new Uint8Array(P2.numEdges) };
   mBW.edges[P2.ed[(0 * 4 + 1) * 4 + 2]] = 1; // down from top-border white circle
   assert.equal(clueStates(P2, mBW)[0], 'bad');
+
+  // Gray circle error highlight rules:
+  // - Labeled gray uses the chosen label's rule
+  // - Unlabeled gray is bad ONLY when incompatible with BOTH white and black
+  const Pg = compile({ name: 'cs_g', rows: 5, cols: 5, clues: [{ r: 2, c: 2, t: 'G' }] });
+  const mid = 2 * 5 + 2;
+  const mg = { edges: new Uint8Array(Pg.numEdges), grays: new Uint8Array(1) };
+  assert.equal(clueStates(Pg, mg)[0], '');
+  // Turn at (2,2) with no extensions crossed out: unlabeled -> OK (compatible with black)
+  mg.edges[Pg.ed[mid * 4 + 0]] = 1;
+  mg.edges[Pg.ed[mid * 4 + 1]] = 1;
+  assert.equal(clueStates(Pg, mg)[0], '');
+  // Label it White -> bad (turn disagrees with White label)
+  mg.grays[0] = 1;
+  assert.equal(clueStates(Pg, mg)[0], 'bad');
+  // Label it Black -> OK
+  mg.grays[0] = 2;
+  assert.equal(clueStates(Pg, mg)[0], '');
+  // Unlabel it, then cross out straight extension of leg up -> incompatible with BOTH white (turns) and black (short leg) -> bad!
+  mg.grays[0] = 0;
+  mg.edges[Pg.ed2[mid * 4 + 0]] = 2;
+  assert.equal(clueStates(Pg, mg)[0], 'bad');
 });
 
 test('earlyLoopEdges flags closed loops that miss clues or leave other segments, and ignores open paths or full single loops', () => {

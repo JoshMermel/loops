@@ -5,7 +5,7 @@
 // a topological/parity contradiction). The derivation is then pruned by ablation to keep ONLY the steps
 // the contradiction really depends on, and priced by the pruned chain length.
 import {
-  NONE, WHITE, BLACK, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
+  NONE, WHITE, BLACK, GRAY, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   cloneState, propagate, lastPropChanges,
 } from './logic.js';
 
@@ -28,13 +28,14 @@ export function minImagineCost(nSteps, area, isFrontier) {
  *   - imagineTrace (Hard, 36..60): single connected thread, <= 2 steps (dist <= 4) or 3 steps (dist <= 3), no area
  *   - imagineChain (Expert, >= 80): long (4+ steps), multi-front/branching, non-frontier, or area contradiction
  */
-export function classifyImagine(P, baseState, edge, steps, broke, area) {
-  const a = P.edgeA[edge], b = P.edgeB[edge];
+export function classifyImagine(P, baseState, edge, steps, broke, area, grayCell = -1) {
+  const a = grayCell >= 0 ? grayCell : P.edgeA[edge];
+  const b = grayCell >= 0 ? grayCell : P.edgeB[edge];
   const cols = P.cols;
   const dist = (c1, c2) => Math.abs(((c1 / cols) | 0) - ((c2 / cols) | 0)) + Math.abs((c1 % cols) - (c2 % cols));
   const distToEdge = (c) => Math.min(dist(c, a), dist(c, b));
 
-  const isFrontier = baseState.cell[a] === LOOP || baseState.cell[b] === LOOP;
+  const isFrontier = grayCell >= 0 || baseState.cell[a] === LOOP || baseState.cell[b] === LOOP;
   const nSteps = steps.length;
   const earlyClose = !!(broke && (broke.kind === 'earlyClose' || broke.kind === 'twoLoops'));
 
@@ -150,6 +151,12 @@ const insertSortNum = (arr) => {
 
 const applySets = (st, sets) => {
   for (const [kind, idx, v] of sets) {
+    if (kind === 'g') {
+      if (st.clue[idx] === v) continue;
+      if (st.clue[idx] !== GRAY) return false;
+      st.clue[idx] = v;
+      continue;
+    }
     const arr = kind === 'c' ? st.cell : st.e;
     if (arr[idx] === v) continue;
     if (arr[idx] !== 0) return false;
@@ -164,6 +171,7 @@ let bkQueue = new Int32Array(0);
 let bkInQ = new Uint8Array(0);
 let propCellBuf = new Int8Array(0);
 let propEdgeBuf = new Int8Array(0);
+let propClueBuf = new Uint8Array(0);
 let dirtyFlag = new Uint8Array(0);
 
 /**
@@ -173,10 +181,12 @@ let dirtyFlag = new Uint8Array(0);
  * Returns null if OK, or { kind, cell?, edge?, cells? } describing what broke.
  */
 export function easyContradiction(P, st, scope = null) {
-  const { N, numEdges, ed, ed2, nb, edgeA, edgeB, clue } = P;
+  const { N, numEdges, ed, ed2, nb, edgeA, edgeB } = P;
+  const clue = st.clue || P.clue;
   const { cell, e } = st;
-  const whites = scope ? scope.whites : P.whites;
-  const blacks = scope ? scope.blacks : P.blacks;
+  const whites = scope ? scope.whites : (st.hasGray ? P.clueCells.filter((i) => clue[i] === WHITE) : P.whites);
+  const blacks = scope ? scope.blacks : (st.hasGray ? P.clueCells.filter((i) => clue[i] === BLACK) : P.blacks);
+  const grays = !st.hasGray ? null : P.grays.filter((i) => clue[i] === GRAY);
 
   // 1. Cell degree / OFF consistency
   if (scope) {
@@ -274,6 +284,34 @@ export function easyContradiction(P, st, scope = null) {
     }
   }
 
+  // 3b. Unresolved gray circles: must remain compatible with at least one of white or black
+  if (grays) {
+    for (let gi = 0; gi < grays.length; gi++) {
+      const i = grays[gi];
+      const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+      const u2 = ed2[i * 4 + 0], r2 = ed2[i * 4 + 1], d2 = ed2[i * 4 + 2], l2 = ed2[i * 4 + 3];
+      let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
+      let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
+      if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
+      if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
+      if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
+      if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
+      if (vOk || hOk) continue;
+
+      const canLeg = (d) => {
+        const x1 = ed[i * 4 + d], x2 = ed2[i * 4 + d], n1 = nb[i * 4 + d], opp = ed[i * 4 + (d ^ 2)];
+        if (x1 < 0 || x2 < 0 || e[x1] === E_OFF || e[x2] === E_OFF || cell[n1] === OFF || cell[P.step2[i * 4 + d]] === OFF) return false;
+        if (opp >= 0 && e[opp] === E_ON) return false;
+        if (clue[n1] === BLACK) return false;
+        const p1 = ed[n1 * 4 + ((d + 1) & 3)], p2 = ed[n1 * 4 + ((d + 3) & 3)];
+        return !((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON));
+      };
+      if (!((canLeg(0) || canLeg(2)) && (canLeg(1) || canLeg(3)))) {
+        return { kind: 'grayBroken', cell: i };
+      }
+    }
+  }
+
   // 4. Early closed loop (or 2 cycles) — skip when no E_ON edge was added in the hypothesis
   if (scope && !scope.checkCycle) return null;
   if (scratchParent.length < N) { scratchParent = new Int16Array(N); scratchSize = new Int32Array(N); }
@@ -354,14 +392,22 @@ function runBookkeeping(P, st, seedCells = null, onTouch = null) {
     if (!ok) continue;
     if (on > 0 && cell[i] === UNKNOWN) { cell[i] = LOOP; if (onTouch) onTouch(i, true); }
     if (on > 2) { ok = false; continue; }
-    if (on === 2 && unk > 0) {
-      for (let d = 0; d < 4; d++) {
-        const x = ed[base + d];
-        if (x >= 0 && e[x] === E_UNKNOWN) {
-          e[x] = E_OFF;
-          const j = nb[base + d];
-          if (onTouch) onTouch(j, false);
-          push(j);
+    if (on === 2) {
+      if (st.hasGray && st.clue[i] === GRAY) {
+        const u = ed[base], dn = ed[base + 2], r = ed[base + 1], l = ed[base + 3];
+        const straight = (u >= 0 && dn >= 0 && e[u] === E_ON && e[dn] === E_ON)
+          || (r >= 0 && l >= 0 && e[r] === E_ON && e[l] === E_ON);
+        st.clue[i] = straight ? WHITE : BLACK;
+      }
+      if (unk > 0) {
+        for (let d = 0; d < 4; d++) {
+          const x = ed[base + d];
+          if (x >= 0 && e[x] === E_UNKNOWN) {
+            e[x] = E_OFF;
+            const j = nb[base + d];
+            if (onTouch) onTouch(j, false);
+            push(j);
+          }
         }
       }
     }
@@ -377,18 +423,51 @@ function runBookkeeping(P, st, seedCells = null, onTouch = null) {
  * hypothesis (sorted in exact board order for bit-for-bit identical rule selection).
  */
 function findEasyStep(P, st, forbid, scope = null) {
-  const { N, numEdges, ed, ed2, nb, step2, edgeA, edgeB, clue } = P;
+  const { N, numEdges, ed, ed2, nb, step2, edgeA, edgeB } = P;
+  const clue = st.clue || P.clue;
   const { cell, e } = st;
-  const whites = scope ? scope.whites : P.whites;
-  const blacks = scope ? scope.blacks : P.blacks;
+  const whites = scope ? scope.whites : (st.hasGray ? P.clueCells.filter((i) => clue[i] === WHITE) : P.whites);
+  const blacks = scope ? scope.blacks : (st.hasGray ? P.clueCells.filter((i) => clue[i] === BLACK) : P.blacks);
 
   const tryEmit = (rule, sets, info = {}) => {
-    const fresh = sets.filter(([k, idx, v]) => (k === 'c' ? cell[idx] : e[idx]) === 0);
+    const fresh = sets.filter(([k, idx, v]) => (k === 'g' ? clue[idx] === GRAY : (k === 'c' ? cell[idx] : e[idx]) === 0));
     if (!fresh.length) return null;
     const sig = `${rule}:${fresh.map(([k, idx, v]) => `${k}${idx}=${v}`).sort().join(',')}`;
     if (forbid && forbid.has(sig)) return null;
     return { rule, sets: fresh, sig, info };
   };
+
+  // 0. Gray circle direct resolutions (grayMustBeBlack / grayMustBeWhite)
+  if (st.hasGray) {
+    for (let gi = 0; gi < P.grays.length; gi++) {
+      const i = P.grays[gi];
+      if (clue[i] !== GRAY) continue;
+      const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+      const u2 = ed2[i * 4 + 0], r2 = ed2[i * 4 + 1], d2 = ed2[i * 4 + 2], l2 = ed2[i * 4 + 3];
+      let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
+      let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
+      if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
+      if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
+      if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
+      if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
+      if (!vOk && !hOk) {
+        const step = tryEmit('grayMustBeBlack', [['g', i, BLACK]], { cell: i, reason: 'blocked' });
+        if (step) return step;
+      }
+      const canLeg = (d) => {
+        const x1 = ed[i * 4 + d], x2 = ed2[i * 4 + d], n1 = nb[i * 4 + d], opp = ed[i * 4 + (d ^ 2)];
+        if (x1 < 0 || x2 < 0 || e[x1] === E_OFF || e[x2] === E_OFF || cell[n1] === OFF || cell[step2[i * 4 + d]] === OFF) return false;
+        if (opp >= 0 && e[opp] === E_ON) return false;
+        if (clue[n1] === BLACK) return false;
+        const p1 = ed[n1 * 4 + ((d + 1) & 3)], p2 = ed[n1 * 4 + ((d + 3) & 3)];
+        return !((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON));
+      };
+      if (!((canLeg(0) || canLeg(2)) && (canLeg(1) || canLeg(3)))) {
+        const step = tryEmit('grayMustBeWhite', [['g', i, WHITE]], { cell: i, reason: 'axisBlocked' });
+        if (step) return step;
+      }
+    }
+  }
 
   // 1. whiteStraight
   for (let wi = 0; wi < whites.length; wi++) {
@@ -583,9 +662,12 @@ function findEasyStep(P, st, forbid, scope = null) {
  * Tracks the dirty causal cone of cells within orthogonal radius 2 of touched cells so
  * `findEasyStep` and `easyContradiction` stay O(local cone) instead of O(N) per step.
  */
-function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkArea = false, forbid = null, scoped = true } = {}) {
+function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkArea = false, forbid = null, scoped = true, grayCell = -1 } = {}) {
   const st = cloneState(baseState);
-  st.e[edge] = val;
+  if (grayCell >= 0) st.clue[grayCell] = val;
+  else st.e[edge] = val;
+  // On gray puzzles (small N), run unscoped so mid-chain gray->W/B promotions never miss dirty-cone wakeups
+  if (st.hasGray) scoped = false;
 
   let scope = null;
   let dirtyAdded = false;
@@ -626,7 +708,8 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
   }
 
   try {
-    if (!runBookkeeping(P, st, [P.edgeA[edge], P.edgeB[edge]], scoped ? touchCell : null)) {
+    const seedCells = grayCell >= 0 ? [grayCell] : [P.edgeA[edge], P.edgeB[edge]];
+    if (!runBookkeeping(P, st, seedCells, scoped ? touchCell : null)) {
       const c = easyContradiction(P, st, null);
       return { broke: c || { kind: 'conflict' }, area: false, steps: [], state: st };
     }
@@ -649,7 +732,9 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
       if (scope) scope.checkCycle = false;
       for (let k = 0; k < step.sets.length; k++) {
         const [kind, idx, v] = step.sets[k];
-        if (kind === 'c') {
+        if (kind === 'g') {
+          touched.push(idx);
+        } else if (kind === 'c') {
           touched.push(idx);
           if (scoped) touchCell(idx, v === LOOP);
         } else {
@@ -679,8 +764,8 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
  * Prune a successful hypothesis chain by ablation: forbid derived steps from back to front;
  * if the contradiction still occurs without a step, drop it.
  */
-function pruneChain(P, baseState, edge, val, rawSteps, area, costCap) {
-  const isFrontier = baseState.cell[P.edgeA[edge]] === LOOP || baseState.cell[P.edgeB[edge]] === LOOP;
+function pruneChain(P, baseState, edge, val, rawSteps, area, costCap, grayCell = -1) {
+  const isFrontier = grayCell >= 0 || baseState.cell[P.edgeA[edge]] === LOOP || baseState.cell[P.edgeB[edge]] === LOOP;
   if (minImagineCost(0, area, isFrontier) >= costCap) return null;
   const forbid = new Set();
   const kept = [];
@@ -691,6 +776,7 @@ function pruneChain(P, baseState, edge, val, rawSteps, area, costCap) {
       maxSteps: rawSteps.length + 2,
       checkArea: area,
       forbid,
+      grayCell,
     });
     if (!r.broke) {
       // Needed!
@@ -704,9 +790,10 @@ function pruneChain(P, baseState, edge, val, rawSteps, area, costCap) {
     maxSteps: rawSteps.length + 2,
     checkArea: area,
     forbid,
+    grayCell,
   });
   if (!clean.broke) return null;
-  const cls = classifyImagine(P, baseState, edge, clean.steps, clean.broke, clean.area);
+  const cls = classifyImagine(P, baseState, edge, clean.steps, clean.broke, clean.area, grayCell);
   return {
     steps: clean.steps,
     broke: clean.broke,
@@ -766,12 +853,16 @@ function candidateEdges(P, st, frontierOnly = false) {
 export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) {
   const frontierOnly = costCap <= 84;
   const edges = candidateEdges(P, st, frontierOnly);
-  if (!edges.length) return null;
+  const unresolvedGrays = st.hasGray ? P.grays.filter((i) => st.clue[i] === GRAY) : [];
+  if (!edges.length && !unresolvedGrays.length) return null;
   if (propCellBuf.length < P.N) propCellBuf = new Int8Array(P.N);
   if (propEdgeBuf.length < P.numEdges) propEdgeBuf = new Int8Array(P.numEdges);
+  if (st.hasGray && propClueBuf.length < P.N) propClueBuf = new Uint8Array(P.N);
   const stProp = {
     cell: propCellBuf.subarray(0, P.N),
     e: propEdgeBuf.subarray(0, P.numEdges),
+    clue: st.hasGray ? propClueBuf.subarray(0, P.N) : P.clue,
+    hasGray: Boolean(st.hasGray),
     cycle: false,
   };
 
@@ -779,8 +870,9 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
   // so trial calls can safely use O(local) seedEdge
   stProp.cell.set(st.cell);
   stProp.e.set(st.e);
+  if (st.hasGray) stProp.clue.set(st.clue);
   stProp.cycle = st.cycle;
-  let baseFixed = propagate(P, stProp) && lastPropChanges === 0;
+  let baseFixed = !st.hasGray && propagate(P, stProp) && lastPropChanges === 0;
   if (baseFixed) {
     for (let i = 0; i < P.N; i++) {
       if (stProp.cell[i] !== st.cell[i]) { baseFixed = false; break; }
@@ -801,17 +893,36 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
       const val = vi === 0 ? E_ON : E_OFF;
       stProp.cell.set(st.cell);
       stProp.e.set(st.e);
+      if (st.hasGray) stProp.clue.set(st.clue);
       stProp.cycle = st.cycle;
       stProp.e[x] = val;
       if (!propagate(P, stProp, baseFixed ? x : -1, -1)) {
         changedMask[ei * 2 + vi] = 1;
         const r = runHypothesis(P, st, x, val, { maxSteps: MAX_STEPS, checkArea: false });
         if (r.broke) {
-          easyHits.push({ edge: x, hyp: val, rawSteps: r.steps, area: false, isFront });
+          easyHits.push({ edge: x, grayCell: -1, hyp: val, rawSteps: r.steps, area: false, isFront });
           easyHitSet.add((x << 2) | val);
         }
       } else {
         changedMask[ei * 2 + vi] = lastPropChanges > 0 ? 1 : 0;
+      }
+    }
+  }
+
+  // Also test imagining each unresolved gray pearl as WHITE or BLACK (natural human technique for Gray Masyu!)
+  for (let gi = 0; gi < unresolvedGrays.length; gi++) {
+    const gc = unresolvedGrays[gi];
+    for (const hypColor of [WHITE, BLACK]) {
+      stProp.cell.set(st.cell);
+      stProp.e.set(st.e);
+      stProp.clue.set(st.clue);
+      stProp.cycle = st.cycle;
+      stProp.clue[gc] = hypColor;
+      if (!propagate(P, stProp)) {
+        const r = runHypothesis(P, st, -1, hypColor, { maxSteps: MAX_STEPS, checkArea: false, grayCell: gc });
+        if (r.broke) {
+          easyHits.push({ edge: -1, grayCell: gc, hyp: hypColor, rawSteps: r.steps, area: false, isFront: true });
+        }
       }
     }
   }
@@ -825,15 +936,17 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
     for (const c of list) {
       if (accepted >= limit) break;
       const cap = best ? best.cost : costCap;
-      const pr = pruneChain(P, st, c.edge, c.hyp, c.rawSteps, c.area, cap);
+      const gc = c.grayCell ?? -1;
+      const pr = pruneChain(P, st, c.edge, c.hyp, c.rawSteps, c.area, cap, gc);
       if (!pr || pr.cost >= costCap) continue;
       if (without && without.includes(pr.rule)) continue;
       accepted++;
       if (!best || pr.cost < best.cost) {
         best = {
           edge: c.edge,
+          grayCell: gc,
           hyp: c.hyp,
-          deduce: c.hyp === E_ON ? E_OFF : E_ON,
+          deduce: gc >= 0 ? (c.hyp === WHITE ? BLACK : WHITE) : (c.hyp === E_ON ? E_OFF : E_ON),
           rule: pr.rule,
           tier: pr.tier,
           cost: pr.cost,
@@ -865,6 +978,7 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
         if (baseFixed && !changedMask[ei * 2 + vi]) continue;
         stProp.cell.set(st.cell);
         stProp.e.set(st.e);
+        if (st.hasGray) stProp.clue.set(st.clue);
         stProp.cycle = st.cycle;
         stProp.e[x] = val;
         // skipEasy=true when propagate succeeded (already guaranteed no easy contradiction);
@@ -872,7 +986,23 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
         if (!propagate(P, stProp, baseFixed ? x : -1, -1) || fullContradiction(P, stProp, true)) {
           const r = runHypothesis(P, st, x, val, { maxSteps: AREA_STEPS, checkArea: true });
           if (r.broke) {
-            areaHits.push({ edge: x, hyp: val, rawSteps: r.steps, area: r.area });
+            areaHits.push({ edge: x, grayCell: -1, hyp: val, rawSteps: r.steps, area: r.area });
+          }
+        }
+      }
+    }
+    for (let gi = 0; gi < unresolvedGrays.length; gi++) {
+      const gc = unresolvedGrays[gi];
+      for (const hypColor of [WHITE, BLACK]) {
+        stProp.cell.set(st.cell);
+        stProp.e.set(st.e);
+        stProp.clue.set(st.clue);
+        stProp.cycle = st.cycle;
+        stProp.clue[gc] = hypColor;
+        if (!propagate(P, stProp) || fullContradiction(P, stProp, true)) {
+          const r = runHypothesis(P, st, -1, hypColor, { maxSteps: AREA_STEPS, checkArea: true, grayCell: gc });
+          if (r.broke && r.area) {
+            areaHits.push({ edge: -1, grayCell: gc, hyp: hypColor, rawSteps: r.steps, area: true });
           }
         }
       }
@@ -887,9 +1017,11 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
 /** Replay a pruned imagine step from `baseState` to produce the exact final state and forced edges (for Hint). */
 export function replayImagine(P, baseState, info) {
   const forbid = new Set(info.forbid || []);
-  return runHypothesis(P, baseState, info.edge, info.hyp, {
+  const grayCell = info.grayCell !== undefined && info.grayCell >= 0 ? info.grayCell : -1;
+  return runHypothesis(P, baseState, info.edge ?? -1, info.hyp, {
     maxSteps: (info.steps ? info.steps.length : MAX_STEPS) + 2,
     checkArea: !!info.area,
     forbid,
+    grayCell,
   });
 }

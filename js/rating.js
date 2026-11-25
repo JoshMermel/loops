@@ -5,7 +5,7 @@
 // A puzzle's `tier` is the tier of the hardest rule it needed; its `score` is the sum of step costs
 // (+100 per undecided cell if the rules get stuck, which makes it Expert, "beyond the hints").
 import {
-  WHITE, BLACK, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
+  WHITE, BLACK, GRAY, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   initialState, cloneState, isSolved,
 } from './logic.js';
 import { bestImagine, setFullContradiction, easyContradiction, MEDIUM_MAX, HARD_MAX } from './imagine.js';
@@ -44,9 +44,40 @@ export function availCount(P, st, i) {
   return n;
 }
 
-/** Apply [['c'|'e', idx, val], ...]. Returns false on conflict. */
+/** Dynamic clue helpers: zero allocation on standard puzzles (!st.hasGray). */
+const clueOf = (P, st) => st.clue || P.clue;
+const whitesOf = (P, st) => {
+  if (!st.hasGray) return P.whites;
+  const out = [...P.whites];
+  const cl = st.clue;
+  for (let k = 0; k < P.grays.length; k++) if (cl[P.grays[k]] === WHITE) out.push(P.grays[k]);
+  return out;
+};
+const blacksOf = (P, st) => {
+  if (!st.hasGray) return P.blacks;
+  const out = [...P.blacks];
+  const cl = st.clue;
+  for (let k = 0; k < P.grays.length; k++) if (cl[P.grays[k]] === BLACK) out.push(P.grays[k]);
+  return out;
+};
+const graysOf = (P, st) => {
+  if (!st.hasGray) return [];
+  const out = [];
+  const cl = st.clue;
+  for (let k = 0; k < P.grays.length; k++) if (cl[P.grays[k]] === GRAY) out.push(P.grays[k]);
+  return out;
+};
+
+/** Apply [['c'|'e'|'g', idx, val], ...]. Returns false on conflict. */
 export function applySets(st, sets) {
   for (const [kind, idx, v] of sets) {
+    if (kind === 'g') {
+      const cur = st.clue[idx];
+      if (cur === v) continue;
+      if (cur !== GRAY) return false;
+      st.clue[idx] = v;
+      continue;
+    }
     const arr = kind === 'c' ? st.cell : st.e;
     if (arr[idx] === v) continue;
     if (arr[idx] !== 0) return false;
@@ -410,9 +441,105 @@ function findClosedLoopRestOff(P, st) {
   return sets.length ? [{ sets, info: {} }] : [];
 }
 
+function findGrayFromShape(P, st) {
+  if (!st.hasGray) return [];
+  const sets = [];
+  for (const i of graysOf(P, st)) {
+    if (onCount(P, st, i) !== 2) continue;
+    const u = P.ed[i * 4], r = P.ed[i * 4 + 1], dn = P.ed[i * 4 + 2], l = P.ed[i * 4 + 3];
+    const straight = (u >= 0 && dn >= 0 && st.e[u] === E_ON && st.e[dn] === E_ON)
+      || (r >= 0 && l >= 0 && st.e[r] === E_ON && st.e[l] === E_ON);
+    sets.push(['g', i, straight ? WHITE : BLACK]);
+  }
+  return sets.length ? [{ sets, info: {} }] : [];
+}
+
+function canGrayBeBlackLeg(P, st, i, d) {
+  const cl = clueOf(P, st);
+  const x1 = P.ed[i * 4 + d], x2 = P.ed2[i * 4 + d], n1 = P.nb[i * 4 + d], n2 = P.step2[i * 4 + d];
+  if (x1 < 0 || x2 < 0 || n1 < 0 || n2 < 0) return false;
+  if (st.e[x1] === E_OFF || st.e[x2] === E_OFF || st.cell[n1] === OFF || st.cell[n2] === OFF) return false;
+  const opp = P.ed[i * 4 + (d ^ 2)];
+  if (opp >= 0 && st.e[opp] === E_ON) return false;
+  if (cl[n1] === BLACK) return false;
+  const p1 = P.ed[n1 * 4 + ((d + 1) & 3)], p2 = P.ed[n1 * 4 + ((d + 3) & 3)];
+  return !((p1 >= 0 && st.e[p1] === E_ON) || (p2 >= 0 && st.e[p2] === E_ON));
+}
+
+function findGrayMustBeBlack(P, st) {
+  if (!st.hasGray) return [];
+  const out = [];
+  for (const i of graysOf(P, st)) {
+    const u = P.ed[i * 4 + 0], r = P.ed[i * 4 + 1], dn = P.ed[i * 4 + 2], l = P.ed[i * 4 + 3];
+    const u2 = P.ed2[i * 4 + 0], r2 = P.ed2[i * 4 + 1], d2 = P.ed2[i * 4 + 2], l2 = P.ed2[i * 4 + 3];
+    let vOk = u >= 0 && dn >= 0 && st.e[u] !== E_OFF && st.e[dn] !== E_OFF;
+    let hOk = r >= 0 && l >= 0 && st.e[r] !== E_OFF && st.e[l] !== E_OFF;
+    if ((r >= 0 && st.e[r] === E_ON) || (l >= 0 && st.e[l] === E_ON)) vOk = false;
+    if ((u >= 0 && st.e[u] === E_ON) || (dn >= 0 && st.e[dn] === E_ON)) hOk = false;
+    if (vOk && u2 >= 0 && st.e[u2] === E_ON && d2 >= 0 && st.e[d2] === E_ON) vOk = false;
+    if (hOk && r2 >= 0 && st.e[r2] === E_ON && l2 >= 0 && st.e[l2] === E_ON) hOk = false;
+    if (!vOk && !hOk) {
+      const corner = (u < 0 || dn < 0) && (r < 0 || l < 0);
+      let inward = false;
+      for (let d = 0; d < 4; d++) {
+        const x = P.ed[i * 4 + d], opp = P.ed[i * 4 + (d ^ 2)];
+        if (x >= 0 && st.e[x] === E_ON && (opp < 0 || st.e[opp] === E_OFF)) inward = true;
+      }
+      const reason = corner ? 'corner' : inward ? 'inward' : 'blocked';
+      out.push({ sets: [['g', i, BLACK]], info: { cell: i, reason } });
+    }
+  }
+  return out;
+}
+
+function findGrayMustBeWhite(P, st) {
+  if (!st.hasGray) return [];
+  const out = [];
+  for (const i of graysOf(P, st)) {
+    const can0 = canGrayBeBlackLeg(P, st, i, 0);
+    const can1 = canGrayBeBlackLeg(P, st, i, 1);
+    const can2 = canGrayBeBlackLeg(P, st, i, 2);
+    const can3 = canGrayBeBlackLeg(P, st, i, 3);
+    const canV = can0 || can2, canH = can1 || can3;
+    if (!canV || !canH) {
+      let shortDir = -1;
+      const canArr = [can0, can1, can2, can3];
+      for (let d = 0; d < 4; d++) {
+        const x = P.ed[i * 4 + d];
+        if (x >= 0 && st.e[x] === E_ON && !canArr[d]) { shortDir = d; break; }
+      }
+      const reason = shortDir >= 0 ? 'shortLeg' : 'axisBlocked';
+      const axis = !canV && !canH ? 'both' : (!canV ? 'v' : 'h');
+      out.push({ sets: [['g', i, WHITE]], info: { cell: i, reason, axis, dir: shortDir } });
+    }
+  }
+  return out;
+}
+
+function findGrayWhiteNoTurn(P, st) {
+  if (!st.hasGray) return [];
+  const out = [];
+  for (const i of graysOf(P, st)) {
+    const u = P.ed[i * 4 + 0], r = P.ed[i * 4 + 1], dn = P.ed[i * 4 + 2], l = P.ed[i * 4 + 3];
+    const axisOk = (d1, d2, p1, p2) => {
+      const e1 = P.ed[i * 4 + d1], e2 = P.ed[i * 4 + d2];
+      if (e1 < 0 || e2 < 0 || st.e[e1] === E_OFF || st.e[e2] === E_OFF) return false;
+      const ep1 = P.ed[i * 4 + p1], ep2 = P.ed[i * 4 + p2];
+      if ((ep1 >= 0 && st.e[ep1] === E_ON) || (ep2 >= 0 && st.e[ep2] === E_ON)) return false;
+      const r1 = forcedStraightReason(P, st, i, d1);
+      const r2 = r1 ? forcedStraightReason(P, st, i, d2) : null;
+      return !(r1 && r2);
+    };
+    if (!axisOk(0, 2, 1, 3) && !axisOk(1, 3, 0, 2)) {
+      out.push({ sets: [['g', i, BLACK]], info: { cell: i } });
+    }
+  }
+  return out;
+}
+
 function findWhiteStraight(P, st) {
   const out = [];
-  for (const i of P.whites) {
+  for (const i of whitesOf(P, st)) {
     const u = P.ed[i * 4 + 0], r = P.ed[i * 4 + 1], dn = P.ed[i * 4 + 2], l = P.ed[i * 4 + 3];
     let vOk = u >= 0 && dn >= 0 && st.e[u] !== E_OFF && st.e[dn] !== E_OFF;
     let hOk = r >= 0 && l >= 0 && st.e[r] !== E_OFF && st.e[l] !== E_OFF;
@@ -439,7 +566,7 @@ function findWhiteStraight(P, st) {
 
 function findBlackExtend(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const x1 = P.ed[i * 4 + d];
       if (x1 < 0 || st.e[x1] !== E_ON) continue;
@@ -455,7 +582,7 @@ function findBlackExtend(P, st) {
 
 function findBlackWall(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const x1 = P.ed[i * 4 + d], x2 = P.ed2[i * 4 + d], n1 = P.nb[i * 4 + d], n2 = P.step2[i * 4 + d];
       const opp1 = P.ed[i * 4 + (d ^ 2)], opp2 = P.ed2[i * 4 + (d ^ 2)];
@@ -474,10 +601,11 @@ function findBlackWall(P, st) {
 
 function findBlackAdjacent(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  const cl = clueOf(P, st);
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const n1 = P.nb[i * 4 + d];
-      if (n1 < 0 || P.clue[n1] !== BLACK) continue;
+      if (n1 < 0 || cl[n1] !== BLACK) continue;
       const x1 = P.ed[i * 4 + d], opp1 = P.ed[i * 4 + (d ^ 2)], opp2 = P.ed2[i * 4 + (d ^ 2)];
       if (opp1 < 0 || opp2 < 0) continue;
       const sets = [];
@@ -492,7 +620,7 @@ function findBlackAdjacent(P, st) {
 
 function findWhiteMustTurn(P, st) {
   const out = [];
-  for (const i of P.whites) {
+  for (const i of whitesOf(P, st)) {
     for (const [d1, d2] of [[0, 2], [1, 3]]) {
       const e1 = P.ed[i * 4 + d1], e2 = P.ed[i * 4 + d2];
       if (e1 < 0 || e2 < 0 || st.e[e1] !== E_ON || st.e[e2] !== E_ON) continue;
@@ -545,7 +673,7 @@ function findForcedExits(P, st) {
 
 function findBlackPerp(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const n1 = P.nb[i * 4 + d], x1 = P.ed[i * 4 + d];
       if (n1 < 0 || x1 < 0) continue;
@@ -565,7 +693,7 @@ function findBlackPerp(P, st) {
 
 function findWhiteBothStraight(P, st) {
   const out = [];
-  for (const i of P.whites) {
+  for (const i of whitesOf(P, st)) {
     const u = P.ed[i * 4 + 0], r = P.ed[i * 4 + 1], dn = P.ed[i * 4 + 2], l = P.ed[i * 4 + 3];
     const u2 = P.ed2[i * 4 + 0], r2 = P.ed2[i * 4 + 1], d2 = P.ed2[i * 4 + 2], l2 = P.ed2[i * 4 + 3];
     if (u2 >= 0 && st.e[u2] === E_ON && d2 >= 0 && st.e[d2] === E_ON && r >= 0 && l >= 0) {
@@ -652,10 +780,11 @@ function findClosingCell(P, st) {
 
 function findThreeWhites(P, st) {
   const out = [];
-  for (const mid of P.whites) {
+  const cl = clueOf(P, st);
+  for (const mid of whitesOf(P, st)) {
     for (const [d1, d2, p1, p2] of [[1, 3, 0, 2], [0, 2, 1, 3]]) {
       const a = P.nb[mid * 4 + d1], b = P.nb[mid * 4 + d2];
-      if (a < 0 || b < 0 || P.clue[a] !== WHITE || P.clue[b] !== WHITE) continue;
+      if (a < 0 || b < 0 || cl[a] !== WHITE || cl[b] !== WHITE) continue;
       // All three must cross along (p1, p2); push each shared (d1,d2) edge once
       const sets = [];
       let ok = true;
@@ -677,10 +806,11 @@ function findThreeWhites(P, st) {
 
 function findTwoWhitesStraight(P, st) {
   const out = [];
-  for (const w1 of P.whites) {
+  const cl = clueOf(P, st);
+  for (const w1 of whitesOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const w2 = P.nb[w1 * 4 + d];
-      if (w2 < 0 || P.clue[w2] !== WHITE) continue;
+      if (w2 < 0 || cl[w2] !== WHITE) continue;
       // If edge continuing straight past w1 (opposite side from w2) is ON, w1 and w2 cannot connect along d
       const far = P.ed2[w1 * 4 + (d ^ 2)];
       if (far < 0 || st.e[far] !== E_ON) continue;
@@ -709,7 +839,7 @@ function forcedStraightReason(P, st, i, d) {
   if (n < 0) return null;
   const ext = P.ed[n * 4 + d];
   if (ext >= 0 && st.e[ext] === E_ON) return 'straight';
-  if (P.clue[n] === WHITE) return 'white';
+  if (clueOf(P, st)[n] === WHITE) return 'white';
   const p1 = P.ed[n * 4 + ((d + 1) & 3)], p2 = P.ed[n * 4 + ((d + 3) & 3)];
   const can1 = p1 >= 0 && st.e[p1] !== E_OFF && st.cell[P.nb[n * 4 + ((d + 1) & 3)]] !== OFF;
   const can2 = p2 >= 0 && st.e[p2] !== E_OFF && st.cell[P.nb[n * 4 + ((d + 3) & 3)]] !== OFF;
@@ -718,7 +848,7 @@ function forcedStraightReason(P, st, i, d) {
 
 function findWhiteNoTurnAxis(P, st) {
   const out = [];
-  for (const i of P.whites) {
+  for (const i of whitesOf(P, st)) {
     for (const [d1, d2, p1, p2] of [[0, 2, 1, 3], [1, 3, 0, 2]]) {
       const e1 = P.ed[i * 4 + d1], e2 = P.ed[i * 4 + d2];
       if (e1 < 0 || e2 < 0 || st.e[e1] === E_OFF || st.e[e2] === E_OFF) continue;
@@ -752,15 +882,16 @@ function findWhiteNoTurnAxis(P, st) {
 
 function findBlackBlockedTarget(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  const cl = clueOf(P, st);
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const x1 = P.ed[i * 4 + d], x2 = P.ed2[i * 4 + d], n2 = P.step2[i * 4 + d];
       if (x1 < 0 || x2 < 0 || n2 < 0 || st.e[x1] === E_OFF || st.e[x2] === E_OFF) continue;
       let bad = false, reason = '';
-      if (P.clue[n2] === WHITE) {
+      if (cl[n2] === WHITE) {
         const nextE = P.ed[n2 * 4 + d];
         if (nextE < 0 || st.e[nextE] === E_OFF) { bad = true; reason = 'whiteWall'; }
-      } else if (P.clue[n2] === BLACK) {
+      } else if (cl[n2] === BLACK) {
         const nextE = P.ed[n2 * 4 + d];
         if (nextE >= 0 && st.e[nextE] === E_ON) { bad = true; reason = 'blackStraight'; }
       }
@@ -784,13 +915,14 @@ function findBlackBlockedTarget(P, st) {
  */
 function findBlackTwoDiagWhites(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  const cl = clueOf(P, st);
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const mid = P.nb[i * 4 + d];
       if (mid < 0) continue;
       const w1 = P.nb[mid * 4 + ((d + 1) & 3)];
       const w2 = P.nb[mid * 4 + ((d + 3) & 3)];
-      if (w1 < 0 || w2 < 0 || P.clue[w1] !== WHITE || P.clue[w2] !== WHITE) continue;
+      if (w1 < 0 || w2 < 0 || cl[w1] !== WHITE || cl[w2] !== WHITE) continue;
       const x = P.ed[i * 4 + d];
       if (x < 0 || st.e[x] === E_ON) continue;
       const opp1 = P.ed[i * 4 + (d ^ 2)], opp2 = P.ed2[i * 4 + (d ^ 2)];
@@ -811,10 +943,11 @@ function findBlackTwoDiagWhites(P, st) {
  */
 function findBlackWhiteNoTurn(P, st) {
   const out = [];
-  for (const i of P.blacks) {
+  const cl = clueOf(P, st);
+  for (const i of blacksOf(P, st)) {
     for (let d = 0; d < 4; d++) {
       const x1 = P.ed[i * 4 + d], x2 = P.ed2[i * 4 + d], n2 = P.step2[i * 4 + d];
-      if (x1 < 0 || x2 < 0 || n2 < 0 || P.clue[n2] !== WHITE) continue;
+      if (x1 < 0 || x2 < 0 || n2 < 0 || cl[n2] !== WHITE) continue;
       if (st.e[x1] === E_ON || st.e[x1] === E_OFF || st.e[x2] === E_OFF) continue;
       const nextE = P.ed[n2 * 4 + d];
       if (nextE < 0 || st.e[nextE] === E_OFF) continue; // handled by blackBlockedTarget
@@ -842,7 +975,7 @@ function findBlackNoEarlyClose(P, st) {
   const { find, size, loopCount, cycleRoot } = onComponents(P, st);
   if (cycleRoot >= 0) return [];
   const out = [];
-  for (const i of P.blacks) {
+  for (const i of blacksOf(P, st)) {
     if (onCount(P, st, i) !== 1) continue;
     const ra = find(i);
     if (size[ra] < 2) continue;
@@ -874,7 +1007,7 @@ function findBlackNoEarlyClose(P, st) {
  */
 function findWhiteCornerPinch(P, st) {
   const out = [];
-  for (const w of P.whites) {
+  for (const w of whitesOf(P, st)) {
     for (const d1 of [0, 2]) {
       const u = P.nb[w * 4 + d1];
       if (u < 0) continue;
@@ -910,7 +1043,7 @@ function findWhiteCornerPinch(P, st) {
 function findWhiteDeadEndPinch(P, st) {
   const out = [];
   const seen = new Set();
-  for (const w of P.whites) {
+  for (const w of whitesOf(P, st)) {
     for (let d1 = 0; d1 < 4; d1++) {
       const u = P.nb[w * 4 + d1];
       if (u < 0 || st.cell[u] !== UNKNOWN || onCount(P, st, u) !== 0 || availCount(P, st, u) !== 2) continue;
@@ -1324,6 +1457,23 @@ function findTryEdge(P, st, { upto }) {
       }
     }
   }
+  if (st.hasGray) {
+    for (const i of graysOf(P, st)) {
+      for (const val of [WHITE, BLACK]) {
+        const s2 = cloneState(st);
+        s2.clue[i] = val;
+        const r = closure(P, s2, upto, best ? best.info.steps - 1 : Infinity);
+        if (r.contradiction) {
+          const cand = {
+            sets: [['g', i, val === WHITE ? BLACK : WHITE]],
+            info: { grayCell: i, hyp: val, steps: r.steps, trace: r.trace },
+          };
+          if (!best || r.steps < best.info.steps) best = cand;
+          if (r.steps <= 2) return [best];
+        }
+      }
+    }
+  }
   return best ? [best] : [];
 }
 
@@ -1339,10 +1489,12 @@ function imagineFind(P, st) {
 }
 
 function imagineFiring(f) {
+  const isGray = f.grayCell !== undefined && f.grayCell >= 0;
   return {
-    sets: [['e', f.edge, f.deduce]],
+    sets: isGray ? [['g', f.grayCell, f.deduce]] : [['e', f.edge, f.deduce]],
     info: {
       edge: f.edge,
+      ...(isGray ? { grayCell: f.grayCell } : {}),
       hyp: f.hyp,
       deduce: f.deduce,
       cost: f.cost,
@@ -1377,11 +1529,14 @@ export const RULES = [
   defRule({ id: 'fullCell', tier: 'Beginner', weight: 1, free: true, find: findFullCell, label: 'a cell with two segments takes no more' }),
   defRule({ id: 'isolatedCellOff', tier: 'Beginner', weight: 1, free: true, find: findIsolatedCellOff, label: 'a cell with all its edges off is not on the loop' }),
   defRule({ id: 'closedLoopRestOff', tier: 'Beginner', weight: 1, free: true, find: findClosedLoopRestOff, label: 'once the single loop is closed, all remaining cells are off the loop' }),
+  defRule({ id: 'grayFromShape', tier: 'Beginner', weight: 1, free: true, find: findGrayFromShape, label: 'a gray circle with two drawn segments resolves to white (straight) or black (turn)' }),
 
   // Beginner (single-segment / direct rule violations + iconic three-whites)
+  defRule({ id: 'grayMustBeBlack', tier: 'Beginner', weight: 2, find: findGrayMustBeBlack, label: 'a gray circle that cannot go straight along either axis must be black' }),
   defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
   defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
   defRule({ id: 'blackWall', tier: 'Beginner', weight: 2, find: findBlackWall, label: 'a black circle blocked within two cells of a wall or cross must extend two cells the opposite way' }),
+  defRule({ id: 'grayMustBeWhite', tier: 'Beginner', weight: 3, find: findGrayMustBeWhite, label: 'a gray circle that cannot extend two straight segments along both axes must be white' }),
   defRule({ id: 'blackAdjacent', tier: 'Beginner', weight: 3, find: findBlackAdjacent, label: 'two touching black circles cannot connect, so each extends two cells away from the other' }),
   defRule({ id: 'whiteMustTurn', tier: 'Beginner', weight: 3, find: findWhiteMustTurn, label: 'a white circle that goes straight at one end must turn at the other' }),
   defRule({ id: 'deadEnd', tier: 'Beginner', weight: 4, find: findDeadEnd, label: 'an empty cell with fewer than two exits left cannot be on the loop' }),
@@ -1395,6 +1550,7 @@ export const RULES = [
   defRule({ id: 'closingCell', tier: 'Medium', weight: 11, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
   defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
   defRule({ id: 'twoWhitesStraight', tier: 'Medium', weight: 12, find: findTwoWhitesStraight, label: 'two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular' }),
+  defRule({ id: 'grayWhiteNoTurn', tier: 'Medium', weight: 12, find: findGrayWhiteNoTurn, label: 'a gray circle that cannot make a valid white-circle turn on either axis must be black' }),
   defRule({ id: 'whiteNoTurnAxis', tier: 'Medium', weight: 14, find: findWhiteNoTurnAxis, label: 'a white circle cannot use an axis whose two neighbors are both unable to turn' }),
   defRule({ id: 'blackNoEarlyClose', tier: 'Medium', weight: 14, find: findBlackNoEarlyClose, label: 'a black circle cannot extend two cells into the other end of its own path and close the loop early' }),
   defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),

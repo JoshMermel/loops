@@ -56,7 +56,7 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 - [x] **Offline play** (`sw.js`, `js/offline.js`, `manifest.webmanifest`): opt-in **Offline play** toggle in Settings that registers the service worker, precaches the app shell (`masyu-app-v1`) and all shipped puzzle books (`masyu-books-v1`, ~7 MB) with live download progress, supports on-demand updates and full cache cleanup when turned off, and silently syncs newly added books when online.
 - [ ] **Playwright PNG screenshots** (`tools/capture_how_to_images.py`) once Playwright is installed, to compare against the pure-Node SVG illustrations.
 - [ ] **Phone / touch testing** of edge-tap vs cell-drag hit margins (`EDGE_MARGIN` in `js/board.js`).
+- [x] **Gray / Any-color circles (`G`):** added mystery gray circles across the exact solver (`js/logic.js`), human rules (`grayFromShape`, `grayMustBeBlack`, `grayMustBeWhite`, `grayWhiteNoTurn`, plus gray-color `imagine*` / `tryEdge` and `faceCircle` integration), progressive hints & wrong-label checks, interactive tap/right-click labeling with outer gray halo visuals & auto-labeling on 2 segments (`js/marks.js`, `js/clues.js`, `js/board.js`, `js/main.js`, `js/print.js`), generator (`gray-mixed`, `gray-all`), solving guide, and two audited 520-puzzle Bonus books (`bonus-gray` and `bonus-allgray`).
 - [ ] **Variants (separate branches, reusing topology + rule table + book machinery):**
-  - **Gray / Any-color circles** (must be visited, either white or black behavior — or Balanced Loop / Masyu with voids).
   - **Hexagonal or triangular Masyu** (generalized topology in `js/logic.js`).
   - **Shaped / cutout boards** (void cells the loop cannot enter).

@@ -35,6 +35,11 @@ function wrapText(text, maxChars) {
 for (const ex of examples) {
   const P = compile({ ...armory[ex.puzzle - 1] });
   const edges = Uint8Array.from(ex.edges, Number);
+  const grays = ex.grays ? Uint8Array.from(ex.grays, Number) : null;
+  const grayLabel = (cell) => {
+    const k = P.grayAt ? P.grayAt[cell] : -1;
+    return (grays && k >= 0) ? grays[k] : 0;
+  };
 
   const innerW = (P.cols - 1) * S + 2 * PAD;
   const innerH = (P.rows - 1) * S + 2 * PAD;
@@ -90,8 +95,16 @@ for (const ex of examples) {
   for (let r = 0; r < P.rows; r++) g += `<line x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}" stroke="#cccccc" stroke-width="1.2"/>`;
   for (let c = 0; c < P.cols; c++) g += `<line x1="${vx(c)}" y1="${vy(0)}" x2="${vx(c)}" y2="${vy(P.rows - 1)}" stroke="#cccccc" stroke-width="1.2"/>`;
 
-  // White circle fills
-  for (const cl of P.clues) if (cl.t === 'W') g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.21}" fill="#ffffff"/>`;
+  // White and gray circle fills (below loop segments)
+  for (const cl of P.clues) {
+    if (cl.t === 'W') {
+      g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.21}" fill="#ffffff"/>`;
+    } else if (cl.t === 'G') {
+      const lbl = grayLabel(cl.r * P.cols + cl.c);
+      if (lbl === 0) g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.215}" fill="#b6bcc4"/>`;
+      else if (lbl === 1) g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.175}" fill="#ffffff"/>`;
+    }
+  }
 
   // Existing segments
   for (let x = 0; x < P.numEdges; x++) {
@@ -100,10 +113,24 @@ for (const ex of examples) {
     g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1976d2" stroke-width="${S * 0.14}" stroke-linecap="round"/>`;
   }
 
-  // Circle outlines & black discs
+  // Circle outlines, black discs, and gray / labeled-gray circles
   for (const cl of P.clues) {
-    if (cl.t === 'W') g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.21}" fill="none" stroke="#111111" stroke-width="2.2"/>`;
-    else g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.22}" fill="#111111"/>`;
+    if (cl.t === 'W') {
+      g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.21}" fill="none" stroke="#111111" stroke-width="2.2"/>`;
+    } else if (cl.t === 'G') {
+      const lbl = grayLabel(cl.r * P.cols + cl.c);
+      if (lbl === 0) {
+        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.215}" fill="none" stroke="#5a626c" stroke-width="2.2"/>`;
+      } else if (lbl === 1) {
+        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.245}" fill="none" stroke="#8c949e" stroke-width="3.6"/>`;
+        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.175}" fill="none" stroke="#111111" stroke-width="1.8"/>`;
+      } else {
+        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.245}" fill="none" stroke="#8c949e" stroke-width="3.6"/>`;
+        g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.175}" fill="#111111"/>`;
+      }
+    } else {
+      g += `<circle cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${S * 0.22}" fill="#111111"/>`;
+    }
   }
 
   // Existing edge X marks
@@ -134,6 +161,12 @@ for (const ex of examples) {
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.11;
     const p = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
     g += `<path d="${p}" stroke="#ffffff" stroke-width="5.2" stroke-linecap="round"/><path d="${p}" stroke="#c62828" stroke-width="2.6" stroke-linecap="round"/>`;
+  }
+  for (const i of targets.grayWhite || []) {
+    g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.165}" fill="#ffffff" stroke="#8a6d00" stroke-width="2.2" stroke-dasharray="4 2.5"/>`;
+  }
+  for (const i of targets.grayBlack || []) {
+    g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.165}" fill="#111111" stroke="#8a6d00" stroke-width="2.2" stroke-dasharray="4 2.5"/>`;
   }
 
   // Axis labels

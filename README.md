@@ -8,18 +8,19 @@ A browser game and puzzle toolkit for **Masyu**, built in the same puzzle-toolki
 
 - **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
 - **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each direction).
+- **Gray circle (bonus):** secretly either white or black — the loop must visit it and satisfy either rule. Tap a gray circle in the app to label it white or black as a note (optional).
 - Empty intersections may or may not be on the loop.
 
 ## Status
 
 | Part | State |
 | --- | --- |
-| Exact solver / uniqueness counter (`js/logic.js`) | done: worklist-driven incremental `propagate()` with CSR edge-clue wakeups and direct cycle tracing, cross-checked against a brute-force reference (`tests/reference_solver.mjs`) |
-| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 40 rules (5 bookkeeping + 35 solving rules) across Beginner, Medium, Hard, and Expert (including dual-face Inside/Outside parity and dynamically priced lookahead); soundness-tested against exact solutions and `data/armory.csv` |
-| Hint button (`js/explain.js`, `js/hintstep.js`) | done: two-press progressive hints (first press highlights where to look without spoiling the move; second press replays the scorer's next step, explains imagined chains step by step, and draws ghost marks and dashed chains; further presses cycle alternate firings); tested end-to-end on Beginner/Medium puzzles and `data/armory.csv` |
-| Generator (`js/generator.js`, `tools/generate.mjs`, `tools/fill_pools.mjs`, `tools/overnight.mjs`) | done: dual-face `tightLoop` (all-4-border + four-quadrant coverage and two-pass clue stripping) + guided `W↔B` mask hill-climber, verified by complete search; supports `--size`, `--seed`, `--budget`, `--style` (`balanced`, `white`, `black`, `sparse`), `--layout` (symmetry/region filters: `checkerboard`, `interior`, `frame`, `stripes`, `rot180`, `mirror`, `transpose`, `rot90`, `yinyang`, `yinyang-mirror`, `yinyang-transpose`, `cookie`, `cookie-horiz`, `cookie-diag`; fixed geometric/wallpaper masks: `lattice`, `blocks2x2`, `quilt2x2`, `circle-ring`, `honeycomb`, `pillars`, `hourglass`, `brackets`, `x-bracket`, `spiral`, `stairs`, `small-x`, `bricks`, `dominoes`, `ltiles`, `mirror-ltiles`, `herringbone`, `slashes`, `zigzags`), `--min-fill`, `--tier`, `--max-tier`, `--keep` |
-| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/build_all_books.mjs`, `tools/audit_books.mjs`) | 28 visible books (**13,564 audited puzzles**): Gentle intro (100: 50 `5×5` + 50 `6×6`); Default across 5 sizes (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`), each with 4 score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert = 2,010 per size); Bonus (6 fixed-size 520-puzzle books split 10% B / 40% M / 40% H / 10% E + 10 `Expert+` + 10 Mega finale puzzles each: All white `8×8`+`12×20`, All black `10×10`+`12×20`, Black & White Cookie `10×10`+`12×20` balanced across vertical/horizontal/diagonal splits, Skyscraper `6×20`+`6×40`, Exact symmetry `10×10`+`14×14` balanced across mirror/diagonal/180°, Full board `10×10`+`12×20`; plus **Patterns** with 294 all-square `9×9`–`13×13` puzzles across 19 shapes & wallpapers) and hidden `armory` (28) |
-| Browser GUI (`index.html`, `style.css`, `js/board.js`, `js/main.js`, `js/rotate.js`, `js/offline.js`, `sw.js`) | playable: intersection-grid edge controls (tap segment to cycle empty/line/✕, drag to draw/erase loop, right-click/drag for ✕, tap/right-click square center to shade Inside/Outside), auto-rotation + manual `↻ Turn` for tall boards, undo/redo, localStorage saves by canonical puzzle hash, "Correct so far?", Hint, Book picker modal, Browse grid, dark mode, line-color palettes, locked Auto-X and Auto-Shade modes, opt-in **Offline play** service worker (`sw.js` + `manifest.webmanifest`), `?book=<id>&puzzle=N` deep links |
+| Exact solver / uniqueness counter (`js/logic.js`) | done: worklist-driven incremental `propagate()` with CSR edge-clue wakeups, direct cycle tracing, and mystery gray-circle resolution (`W`/`B`/`G`), cross-checked against a brute-force reference (`tests/reference_solver.mjs`) |
+| Human-style scorer (`js/rating.js`, `js/faceparity.js`, `js/imagine.js`) | done: 44 rules (6 bookkeeping + 38 solving rules, including gray-circle deductions and gray-color lookahead) across Beginner, Medium, Hard, and Expert; soundness-tested against exact solutions and `data/armory.csv` |
+| Hint button (`js/explain.js`, `js/hintstep.js`) | done: two-press progressive hints (first press highlights where to look without spoiling the move; second press replays the scorer's next step, explains imagined chains step by step, and draws ghost edge/gray-label marks and dashed chains; further presses cycle alternate firings); tested end-to-end on Beginner/Medium puzzles, gray puzzles, and `data/armory.csv` |
+| Generator (`js/generator.js`, `tools/generate.mjs`, `tools/fill_pools.mjs`, `tools/overnight.mjs`) | done: dual-face `tightLoop` (all-4-border + four-quadrant coverage and two-pass clue stripping) + guided `W↔B` mask hill-climber, verified by complete search; supports `--size`, `--seed`, `--budget`, `--style` (`balanced`, `white`, `black`, `sparse`, `gray-mixed`, `gray-all`), `--layout` (symmetry/region filters: `checkerboard`, `interior`, `frame`, `stripes`, `rot180`, `mirror`, `transpose`, `rot90`, `yinyang`, `yinyang-mirror`, `yinyang-transpose`, `cookie`, `cookie-horiz`, `cookie-diag`; fixed geometric/wallpaper masks: `lattice`, `blocks2x2`, `quilt2x2`, `circle-ring`, `honeycomb`, `pillars`, `hourglass`, `brackets`, `x-bracket`, `spiral`, `stairs`, `small-x`, `bricks`, `dominoes`, `ltiles`, `mirror-ltiles`, `herringbone`, `slashes`, `zigzags`), `--min-fill`, `--tier`, `--max-tier`, `--keep` |
+| Corpus and books (`tools/library/`, `tools/build_book.mjs`, `tools/build_all_books.mjs`, `tools/audit_books.mjs`) | 30 visible books (**14,604 audited puzzles**): Gentle intro (100: 50 `5×5` + 50 `6×6`); Default across 5 sizes (`8×8`, `12×12`, `16×16`, `12×20`, `16×24`), each with 4 score-banded 500-puzzle difficulty books (+ 10 `Expert+` beyond hints in Expert = 2,010 per size); Bonus (8 fixed-size 520-puzzle books split 10% B / 40% M / 40% H / 10% E + 10 `Expert+` + 10 Mega finale puzzles each: All white `8×8`+`12×20`, All black `10×10`+`12×20`, Gray circles `8×8`+`12×20`, All gray `8×8`+`10×12`, Black & White Cookie `10×10`+`12×20` balanced across vertical/horizontal/diagonal splits, Skyscraper `6×20`+`6×40`, Exact symmetry `10×10`+`14×14` balanced across mirror/diagonal/180°, Full board `10×10`+`12×20`; plus **Patterns** with 294 all-square `9×9`–`13×13` puzzles across 19 shapes & wallpapers) and hidden `armory` (32) |
+| Browser GUI (`index.html`, `style.css`, `js/board.js`, `js/main.js`, `js/rotate.js`, `js/offline.js`, `sw.js`) | playable: intersection-grid edge controls (tap segment to cycle empty/line/✕, drag to draw/erase loop, right-click/drag for ✕, tap/right-click square center to shade Inside/Outside, tap/right-click gray circles to label white/black with auto-labeling on 2 segments), auto-rotation + manual `↻ Turn` for tall boards, undo/redo, localStorage saves by canonical puzzle hash, "Correct so far?", Hint, Book picker modal, Browse grid, dark mode, line-color palettes, locked Auto-X and Auto-Shade modes, opt-in **Offline play** service worker (`sw.js` + `manifest.webmanifest`), `?book=<id>&puzzle=N` deep links |
 | Printing (`js/print.js`, Settings → Print puzzles) | done: fixed black-and-white SVG booklet for any range (`1-10, 15`), optional answer key, laid out by cell size for A4 and Letter, every page header linking to the site |
 | Docs (`docs/how_to_solve.md`, `docs/how_to_solve.html`) | generated from `js/rating.js` with illustrations from the hidden `armory` book |
 
@@ -47,7 +48,7 @@ node --test tests/*.test.mjs
 # Generate puzzles into a pool in tools/library/ (COLSxROWS)
 node tools/generate.mjs --size 8x8 --count 10 --seed 1 --budget 60 --style balanced --tier any
 
-# Fill pools in parallel (groups: core | giants | bonus | bonus-cookie | bonus-patterns | bonus-finales | all)
+# Fill pools in parallel (groups: core | giants | bonus | bonus-cookie | bonus-gray | bonus-patterns | bonus-finales | all)
 node tools/fill_pools.mjs --only core
 node tools/fill_pools.mjs --only giants
 node tools/build_all_books.mjs
@@ -73,7 +74,7 @@ node tools/build_how_to_solve.mjs
 name,rows,cols,clues,solution,rules,tier,score
 ```
 
-- `clues`: `row:col:W|B` items joined by `;` (0-based row and column, `W` = white circle, `B` = black circle).
+- `clues`: `row:col:W|B|G` items joined by `;` (0-based row and column, `W` = white circle, `B` = black circle, `G` = mystery gray circle).
 - `solution`: one char per cell, row-major: a hex digit of the loop cell's exits (`U=1, R=2, D=4, L=8`, so `3`=UR, `5`=UD, `6`=RD, `9`=UL, `a`=RL, `c`=DL), or `#` for a cell not on the loop.
 - `rules`, `tier`, `score`: hardest rule needed, difficulty tier (`Beginner`, `Medium`, `Hard`, `Expert`), and integer step-cost sum from `js/rating.js`.
 
@@ -113,41 +114,45 @@ The human-style solver (`js/rating.js`) always applies the cheapest applicable r
 | 3 | `fullCell` | bookkeeping: a cell with two segments takes no more | Beginner | 1 |
 | 4 | `isolatedCellOff` | bookkeeping: a cell with all its edges off is not on the loop | Beginner | 1 |
 | 5 | `closedLoopRestOff` | bookkeeping: once the single loop is closed, all remaining cells are off the loop | Beginner | 1 |
-| 6 | `whiteStraight` | a white circle blocked on one axis goes straight along the other | Beginner | 2 |
-| 7 | `blackExtend` | a black circle continues straight two cells from an existing segment and turns away from the opposite side | Beginner | 2 |
-| 8 | `blackWall` | a black circle blocked within two cells of a wall or cross must extend two cells the opposite way | Beginner | 2 |
-| 9 | `blackAdjacent` | two touching black circles cannot connect, so each extends two cells away from the other | Beginner | 3 |
-| 10 | `whiteMustTurn` | a white circle that goes straight at one end must turn at the other | Beginner | 3 |
-| 11 | `deadEnd` | an empty cell with fewer than two exits left cannot be on the loop | Beginner | 4 |
-| 12 | `forcedExits` | a loop cell with only two exits left must use both | Beginner | 4 |
-| 13 | `blackPerp` | a black circle cannot enter a neighbor that already has a perpendicular segment | Beginner | 5 |
-| 14 | `noEarlyClose` | a segment joining the two ends of one path would close the loop early | Beginner | 6 |
-| 15 | `threeWhites` | three white circles in a row must all cross perpendicular to the row | Beginner | 8 |
-| 16 | `whiteBothStraight` | a white circle cannot use an axis where both neighbors already continue straight | Medium | 10 |
-| 17 | `closingCell` | an empty cell whose only two exits meet one path cannot be on the loop | Medium | 11 |
-| 18 | `samePathExits` | a loop cell with three exits where two meet one path must use the third | Medium | 11 |
-| 19 | `twoWhitesStraight` | two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular | Medium | 12 |
-| 20 | `whiteNoTurnAxis` | a white circle cannot use an axis whose two neighbors are both unable to turn | Medium | 14 |
-| 21 | `blackNoEarlyClose` | a black circle cannot extend two cells into the other end of its own path and close the loop early | Medium | 14 |
-| 22 | `blackBlockedTarget` | a black circle cannot extend toward a circle two cells away that cannot accept a straight segment | Medium | 15 |
-| 23 | `blackTwoDiagWhites` | a black circle flanked by two diagonally adjacent white circles cannot extend between them | Medium | 15 |
-| 24 | `blackWhiteNoTurn` | a black circle cannot extend into a white circle two cells away whose far side cannot turn | Medium | 16 |
-| 25 | `whiteCornerPinch` | a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors | Medium | 17 |
-| 26 | `whiteDeadEndPinch` | a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes | Medium | 17 |
-| 27 | `faceShade` | basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge | Medium | 18 |
-| 28 | `boxStrand` | closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side | Medium | 20 |
-| 29 | `corridorNoEarlyClose` | a forced multi-cell corridor joining the two ends of one path would close the loop early | Hard | 30 |
-| 30 | `faceCircle` | advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge | Hard | 38 |
-| 31 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Hard | 44 |
-| 32 | `chokepoint` | blocking this segment would cut off a small area or leave a single chokepoint cell | Hard | 48 |
-| 33 | `parityPocket` | the other choice would seal off a small pocket with an odd number of open ends | Hard | 52 |
-| 34 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 58 |
-| 35 | `chokepointArea` | blocking this segment would cut off a large area or leave a single chokepoint cell | Hard | 64 |
-| 36 | `parityForces` | the other choice would seal off an area with an odd number of open ends | Hard | 68 |
-| 37 | `tryEdge` | trying a segment one way leads to a contradiction | Expert | 120 |
-| 38 | `imagineLocal` | imagine a segment on or off at a circle or open end: one local step immediately breaks a rule | Medium | 22–28 |
-| 39 | `imagineTrace` | imagine a segment on or off and trace one single thread 2–3 steps ahead until something breaks | Hard | 36–75 |
-| 40 | `imagineChain` | imagine a segment on or off and follow a long, multi-front, or area-parity chain until something breaks | Expert | ≥80 |
+| 6 | `grayFromShape` | bookkeeping: a gray circle with two drawn segments resolves to white (straight) or black (turn) | Beginner | 1 |
+| 7 | `whiteStraight` | a white circle blocked on one axis goes straight along the other | Beginner | 2 |
+| 8 | `blackExtend` | a black circle continues straight two cells from an existing segment and turns away from the opposite side | Beginner | 2 |
+| 9 | `blackWall` | a black circle blocked within two cells of a wall or cross must extend two cells the opposite way | Beginner | 2 |
+| 10 | `grayMustBeBlack` | a gray circle that cannot go straight through must be black | Beginner | 2 |
+| 11 | `blackAdjacent` | two touching black circles cannot connect, so each extends two cells away from the other | Beginner | 3 |
+| 12 | `whiteMustTurn` | a white circle that goes straight at one end must turn at the other | Beginner | 3 |
+| 13 | `grayMustBeWhite` | a gray circle without a two-cell leg on one axis must be white | Beginner | 3 |
+| 14 | `deadEnd` | an empty cell with fewer than two exits left cannot be on the loop | Beginner | 4 |
+| 15 | `forcedExits` | a loop cell with only two exits left must use both | Beginner | 4 |
+| 16 | `blackPerp` | a black circle cannot enter a neighbor that already has a perpendicular segment | Beginner | 5 |
+| 17 | `noEarlyClose` | a segment joining the two ends of one path would close the loop early | Beginner | 6 |
+| 18 | `threeWhites` | three white circles in a row must all cross perpendicular to the row | Beginner | 8 |
+| 19 | `whiteBothStraight` | a white circle cannot use an axis where both neighbors already continue straight | Medium | 10 |
+| 20 | `closingCell` | an empty cell whose only two exits meet one path cannot be on the loop | Medium | 11 |
+| 21 | `samePathExits` | a loop cell with three exits where two meet one path must use the third | Medium | 11 |
+| 22 | `twoWhitesStraight` | two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular | Medium | 12 |
+| 23 | `grayWhiteNoTurn` | a gray circle that cannot turn on either side of its only open axis must be black | Medium | 12 |
+| 24 | `whiteNoTurnAxis` | a white circle cannot use an axis whose two neighbors are both unable to turn | Medium | 14 |
+| 25 | `blackNoEarlyClose` | a black circle cannot extend two cells into the other end of its own path and close the loop early | Medium | 14 |
+| 26 | `blackBlockedTarget` | a black circle cannot extend toward a circle two cells away that cannot accept a straight segment | Medium | 15 |
+| 27 | `blackTwoDiagWhites` | a black circle flanked by two diagonally adjacent white circles cannot extend between them | Medium | 15 |
+| 28 | `blackWhiteNoTurn` | a black circle cannot extend into a white circle two cells away whose far side cannot turn | Medium | 16 |
+| 29 | `whiteCornerPinch` | a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors | Medium | 17 |
+| 30 | `whiteDeadEndPinch` | a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes | Medium | 17 |
+| 31 | `faceShade` | basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge | Medium | 18 |
+| 32 | `boxStrand` | closing two active corners of a 2×2 square cannot seal off both escapes of an open end on the opposite side | Medium | 20 |
+| 33 | `corridorNoEarlyClose` | a forced multi-cell corridor joining the two ends of one path would close the loop early | Hard | 30 |
+| 34 | `faceCircle` | advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge | Hard | 38 |
+| 35 | `twoEndsJoin` | a sealed area with just two open ends must connect them, so their far ends cannot join early | Hard | 44 |
+| 36 | `chokepoint` | blocking this segment would cut off a small area or leave a single chokepoint cell | Hard | 48 |
+| 37 | `parityPocket` | the other choice would seal off a small pocket with an odd number of open ends | Hard | 52 |
+| 38 | `crossingParity` | the loop crosses the border of any rectangle or band an even number of times | Hard | 58 |
+| 39 | `chokepointArea` | blocking this segment would cut off a large area or leave a single chokepoint cell | Hard | 64 |
+| 40 | `parityForces` | the other choice would seal off an area with an odd number of open ends | Hard | 68 |
+| 41 | `tryEdge` | trying a segment or gray circle one way leads to a contradiction | Expert | 120 |
+| 42 | `imagineLocal` | imagine a segment or gray circle one way: one local step immediately breaks a rule | Medium | 22–28 |
+| 43 | `imagineTrace` | imagine a segment or gray circle one way and trace one single thread 2–3 steps ahead until something breaks | Hard | 36–75 |
+| 44 | `imagineChain` | imagine a segment or gray circle one way and follow a long, multi-front, or area-parity chain until something breaks | Expert | ≥80 |
 
 ## License
 

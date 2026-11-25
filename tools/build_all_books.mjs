@@ -58,7 +58,7 @@ const manifest = {
     {
       name: 'Bonus',
       icon: '🎁',
-      blurb: 'Themed variations with the same Masyu rules.',
+      blurb: 'Themed variations and mystery gray circles.',
     },
   ],
   books: existingHidden,
@@ -194,6 +194,18 @@ const recipes = [
     glob: 'black_10x10', tiers: '50,200,200,50', tierBands: '0:345,315:380,365:510,500:1100',
     expertPlus: 10, bonusGlob: 'black_12x20', bonusCount: 10,
     blurb: 'Every circle is black — sharp corners and long legs.',
+  },
+  {
+    id: 'bonus-gray', name: 'Gray circles', label: '🔘 Gray circles (8×8)', group: 'Bonus',
+    glob: 'gray_8x8', tiers: '50,200,200,50', tierBands: '0:265,235:315,300:540,520:1500',
+    expertPlus: 10, bonusGlob: 'gray_12x20', bonusCount: 10,
+    blurb: 'Mystery gray circles mixed with white and black — deduce which each one is (tap to label).',
+  },
+  {
+    id: 'bonus-allgray', name: 'All gray', label: '🌫️ All gray (8×8)', group: 'Bonus',
+    glob: 'allgray_8x8', tiers: '50,200,200,50', tierBands: '0:270,245:325,310:520,500:1600',
+    expertPlus: 10, bonusGlob: 'allgray_10x12', bonusCount: 10,
+    blurb: 'Every circle is a mystery gray circle — figure out white vs. black from scratch.',
   },
   {
     id: 'bonus-cookie', name: 'Black & White Cookie', label: '🍪 Black & White Cookie (10×10)', group: 'Bonus',

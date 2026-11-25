@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  compile, parseCsv, solve, initialState, isSolved, decodeSolution, encodeSolution, E_ON, E_OFF, OFF, LOOP,
+  compile, parseCsv, solve, initialState, isSolved, decodeSolution, encodeSolution,
+  E_ON, E_OFF, OFF, LOOP, WHITE, BLACK,
 } from '../js/logic.js';
 import { RULES, rate, solvedByRules, nextSteps, applySets, TIERS } from '../js/rating.js';
 import { findFaceShade, findFaceCircle } from '../js/faceparity.js';
@@ -469,4 +470,90 @@ test('named Medium/Hard pattern rules fire cleanly and respect negative/boundary
     for (const f of base.firings) applySets(st11, f.sets);
   }
   assert.equal(sawFiltered, true, 'excluding imagineLocal must still allow imagineTrace/imagineChain');
+});
+
+test('gray pearl human rules fire cleanly and are 100% sound on random unique mixed & all-gray boards', () => {
+  // 1. grayMustBeBlack on a corner
+  const Pg1 = compile({ name: 'gmbb', rows: 4, cols: 4, clues: [{ r: 0, c: 0, t: 'G' }] });
+  const s1 = nextSteps(Pg1, initialState(Pg1));
+  assert.equal(s1.rule, 'grayMustBeBlack');
+  assert.deepEqual(s1.firings[0].sets, [['g', 0, BLACK]]);
+
+  // 2. grayMustBeWhite when an interior gray has both vertical 2-step extensions blocked by walls (3x5 board, gray at (1,2))
+  const Pg2 = compile({ name: 'gmbw', rows: 3, cols: 5, clues: [{ r: 1, c: 2, t: 'G' }] });
+  const s2 = nextSteps(Pg2, initialState(Pg2));
+  assert.equal(s2.rule, 'grayMustBeWhite');
+  assert.deepEqual(s2.firings[0].sets, [['g', 1 * 5 + 2, WHITE]]);
+
+  // 3. grayFromShape resolves a gray pearl with 2 drawn segments (bookkeeping) and unlocks blackExtend
+  const Pg3 = compile({ name: 'gfs', rows: 5, cols: 5, clues: [{ r: 2, c: 2, t: 'G' }] });
+  const st3 = initialState(Pg3);
+  st3.e[Pg3.ed[(2 * 5 + 2) * 4 + 0]] = E_ON;
+  st3.e[Pg3.ed[(2 * 5 + 2) * 4 + 1]] = E_ON;
+  const f3 = RULES.find((r) => r.id === 'grayFromShape').find(Pg3, st3);
+  assert.equal(f3.length, 1);
+  assert.deepEqual(f3[0].sets, [['g', 2 * 5 + 2, BLACK]]);
+  const s3 = nextSteps(Pg3, st3);
+  assert.equal(s3.rule, 'blackExtend');
+
+  // 4. grayWhiteNoTurn: gray on top border (0,2) flanked by (0,1) and (0,3) whose turns down are crossed out -> must be Black
+  const Pg4 = compile({ name: 'gwnt', rows: 5, cols: 5, clues: [{ r: 0, c: 2, t: 'G' }] });
+  const st4 = initialState(Pg4);
+  st4.e[Pg4.ed[(0 * 5 + 1) * 4 + 2]] = E_OFF; // (0,1)-(1,1) OFF
+  st4.e[Pg4.ed[(0 * 5 + 3) * 4 + 2]] = E_OFF; // (0,3)-(1,3) OFF
+  const f4 = RULES.find((r) => r.id === 'grayWhiteNoTurn').find(Pg4, st4);
+  assert.equal(f4.length, 1);
+  assert.deepEqual(f4[0].sets, [['g', 2, BLACK]]);
+
+  // 5. Soundness fuzz on 30+ unique random mixed-gray and all-gray 4x4 / 5x5 boards
+  const rng = mulberry32(9090);
+  let checked = 0;
+  let solvedCount = 0;
+  const grayRulesSeen = new Set();
+  for (let attempt = 0; attempt < 900 && checked < 35; attempt++) {
+    const rows = 4 + (attempt % 2);
+    const cols = 4 + ((attempt >> 1) % 2);
+    const allGray = attempt % 3 === 0;
+    const empty = compile({ name: 'e', rows, cols, clues: [] });
+    const solRes = solve(empty, { limit: 1, maxNodes: 2000, rng });
+    if (solRes.count === 0) continue;
+    const loopSt = solRes.solutions[0];
+    const clues = [];
+    for (let i = 0; i < empty.N; i++) {
+      const dirs = [];
+      for (let d = 0; d < 4; d++) {
+        const x = empty.ed[i * 4 + d];
+        if (x >= 0 && loopSt.e[x] === E_ON) dirs.push(d);
+      }
+      if (dirs.length !== 2) continue;
+      const straight = ((dirs[0] ^ dirs[1]) & 1) === 0;
+      const ext0 = empty.ed2[i * 4 + dirs[0]], ext1 = empty.ed2[i * 4 + dirs[1]];
+      const s0 = ext0 >= 0 && loopSt.e[ext0] === E_ON;
+      const s1 = ext1 >= 0 && loopSt.e[ext1] === E_ON;
+      if (straight && !(s0 && s1)) clues.push({ r: (i / cols) | 0, c: i % cols, t: (allGray || rng() < 0.55) ? 'G' : 'W' });
+      else if (!straight && s0 && s1) clues.push({ r: (i / cols) | 0, c: i % cols, t: (allGray || rng() < 0.55) ? 'G' : 'B' });
+    }
+    if (!clues.some((c) => c.t === 'G')) continue;
+    const P = compile({ name: `gfuzz_${attempt}`, rows, cols, clues });
+    const exact = solve(P, { limit: 2, maxNodes: 30000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    checked++;
+    const truth = exact.solutions[0];
+    const r = rate(P);
+    for (const s of r.steps) {
+      if (s.rule.startsWith('gray') || s.info?.grayCell >= 0) grayRulesSeen.add(s.rule);
+      for (const [k, idx, val] of s.sets) {
+        if (k === 'e') assert.equal(val, truth.e[idx], `UNSOUND edge by ${s.rule} on ${P.name}`);
+        else if (k === 'c') assert.equal(val, truth.cell[idx], `UNSOUND cell by ${s.rule} on ${P.name}`);
+        else if (k === 'g') assert.equal(val, truth.clue[idx], `UNSOUND gray label by ${s.rule} on ${P.name} cell ${idx}`);
+      }
+    }
+    if (r.solved) {
+      solvedCount++;
+      assert.equal(encodeSolution(P, r.state), encodeSolution(P, truth));
+    }
+  }
+  assert.ok(checked >= 25, `expected >= 25 unique gray boards, got ${checked}`);
+  assert.ok(solvedCount >= checked * 0.8, `expected rules to solve most gray boards, solved ${solvedCount}/${checked}`);
+  assert.ok(grayRulesSeen.size >= 2, `expected gray rules to fire, saw ${[...grayRulesSeen].join(', ')}`);
 });

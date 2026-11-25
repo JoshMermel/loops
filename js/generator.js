@@ -9,7 +9,7 @@
 //      if the human rater gets stuck (Expert) or exceeds `maxTier`.
 // 3. Re-verify exact uniqueness (complete search, never trusting exceeded) and rate with js/rating.js.
 import {
-  compile, propagate, initialState, solve, isSolved, encodeSolution, WHITE, BLACK, E_ON, E_OFF, E_UNKNOWN,
+  compile, propagate, initialState, solve, isSolved, encodeSolution, WHITE, BLACK, GRAY, E_ON, E_OFF, E_UNKNOWN,
 } from './logic.js';
 import { RULES, rate, solvedByRules, FIRST_LOOKAHEAD, TIERS } from './rating.js';
 
@@ -410,27 +410,34 @@ export function tightLoop(rows, cols, rng, {
   const baseGrid = compile({ name: 'tl', rows, cols, clues: [] });
   const tlClue = new Uint8Array(N);
   const tlClueAt = new Int16Array(N);
+  const tlGrayAt = new Int16Array(N);
 
   const evaluate = () => {
     const { edges, loopCells, minR, maxR, minC, maxC, emptyBorders, quadFills, qTot, minQuadFill } = toEdges();
     const { whites, blacks } = allowedClues(rows, cols, edges, baseGrid);
-    const pool = style === 'white' ? whites : style === 'black' ? blacks : whites.concat(blacks);
+    const pool = style === 'white' ? whites
+      : style === 'black' ? blacks
+      : style === 'gray-all' ? whites.concat(blacks).map((c) => ({ r: c.r, c: c.c, t: 'G' }))
+      : whites.concat(blacks);
     const clues = filterClues(pool);
     tlClue.fill(0);
     tlClueAt.fill(-1);
-    const clueCells = [], wIdx = [], bIdx = [];
+    tlGrayAt.fill(-1);
+    const clueCells = [], wIdx = [], bIdx = [], gIdx = [];
     for (let k = 0; k < clues.length; k++) {
       const cl = clues[k];
       const i = cl.r * cols + cl.c;
       tlClueAt[i] = k;
-      tlClue[i] = cl.t === 'W' ? WHITE : BLACK;
+      tlClue[i] = cl.t === 'W' ? WHITE : cl.t === 'B' ? BLACK : GRAY;
       clueCells.push(i);
-      if (cl.t === 'W') wIdx.push(i); else bIdx.push(i);
+      if (cl.t === 'W') wIdx.push(i);
+      else if (cl.t === 'B') bIdx.push(i);
+      else { tlGrayAt[i] = gIdx.length; gIdx.push(i); }
     }
     const P = {
       name: 'tl', rows, cols, clues,
       N: baseGrid.N, K: 4, numEdges: baseGrid.numEdges,
-      clue: tlClue, clueAt: tlClueAt, clueCells, whites: wIdx, blacks: bIdx,
+      clue: tlClue, clueAt: tlClueAt, clueCells, whites: wIdx, blacks: bIdx, grays: gIdx, grayAt: tlGrayAt,
       nb: baseGrid.nb, ed: baseGrid.ed, step2: baseGrid.step2, ed2: baseGrid.ed2,
       edgeA: baseGrid.edgeA, edgeB: baseGrid.edgeB,
       _ecOff: null, _ecData: null,
@@ -793,7 +800,7 @@ function generateMaskPuzzle({
  * Options:
  *   rows, cols           board dimensions (each >= 4)
  *   seed                 PRNG seed (or pass `rng` directly)
- *   style                'balanced' | 'white' | 'black' | 'sparse'
+ *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all'
  *   layout               clue filter or geometric pattern mask name (default 'none')
  *   minFill              minimum loop fill fraction (e.g. 1.0 for Full board)
  *   maxTier              'Beginner' | 'Medium' | 'Hard' | 'Expert' (default 'Expert')
@@ -857,10 +864,10 @@ export function generatePuzzle({
 
   while (Date.now() < deadline) {
     const base = tightLoop(rows, cols, rand, {
-      style: style === 'white' || style === 'black' ? style : 'balanced',
+      style: (style === 'white' || style === 'black' || style === 'gray-all') ? style : 'balanced',
       layout,
       minFill,
-      maxSteps: style === 'black' ? Math.max(700, (rows - 1) * (cols - 1) * 6) : null,
+      maxSteps: (style === 'black' || style === 'gray-all') ? Math.max(700, (rows - 1) * (cols - 1) * 6) : null,
     });
     if (base.loopCells < minLoopCells || base.emptyBorders > 0 || base.clues.length < 4) continue;
     if (reqQuadFill > 0 && base.minQuadFill < reqQuadFill) continue;
@@ -874,6 +881,42 @@ export function generatePuzzle({
     }
 
     let current = base.clues.slice();
+    let baseTight = base.unk === 0;
+
+    // For gray-mixed, convert ~55% of the initial clue pool into mystery gray pearls while preserving uniqueness
+    // (trying a fast batch flip first, then sub-ms propagation-guided greedy flips).
+    if (style === 'gray-mixed' && !pairedStrip) {
+      const targetG = Math.max(3, Math.round(current.length * (0.48 + 0.16 * rand())));
+      const idxs = shuffle(current.map((_, idx) => idx), rand);
+      const batch = current.map((c) => ({ ...c }));
+      for (let j = 0; j < targetG && j < idxs.length; j++) batch[idxs[j]].t = 'G';
+      const Pbatch = compile({ name, rows, cols, clues: batch });
+      let batchOk = solvedByPropagate(Pbatch) ? 2 : 0;
+      if (!batchOk && !beginnerOnly) {
+        const ex = solve(Pbatch, { limit: 2, maxNodes: Math.min(2500, pruneNodeCap) });
+        if (!ex.exceeded && ex.count === 1) batchOk = 1;
+      }
+      if (batchOk) {
+        current = batch;
+        baseTight = batchOk === 2;
+      } else {
+        // Sub-millisecond propagation-only greedy flips (never stalls on hard exact-search trees)
+        current = current.map((c) => ({ ...c }));
+        let flipped = 0;
+        for (const idx of idxs) {
+          if (Date.now() >= deadline || flipped >= targetG) break;
+          const prev = current[idx].t;
+          current[idx].t = 'G';
+          if (solvedByPropagate(compile({ name, rows, cols, clues: current }))) {
+            flipped++;
+          } else {
+            current[idx].t = prev;
+          }
+        }
+        baseTight = true;
+      }
+    }
+
     const minKeep = keepFrac != null
       ? Math.max(2, Math.floor(current.length * keepFrac))
       : (style === 'sparse' ? 2 : beginnerOnly ? Math.max(4, Math.floor(current.length * 0.22)) : 2);
@@ -902,12 +945,17 @@ export function generatePuzzle({
         keyed.sort((a, b) => a.k - b.k);
         for (let i = 0; i < keyed.length; i++) units[i] = keyed[i].u;
       }
+    } else if (style === 'gray-mixed') {
+      // Gently prefer stripping regular W/B before gray clues so stripped puzzles keep a healthy gray mix
+      const keyed = units.map((u) => ({ u, k: (u.items[0].t === 'G' ? 0.45 : 0) + rand() }));
+      keyed.sort((a, b) => a.k - b.k);
+      for (let i = 0; i < keyed.length; i++) units[i] = keyed[i].u;
     }
 
     // Pass 0: ultra-fast propagation-only pruning (sub-millisecond per clue, Beginner-sound).
     // Strips the bulk of redundant clues cheaply before running full human-rule or exact-search passes.
     const keepSet = new Set(current.map((c) => c.r * cols + c.c));
-    if (base.unk === 0) {
+    if (baseTight) {
       for (const u of units) {
         if (Date.now() >= deadline || current.length - u.keys.length < minKeep) break;
         if (u.keys.some((k) => !keepSet.has(k))) continue;
@@ -1013,6 +1061,19 @@ export function generatePuzzle({
       const hasW = current.some((c) => c.t === 'W');
       const hasB = current.some((c) => c.t === 'B');
       if (!hasW || !hasB) continue;
+    }
+    if (style === 'gray-mixed') {
+      let nW = 0, nB = 0, nG = 0, nonCornerG = 0;
+      for (const c of current) {
+        if (c.t === 'W') nW++;
+        else if (c.t === 'B') nB++;
+        else if (c.t === 'G') {
+          nG++;
+          if (!((c.r === 0 || c.r === rows - 1) && (c.c === 0 || c.c === cols - 1))) nonCornerG++;
+        }
+      }
+      const minG = Math.max(2, Math.ceil(current.length * 0.30));
+      if (nW < 1 || nB < 1 || nG < minG || nonCornerG < 1) continue;
     }
     if (reqQuadClues > 0) {
       const qs = quadrantStats(rows, cols, base.edges, current);

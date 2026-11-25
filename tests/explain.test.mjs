@@ -139,13 +139,18 @@ test('imagine explanation describes the chain of consequences, not just the verd
   assert.ok(checkedImagine >= 3, `expected >= 3 imagine puzzles in armory, checked ${checkedImagine}`);
 
   // Also test targetsOf deduplication and describeMarks formatting
-  const P0 = compile({ name: 'fmt', rows: 4, cols: 4, clues: [] });
-  assert.deepEqual(targetsOf([['e', 0, E_ON], ['e', 0, E_ON], ['e', 1, E_OFF], ['e', 1, E_OFF]]), {
-    segOn: [0], segOff: [1],
+  const P0 = compile({ name: 'fmt', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'G' }, { r: 2, c: 2, t: 'G' }] });
+  assert.deepEqual(targetsOf([
+    ['e', 0, E_ON], ['e', 0, E_ON], ['e', 1, E_OFF], ['e', 1, E_OFF],
+    ['g', 5, 1], ['g', 5, 1], ['g', 10, 2],
+  ]), {
+    segOn: [0], segOff: [1], grayWhite: [5], grayBlack: [10],
   });
-  const txt = describeMarks(P0, { segOn: [0], segOff: [1] });
+  const txt = describeMarks(P0, { segOn: [0], segOff: [1], grayWhite: [5], grayBlack: [10] });
   assert.ok(txt.includes('draw '));
   assert.ok(txt.includes('cross out '));
+  assert.ok(txt.includes('label B2 white'));
+  assert.ok(txt.includes('label C3 black'));
 });
 
 test('faceCircle and faceShade explanations include shading text and Inside/Outside face overlays', () => {
@@ -370,4 +375,105 @@ test('every armory rule produces a non-spoiling nudge and at least one nudgeRole
   }
   assert.ok(seenRules.size >= 25, `expected >= 25 rules covered across armory, saw ${seenRules.size}`);
   assert.equal(sawImagineChain, true, 'expected at least one armory imagine step to populate dashed chain edges');
+});
+
+test('gray pearl hints: end-to-end solving, wrong manual gray label detection, and nudges', () => {
+  // 1. Wrong manual gray label is detected before logical hints
+  const P1 = compile({
+    name: 'g_wrong', rows: 4, cols: 4,
+    clues: [{ r: 0, c: 0, t: 'G' }, { r: 3, c: 3, t: 'B' }, { r: 0, c: 2, t: 'W' }, { r: 2, c: 0, t: 'W' }],
+  });
+  const sol1 = solve(P1, { limit: 2 }).solutions[0];
+  P1.solution = encodeSolution(P1, sol1);
+  // Corner (0,0) must be Black (2) in solution; label it White (1) manually
+  const m1 = { edges: new Uint8Array(P1.numEdges), grays: new Uint8Array(P1.grays.length), autoG: new Uint8Array(P1.grays.length) };
+  m1.grays[0] = 1;
+  const chk = checkMarksAgainstSolution(P1, m1);
+  assert.equal(chk.total, 1);
+  assert.deepEqual(chk.wrongClues, [0]);
+  const hWrong = computeHint(P1, m1);
+  assert.equal(hWrong.kind, 'wrong');
+  assert.deepEqual(hWrong.wrongClues, [0]);
+
+  // If marked autoG=1 without wrong edges, checkMarksAgainstSolution skips autoG (manual labels only)
+  m1.autoG[0] = 1;
+  assert.equal(checkMarksAgainstSolution(P1, m1).wrongClues.length, 0);
+
+  // 2. Explanations and non-spoiling nudges for gray rules and gray imagine hypothesis
+  const Pg = compile({
+    name: 'g_exp', rows: 5, cols: 5,
+    clues: [{ r: 0, c: 0, t: 'G' }, { r: 2, c: 2, t: 'G' }],
+  });
+  for (const step of [
+    { rule: 'grayMustBeBlack', tier: 'Beginner', weight: 2, sets: [['g', 0, 2]], info: { cell: 0, reason: 'corner' } },
+    { rule: 'grayMustBeWhite', tier: 'Beginner', weight: 3, sets: [['g', 12, 1]], info: { cell: 12, axis: 'v' } },
+    { rule: 'grayWhiteNoTurn', tier: 'Medium', weight: 12, sets: [['g', 12, 2]], info: { cell: 12 } },
+    {
+      rule: 'imagineLocal', tier: 'Medium', weight: 20, sets: [['g', 12, 2]],
+      info: { grayCell: 12, hyp: 1, deduce: 2, steps: [], contra: { kind: 'grayBroken', cell: 12 } },
+    },
+  ]) {
+    const exp = explainStep(Pg, step);
+    assert.ok(exp.text.length > 20, `short text for ${step.rule}: ${exp.text}`);
+    assert.ok(exp.nudge && exp.nudge.length > 15, `short nudge for ${step.rule}: ${exp.nudge}`);
+    assert.ok(Object.values(exp.nudgeRoles).some((arr) => arr.length > 0), `empty nudgeRoles for ${step.rule}`);
+    assert.ok(!exp.nudge.includes('So label'), `nudge leaked answer for ${step.rule}: ${exp.nudge}`);
+  }
+
+  // 3. Follow hints end-to-end on random unique mixed-gray boards
+  const rng = mulberry32(4242);
+  let solvedGray = 0;
+  for (let attempt = 0; attempt < 400 && solvedGray < 15; attempt++) {
+    const rows = 4 + (attempt % 2);
+    const cols = 4 + ((attempt >> 1) % 2);
+    const empty = compile({ name: 'e', rows, cols, clues: [] });
+    const solRes = solve(empty, { limit: 1, maxNodes: 2000, rng });
+    if (solRes.count === 0) continue;
+    const loopSt = solRes.solutions[0];
+    const clues = [];
+    for (let i = 0; i < empty.N; i++) {
+      const dirs = [];
+      for (let d = 0; d < 4; d++) {
+        const x = empty.ed[i * 4 + d];
+        if (x >= 0 && loopSt.e[x] === E_ON) dirs.push(d);
+      }
+      if (dirs.length !== 2) continue;
+      const straight = ((dirs[0] ^ dirs[1]) & 1) === 0;
+      const ext0 = empty.ed2[i * 4 + dirs[0]], ext1 = empty.ed2[i * 4 + dirs[1]];
+      const s0 = ext0 >= 0 && loopSt.e[ext0] === E_ON;
+      const s1 = ext1 >= 0 && loopSt.e[ext1] === E_ON;
+      if (straight && !(s0 && s1)) clues.push({ r: (i / cols) | 0, c: i % cols, t: rng() < 0.55 ? 'G' : 'W' });
+      else if (!straight && s0 && s1) clues.push({ r: (i / cols) | 0, c: i % cols, t: rng() < 0.55 ? 'G' : 'B' });
+    }
+    if (!clues.some((c) => c.t === 'G')) continue;
+    const P = compile({ name: `gh_${attempt}`, rows, cols, clues });
+    const exact = solve(P, { limit: 2, maxNodes: 20000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    const r = rate(P);
+    if (!r.solved) continue;
+    P.solution = encodeSolution(P, exact.solutions[0]);
+
+    const marks = { edges: new Uint8Array(P.numEdges), grays: new Uint8Array(P.grays.length), autoG: new Uint8Array(P.grays.length) };
+    let steps = 0;
+    while (!isSolved(P, marks.edges) && steps < 400) {
+      const h = computeHint(P, marks);
+      assert.equal(h.kind, 'step', `got ${h.kind} on ${P.name} at step ${steps}`);
+      const t = h.hints[0].targets;
+      let changed = applyHintToMarks(marks, h.hints[0]);
+      for (const cell of t.grayWhite) {
+        const k = P.grayAt[cell];
+        if (k >= 0 && marks.grays[k] !== 1) { marks.grays[k] = 1; changed = true; }
+      }
+      for (const cell of t.grayBlack) {
+        const k = P.grayAt[cell];
+        if (k >= 0 && marks.grays[k] !== 2) { marks.grays[k] = 2; changed = true; }
+      }
+      assert.equal(changed, true, `hint made no change for ${h.rule} on ${P.name}`);
+      steps++;
+    }
+    assert.equal(isSolved(P, marks.edges), true, `did not solve ${P.name}`);
+    assert.equal(checkMarksAgainstSolution(P, marks).total, 0);
+    solvedGray++;
+  }
+  assert.ok(solvedGray >= 12, `expected >= 12 solved gray hint runs, got ${solvedGray}`);
 });

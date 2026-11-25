@@ -5,7 +5,7 @@
 //   node tools/audit_books.mjs [--book id[,id...]] [--jobs N] [--chunk 25] [--rate] [--all]
 //
 // Checks per puzzle:
-//   - clues in bounds, distinct cells, valid type W|B
+//   - clues in bounds, distinct cells, valid type W|B|G
 //   - stored solution is valid (isSolved)
 //   - exactly ONE solution proved independently (sound rules, or complete exhaustive search without hitting node cap)
 //   - with --rate: stored tier, rules, and score match a fresh rate(P)
@@ -45,7 +45,7 @@ if (process.argv.includes('--worker')) {
       const idx = c.r * raw.cols + c.c;
       if (seen.has(idx)) return fail('two clues on one cell');
       seen.add(idx);
-      if (c.t !== 'W' && c.t !== 'B') return fail(`bad clue type "${c.t}"`);
+      if (c.t !== 'W' && c.t !== 'B' && c.t !== 'G') return fail(`bad clue type "${c.t}"`);
     }
 
     let P;

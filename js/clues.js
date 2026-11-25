@@ -1,13 +1,41 @@
-// Live circle error feedback from player edge marks alone (never looks at the stored solution).
+// Live circle error feedback from player edge marks and gray labels alone (never looks at the stored solution).
 // Returns an array of 'bad' | '' per clue in P.clues (only broken circles are marked; completion is left to the player).
-import { WHITE, BLACK } from './logic.js';
+import { WHITE, BLACK, GRAY } from './logic.js';
 
 export function clueStates(P, marks) {
   const { ed, ed2, nb } = P;
   const e = marks.edges; // 0 empty, 1 segment, 2 cross
+  const grays = marks.grays;
 
   const seg = (x) => x >= 0 && e[x] === 1;
   const blocked = (x) => x < 0 || e[x] === 2;
+
+  const isBadWhite = (i, dirsOn) => {
+    if (dirsOn.length === 2 && ((dirsOn[0] ^ dirsOn[1]) & 1) === 1) return true;
+    for (const d of dirsOn) if (blocked(ed[i * 4 + (d ^ 2)])) return true;
+    const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+    const vBlock = blocked(u) || blocked(dn);
+    const hBlock = blocked(r) || blocked(l);
+    if (vBlock && hBlock) return true;
+    if (dirsOn.length === 2) {
+      const [d1, d2] = dirsOn;
+      if (seg(ed2[i * 4 + d1]) && seg(ed2[i * 4 + d2])) return true;
+    }
+    return false;
+  };
+
+  const isBadBlack = (i, dirsOn) => {
+    if (dirsOn.length === 2 && ((dirsOn[0] ^ dirsOn[1]) & 1) === 0) return true;
+    const canDir = (d) => {
+      const x1 = ed[i * 4 + d], x2 = ed2[i * 4 + d], n1 = nb[i * 4 + d];
+      if (blocked(x1) || blocked(x2)) return false;
+      if (seg(ed[n1 * 4 + ((d + 1) & 3)]) || seg(ed[n1 * 4 + ((d + 3) & 3)])) return false;
+      return true;
+    };
+    if ((!canDir(0) && !canDir(2)) || (!canDir(1) && !canDir(3))) return true;
+    for (const d of dirsOn) if (!canDir(d)) return true;
+    return false;
+  };
 
   return P.clues.map((cl) => {
     const i = cl.r * P.cols + cl.c;
@@ -15,31 +43,15 @@ export function clueStates(P, marks) {
     for (let d = 0; d < 4; d++) if (seg(ed[i * 4 + d])) dirsOn.push(d);
     if (dirsOn.length > 2) return 'bad';
 
-    if (P.clue[i] === WHITE) {
-      if (dirsOn.length === 2 && ((dirsOn[0] ^ dirsOn[1]) & 1) === 1) return 'bad';
-      for (const d of dirsOn) if (blocked(ed[i * 4 + (d ^ 2)])) return 'bad';
-      const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
-      const vBlock = blocked(u) || blocked(dn);
-      const hBlock = blocked(r) || blocked(l);
-      if (vBlock && hBlock) return 'bad';
-      if (dirsOn.length === 2) {
-        const [d1, d2] = dirsOn;
-        if (seg(ed2[i * 4 + d1]) && seg(ed2[i * 4 + d2])) return 'bad';
-      }
-      return '';
-    }
-
-    if (P.clue[i] === BLACK) {
-      if (dirsOn.length === 2 && ((dirsOn[0] ^ dirsOn[1]) & 1) === 0) return 'bad';
-      const canDir = (d) => {
-        const x1 = ed[i * 4 + d], x2 = ed2[i * 4 + d], n1 = nb[i * 4 + d];
-        if (blocked(x1) || blocked(x2)) return false;
-        if (seg(ed[n1 * 4 + ((d + 1) & 3)]) || seg(ed[n1 * 4 + ((d + 3) & 3)])) return false;
-        return true;
-      };
-      if ((!canDir(0) && !canDir(2)) || (!canDir(1) && !canDir(3))) return 'bad';
-      for (const d of dirsOn) if (!canDir(d)) return 'bad';
-      return '';
+    const t = P.clue[i];
+    if (t === WHITE) return isBadWhite(i, dirsOn) ? 'bad' : '';
+    if (t === BLACK) return isBadBlack(i, dirsOn) ? 'bad' : '';
+    if (t === GRAY) {
+      const gIdx = P.grayAt ? P.grayAt[i] : -1;
+      const lbl = (grays && gIdx >= 0) ? grays[gIdx] : 0;
+      if (lbl === WHITE) return isBadWhite(i, dirsOn) ? 'bad' : '';
+      if (lbl === BLACK) return isBadBlack(i, dirsOn) ? 'bad' : '';
+      return (isBadWhite(i, dirsOn) && isBadBlack(i, dirsOn)) ? 'bad' : '';
     }
     return '';
   });

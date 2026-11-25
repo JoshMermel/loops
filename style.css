@@ -21,6 +21,9 @@
   --grid-dot: #bcbcbc;
   --pearl-ink: #111;
   --pearl-white-fill: #fff;
+  --pearl-gray-fill: #b6bcc4;
+  --pearl-gray-ring: #5a626c;
+  --pearl-gray-halo: #8c949e;
   --pearl-bad: #c62828;
   --loop: #1976d2;
   --edge-x: #757575;
@@ -64,6 +67,9 @@
   --grid-dot: #505050;
   --pearl-ink: #e6e6e6;
   --pearl-white-fill: #222;
+  --pearl-gray-fill: #78808a;
+  --pearl-gray-ring: #c6cdd6;
+  --pearl-gray-halo: #8c949e;
   --pearl-bad: #ef5350;
   --loop: #64b5f6;
   --edge-x: #aaa;
@@ -148,14 +154,25 @@ button.ghost { background: transparent; }
 .pearl-white-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }
 .pearl-black { fill: var(--pearl-ink); stroke: var(--pearl-ink); stroke-width: 1; pointer-events: none; }
 .pearl-black.bad { fill: var(--pearl-bad); stroke: var(--pearl-bad); }
+.pearl-gray-fill { fill: var(--pearl-gray-fill); pointer-events: none; }
+.pearl-gray-ring { fill: none; stroke: var(--pearl-gray-ring); stroke-width: 2.4; pointer-events: none; }
+.pearl-gray-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }
+.pearl-gray-halo { fill: none; stroke: var(--pearl-gray-halo); stroke-width: 3.8; pointer-events: none; }
+.pearl-gray-halo.auto { opacity: 0.78; }
+.pearl-gray-halo.bad { stroke: var(--pearl-bad); opacity: 0.75; }
+.pearl-white-ring.pearl-gray-inner { stroke-width: 2; }
+.pearl-black.pearl-gray-inner { stroke-width: 0.8; }
 /* In dark mode, keep white circles light and black circles dark (rimmed so they pop against #222) so colors always match the rules and hint text. */
 :root[data-theme="dark"] .pearl-white-fill { fill: #f0f3f7; }
 :root[data-theme="dark"] .pearl-white-ring { stroke: #111; stroke-width: 2.4; }
+:root[data-theme="dark"] .pearl-white-ring.pearl-gray-inner { stroke: #111; stroke-width: 1.9; }
 :root[data-theme="dark"] .pearl-white-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.2; }
 :root[data-theme="dark"] .pearl-black { fill: #090a0c; stroke: #8d96a0; stroke-width: 2.2; }
+:root[data-theme="dark"] .pearl-black.pearl-gray-inner { stroke: #181a1e; stroke-width: 1; }
 :root[data-theme="dark"] .pearl-black.bad { stroke: var(--pearl-bad); stroke-width: 3; }
 
 .edge-hover { fill: var(--edge-hover); pointer-events: none; }
+.pearl-hover { fill: none; stroke: var(--primary-blue); stroke-width: 2; opacity: 0.55; pointer-events: none; }
 .over { fill: none; stroke: var(--color-error); stroke-width: 3; pointer-events: none; }
 .axis-label { fill: var(--axis); font-size: 11px; text-anchor: middle; dominant-baseline: auto; pointer-events: none; }
 .axis-label.side { text-anchor: end; dominant-baseline: central; }
@@ -180,7 +197,10 @@ button.ghost { background: transparent; }
 .ghost-seg { stroke: var(--hint-ink); stroke-linecap: round; stroke-dasharray: 5 4; pointer-events: none; }
 .ghost-x { stroke: var(--color-error); stroke-width: 2.8; stroke-linecap: round; fill: none; pointer-events: none; }
 .ghost-x-halo { stroke: var(--bg-white); stroke-width: 5.5; stroke-linecap: round; fill: none; pointer-events: none; }
+.ghost-gray-white { fill: #fff; stroke: var(--hint-ink); stroke-width: 2.2; stroke-dasharray: 4 2.5; pointer-events: none; }
+.ghost-gray-black { fill: #111; stroke: var(--hint-ink); stroke-width: 2.2; stroke-dasharray: 4 2.5; pointer-events: none; }
 .wrong-seg { stroke: var(--color-error); stroke-linecap: round; opacity: 0.5; pointer-events: none; }
+.wrong-clue { fill: none; stroke: var(--color-error); stroke-width: 3.2; opacity: 0.85; pointer-events: none; }
 
 .toast {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 90vw;

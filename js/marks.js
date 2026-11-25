@@ -1,10 +1,11 @@
-// Pure edge-mark and dual-face (Inside/Outside) transitions + Auto-X / Auto-Shade bookkeeping (no DOM).
+// Pure edge-mark, gray-label, and dual-face (Inside/Outside) transitions + Auto-X / Auto-Shade bookkeeping (no DOM).
 //
 // Edge marks:   m.edges[x] = 0 empty, 1 loop segment, 2 cross (X, no segment).
 // Auto-X mask:  m.autoE[x] = 1 when edge x's X was placed automatically by Auto-X mode (0 for manual marks).
 // Face marks:   m.faces[f] = 0 blank, 1 Inside (IN), 2 Outside (OUT) on the (rows-1) x (cols-1) dual grid.
 // Auto-Shade:   m.autoF[f] = 1 when face f's tint was placed automatically by Auto-Shade mode (0 for manual).
-import { NONE } from './logic.js';
+// Gray labels:  m.grays[k] = 0 unlabeled, 1 White, 2 Black (indexed by P.grays[k]); m.autoG[k] = 1 if auto-labeled.
+import { NONE, WHITE, BLACK } from './logic.js';
 
 export const FACE_BLANK = 0, FACE_IN = 1, FACE_OUT = 2;
 
@@ -26,6 +27,47 @@ export function cycleFaceMark(cur) {
 /** Right-click on a dual square cycles in reverse: blank (0) -> Outside (2) -> Inside (1) -> blank (0). */
 export function cycleFaceMarkReverse(cur) {
   return cur === 0 ? FACE_OUT : cur === FACE_OUT ? FACE_IN : FACE_BLANK;
+}
+
+/** Left-tap on a gray pearl cycles: unlabeled (0) -> White (1) -> Black (2) -> unlabeled (0). */
+export function cycleGrayLabel(cur) {
+  return cur === 0 ? WHITE : cur === WHITE ? BLACK : 0;
+}
+
+/** Right-click on a gray pearl cycles in reverse: unlabeled (0) -> Black (2) -> White (1) -> unlabeled (0). */
+export function cycleGrayLabelReverse(cur) {
+  return cur === 0 ? BLACK : cur === BLACK ? WHITE : 0;
+}
+
+/**
+ * Auto-label unlabeled gray pearls that already have 2 drawn loop segments (straight -> White, turn -> Black).
+ * Never overwrites a manual label (`autoG[k] === 0`); cleanly unwinds when one of the 2 segments is erased.
+ */
+export function reconcileAutoGray(P, cur) {
+  const n = P.grays ? P.grays.length : 0;
+  if (!n) return;
+  if (!cur.grays || cur.grays.length !== n) cur.grays = new Uint8Array(n);
+  if (!cur.autoG || cur.autoG.length !== n) cur.autoG = new Uint8Array(n);
+  const { ed } = P;
+  for (let k = 0; k < n; k++) {
+    const i = P.grays[k];
+    let d0 = -1, d1 = -1, cnt = 0;
+    for (let d = 0; d < 4; d++) {
+      const x = ed[i * 4 + d];
+      if (x >= 0 && cur.edges[x] === 1) {
+        if (cnt === 0) d0 = d;
+        else if (cnt === 1) d1 = d;
+        cnt++;
+      }
+    }
+    const forced = cnt === 2 ? (((d0 ^ d1) & 1) === 0 ? WHITE : BLACK) : 0;
+    if (cur.grays[k] !== 0 && cur.autoG[k]) {
+      if (!forced) { cur.grays[k] = 0; cur.autoG[k] = 0; }
+      else cur.grays[k] = forced;
+    } else if (cur.grays[k] === 0 && forced) {
+      cur.grays[k] = forced; cur.autoG[k] = 1;
+    }
+  }
 }
 
 // ------------------------------------------------------------ Auto-X mode
@@ -68,8 +110,26 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     }
   }
 
+  // Effective white & black circles (includes labeled gray pearls when present)
+  let effWhites = whites, effBlacks = blacks;
+  if (P.grays && P.grays.length && m.grays) {
+    let extraW = false, extraB = false;
+    for (let k = 0; k < P.grays.length; k++) {
+      if (m.grays[k] === WHITE) extraW = true;
+      else if (m.grays[k] === BLACK) extraB = true;
+    }
+    if (extraW) {
+      effWhites = whites.slice();
+      for (let k = 0; k < P.grays.length; k++) if (m.grays[k] === WHITE) effWhites.push(P.grays[k]);
+    }
+    if (extraB) {
+      effBlacks = blacks.slice();
+      for (let k = 0; k < P.grays.length; k++) if (m.grays[k] === BLACK) effBlacks.push(P.grays[k]);
+    }
+  }
+
   // Rule 2: white circle with both straight segments drawn and continuing straight on one side -> X out straight past the other side
-  for (const i of whites) {
+  for (const i of effWhites) {
     for (let d = 0; d < 4; d++) {
       const e1 = ed[i * 4 + d], e2 = ed[i * 4 + (d ^ 2)], ext1 = ed2[i * 4 + d];
       if (e1 >= 0 && e2 >= 0 && ext1 >= 0 && w[e1] === 1 && w[e2] === 1 && w[ext1] === 1) {
@@ -80,7 +140,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   }
 
   // Rule 3: black circle going in direction d -> X out the opposite direction
-  for (const i of blacks) {
+  for (const i of effBlacks) {
     for (let d = 0; d < 4; d++) {
       const e1 = ed[i * 4 + d];
       if (e1 >= 0 && w[e1] === 1) {

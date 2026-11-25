@@ -22,12 +22,12 @@ export function colName(c) {
 export const DR = [-1, 0, 1, 0];
 export const DC = [0, 1, 0, -1];
 
-export const NONE = 0, WHITE = 1, BLACK = 2;
+export const NONE = 0, WHITE = 1, BLACK = 2, GRAY = 3;
 export const UNKNOWN = 0, OFF = 1, LOOP = 2;
 export const E_UNKNOWN = 0, E_ON = 1, E_OFF = 2;
 
 /**
- * Puzzle = { name, rows, cols, clues: [{ r, c, t: 'W'|'B' }], solution?, rules?, tier?, score? }.
+ * Puzzle = { name, rows, cols, clues: [{ r, c, t: 'W'|'B'|'G' }], solution?, rules?, tier?, score? }.
  * compile() attaches the lookup tables every other function uses.
  */
 export function compile(p) {
@@ -37,9 +37,10 @@ export function compile(p) {
   }
   const N = rows * cols;
   const numEdges = 2 * N;
-  const clue = new Uint8Array(N); // 0 none, 1 white, 2 black
+  const clue = new Uint8Array(N); // 0 none, 1 white, 2 black, 3 gray
   const clueAt = new Int16Array(N).fill(-1);
-  const whites = [], blacks = [], clueCells = [];
+  const grayAt = new Int16Array(N).fill(-1);
+  const whites = [], blacks = [], grays = [], clueCells = [];
   if (!Array.isArray(p.clues)) throw new Error('puzzle clues must be an array');
   p.clues.forEach((cl, k) => {
     if (!Number.isInteger(cl.r) || !Number.isInteger(cl.c) || cl.r < 0 || cl.c < 0 || cl.r >= rows || cl.c >= cols) {
@@ -47,11 +48,13 @@ export function compile(p) {
     }
     const i = cl.r * cols + cl.c;
     if (clueAt[i] >= 0) throw new Error(`two clues on cell ${cl.r},${cl.c}`);
-    if (cl.t !== 'W' && cl.t !== 'B') throw new Error(`unknown clue type "${cl.t}" at ${cl.r},${cl.c}`);
+    if (cl.t !== 'W' && cl.t !== 'B' && cl.t !== 'G') throw new Error(`unknown clue type "${cl.t}" at ${cl.r},${cl.c}`);
     clueAt[i] = k;
-    clue[i] = cl.t === 'W' ? WHITE : BLACK;
+    clue[i] = cl.t === 'W' ? WHITE : cl.t === 'B' ? BLACK : GRAY;
     clueCells.push(i);
-    if (cl.t === 'W') whites.push(i); else blacks.push(i);
+    if (cl.t === 'W') whites.push(i);
+    else if (cl.t === 'B') blacks.push(i);
+    else { grayAt[i] = grays.length; grays.push(i); }
   });
 
   const edgeA = new Int16Array(numEdges).fill(-1);
@@ -87,7 +90,7 @@ export function compile(p) {
   }
 
   return Object.assign(p, {
-    N, numEdges, clue, clueAt, clueCells, whites, blacks,
+    N, numEdges, clue, clueAt, grayAt, clueCells, whites, blacks, grays,
     nb, ed, step2, ed2, edgeA, edgeB,
     _ecOff: null, _ecData: null,
   });
@@ -97,12 +100,20 @@ export function initialState(P) {
   const cell = new Int8Array(P.N);
   for (const i of P.clueCells) cell[i] = LOOP;
   const e = new Int8Array(P.numEdges);
-  // Edges off the board (edgeA < 0) stay 0 and are never referenced via P.ed
-  return { cell, e, cycle: false };
+  const hasGray = P.grays && P.grays.length > 0;
+  // Share immutable P.clue when there are no gray pearls (zero allocation overhead on standard puzzles).
+  const clue = hasGray ? P.clue.slice() : P.clue;
+  return { cell, e, clue, hasGray, cycle: false };
 }
 
 export function cloneState(st) {
-  return { cell: st.cell.slice(), e: st.e.slice(), cycle: st.cycle };
+  return {
+    cell: st.cell.slice(),
+    e: st.e.slice(),
+    clue: st.hasGray && st.clue ? st.clue.slice() : st.clue,
+    hasGray: Boolean(st.hasGray),
+    cycle: st.cycle,
+  };
 }
 
 /** Endpoints of an edge index, or [-1, -1] if off-board. */
@@ -175,8 +186,9 @@ function getEdgeClues(P) {
  * of a single newly assigned edge/cell (used by `solve()` after a prior fixed point).
  */
 export function propagate(P, st, seedEdge = -1, seedCell = -1) {
-  const { N, cols, nb, ed, ed2, edgeA, edgeB, clue, whites, blacks } = P;
+  const { N, cols, nb, ed, ed2, edgeA, edgeB, whites, blacks, grays } = P;
   const cell = st.cell, e = st.e;
+  const clue = st.clue || P.clue;
 
   ensurePropScratch(N);
   const vis = scratchVis;
@@ -235,6 +247,19 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (v === E_ON) needLoopCheck = true;
     wakeEdge(x);
   };
+  const setGray = (i, v) => {
+    const cur = clue[i];
+    if (cur === v) return;
+    if (cur !== GRAY) { ok = false; return; }
+    clue[i] = v;
+    changes++;
+    pushClue(i);
+    const i4 = i * 4;
+    for (let d = 0; d < 4; d++) {
+      const j = nb[i4 + d];
+      if (j >= 0 && clue[j] !== NONE) pushClue(j);
+    }
+  };
 
   if (seedEdge >= 0) {
     if (e[seedEdge] === E_ON) needLoopCheck = true;
@@ -247,6 +272,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     for (let i = 0; i < N; i++) pushCell(i);
     for (let wi = 0; wi < whites.length; wi++) pushClue(whites[wi]);
     for (let bi = 0; bi < blacks.length; bi++) pushClue(blacks[bi]);
+    if (grays) for (let gi = 0; gi < grays.length; gi++) pushClue(grays[gi]);
   }
 
   while (ok) {
@@ -304,7 +330,36 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
         inClueQ[i] = 0;
 
         const i4 = i * 4;
-        if (clue[i] === WHITE) {
+        const ct = clue[i];
+        if (ct === GRAY) {
+          // Gray circle: secretly either white or black. Resolve when only one color remains possible.
+          const u = ed[i4], r = ed[i4 + 1], dn = ed[i4 + 2], l = ed[i4 + 3];
+          const u2 = ed2[i4], r2 = ed2[i4 + 1], d2 = ed2[i4 + 2], l2 = ed2[i4 + 3];
+
+          let vOk = u >= 0 && dn >= 0 && e[u] !== E_OFF && e[dn] !== E_OFF;
+          let hOk = r >= 0 && l >= 0 && e[r] !== E_OFF && e[l] !== E_OFF;
+          if (vOk && u2 >= 0 && e[u2] === E_ON && d2 >= 0 && e[d2] === E_ON) vOk = false;
+          if (hOk && r2 >= 0 && e[r2] === E_ON && l2 >= 0 && e[l2] === E_ON) hOk = false;
+          if ((r >= 0 && e[r] === E_ON) || (l >= 0 && e[l] === E_ON)) vOk = false;
+          if ((u >= 0 && e[u] === E_ON) || (dn >= 0 && e[dn] === E_ON)) hOk = false;
+          const canWhite = vOk || hOk;
+
+          const canLeg = (d) => {
+            const x1 = ed[i4 + d], x2 = ed2[i4 + d], opp = ed[i4 + (d ^ 2)];
+            if (x1 < 0 || x2 < 0 || e[x1] === E_OFF || e[x2] === E_OFF) return false;
+            if (opp >= 0 && e[opp] === E_ON) return false;
+            const n1 = nb[i4 + d];
+            if (clue[n1] === BLACK) return false;
+            const p1 = ed[n1 * 4 + ((d + 1) & 3)], p2 = ed[n1 * 4 + ((d + 3) & 3)];
+            if ((p1 >= 0 && e[p1] === E_ON) || (p2 >= 0 && e[p2] === E_ON)) return false;
+            return true;
+          };
+          const canBlack = (canLeg(0) || canLeg(2)) && (canLeg(1) || canLeg(3));
+
+          if (!canWhite && !canBlack) { ok = false; break; }
+          if (!canWhite) setGray(i, BLACK);
+          else if (!canBlack) setGray(i, WHITE);
+        } else if (ct === WHITE) {
           // 3. White circles: straight through, turn at >= 1 end
           const u = ed[i4], r = ed[i4 + 1], dn = ed[i4 + 2], l = ed[i4 + 3];
           const u2 = ed2[i4], r2 = ed2[i4 + 1], d2 = ed2[i4 + 2], l2 = ed2[i4 + 3];
@@ -643,6 +698,14 @@ export function decodeSolution(P, str) {
       }
     }
   }
+  if (st.hasGray) {
+    for (const i of P.grays) {
+      const u = P.ed[i * 4], dn = P.ed[i * 4 + 2], r = P.ed[i * 4 + 1], l = P.ed[i * 4 + 3];
+      const straight = (u >= 0 && dn >= 0 && st.e[u] === E_ON && st.e[dn] === E_ON)
+        || (r >= 0 && l >= 0 && st.e[r] === E_ON && st.e[l] === E_ON);
+      st.clue[i] = straight ? WHITE : BLACK;
+    }
+  }
   st.cycle = true;
   return st;
 }
@@ -717,6 +780,31 @@ export function isSolved(P, edges) {
     }
   }
 
+  // Gray circles: must satisfy either the white rule (straight + turn) or black rule (turn + straight-2 each way)
+  if (P.grays) {
+    for (const i of P.grays) {
+      const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
+      const vert = u >= 0 && dn >= 0 && edges[u] === E_ON && edges[dn] === E_ON;
+      const horiz = r >= 0 && l >= 0 && edges[r] === E_ON && edges[l] === E_ON;
+      if (vert || horiz) {
+        const d1 = vert ? 0 : 1, d2 = d1 ^ 2;
+        const ext1 = P.ed2[i * 4 + d1], ext2 = P.ed2[i * 4 + d2];
+        if (ext1 >= 0 && edges[ext1] === E_ON && ext2 >= 0 && edges[ext2] === E_ON) return false;
+      } else {
+        let found = 0;
+        for (let d = 0; d < 4; d++) {
+          const x = ed[i * 4 + d];
+          if (x >= 0 && edges[x] === E_ON) {
+            const ext = P.ed2[i * 4 + d];
+            if (ext < 0 || edges[ext] !== E_ON) return false;
+            found++;
+          }
+        }
+        if (found !== 2) return false;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -733,7 +821,7 @@ export function cluesFromString(s) {
   if (!s) return [];
   return s.split(';').map((tok) => {
     const parts = tok.split(':');
-    if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1]) || (parts[2] !== 'W' && parts[2] !== 'B')) {
+    if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1]) || (parts[2] !== 'W' && parts[2] !== 'B' && parts[2] !== 'G')) {
       throw new Error(`bad clue "${tok}"`);
     }
     return { r: +parts[0], c: +parts[1], t: parts[2] };

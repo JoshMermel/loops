@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compile } from '../js/logic.js';
+import { compile, WHITE, BLACK } from '../js/logic.js';
 import {
   FACE_BLANK, FACE_IN, FACE_OUT,
   cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
+  cycleGrayLabel, cycleGrayLabelReverse, reconcileAutoGray,
   reconcileAutoX, applyAutoX,
   autoShadeCompute, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
@@ -521,4 +522,80 @@ test('Auto-X + Auto-Shade places X between same-color squares and between Outsid
   m2.faces[1 * 3 + 1] = FACE_BLANK;
   reconcileAutoX(P, m2, true, { useShade: true });
   assert.equal(m2.edges[eIntV], 0, 'clearing one same-color face must unwind the auto-X');
+});
+
+test('gray pearl cycling, auto-labeling (autoG), unwinding, and Auto-X integration', () => {
+  assert.equal(cycleGrayLabel(0), WHITE);
+  assert.equal(cycleGrayLabel(WHITE), BLACK);
+  assert.equal(cycleGrayLabel(BLACK), 0);
+  assert.equal(cycleGrayLabelReverse(0), BLACK);
+  assert.equal(cycleGrayLabelReverse(BLACK), WHITE);
+  assert.equal(cycleGrayLabelReverse(WHITE), 0);
+
+  const P = compile({ name: 'gauto', rows: 5, cols: 5, clues: [{ r: 2, c: 2, t: 'G' }] });
+  const m = {
+    edges: new Uint8Array(P.numEdges),
+    autoE: new Uint8Array(P.numEdges),
+    faces: new Uint8Array(numFacesOf(P)),
+    autoF: new Uint8Array(numFacesOf(P)),
+    grays: new Uint8Array(P.grays.length),
+    autoG: new Uint8Array(P.grays.length),
+  };
+  const mid = 2 * 5 + 2;
+  const eU = P.ed[mid * 4 + 0], eR = P.ed[mid * 4 + 1], eD = P.ed[mid * 4 + 2], eL = P.ed[mid * 4 + 3];
+
+  // 1. Drawing 1 segment does NOT auto-label and does NOT trigger Black Rule 3 while unlabeled
+  m.edges[eU] = 1;
+  reconcileAutoGray(P, m);
+  reconcileAutoX(P, m, true);
+  assert.equal(m.grays[0], 0);
+  assert.equal(m.edges[eD], 0, 'unlabeled gray must not trigger Black Rule 3');
+
+  // 2. Manually labeling Black triggers Black Rule 3 (crosses out opposite edge eD)
+  m.grays[0] = BLACK; m.autoG[0] = 0;
+  reconcileAutoGray(P, m);
+  reconcileAutoX(P, m, true);
+  assert.equal(m.edges[eD], 2, 'manual Black label on gray triggers Black Rule 3');
+  assert.equal(m.autoE[eD], 1);
+
+  // 3. Clearing manual label unwinds Black Rule 3 auto-X
+  m.grays[0] = 0;
+  reconcileAutoGray(P, m);
+  reconcileAutoX(P, m, true);
+  assert.equal(m.edges[eD], 0);
+
+  // 4. Drawing a 90° turn (eU + eR) auto-labels Black (autoG=1); erasing eR unwinds it cleanly
+  m.edges[eR] = 1;
+  reconcileAutoGray(P, m);
+  assert.equal(m.grays[0], BLACK);
+  assert.equal(m.autoG[0], 1);
+  m.edges[eR] = 0;
+  reconcileAutoGray(P, m);
+  assert.equal(m.grays[0], 0);
+  assert.equal(m.autoG[0], 0);
+
+  // 5. Drawing straight through (eU + eD) + straight extension on one side auto-labels White and triggers White Rule 2
+  m.edges[eD] = 1;
+  m.edges[P.ed2[mid * 4 + 0]] = 1; // (0,2)-(1,2)
+  reconcileAutoGray(P, m);
+  reconcileAutoX(P, m, true);
+  assert.equal(m.grays[0], WHITE);
+  assert.equal(m.autoG[0], 1);
+  assert.equal(m.edges[P.ed2[mid * 4 + 2]], 2, 'auto-labeled White gray triggers White Rule 2');
+
+  // 6. Manual label is NEVER overwritten by reconcileAutoGray even if drawn edges disagree
+  m.grays[0] = BLACK; m.autoG[0] = 0;
+  reconcileAutoGray(P, m);
+  assert.equal(m.grays[0], BLACK);
+  assert.equal(m.autoG[0], 0);
+
+  // 7. Auto-X Rule 4 never auto-Xes the last exit of an unlabeled gray pearl
+  const P2 = compile({ name: 'gdead', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'G' }] });
+  const m2 = blank(P2);
+  const c11 = 1 * 4 + 1;
+  m2.edges[P2.ed[c11 * 4 + 0]] = 2;
+  m2.edges[P2.ed[c11 * 4 + 1]] = 2;
+  m2.edges[P2.ed[c11 * 4 + 2]] = 2;
+  reconcileAutoX(P2, m2, true);
+  assert.equal(m2.edges[P2.ed[c11 * 4 + 3]], 0, 'must never auto-X last exit of gray pearl');
 });

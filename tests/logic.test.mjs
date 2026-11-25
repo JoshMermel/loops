@@ -264,3 +264,45 @@ test('incremental propagate(P, st, seedEdge) matches full propagate() and compil
   const shortDec = decodeSolution(P, '6a');
   assert.equal(shortDec.cell[P.N - 1], 1, 'trailing cells on short solution must stay OFF, not LOOP');
 });
+
+test('gray pearls: cross-check fast solver against brute-force reference on 120 random mixed & all-gray 4x4/5x5 boards', () => {
+  const rng = mulberry32(777);
+  let checkedNonZero = 0;
+  for (let k = 0; k < 120; k++) {
+    const rows = k < 70 ? 4 : 5;
+    const cols = k < 70 ? 4 : 5;
+    const allGray = k % 3 === 0;
+    const nClues = 2 + ((rng() * 5) | 0);
+    const used = new Set();
+    const clues = [];
+    while (clues.length < nClues) {
+      const r = (rng() * rows) | 0;
+      const c = (rng() * cols) | 0;
+      const id = r * cols + c;
+      if (used.has(id)) continue;
+      used.add(id);
+      const t = allGray ? 'G' : (rng() < 0.55 ? 'G' : rng() < 0.5 ? 'W' : 'B');
+      clues.push({ r, c, t });
+    }
+    const P = compile({ name: `gray_${k}`, rows, cols, clues });
+    const ref = referenceCount(P);
+    const fast = solve(P, { limit: rows === 4 ? 1000 : 2 });
+    assert.equal(fast.exceeded, false);
+    if (rows === 4) {
+      assert.equal(fast.count, ref, `gray 4x4 mismatch on ${k}: fast=${fast.count} ref=${ref}`);
+    } else {
+      assert.equal(Math.min(fast.count, 2), Math.min(ref, 2), `gray 5x5 cap-2 mismatch on ${k}`);
+    }
+    for (const sol of fast.solutions) {
+      assert.equal(isSolved(P, sol.e), true);
+      const enc = encodeSolution(P, sol);
+      const dec = decodeSolution(P, enc);
+      assert.equal(isSolved(P, dec.e), true);
+      for (const i of P.grays) {
+        assert.ok(dec.clue[i] === 1 || dec.clue[i] === 2, 'decoded gray pearl must resolve to WHITE or BLACK');
+      }
+    }
+    if (ref > 0) checkedNonZero++;
+  }
+  assert.ok(checkedNonZero >= 30, `expected >= 30 solvable random gray boards, got ${checkedNonZero}`);
+});

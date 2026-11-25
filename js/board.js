@@ -11,9 +11,11 @@
 //   * right-drag across intersections -> handlers.onCrossStep(fromNode, toNode, first) (swipe-place/erase ✕)
 //   * tap a square center             -> handlers.onFaceTap(faceIdx)                   (cycle blank -> Inside -> Outside -> blank)
 //   * right-click a square center     -> handlers.onFaceRight(faceIdx)                 (cycle blank -> Outside -> Inside -> blank)
-//   * tap an intersection center      -> no-op (prevents accidental marks)
+//   * tap a gray circle               -> handlers.onCellTap(cellIdx)                   (cycle gray -> white -> black -> gray)
+//   * right-click a gray circle       -> handlers.onCellRight(cellIdx)                 (cycle gray -> black -> white -> gray)
+//   * tap any other intersection      -> no-op (prevents accidental marks)
 // handlers.onStart() / handlers.onEnd(cancelled) bracket every gesture (1 undo step per gesture).
-import { colName, edgeCells } from './logic.js';
+import { colName, edgeCells, WHITE, BLACK, GRAY } from './logic.js';
 import { makeColorKeeper, assignPathColors } from './pathcolors.js';
 import { makeGrace } from './grace.js';
 import { otherEnd } from './lineends.js';
@@ -492,14 +494,29 @@ export class Board {
       if (deg[i] > 2) g += `<circle class="over" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.30}"/>`;
     }
 
-    // White circle interior fills (below loop segments so segments clearly pass straight through)
+    // White and unlabeled-gray circle interior fills (below loop segments so segments pass cleanly through)
     const rWhite = S * 0.21;
     const rBlack = S * 0.22;
+    const rGray = S * 0.215;
+    const rGrayInner = S * 0.175;
+    const rGrayHalo = S * 0.245;
+    const grayLabel = (cell) => {
+      const k = P.grayAt ? P.grayAt[cell] : -1;
+      if (k < 0) return { lbl: 0, auto: false };
+      const lbl = marks.grays ? marks.grays[k] : 0;
+      const auto = !!(lbl && marks.autoG && marks.autoG[k]);
+      return { lbl, auto };
+    };
     for (let k = 0; k < P.clues.length; k++) {
       const cl = P.clues[k];
-      if (cl.t !== 'W') continue;
       const st = info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
-      g += `<circle class="pearl-white-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
+      if (cl.t === 'W') {
+        g += `<circle class="pearl-white-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
+      } else if (cl.t === 'G') {
+        const { lbl } = grayLabel(cl.r * P.cols + cl.c);
+        if (lbl === 0) g += `<circle class="pearl-gray-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGray}"/>`;
+        else if (lbl === WHITE) g += `<circle class="pearl-white-fill ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayInner}"/>`;
+      }
     }
 
     // Drawn loop segments directly along the lattice tracks (with red highlight + glow on early-closed loops)
@@ -520,12 +537,24 @@ export class Board {
       g += `<line class="seg${isBadLoop ? ' bad' : ''}"${style} stroke-width="${S * 0.14}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
     }
 
-    // Circle outlines (white) and solid discs (black) on intersections
+    // Circle outlines (white), solid discs (black), and gray/labeled-gray circles on intersections
     for (let k = 0; k < P.clues.length; k++) {
       const cl = P.clues[k];
       const st = info.clueState[k] === 'bad' && show.has(`c${k}`) ? 'bad' : '';
       if (cl.t === 'W') {
         g += `<circle class="pearl-white-ring ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rWhite}"/>`;
+      } else if (cl.t === 'G') {
+        const { lbl, auto } = grayLabel(cl.r * P.cols + cl.c);
+        const autoCls = auto ? ' auto' : '';
+        if (lbl === 0) {
+          g += `<circle class="pearl-gray-ring ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGray}"/>`;
+        } else if (lbl === WHITE) {
+          g += `<circle class="pearl-gray-halo${autoCls} ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayHalo}"/>`;
+          g += `<circle class="pearl-white-ring pearl-gray-inner ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayInner}"/>`;
+        } else if (lbl === BLACK) {
+          g += `<circle class="pearl-gray-halo${autoCls} ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayHalo}"/>`;
+          g += `<circle class="pearl-black pearl-gray-inner ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rGrayInner}"/>`;
+        }
       } else {
         g += `<circle class="pearl-black ${st}" cx="${vx(cl.c)}" cy="${vy(cl.r)}" r="${rBlack}"/>`;
       }
@@ -562,31 +591,46 @@ export class Board {
         const path = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
         g += `<path class="ghost-x-halo" d="${path}"/><path class="ghost-x" d="${path}"/>`;
       }
+      for (const i of targets.grayWhite || []) {
+        g += `<circle class="ghost-gray-white" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.165}"/>`;
+      }
+      for (const i of targets.grayBlack || []) {
+        g += `<circle class="ghost-gray-black" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.165}"/>`;
+      }
       for (const x of hint.wrongEdges || []) {
         const [x1, y1, x2, y2] = segCoords(x);
         g += `<line class="wrong-seg" stroke-width="${S * 0.2}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
       }
+      for (const i of hint.wrongClues || []) {
+        g += `<circle class="wrong-clue" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.30}"/>`;
+      }
     }
 
-    // Hover feedback (track midpoint highlight, or open line-end rings on degree-1 endpoints)
+    // Hover feedback (track midpoint highlight, tappable gray circle ring, or open line-end diamonds)
     if (!this.gesture) {
       const hoverAutoX = this.hoverEdge >= 0 && marks.edges[this.hoverEdge] === 2 && marks.autoE && marks.autoE[this.hoverEdge];
       if (this.hoverEdge >= 0 && !hoverAutoX) {
         const [x1, y1, x2, y2] = segCoords(this.hoverEdge);
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
         g += `<circle class="edge-hover" cx="${mx}" cy="${my}" r="${S * 0.16}"/>`;
-      } else if (this.hoverCell >= 0 && deg[this.hoverCell] === 1) {
-        const far = otherEnd(P, marks.edges, this.hoverCell);
-        if (far >= 0) {
-          const strokeStyle = this.opts.colorLines && pc
-            ? ` style="stroke:${pc[colorOf.get(find(this.hoverCell)) % pc.length]}"`
-            : '';
-          for (const i of [this.hoverCell, far]) {
-            const x = ix(i), y = iy(i);
-            const d = P.clue[i] ? S * 0.28 : S * 0.20;
-            const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
-            g += `<path class="line-end-halo" d="${path}"/>`;
-            g += `<path class="line-end"${strokeStyle} d="${path}"/>`;
+      } else if (this.hoverCell >= 0) {
+        if (P.clue[this.hoverCell] === GRAY) {
+          const { auto } = grayLabel(this.hoverCell);
+          if (!auto) g += `<circle class="pearl-hover" cx="${ix(this.hoverCell)}" cy="${iy(this.hoverCell)}" r="${S * 0.29}"/>`;
+        }
+        if (deg[this.hoverCell] === 1) {
+          const far = otherEnd(P, marks.edges, this.hoverCell);
+          if (far >= 0) {
+            const strokeStyle = this.opts.colorLines && pc
+              ? ` style="stroke:${pc[colorOf.get(find(this.hoverCell)) % pc.length]}"`
+              : '';
+            for (const i of [this.hoverCell, far]) {
+              const x = ix(i), y = iy(i);
+              const d = P.clue[i] ? S * 0.28 : S * 0.20;
+              const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
+              g += `<path class="line-end-halo" d="${path}"/>`;
+              g += `<path class="line-end"${strokeStyle} d="${path}"/>`;
+            }
           }
         }
       }
@@ -692,8 +736,13 @@ export class Board {
 
   up(e) {
     if (!this.gesture || e.pointerId !== this.gesture.id) return;
+    const g = this.gesture;
     this.gesture = null;
     try { this.el.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (!g.dragged && g.startHit.kind === 'cell' && this.P && this.P.clue[g.startHit.cell] === GRAY) {
+      if (g.right) this.h.onCellRight?.(g.startHit.cell);
+      else this.h.onCellTap?.(g.startHit.cell);
+    }
     if (e.pointerType === 'touch') {
       this.hoverCell = -1; this.hoverEdge = -1; this.hoverFace = -1;
     } else {

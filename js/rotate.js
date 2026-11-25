@@ -75,13 +75,16 @@ export function mapFaceCW(baseP, f) {
   return fc * fR + (fR - 1 - fr);
 }
 
-/** Transform a marks bundle `{ edges, autoE, faces, autoF }` from `baseP` into `rotP` (90° CW). */
+/** Transform a marks bundle `{ edges, autoE, faces, autoF, grays?, autoG? }` from `baseP` into `rotP` (90° CW). */
 export function rotateMarksCW(baseP, rotP, m) {
+  const gLen = rotP.grays ? rotP.grays.length : 0;
   const out = {
     edges: new Uint8Array(rotP.numEdges),
     autoE: new Uint8Array(rotP.numEdges),
     faces: new Uint8Array(numFacesOf(rotP)),
     autoF: new Uint8Array(numFacesOf(rotP)),
+    grays: m.grays ? m.grays.slice() : new Uint8Array(gLen),
+    autoG: m.autoG ? m.autoG.slice() : new Uint8Array(gLen),
   };
   for (let x = 0; x < baseP.numEdges; x++) {
     const x2 = mapEdgeCW(baseP, x);
@@ -103,11 +106,14 @@ export function rotateMarksCW(baseP, rotP, m) {
 
 /** Inverse of `rotateMarksCW`: transform marks from `rotP` back into canonical `baseP` (90° CCW). */
 export function unrotateMarksCW(baseP, rotP, m) {
+  const gLen = baseP.grays ? baseP.grays.length : 0;
   const out = {
     edges: new Uint8Array(baseP.numEdges),
     autoE: new Uint8Array(baseP.numEdges),
     faces: new Uint8Array(numFacesOf(baseP)),
     autoF: new Uint8Array(numFacesOf(baseP)),
+    grays: m.grays ? m.grays.slice() : new Uint8Array(gLen),
+    autoG: m.autoG ? m.autoG.slice() : new Uint8Array(gLen),
   };
   for (let x = 0; x < baseP.numEdges; x++) {
     const x2 = mapEdgeCW(baseP, x);

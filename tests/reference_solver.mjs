@@ -64,6 +64,10 @@ export function referenceCount(p) {
       } else if (t === 'B') {
         if (!turnHere) return false;
         if (turnPrev || turnNext) return false;
+      } else if (t === 'G') {
+        const okW = !turnHere && (turnPrev || turnNext);
+        const okB = turnHere && !turnPrev && !turnNext;
+        if (!okW && !okB) return false;
       }
     }
     return true;

@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -278,6 +278,32 @@ if (!isMainThread) {
       },
       budgetSec: 360, perPuzzleMs: 25000,
     },
+
+    // ---- Bonus: Gray pearls (mixed white/black/gray & all-gray 8x8 + Expert+ + Mega finales)
+    {
+      group: 'bonus-gray', pool: 'gray_8x8', cols: 8, rows: 8, style: 'gray-mixed',
+      buckets: {
+        Beginner: { need: 52, maxScore: 265 },
+        Medium: { need: 204, minScore: 235, maxScore: 315 },
+        Hard: { need: 204, minScore: 300, maxScore: 540 },
+        Expert: { need: 52, minScore: 520, maxScore: 1500 },
+        'Expert+': { need: 12 },
+      },
+      budgetSec: 240, perPuzzleMs: 12000,
+    },
+    { group: 'bonus-gray', pool: 'gray_12x20', cols: 12, rows: 20, style: 'gray-mixed', total: 12, budgetSec: 120, perPuzzleMs: 25000 },
+    {
+      group: 'bonus-gray', pool: 'allgray_8x8', cols: 8, rows: 8, style: 'gray-all',
+      buckets: {
+        Beginner: { need: 52, maxScore: 270 },
+        Medium: { need: 204, minScore: 245, maxScore: 325 },
+        Hard: { need: 204, minScore: 310, maxScore: 520 },
+        Expert: { need: 52, minScore: 500, maxScore: 1600 },
+        'Expert+': { need: 12 },
+      },
+      budgetSec: 240, perPuzzleMs: 12000,
+    },
+    { group: 'bonus-gray', pool: 'allgray_10x12', cols: 10, rows: 12, style: 'gray-all', total: 12, budgetSec: 120, perPuzzleMs: 25000 },
 
     // ---- Bonus: Black & White Cookie (left/right, top/bottom, and diagonal W/B half-splits)
     {

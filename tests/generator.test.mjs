@@ -78,6 +78,18 @@ test('generatePuzzle respects targetTier Beginner and style white/black', () => 
   const pk = generatePuzzle({ rows: 6, cols: 6, seed: 55, style: 'black', budgetMs: 8000 });
   assert.ok(pk, 'failed to generate 6x6 all-black puzzle');
   assert.ok(pk.clues.every((c) => c.t === 'B'));
+
+  const pgm = generatePuzzle({ rows: 6, cols: 6, seed: 66, style: 'gray-mixed', budgetMs: 8000 });
+  assert.ok(pgm, 'failed to generate 6x6 gray-mixed puzzle');
+  assert.ok(pgm.clues.some((c) => c.t === 'G'));
+  assert.ok(pgm.clues.some((c) => c.t === 'W'));
+  assert.ok(pgm.clues.some((c) => c.t === 'B'));
+  assert.equal(rate(pgm).solved, true);
+
+  const pga = generatePuzzle({ rows: 6, cols: 6, seed: 77, style: 'gray-all', budgetMs: 10000 });
+  assert.ok(pga, 'failed to generate 6x6 gray-all puzzle');
+  assert.ok(pga.clues.every((c) => c.t === 'G'));
+  assert.equal(rate(pga).solved, true);
 });
 
 test('generatePuzzle supports themed layouts (checkerboard, interior, rot180, yinyang, full-fill)', () => {
