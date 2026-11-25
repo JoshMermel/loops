@@ -445,3 +445,76 @@ test('shaped / cutout boards (voids): brute-force cross-check, dual-face topolog
   assert.equal(symmetryKey(pA), symmetryKey(pFlip));
   assert.notEqual(puzzleHash(pA), puzzleHash(pFlip));
 });
+
+test('slitherlink & hybrids (slither+masyu, slither+fullBoard): brute-force cross-check, CSV roundtrip, symmetryKey, and puzzleHash', () => {
+  const rng = mulberry32(2026);
+  let checkedPure = 0, checkedHybrid = 0, checkedFull = 0;
+
+  for (let k = 0; k < 150; k++) {
+    const rows = k < 100 ? 4 : 5;
+    const cols = k < 100 ? 4 : 5;
+    const fr = rows - 1, fc = cols - 1;
+    const mode = k % 3; // 0 = pure slitherlink, 1 = slither+masyu, 2 = slither+fullBoard
+    const nSl = mode === 0 ? 2 + ((rng() * 5) | 0) : 1 + ((rng() * 3) | 0);
+    const usedF = new Set();
+    const slither = [];
+    while (slither.length < nSl) {
+      const r = (rng() * fr) | 0, c = (rng() * fc) | 0;
+      const f = r * fc + c;
+      if (usedF.has(f)) continue;
+      usedF.add(f);
+      slither.push({ r, c, n: (rng() * 4) | 0 });
+    }
+    const clues = [];
+    if (mode === 1) {
+      const usedC = new Set();
+      const nCl = 1 + ((rng() * 3) | 0);
+      while (clues.length < nCl) {
+        const r = (rng() * rows) | 0, c = (rng() * cols) | 0;
+        const i = r * cols + c;
+        if (usedC.has(i)) continue;
+        usedC.add(i);
+        clues.push({ r, c, t: rng() < 0.5 ? 'W' : 'B' });
+      }
+    }
+    const fullBoard = mode === 2;
+    const P = compile({ name: `sl_${k}`, rows, cols, clues, slither, fullBoard });
+    const ref = referenceCount(P);
+    const lim = rows === 4 ? 500 : 10;
+    const fast = solve(P, { limit: lim });
+    assert.equal(fast.exceeded, false);
+    assert.equal(fast.count, Math.min(ref, lim), `slitherlink mismatch on ${k} (mode=${mode}): fast=${fast.count} ref=${ref}`);
+    for (const sol of fast.solutions) {
+      assert.equal(isSolved(P, sol.e), true);
+      const dec = decodeSolution(P, encodeSolution(P, sol));
+      assert.equal(isSolved(P, dec.e), true);
+    }
+    if (ref > 0) {
+      if (mode === 0) checkedPure++;
+      else if (mode === 1) checkedHybrid++;
+      else checkedFull++;
+    }
+  }
+  assert.ok(checkedPure >= 15, `expected >= 15 solvable pure slitherlink boards, got ${checkedPure}`);
+  assert.ok(checkedHybrid >= 10, `expected >= 10 solvable slither+masyu boards, got ${checkedHybrid}`);
+  assert.ok(checkedFull >= 5, `expected >= 5 solvable slither+fullBoard boards, got ${checkedFull}`);
+
+  // CSV roundtrip + dihedral symmetryKey + puzzleHash + validation
+  const pA = compile({
+    name: 'rt_sl', rows: 4, cols: 5,
+    clues: [{ r: 1, c: 2, t: 'W' }],
+    slither: [{ r: 0, c: 0, n: 3 }, { r: 2, c: 3, n: 1 }],
+  });
+  const parsed = parseCsv(toCsv([pA]))[0];
+  assert.deepEqual(parsed.clues, pA.clues);
+  assert.deepEqual(parsed.slither, [{ r: 0, c: 0, n: 3 }, { r: 2, c: 3, n: 1 }]);
+  const pFlip = compile({
+    name: 'rt_sl_flip', rows: 4, cols: 5,
+    clues: [{ r: 1, c: 2, t: 'W' }],
+    slither: [{ r: 0, c: 3, n: 3 }, { r: 2, c: 0, n: 1 }],
+  });
+  assert.equal(symmetryKey(pA), symmetryKey(pFlip));
+  assert.notEqual(puzzleHash(pA), puzzleHash(pFlip));
+  assert.throws(() => compile({ name: 'bad_s', rows: 4, cols: 4, clues: [], slither: [{ r: 3, c: 0, n: 2 }] }), /out of bounds/);
+  assert.throws(() => compile({ name: 'bad_n', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 4 }] }), /bad slitherlink/);
+});

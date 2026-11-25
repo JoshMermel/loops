@@ -47,6 +47,13 @@ const VARIANT_GROUPS = [
     htmlIntro: 'Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, <code>chokepoint</code>, <code>faceShade</code>, and <code>faceCircle</code> — work naturally around and across interior holes.',
     ruleIds: [],
   },
+  {
+    id: 'variant-slitherlink',
+    title: 'Slitherlink & Hybrids',
+    intro: 'Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrid** books, numbered squares share the same single loop with Masyu circles or the Full-board rule.',
+    htmlIntro: 'Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrid</b> books, numbered squares share the same single loop with Masyu circles or the Full-board rule.',
+    ruleIds: ['slitherZero', 'slitherCount', 'slitherCorner', 'slitherAdjacent3', 'slitherDiag3', 'slither3LineIn', 'slither1LineIn', 'slitherDiag32', 'faceSlither'],
+  },
 ];
 const VARIANT_RULE_IDS = new Set(VARIANT_GROUPS.flatMap((g) => g.ruleIds));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
@@ -97,7 +104,7 @@ say(
   '- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.',
   '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.',
   '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).',
-  '- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, and Swiss cheese).',
+  '- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, Swiss cheese, and Slitherlink & Hybrids).',
   '',
   '## How the examples work',
   '',
@@ -242,7 +249,7 @@ htmlParts.push(`<!DOCTYPE html>
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, and Swiss cheese).</li>
+      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, Swiss cheese, and Slitherlink &amp; Hybrids).</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>

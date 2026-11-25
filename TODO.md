@@ -4,6 +4,7 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## Variants & future twists
 
+- [ ] **Grow Slitherlink & Hybrids:** expand the prototype Slitherlink / Hybrid books to full-size books (and more sizes / hybrids like Slitherlink + Swiss cheese, Slitherlink + Gray circles, or Slitherlink + Symmetry), add Slitherlink armory illustrations to `docs/how_to_solve.html`, and consider additional modular single-loop plugins in `js/variants/` (e.g., **Yajilin**, **Balance Loop**, **Castle Wall**, **Simple Loop**).
 - [ ] **New circle types:**
   - **Strict / double-turn whites & numbered blacks:** e.g. marked white circles that must turn on *both* sides, and/or numbered black circles whose straight legs have a required length.
   - **Anti-Masyu (inverted pearls):** inverted rules (white turns and immediately turns on ≥1 side; black goes straight and stays straight on both sides), standalone or mixed with standard circles.

@@ -52,6 +52,16 @@
       "name": "Bonus",
       "icon": "🎁",
       "blurb": "Themed variations with the same Masyu rules."
+    },
+    {
+      "name": "Slitherlink",
+      "icon": "🔢",
+      "blurb": "Each numbered square tells how many of its four sides belong to the single closed loop."
+    },
+    {
+      "name": "Hybrids",
+      "icon": "🔀",
+      "blurb": "Two loop rule sets combined on one board — every puzzle genuinely needs both rules."
     }
   ],
   "books": [
@@ -407,6 +417,42 @@
       "count": 294,
       "group": "Bonus",
       "blurb": "Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more."
+    },
+    {
+      "id": "slither-small",
+      "name": "Slitherlink — Small",
+      "label": "Small",
+      "file": "data/slither-small.csv",
+      "count": 24,
+      "group": "Slitherlink",
+      "blurb": "Compact Slitherlink boards across all four difficulties."
+    },
+    {
+      "id": "slither-classic",
+      "name": "Slitherlink — Classic",
+      "label": "Classic",
+      "file": "data/slither-classic.csv",
+      "count": 24,
+      "group": "Slitherlink",
+      "blurb": "Classic 10×10-square Slitherlink boards across all four difficulties."
+    },
+    {
+      "id": "hybrid-slither-masyu",
+      "name": "Slitherlink + Masyu",
+      "label": "Slitherlink + Masyu",
+      "file": "data/hybrid-slither-masyu.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "blurb": "Numbered squares and Masyu circles share one single loop — every puzzle genuinely requires both."
+    },
+    {
+      "id": "hybrid-slither-full",
+      "name": "Slitherlink + Full board",
+      "label": "Slitherlink + Full board",
+      "file": "data/hybrid-slither-full.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "blurb": "Slitherlink numbers on a Hamiltonian cycle that visits every single dot."
     },
     {
       "id": "armory",

@@ -81,7 +81,7 @@
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, and Swiss cheese).</li>
+      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, Swiss cheese, and Slitherlink &amp; Hybrids).</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>
@@ -432,6 +432,7 @@
       <a href="#variant-gray">Gray circles</a>
       <a href="#variant-full">Full board</a>
       <a href="#variant-swiss">Swiss cheese</a>
+      <a href="#variant-slitherlink">Slitherlink &amp; Hybrids</a>
     </nav>
 
     <h3 class="variant-heading" id="variant-gray">Gray circles</h3>
@@ -491,6 +492,72 @@
 
     <h3 class="variant-heading" id="variant-swiss">Swiss cheese</h3>
     <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, <code>chokepoint</code>, <code>faceShade</code>, and <code>faceCircle</code> — work naturally around and across interior holes.</p>
+
+    <h3 class="variant-heading" id="variant-slitherlink">Slitherlink &amp; Hybrids</h3>
+    <p>Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrid</b> books, numbered squares share the same single loop with Masyu circles or the Full-board rule.</p>
+
+    <section class="rule-card" id="slitherZero">
+      <h3><code>slitherZero</code></h3>
+      <div class="rule-meta">Beginner, cost 2</div>
+      <p>A 0 square has no loop segments around it.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slitherCount">
+      <h3><code>slitherCount</code></h3>
+      <div class="rule-meta">Beginner, cost 2</div>
+      <p>A numbered square whose remaining edges match its count must fill or cross them out.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slitherCorner">
+      <h3><code>slitherCorner</code></h3>
+      <div class="rule-meta">Beginner, cost 3</div>
+      <p>A 3, 1, or 2 at a blocked corner forces its corner or outer extension segments.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slitherAdjacent3">
+      <h3><code>slitherAdjacent3</code></h3>
+      <div class="rule-meta">Beginner, cost 5</div>
+      <p>Two orthogonally adjacent 3s force three parallel segments and cross out the shared-vertex extensions.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slitherDiag3">
+      <h3><code>slitherDiag3</code></h3>
+      <div class="rule-meta">Beginner, cost 6</div>
+      <p>Two diagonally adjacent 3s force both outer corners on.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slither3LineIn">
+      <h3><code>slither3LineIn</code></h3>
+      <div class="rule-meta">Beginner, cost 6</div>
+      <p>A segment entering a corner of a 3 forces its two opposite sides on and blocks the other exit.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slither1LineIn">
+      <h3><code>slither1LineIn</code></h3>
+      <div class="rule-meta">Medium, cost 12</div>
+      <p>A segment forced into a corner of a 1 crosses out its two opposite sides.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="slitherDiag32">
+      <h3><code>slitherDiag32</code></h3>
+      <div class="rule-meta">Medium, cost 14</div>
+      <p>A diagonal chain of 2s between two 3s forces both outer corners on.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="faceSlither">
+      <h3><code>faceSlither</code></h3>
+      <div class="rule-meta">Hard, cost 38</div>
+      <p>Inside/outside shading around numbered Slitherlink squares (and circles on hybrids) forces an edge.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
 
   </main>
 </body>

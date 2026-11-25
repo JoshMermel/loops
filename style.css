@@ -166,6 +166,16 @@ button.ghost { background: transparent; }
 .wall-given { stroke: var(--pearl-ink); stroke-width: 2.8; stroke-linecap: round; fill: none; pointer-events: none; }
 .wall-given-halo { stroke: var(--cell-bg); stroke-width: 5.2; stroke-linecap: round; fill: none; pointer-events: none; }
 .trapped-cell { fill: none; stroke: var(--color-error); stroke-width: 2.6; pointer-events: none; }
+.slither-num {
+  fill: var(--pearl-ink); font-size: 21px; font-weight: 700;
+  text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none;
+}
+.slither-num.bad { fill: var(--pearl-bad); }
+.hr-num {
+  fill: var(--pearl-ink); font-size: 13px; font-weight: 700;
+  text-anchor: middle; dominant-baseline: central; pointer-events: none;
+}
+.hr-num.bad { fill: var(--pearl-bad); }
 
 /* Masyu circles (pearls) */
 .pearl-white-fill { fill: var(--pearl-white-fill); pointer-events: none; }

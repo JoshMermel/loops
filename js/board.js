@@ -596,6 +596,7 @@ export class Board {
 
     const wanted = new Set();
     (info.clueState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`c${k}`); });
+    (info.slitherState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`s${k}`); });
     if (info.badFaces) for (const f of info.badFaces) wanted.add(`f${f}`);
     if (info.earlyLoops) for (const x of info.earlyLoops) wanted.add(`l${x}`);
     if (info.trappedCells) for (const i of info.trappedCells) wanted.add(`t${i}`);
@@ -689,6 +690,8 @@ export class Board {
         };
         emitHintFaces(hint.faces.in, 'hint-face-in');
         emitHintFaces(hint.faces.out, 'hint-face-out');
+        emitHintFaces(hint.faces.clue, 'hint-clue');
+        emitHintFaces(hint.faces.focus, 'hint-focus');
       }
       const tile = (i, cls, pad = 0) => `<rect class="${cls}" x="${ix(i) - S / 2 + pad}" y="${iy(i) - S / 2 + pad}" width="${S - 2 * pad}" height="${S - 2 * pad}" rx="${pad ? 8 : 0}"/>`;
       for (const i of hint.undecided || []) if (!P.hasVoids || !P.isVoid[i]) g += tile(i, 'hint-undecided', 2);
@@ -727,6 +730,16 @@ export class Board {
     for (let i = 0; i < P.N; i++) {
       if ((P.hasVoids && P.isVoid[i]) || P.clue[i] || deg[i] > 0) continue;
       g += `<circle class="${dotCls}" cx="${ix(i)}" cy="${iy(i)}" r="${dotR}"/>`;
+    }
+
+    // Slitherlink face numbers (0..3) centered inside dual squares, above shading & grid lines
+    if (P.hasSlither) {
+      const sStates = info.slitherState || [];
+      for (let k = 0; k < P.slither.length; k++) {
+        const sc = P.slither[k];
+        const st = sStates[k] === 'bad' && show.has(`s${k}`) ? ' bad' : '';
+        g += `<text class="slither-num${st}" x="${vx(sc.c) + S / 2}" y="${vy(sc.r) + S / 2}">${sc.n}</text>`;
+      }
     }
 
     // Branching error ring (deg > 2) & full-board trapped-intersection error ring

@@ -256,3 +256,30 @@ test('generatePuzzle enforces balanced four-quadrant loop and clue coverage on l
   assert.ok(ql.fills[0] > 0);
   assert.equal(ql.minFill, 0);
 });
+
+test('generatePuzzle supports slither, slither-masyu (mutual necessity), and slither-full (full-board necessity)', () => {
+  const pSl = generatePuzzle({ rows: 6, cols: 6, seed: 301, style: 'slither', budgetMs: 8000 });
+  assert.ok(pSl, 'failed to generate 6x6 pure Slitherlink puzzle');
+  assert.equal(pSl.clues.length, 0);
+  assert.ok(pSl.slither.length >= 4);
+  assert.equal(solve(pSl, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(pSl).solved, true);
+
+  const pHyb = generatePuzzle({ rows: 6, cols: 6, seed: 302, style: 'slither-masyu', budgetMs: 8000 });
+  assert.ok(pHyb, 'failed to generate 6x6 Slitherlink+Masyu hybrid puzzle');
+  assert.ok(pHyb.clues.length >= 3 && pHyb.slither.length >= 4);
+  assert.equal(solve(pHyb, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.ok(solve(compile({ name: 'ns', rows: 6, cols: 6, clues: [], slither: pHyb.slither }), { limit: 2, maxNodes: 50000 }).count >= 2, 'hybrid must require Masyu circles');
+  assert.ok(solve(compile({ name: 'nm', rows: 6, cols: 6, clues: pHyb.clues, slither: [] }), { limit: 2, maxNodes: 50000 }).count >= 2, 'hybrid must require Slitherlink numbers');
+  assert.equal(rate(pHyb).solved, true);
+
+  const pFull = generatePuzzle({ rows: 6, cols: 6, seed: 303, style: 'slither-full', budgetMs: 8000 });
+  assert.ok(pFull, 'failed to generate 6x6 Slitherlink+Full puzzle');
+  assert.equal(pFull.fullBoard, true);
+  assert.equal(pFull.clues.length, 0);
+  assert.ok(pFull.slither.length >= 4);
+  assert.equal(pFull.solution.includes('#'), false);
+  assert.equal(solve(pFull, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.ok(solve(compile({ name: 'nf', rows: 6, cols: 6, clues: [], slither: pFull.slither, fullBoard: false }), { limit: 2, maxNodes: 50000 }).count >= 2, 'slither-full must require fullBoard');
+  assert.equal(rate(pFull).solved, true);
+});

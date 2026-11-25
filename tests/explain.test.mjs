@@ -540,3 +540,67 @@ test('fullBoard & given edges/walls hints: end-to-end solving, checkerPocket exp
   }
   assert.ok(solvedFB >= 8, `expected >= 8 solved fullBoard hint runs, got ${solvedFB}`);
 });
+
+test('Slitherlink & hybrid hints: end-to-end solving, explanations, nudges, and wrong-mark detection', () => {
+  const rng = mulberry32(7331);
+  let solvedPure = 0, solvedHybrid = 0;
+  for (let attempt = 0; attempt < 350 && (solvedPure < 6 || solvedHybrid < 6); attempt++) {
+    const hybrid = attempt % 2 === 1;
+    if (!hybrid && solvedPure >= 6) continue;
+    if (hybrid && solvedHybrid >= 6) continue;
+    const rows = 4, cols = 5;
+    const empty = compile({ name: 'sle', rows, cols, clues: [] });
+    const solRes = solve(empty, { limit: 1, maxNodes: 3000, rng });
+    if (!solRes.count) continue;
+    const truth = solRes.solutions[0];
+    const slither = [];
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        const f4 = (r * (cols - 1) + c) * 4;
+        let cnt = 0;
+        for (let d = 0; d < 4; d++) if (truth.e[empty.faceEdges[f4 + d]] === E_ON) cnt++;
+        if (cnt <= 3 && rng() < (hybrid ? 0.45 : 0.72)) slither.push({ r, c, n: cnt });
+      }
+    }
+    if (!slither.length) continue;
+    const clues = [];
+    if (hybrid) {
+      for (let i = 0; i < empty.N; i++) {
+        const dirs = [];
+        for (let d = 0; d < 4; d++) { const x = empty.ed[i * 4 + d]; if (x >= 0 && truth.e[x] === E_ON) dirs.push(d); }
+        if (dirs.length !== 2) continue;
+        const straight = ((dirs[0] ^ dirs[1]) & 1) === 0;
+        const ext0 = empty.ed2[i * 4 + dirs[0]], ext1 = empty.ed2[i * 4 + dirs[1]];
+        const s0 = ext0 >= 0 && truth.e[ext0] === E_ON, s1 = ext1 >= 0 && truth.e[ext1] === E_ON;
+        if (straight && !(s0 && s1) && rng() < 0.35) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'W' });
+        else if (!straight && s0 && s1 && rng() < 0.35) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'B' });
+      }
+      if (!clues.length) continue;
+    }
+    const P = compile({ name: `slh_${attempt}`, rows, cols, clues, slither });
+    const exact = solve(P, { limit: 2, maxNodes: 20000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    const r = rate(P);
+    if (!r.solved) continue;
+    P.solution = encodeSolution(P, exact.solutions[0]);
+
+    const marks = { edges: new Uint8Array(P.numEdges) };
+    let steps = 0;
+    while (!isSolved(P, marks.edges) && steps < 300) {
+      const h = computeHint(P, marks);
+      assert.equal(h.kind, 'step', `got ${h.kind} on ${P.name} at step ${steps}`);
+      const h0 = h.hints[0];
+      assert.ok(h0.text && h0.text.length > 15, `missing text for ${h.rule}`);
+      assert.ok(h0.nudge && h0.nudge.length > 12, `missing nudge for ${h.rule}`);
+      const hasHighlight = Object.values(h0.nudgeRoles).some((a) => a.length > 0)
+        || (h0.faces && (h0.faces.focus?.length > 0 || h0.faces.clue?.length > 0));
+      assert.equal(hasHighlight, true, `missing nudge highlight for ${h.rule}`);
+      assert.equal(applyHintToMarks(marks, h0), true);
+      steps++;
+    }
+    assert.equal(isSolved(P, marks.edges), true);
+    if (hybrid) solvedHybrid++; else solvedPure++;
+  }
+  assert.ok(solvedPure >= 5, `expected >= 5 solved pure Slitherlink hint runs, got ${solvedPure}`);
+  assert.ok(solvedHybrid >= 5, `expected >= 5 solved Slitherlink+Masyu hint runs, got ${solvedHybrid}`);
+});

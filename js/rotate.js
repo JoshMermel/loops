@@ -10,6 +10,7 @@
 // directional hints in js/explain.js, Auto-X, Auto-Shade, and drag gestures all remain 100% consistent,
 // while localStorage saves stay in canonical base orientation.
 import { compile, puzzleHash } from './logic.js';
+import { rotateSlitherCW } from './variants/slitherlink.js';
 import { numFacesOf } from './marks.js';
 
 export const MIN_PX = 26;
@@ -22,6 +23,7 @@ const rotDirMaskCW = (m) => ((m << 1) | (m >> 3)) & 15;
 export function rotatePuzzleCW(P) {
   const R = P.rows, C = P.cols;
   const clues = P.clues.map((cl) => ({ r: cl.c, c: R - 1 - cl.r, t: cl.t }));
+  const slither = rotateSlitherCW(P);
   const voids = (P.voids || []).map((v) => ({ r: v.c, c: R - 1 - v.r }));
   const givens = (P.givens || []).map((gv) => (
     gv.dir === 'H'
@@ -47,6 +49,7 @@ export function rotatePuzzleCW(P) {
     rows: C,
     cols: R,
     clues,
+    ...(slither.length ? { slither } : {}),
     ...(P.fullBoard ? { fullBoard: true } : {}),
     ...(voids.length ? { voids } : {}),
     ...(givens.length ? { givens } : {}),

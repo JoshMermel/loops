@@ -159,3 +159,24 @@ test('rotatePuzzleCW rotates shaped board voids cleanly and preserves exact solu
   assert.equal(rot.isVoid[3 * 5 + 2], 1); // (2,3) -> (3,2)
   assert.equal(isSolved(rot, decodeSolution(rot, rot.solution).e), true);
 });
+
+test('rotatePuzzleCW rotates Slitherlink face numbers cleanly and preserves exact solution', () => {
+  const base = compile({
+    name: 'sl_rot', rows: 4, cols: 5,
+    clues: [{ r: 0, c: 0, t: 'B' }],
+    slither: [{ r: 0, c: 0, n: 2 }, { r: 2, c: 3, n: 2 }, { r: 1, c: 2, n: 0 }],
+  });
+  const sol = solve(base, { limit: 1 });
+  assert.ok(sol.count >= 1);
+  base.solution = encodeSolution(base, sol.solutions[0]);
+  const rot = rotatePuzzleCW(base);
+  assert.equal(rot.rows, 5);
+  assert.equal(rot.cols, 4);
+  assert.equal(rot.slither.length, 3);
+  // Original face (r, c) in (fr=3, fc=4) -> rotated face (c, fr-1-r) in (4, 3):
+  // (0,0)->(0,2)=2, (2,3)->(3,0)=2, (1,2)->(2,1)=0
+  assert.equal(rot.slitherNum[0 * 3 + 2], 2);
+  assert.equal(rot.slitherNum[3 * 3 + 0], 2);
+  assert.equal(rot.slitherNum[2 * 3 + 1], 0);
+  assert.equal(isSolved(rot, decodeSolution(rot, rot.solution).e), true);
+});

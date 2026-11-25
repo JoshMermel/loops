@@ -75,6 +75,16 @@ const manifest = {
       icon: '🎁',
       blurb: 'Themed variations with the same Masyu rules.',
     },
+    {
+      name: 'Slitherlink',
+      icon: '🔢',
+      blurb: 'Each numbered square tells how many of its four sides belong to the single closed loop.',
+    },
+    {
+      name: 'Hybrids',
+      icon: '🔀',
+      blurb: 'Two loop rule sets combined on one board — every puzzle genuinely needs both rules.',
+    },
   ],
   books: existingHidden,
 };
@@ -297,6 +307,30 @@ const recipes = [
     glob: 'lattice_9x9,lattice_13x13,pat_blocks2x2_9x9,pat_quilt2x2_10x10,pat_circle_10x10,pat_honeycomb_10x10,pat_pillars_9x9,pat_hourglass_10x10,pat_brackets_10x10,pat_xbracket_9x9,pat_spiral_10x10,pat_stairs_9x9,pat_smallx_9x9,pat_bricks_10x10,pat_dominoes_10x10,pat_ltiles_10x10,pat_mirrorltiles_10x10,pat_herringbone_10x10,pat_slashes_10x10,pat_zigzags_10x10',
     tierBands: '0:,0:,0:,0:1300', interleaveGroups: true, maxRun: 2,
     blurb: 'Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more.',
+  },
+
+  // ---- Slitherlink (prototype books)
+  {
+    id: 'slither-small', name: 'Slitherlink — Small', label: 'Small', group: 'Slitherlink',
+    glob: 'slither_8x8', tiers: '4,8,8,4',
+    blurb: 'Compact Slitherlink boards across all four difficulties.',
+  },
+  {
+    id: 'slither-classic', name: 'Slitherlink — Classic', label: 'Classic', group: 'Slitherlink',
+    glob: 'slither_11x11', tiers: '4,8,8,4',
+    blurb: 'Classic 10×10-square Slitherlink boards across all four difficulties.',
+  },
+
+  // ---- Hybrids (prototype books)
+  {
+    id: 'hybrid-slither-masyu', name: 'Slitherlink + Masyu', label: 'Slitherlink + Masyu', group: 'Hybrids',
+    glob: 'hybrid_slither_masyu_8x8', tiers: '4,8,8,4',
+    blurb: 'Numbered squares and Masyu circles share one single loop — every puzzle genuinely requires both.',
+  },
+  {
+    id: 'hybrid-slither-full', name: 'Slitherlink + Full board', label: 'Slitherlink + Full board', group: 'Hybrids',
+    glob: 'hybrid_slither_full_8x8', tiers: '4,8,8,4',
+    blurb: 'Slitherlink numbers on a Hamiltonian cycle that visits every single dot.',
   },
 ];
 

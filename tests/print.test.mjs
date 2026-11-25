@@ -50,4 +50,13 @@ test('boardSvg outputs fixed black-and-white SVG with white/black/gray circles a
   assert.ok(svgFb.includes('class="full-dot"'));
   assert.ok(svgFb.includes('class="given-line"'));
   assert.ok(svgFb.includes('class="given-wall"'));
+
+  // Slitherlink puzzle renders slither-num digits cleanly
+  const Psl = compile({
+    name: 'psl', rows: 4, cols: 4, clues: [],
+    slither: [{ r: 0, c: 0, n: 3 }, { r: 1, c: 2, n: 0 }],
+  });
+  const svgSl = boardSvg(Psl, null);
+  assert.ok(svgSl.includes('class="slither-num"'));
+  assert.ok(svgSl.includes('>3</text>') && svgSl.includes('>0</text>'));
 });

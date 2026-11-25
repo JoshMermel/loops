@@ -803,3 +803,125 @@ test('symmetry uniqueness inference: copy, center, axisEdge, diagPair, twoCrossi
   }
   assert.ok(symFired >= 5, `expected symmetry to fire on real bonus-symmetry puzzles, got ${symFired}`);
 });
+
+test('Slitherlink rules & faceSlither fire cleanly and are 100% sound on pure, +Masyu, and +Full-board puzzles', () => {
+  // 1. Direct unit checks for named Slitherlink rules
+  const P0 = compile({ name: 's0', rows: 4, cols: 4, clues: [], slither: [{ r: 1, c: 1, n: 0 }] });
+  assert.equal(nextSteps(P0, initialState(P0)).rule, 'slitherZero');
+
+  // Corner 3 forces both outer corner edges ON
+  const Pc3 = compile({ name: 'sc3', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 3 }] });
+  const rC3 = RULES.find((r) => r.id === 'slitherCorner').find(Pc3, initialState(Pc3));
+  assert.equal(rC3.length, 1);
+  assert.equal(rC3[0].sets.length, 2);
+  assert.ok(rC3[0].sets.every((s) => s[2] === E_ON));
+
+  // Corner 1 forces both outer corner edges OFF
+  const Pc1 = compile({ name: 'sc1', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 1 }] });
+  const rC1 = RULES.find((r) => r.id === 'slitherCorner').find(Pc1, initialState(Pc1));
+  assert.equal(rC1.length, 1);
+  assert.ok(rC1[0].sets.every((s) => s[2] === E_OFF));
+
+  // Corner 2 forces outer extension edges along board border ON
+  const Pc2 = compile({ name: 'sc2', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 0, n: 2 }] });
+  const rC2 = RULES.find((r) => r.id === 'slitherCorner').find(Pc2, initialState(Pc2));
+  assert.equal(rC2.length, 1);
+  assert.equal(rC2[0].sets.length, 2);
+  assert.ok(rC2[0].sets.every((s) => s[2] === E_ON));
+
+  // Adjacent 3-3 negative guard: when ONLY two adjacent 3s exist, do NOT fire (1x2 rectangle is a valid loop)
+  const PadjOnly = compile({ name: 'sa_only', rows: 4, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 1, c: 2, n: 3 }] });
+  assert.equal(RULES.find((r) => r.id === 'slitherAdjacent3').find(PadjOnly, initialState(PadjOnly)).length, 0);
+  // With a third clue outside, adjacent 3-3 fires cleanly!
+  const Padj = compile({ name: 'sa', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 1, c: 2, n: 3 }, { r: 3, c: 3, n: 1 }] });
+  const rAdj = RULES.find((r) => r.id === 'slitherAdjacent3').find(Padj, initialState(Padj));
+  assert.equal(rAdj.length, 1);
+  assert.equal(rAdj[0].sets.length, 5);
+
+  // Diagonal 3-3 and diagonal 3-2-3
+  const Pdiag3 = compile({ name: 'sd3', rows: 5, cols: 5, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 2, c: 2, n: 3 }] });
+  assert.equal(RULES.find((r) => r.id === 'slitherDiag3').find(Pdiag3, initialState(Pdiag3)).length, 1);
+  const Pdiag32 = compile({ name: 'sd32', rows: 6, cols: 6, clues: [], slither: [{ r: 1, c: 1, n: 3 }, { r: 2, c: 2, n: 2 }, { r: 3, c: 3, n: 3 }] });
+  assert.equal(RULES.find((r) => r.id === 'slitherDiag32').find(Pdiag32, initialState(Pdiag32)).length, 1);
+
+  // 2. Soundness fuzz across pure Slitherlink, Slitherlink+Masyu, and Slitherlink+Full-board
+  const rng = mulberry32(20261125);
+  let checkedPure = 0, checkedHybrid = 0, checkedFull = 0, solvedTotal = 0;
+  const slitherRulesSeen = new Set();
+
+  const faceCounts = (P, truth) => {
+    const out = [];
+    const fr = P.rows - 1, fc = P.cols - 1;
+    for (let r = 0; r < fr; r++) {
+      for (let c = 0; c < fc; c++) {
+        const f4 = (r * fc + c) * 4;
+        let cnt = 0;
+        for (let d = 0; d < 4; d++) {
+          const x = P.faceEdges[f4 + d];
+          if (x >= 0 && truth.e[x] === E_ON) cnt++;
+        }
+        if (cnt <= 3) out.push({ r, c, n: cnt });
+      }
+    }
+    return out;
+  };
+
+  for (let attempt = 0; attempt < 900 && (checkedPure < 25 || checkedHybrid < 20 || checkedFull < 15); attempt++) {
+    const mode = attempt % 3; // 0: pure, 1: slither+masyu, 2: slither+full
+    if (mode === 0 && checkedPure >= 25) continue;
+    if (mode === 1 && checkedHybrid >= 20) continue;
+    if (mode === 2 && checkedFull >= 15) continue;
+    const rows = mode === 2 ? 4 : (4 + (attempt % 2));
+    const cols = mode === 2 ? 6 : (4 + ((attempt >> 1) % 2));
+    const empty = compile({ name: 'se', rows, cols, clues: [], fullBoard: mode === 2 });
+    const solRes = solve(empty, { limit: 1, maxNodes: 4000, rng });
+    if (!solRes.count) continue;
+    const truth = solRes.solutions[0];
+
+    const allFaces = faceCounts(empty, truth);
+    const slither = allFaces.filter(() => rng() < (mode === 0 ? 0.65 : mode === 1 ? 0.35 : 0.45));
+    if (!slither.length) continue;
+
+    const clues = [];
+    if (mode === 1) {
+      for (let i = 0; i < empty.N; i++) {
+        const dirs = [];
+        for (let d = 0; d < 4; d++) { const x = empty.ed[i * 4 + d]; if (x >= 0 && truth.e[x] === E_ON) dirs.push(d); }
+        if (dirs.length !== 2) continue;
+        const straight = ((dirs[0] ^ dirs[1]) & 1) === 0;
+        const ext0 = empty.ed2[i * 4 + dirs[0]], ext1 = empty.ed2[i * 4 + dirs[1]];
+        const s0 = ext0 >= 0 && truth.e[ext0] === E_ON, s1 = ext1 >= 0 && truth.e[ext1] === E_ON;
+        if (straight && !(s0 && s1) && rng() < 0.3) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'W' });
+        else if (!straight && s0 && s1 && rng() < 0.3) clues.push({ r: (i / cols) | 0, c: i % cols, t: 'B' });
+      }
+      if (!clues.length) continue;
+    }
+
+    const P = compile({ name: `slf_${mode}_${attempt}`, rows, cols, clues, slither, fullBoard: mode === 2 });
+    const exact = solve(P, { limit: 2, maxNodes: 30000 });
+    if (exact.exceeded || exact.count !== 1) continue;
+    if (mode === 0) checkedPure++;
+    else if (mode === 1) checkedHybrid++;
+    else checkedFull++;
+
+    const exactSol = exact.solutions[0];
+    const r = rate(P);
+    for (const s of r.steps) {
+      if (s.rule.startsWith('slither') || s.rule === 'faceSlither') slitherRulesSeen.add(s.rule);
+      for (const [k, idx, val] of s.sets) {
+        if (k === 'e') assert.equal(val, exactSol.e[idx], `UNSOUND edge by ${s.rule} on ${P.name}`);
+        else if (k === 'c') assert.equal(val, exactSol.cell[idx], `UNSOUND cell by ${s.rule} on ${P.name}`);
+      }
+    }
+    if (r.solved) {
+      solvedTotal++;
+      assert.equal(encodeSolution(P, r.state), encodeSolution(P, exactSol));
+    }
+  }
+  const totalChecked = checkedPure + checkedHybrid + checkedFull;
+  assert.ok(checkedPure >= 20, `expected >= 20 unique pure Slitherlink boards, got ${checkedPure}`);
+  assert.ok(checkedHybrid >= 15, `expected >= 15 unique Slitherlink+Masyu boards, got ${checkedHybrid}`);
+  assert.ok(checkedFull >= 10, `expected >= 10 unique Slitherlink+Full boards, got ${checkedFull}`);
+  assert.ok(solvedTotal >= totalChecked * 0.9, `expected rules to solve >= 90% of Slitherlink boards, got ${solvedTotal}/${totalChecked}`);
+  assert.ok(slitherRulesSeen.size >= 4, `expected >= 4 Slitherlink rules to fire, saw ${[...slitherRulesSeen].join(', ')}`);
+});

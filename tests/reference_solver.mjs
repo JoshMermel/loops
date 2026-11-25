@@ -17,7 +17,7 @@ function isTurn(a, b, c, cols) {
  * Enumerates every undirected simple cycle on the grid and checks Masyu rules directly on the cycle's vertices.
  */
 export function referenceCount(p) {
-  const { rows, cols, clues = [], fullBoard = false, givens = [], voids = [] } = p;
+  const { rows, cols, clues = [], slither = [], fullBoard = false, givens = [], voids = [] } = p;
   const N = rows * cols;
   const voidSet = new Set(voids.map((v) => v.r * cols + v.c));
   const activeCount = N - voidSet.size;
@@ -66,12 +66,26 @@ export function referenceCount(p) {
     // Must visit every clue cell
     for (const ci of clueType.keys()) if (!visited[ci]) return false;
     // Must include every required given edge
-    if (reqEdges.size > 0) {
-      let seenReq = 0;
-      for (let k = 0; k < L; k++) {
-        if (reqEdges.has(edgeKey(path[k], path[(k + 1) % L]))) seenReq++;
+    let cycEdges = null;
+    if (reqEdges.size > 0 || slither.length > 0) {
+      cycEdges = new Set();
+      for (let k = 0; k < L; k++) cycEdges.add(edgeKey(path[k], path[(k + 1) % L]));
+      if (reqEdges.size > 0) {
+        for (const rk of reqEdges) if (!cycEdges.has(rk)) return false;
       }
-      if (seenReq !== reqEdges.size) return false;
+    }
+    // Check Slitherlink face numbers independently
+    for (const sc of slither) {
+      const a = sc.r * cols + sc.c;
+      const b = a + 1;
+      const c = a + cols;
+      const d = c + 1;
+      let cnt = 0;
+      if (cycEdges.has(edgeKey(a, b))) cnt++;
+      if (cycEdges.has(edgeKey(b, d))) cnt++;
+      if (cycEdges.has(edgeKey(c, d))) cnt++;
+      if (cycEdges.has(edgeKey(a, c))) cnt++;
+      if (cnt !== sc.n) return false;
     }
     // Check white and black rules along the cycle
     for (let k = 0; k < L; k++) {

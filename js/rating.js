@@ -9,7 +9,8 @@ import {
   initialState, cloneState, isSolved,
 } from './logic.js';
 import { bestImagine, setFullContradiction, easyContradiction, MEDIUM_MAX, HARD_MAX } from './imagine.js';
-import { findFaceShade, findFaceCircle } from './faceparity.js';
+import { findFaceShade, findFaceCircle, findFaceSlither } from './faceparity.js';
+import { SLITHER_RULES } from './variants/slitherlink.js';
 
 export const TIERS = ['Beginner', 'Medium', 'Hard', 'Expert'];
 
@@ -755,7 +756,24 @@ function findNoEarlyClose(P, st) {
     const a = P.edgeA[x], b = P.edgeB[x];
     if (a < 0) continue;
     const ra = find(a);
-    if (ra === find(b) && size[ra] < loopCount) {
+    if (ra !== find(b)) continue;
+    let forbid = size[ra] < loopCount;
+    if (!forbid && P.hasSlither) {
+      const ef0 = P.edgeFaces[x * 2], ef1 = P.edgeFaces[x * 2 + 1];
+      const fe = P.faceEdges;
+      for (let si = 0; si < P.slither.length; si++) {
+        const sc = P.slither[si];
+        if (sc.n === 0) continue;
+        const f4 = sc.f * 4;
+        let fon = (sc.f === ef0 || sc.f === ef1) ? 1 : 0;
+        if (fe[f4] >= 0 && st.e[fe[f4]] === E_ON) fon++;
+        if (fe[f4 + 1] >= 0 && st.e[fe[f4 + 1]] === E_ON) fon++;
+        if (fe[f4 + 2] >= 0 && st.e[fe[f4 + 2]] === E_ON) fon++;
+        if (fe[f4 + 3] >= 0 && st.e[fe[f4 + 3]] === E_ON) fon++;
+        if (fon < sc.n) { forbid = true; break; }
+      }
+    }
+    if (forbid) {
       out.push({ sets: [['e', x, E_OFF]], info: { edge: x, a, b } });
     }
   }
@@ -1657,6 +1675,17 @@ export function detectSymmetries(P) {
       edgeMap[x] = tx;
     }
     if (!ok) continue;
+
+    if (P.hasSlither) {
+      const fr = rows - 1, fc = cols - 1;
+      for (let r = 0; r < fr && ok; r++) {
+        for (let c = 0; c < fc; c++) {
+          const [r2, c2] = def.map(r, c, fr, fc);
+          if (P.slitherNum[r * fc + c] !== P.slitherNum[r2 * fc + c2]) { ok = false; break; }
+        }
+      }
+    }
+    if (!ok) continue;
     out.push({ id: def.id, refl: def.refl, cellMap, edgeMap });
   }
 
@@ -2134,7 +2163,8 @@ export const RULES = [
   defRule({ id: 'closedLoopRestOff', tier: 'Beginner', weight: 1, free: true, find: findClosedLoopRestOff, label: 'once the single loop is closed, all remaining cells are off the loop' }),
   defRule({ id: 'grayFromShape', tier: 'Beginner', weight: 1, free: true, find: findGrayFromShape, label: 'a gray circle with two drawn segments resolves to white (straight) or black (turn)' }),
 
-  // Beginner (single-segment / direct rule violations + iconic three-whites)
+  // Beginner (single-segment / direct rule violations + iconic three-whites + Slitherlink basics)
+  ...SLITHER_RULES.filter((r) => r.tier === 'Beginner').map(defRule),
   defRule({ id: 'grayMustBeBlack', tier: 'Beginner', weight: 2, find: findGrayMustBeBlack, label: 'a gray circle that cannot go straight along either axis must be black' }),
   defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
   defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
@@ -2149,6 +2179,7 @@ export const RULES = [
   defRule({ id: 'threeWhites', tier: 'Beginner', weight: 8, find: findThreeWhites, label: 'three white circles in a row must all cross perpendicular to the row' }),
 
   // Medium (local multi-segment inferences, Auto-Shade border parity, and 1-step local lookahead)
+  ...SLITHER_RULES.filter((r) => r.tier === 'Medium').map(defRule),
   defRule({ id: 'whiteBothStraight', tier: 'Medium', weight: 10, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
   defRule({ id: 'closingCell', tier: 'Medium', weight: 11, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
   defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
@@ -2169,6 +2200,7 @@ export const RULES = [
   defRule({ id: 'corridorNoEarlyClose', tier: 'Hard', weight: 30, find: findCorridorNoEarlyClose, label: 'a forced multi-cell corridor joining the two ends of one path would close the loop early' }),
   defRule({ id: 'checkerParity', tier: 'Hard', weight: 36, find: findChecker(false), label: 'checkerboard light/dark dot counts in a full-board region force its exit segments' }),
   defRule({ id: 'faceCircle', tier: 'Hard', weight: 38, find: findFaceCircle, extra: extraFaceCircle, label: 'advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge' }),
+  defRule({ id: 'faceSlither', tier: 'Hard', weight: 38, find: findFaceSlither, extra: extraFaceCircle, label: 'inside/outside shading around numbered Slitherlink squares (and circles on hybrids) forces an edge' }),
   defRule({ id: 'twoEndsJoin', tier: 'Hard', weight: 44, find: findTwoEndsJoin, label: 'a sealed area with just two open ends must connect them, so their far ends cannot join early' }),
   defRule({ id: 'chokepoint', tier: 'Hard', weight: 48, costly: true, find: findChokepoint(true), label: 'blocking this segment would cut off a small area or leave a single chokepoint cell' }),
   defRule({ id: 'parityPocket', tier: 'Hard', weight: 52, costly: true, find: findParity(true), label: 'the other choice would seal off a small pocket with an odd number of open ends' }),

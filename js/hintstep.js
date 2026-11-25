@@ -99,7 +99,7 @@ export function computeHint(P, marks) {
   const st = stateFromMarks(P, marks);
   if (!sol) {
     const chk = cloneState(st);
-    if (!propagate(P, chk) || contradiction(P, chk) || buildFaceParity(P, chk, { buildGraph: false, useCircles: true }).conflict) {
+    if (!propagate(P, chk) || contradiction(P, chk) || buildFaceParity(P, chk, { buildGraph: false, useCircles: true, useSlither: Boolean(P.hasSlither) }).conflict) {
       return { kind: 'wrong', wrongEdges: [], wrongClues: [], total: 0, contradiction: true };
     }
   }

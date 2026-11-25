@@ -11,7 +11,7 @@ import {
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
 } from './marks.js';
-import { clueStates, earlyLoopEdges, trappedFullCells } from './clues.js';
+import { clueStates, slitherStates, earlyLoopEdges, trappedFullCells } from './clues.js';
 import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
 import {
@@ -295,6 +295,7 @@ function reset() {
 function analyse() {
   return {
     clueState: state.solved ? state.P.clues.map(() => '') : clueStates(state.P, state.marks),
+    slitherState: state.solved || !state.P.hasSlither ? [] : slitherStates(state.P, state.marks),
     badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
     trappedCells: state.solved ? new Set() : trappedFullCells(state.P, state.marks),
@@ -1017,6 +1018,7 @@ const settingsModal = setupModal('settings-modal', 'settings-btn', () => {
 function renderHelpModal() {
   const P = state.P;
   const hasClues = !P || (P.clues && P.clues.length > 0);
+  const hasSlither = Boolean(P && P.hasSlither);
   const hasGray = Boolean(P && P.grays && P.grays.length > 0);
   const isFull = Boolean(P && P.fullBoard);
   const hasGivens = Boolean(P && P.hasGivens);
@@ -1024,7 +1026,13 @@ function renderHelpModal() {
 
   const intro = $('help-intro');
   if (intro) {
-    if (isFull && !hasClues) {
+    if (hasSlither && hasClues) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle and matching every numbered square, with no crossings or branches.';
+    } else if (hasSlither && isFull) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and matching every numbered square, with no crossings or branches.';
+    } else if (hasSlither) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines so each numbered square has that many loop segments around it, with no crossings or branches.';
+    } else if (isFull && !hasClues) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b>, respecting all pre-filled segments and walls, with no crossings or branches.';
     } else if (isFull) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and every circle, with no crossings or branches.';
@@ -1037,6 +1045,7 @@ function renderHelpModal() {
 
   $('help-card-white').hidden = !hasClues;
   $('help-card-black').hidden = !hasClues;
+  $('help-card-slither').hidden = !hasSlither;
   $('help-card-gray').hidden = !hasGray;
   $('help-card-full').hidden = !isFull;
   $('help-card-voids').hidden = !hasVoids;
@@ -1066,7 +1075,7 @@ function renderHelpModal() {
 
   const link = $('help-guide-link');
   if (link) {
-    const hash = hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
+    const hash = hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
     link.setAttribute('href', `docs/how_to_solve.html${hash}`);
   }
 }

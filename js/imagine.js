@@ -8,6 +8,7 @@ import {
   NONE, WHITE, BLACK, GRAY, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   cloneState, propagate, lastPropChanges,
 } from './logic.js';
+import { isSlitherSatisfied } from './variants/slitherlink.js';
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
 export const HARD_MAX = 75;   // imagineTrace (36..60) sits in Hard; imagineChain (>= 80) sits in Expert
@@ -35,7 +36,11 @@ export function classifyImagine(P, baseState, edge, steps, broke, area, grayCell
   const dist = (c1, c2) => Math.abs(((c1 / cols) | 0) - ((c2 / cols) | 0)) + Math.abs((c1 % cols) - (c2 % cols));
   const distToEdge = (c) => Math.min(dist(c, a), dist(c, b));
 
-  const isFrontier = grayCell >= 0 || baseState.cell[a] === LOOP || baseState.cell[b] === LOOP;
+  const touchesSlither = P.hasSlither && grayCell < 0 && (
+    (P.edgeFaces[edge * 2] >= 0 && P.slitherNum[P.edgeFaces[edge * 2]] > 0)
+    || (P.edgeFaces[edge * 2 + 1] >= 0 && P.slitherNum[P.edgeFaces[edge * 2 + 1]] > 0)
+  );
+  const isFrontier = grayCell >= 0 || baseState.cell[a] === LOOP || baseState.cell[b] === LOOP || touchesSlither;
   const nSteps = steps.length;
   const earlyClose = !!(broke && (broke.kind === 'earlyClose' || broke.kind === 'twoLoops'));
 
@@ -312,6 +317,23 @@ export function easyContradiction(P, st, scope = null) {
     }
   }
 
+  // 3c. Slitherlink numbered faces: on <= n <= on + unk
+  if (P.hasSlither) {
+    const fe = P.faceEdges;
+    for (let si = 0; si < P.slither.length; si++) {
+      const sc = P.slither[si];
+      const f4 = sc.f * 4;
+      let on = 0, unk = 0;
+      for (let d = 0; d < 4; d++) {
+        const x = fe[f4 + d];
+        if (x < 0) continue;
+        if (e[x] === E_ON) on++;
+        else if (e[x] === E_UNKNOWN) unk++;
+      }
+      if (on > sc.n || on + unk < sc.n) return { kind: 'slitherBroken', face: sc.f, n: sc.n };
+    }
+  }
+
   // 4. Early closed loop (or 2 cycles) — skip when no E_ON edge was added in the hypothesis
   if (scope && !scope.checkCycle) return null;
   if (scratchParent.length < N) { scratchParent = new Int16Array(N); scratchSize = new Int32Array(N); }
@@ -329,6 +351,16 @@ export function easyContradiction(P, st, scope = null) {
     cyc = find(cyc);
     for (let i = 0; i < N; i++) {
       if (cell[i] === LOOP && find(i) !== cyc) return { kind: 'earlyClose', cell: i };
+    }
+    if (P.hasSlither && !isSlitherSatisfied(P, e)) {
+      const fe = P.faceEdges;
+      for (let si = 0; si < P.slither.length; si++) {
+        const sc = P.slither[si];
+        const f4 = sc.f * 4;
+        let on = 0;
+        for (let d = 0; d < 4; d++) if (fe[f4 + d] >= 0 && e[fe[f4 + d]] === E_ON) on++;
+        if (on !== sc.n) return { kind: 'earlyClose', face: sc.f, n: sc.n };
+      }
     }
   }
   return null;
@@ -436,6 +468,34 @@ function findEasyStep(P, st, forbid, scope = null) {
     if (forbid && forbid.has(sig)) return null;
     return { rule, sets: fresh, sig, info };
   };
+
+  // 0b. Slitherlink direct counts (slitherZero / slitherCount)
+  if (P.hasSlither) {
+    const fe = P.faceEdges;
+    for (let si = 0; si < P.slither.length; si++) {
+      const sc = P.slither[si];
+      const f4 = sc.f * 4;
+      let on = 0;
+      const unks = [];
+      for (let d = 0; d < 4; d++) {
+        const x = fe[f4 + d];
+        if (x < 0) continue;
+        if (e[x] === E_ON) on++;
+        else if (e[x] === E_UNKNOWN) unks.push(x);
+      }
+      if (!unks.length) continue;
+      if (sc.n === 0) {
+        const s = tryEmit('slitherZero', unks.map((x) => ['e', x, E_OFF]), { face: sc.f, n: 0 });
+        if (s) return s;
+      } else if (on === sc.n) {
+        const s = tryEmit('slitherCount', unks.map((x) => ['e', x, E_OFF]), { face: sc.f, n: sc.n, mode: 'done' });
+        if (s) return s;
+      } else if (on + unks.length === sc.n) {
+        const s = tryEmit('slitherCount', unks.map((x) => ['e', x, E_ON]), { face: sc.f, n: sc.n, mode: 'fill' });
+        if (s) return s;
+      }
+    }
+  }
 
   // 0. Gray circle direct resolutions (grayMustBeBlack / grayMustBeWhite)
   if (st.hasGray) {
@@ -812,12 +872,16 @@ function pruneChain(P, baseState, edge, val, rawSteps, area, costCap, grayCell =
 function candidateEdges(P, st, frontierOnly = false) {
   const { numEdges, edgeA, edgeB, clue, nb } = P;
   const { cell, e } = st;
+  const isSlitherEdge = (x) => P.hasSlither && (
+    (P.edgeFaces[x * 2] >= 0 && P.slitherNum[P.edgeFaces[x * 2]] > 0)
+    || (P.edgeFaces[x * 2 + 1] >= 0 && P.slitherNum[P.edgeFaces[x * 2 + 1]] > 0)
+  );
   const primary = [];
   if (frontierOnly) {
     for (let x = 0; x < numEdges; x++) {
       if (e[x] !== E_UNKNOWN) continue;
       const a = edgeA[x], b = edgeB[x];
-      if (a >= 0 && (cell[a] === LOOP || cell[b] === LOOP)) primary.push(x);
+      if (a >= 0 && (cell[a] === LOOP || cell[b] === LOOP || isSlitherEdge(x))) primary.push(x);
     }
     return primary;
   }
@@ -831,12 +895,23 @@ function candidateEdges(P, st, frontierOnly = false) {
       }
     }
   }
+  if (P.hasSlither) {
+    for (let si = 0; si < P.slither.length; si++) {
+      const sc = P.slither[si];
+      if (sc.n === 0) continue;
+      const f4 = sc.f * 4;
+      for (let d = 0; d < 4; d++) {
+        const x = P.faceEdges[f4 + d];
+        if (x >= 0) { near[edgeA[x]] = 1; near[edgeB[x]] = 1; }
+      }
+    }
+  }
   const secondary = [];
   for (let x = 0; x < numEdges; x++) {
     if (e[x] !== E_UNKNOWN) continue;
     const a = edgeA[x], b = edgeB[x];
     if (a < 0) continue;
-    if (cell[a] === LOOP || cell[b] === LOOP) primary.push(x);
+    if (cell[a] === LOOP || cell[b] === LOOP || isSlitherEdge(x)) primary.push(x);
     else if (near[a] && near[b]) secondary.push(x);
   }
   return primary.concat(secondary);

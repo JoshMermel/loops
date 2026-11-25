@@ -1,16 +1,19 @@
-// Masyu: pure logic (no DOM). Used by the browser GUI and by the node tools.
+// Single-loop puzzle core (Masyu, Slitherlink, Full board, and hybrids; pure logic, no DOM).
 //
-// Rules: draw one single closed loop through cell centres orthogonally (no crossings, no branches).
-//   * The loop must pass through every circle (white and black).
-//   * White circle (W): the loop goes straight through it, and must turn 90° in at least one of the two
-//     adjacent cells along the loop.
-//   * Black circle (B): the loop turns 90° at it, and must go straight through both adjacent cells along the loop
-//     (at least two segments straight in each exit direction).
+// Shared rules: draw one single closed loop along the orthogonal grid lines (no crossings, no branches).
+// Modular constraint layers compose freely on the same board:
+//   * Masyu circles (W/B/G on intersections)
+//   * Slitherlink numbers (S0..S3 inside dual squares)
+//   * Full board (Hamiltonian cycle visiting every active intersection) + givens (H1/H0/V1/V0) + voids (X)
 //
-// Coordinates: cell (r, c) has index r*cols + c. Directions: 0=U 1=R 2=D 3=L.
-// Edges: edge 2*i is cell i's right edge (i <-> i+1), 2*i+1 is cell i's bottom edge (i <-> i+cols).
+// Coordinates: vertex (r, c) has index r*cols + c. Directions: 0=U 1=R 2=D 3=L.
+// Edges: edge 2*i is vertex i's right edge (i <-> i+1), 2*i+1 is vertex i's bottom edge (i <-> i+cols).
 // Edge states: 0 unknown, 1 on (loop segment), 2 off (no segment).
 // Cell states: 0 unknown, 1 off (not on the loop), 2 loop (on the loop; all circles start as LOOP).
+import {
+  compileSlither, serializeSlither, parseSlitherToken, symmetrySlither,
+  isSlitherSatisfied, propagateSlitherFace,
+} from './variants/slitherlink.js';
 
 /** Column letters like a spreadsheet: 0 -> A, 25 -> Z, 26 -> AA. */
 export function colName(c) {
@@ -206,7 +209,7 @@ export function compile(p) {
     }
   }
 
-  return Object.assign(p, {
+  const compiled = Object.assign(p, {
     N, numEdges, clue, clueAt, grayAt, clueCells, whites, blacks, grays,
     voids, isVoid, hasVoids, activeCount, activeLight, activeDark,
     faceExterior, faceHoleId, faceRep, holeList,
@@ -214,6 +217,8 @@ export function compile(p) {
     nb, ed, step2, ed2, edgeA, edgeB,
     _ecOff: null, _ecData: null, _syms: null,
   });
+  compileSlither(compiled, p);
+  return compiled;
 }
 
 export function initialState(P) {
@@ -262,6 +267,8 @@ let scratchCellQ = new Int16Array(0);
 let scratchInCellQ = new Uint8Array(0);
 let scratchClueQ = new Int16Array(0);
 let scratchInClueQ = new Uint8Array(0);
+let scratchFaceQ = new Int16Array(0);
+let scratchInFaceQ = new Uint8Array(0);
 let scratchQCap = 0;
 
 /** Number of edge assignments or cell=OFF deductions made by the most recent propagate() call. */
@@ -273,6 +280,7 @@ function ensurePropScratch(N) {
     scratchLoopCells = new Int16Array(N);
     scratchInCellQ = new Uint8Array(N);
     scratchInClueQ = new Uint8Array(N);
+    scratchInFaceQ = new Uint8Array(N);
   }
   if (scratchQCap <= N) {
     let cap = 64;
@@ -280,6 +288,7 @@ function ensurePropScratch(N) {
     scratchQCap = cap;
     scratchCellQ = new Int16Array(cap);
     scratchClueQ = new Int16Array(cap);
+    scratchFaceQ = new Int16Array(cap);
   }
 }
 
@@ -330,15 +339,20 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const loopCells = scratchLoopCells;
   const qCell = scratchCellQ, inCellQ = scratchInCellQ;
   const qClue = scratchClueQ, inClueQ = scratchInClueQ;
+  const qFace = scratchFaceQ, inFaceQ = scratchInFaceQ;
   const qMask = scratchQCap - 1;
   let cHead = 0, cTail = 0;
   let kHead = 0, kTail = 0;
+  let fHead = 0, fTail = 0;
   let ok = true;
   let needLoopCheck = false;
   let changes = 0;
 
   if (!P._ecData) getEdgeClues(P);
   const ecOff = P._ecOff, ecData = P._ecData;
+  const hasSlither = Boolean(P.hasSlither);
+  const slitherNum = P.slitherNum;
+  const edgeFaces = P.edgeFaces;
 
   const pushCell = (i) => {
     if (!inCellQ[i]) {
@@ -354,6 +368,13 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       kTail = (kTail + 1) & qMask;
     }
   };
+  const pushFace = (f) => {
+    if (f >= 0 && slitherNum[f] >= 0 && !inFaceQ[f]) {
+      inFaceQ[f] = 1;
+      qFace[fTail] = f;
+      fTail = (fTail + 1) & qMask;
+    }
+  };
   const wakeEdge = (x) => {
     const a = edgeA[x];
     if (a < 0) return;
@@ -361,6 +382,10 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     pushCell(edgeB[x]);
     const end = ecOff[x + 1];
     for (let k = ecOff[x]; k < end; k++) pushClue(ecData[k]);
+    if (hasSlither) {
+      pushFace(edgeFaces[x * 2]);
+      pushFace(edgeFaces[x * 2 + 1]);
+    }
   };
 
   const setCell = (i, v) => {
@@ -408,11 +433,12 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     for (let wi = 0; wi < whites.length; wi++) pushClue(whites[wi]);
     for (let bi = 0; bi < blacks.length; bi++) pushClue(blacks[bi]);
     if (grays) for (let gi = 0; gi < grays.length; gi++) pushClue(grays[gi]);
+    if (hasSlither) for (let si = 0; si < P.slither.length; si++) pushFace(P.slither[si].f);
   }
 
   while (ok) {
-    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues whose neighborhood changed.
-    while (ok && (cHead !== cTail || kHead !== kTail)) {
+    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces whose neighborhood changed.
+    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail)) {
       while (ok && cHead !== cTail) {
         const i = qCell[cHead];
         cHead = (cHead + 1) & qMask;
@@ -589,6 +615,13 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
           }
         }
       }
+
+      while (ok && fHead !== fTail) {
+        const f = qFace[fHead];
+        fHead = (fHead + 1) & qMask;
+        inFaceQ[f] = 0;
+        if (!propagateSlitherFace(P, st, f, setEdge)) ok = false;
+      }
     }
     if (!ok || !needLoopCheck) break;
     needLoopCheck = false;
@@ -631,13 +664,32 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
         if (nxt < 0) break;
         prev = cur; cur = nxt; len++;
       }
-      if (len >= 4 && len < loopCount) {
+      if (len >= 4) {
         const diff = u > cur ? u - cur : cur - u;
         if (diff === 1 || diff === cols) {
           for (let d = 0; d < 4; d++) {
             if (nb[u4 + d] === cur) {
               const ex = ed[u4 + d];
-              if (e[ex] === E_UNKNOWN) setEdge(ex, E_OFF);
+              if (e[ex] === E_UNKNOWN) {
+                let forbid = len < loopCount;
+                if (!forbid && hasSlither) {
+                  // Closing ex would end the loop; forbid if any Slitherlink face would still be short of its count
+                  const ef0 = edgeFaces[ex * 2], ef1 = edgeFaces[ex * 2 + 1];
+                  const fe = P.faceEdges;
+                  for (let si = 0; si < P.slither.length; si++) {
+                    const sc = P.slither[si];
+                    if (sc.n === 0) continue;
+                    const f4 = sc.f * 4;
+                    let fon = (sc.f === ef0 || sc.f === ef1) ? 1 : 0;
+                    if (fe[f4] >= 0 && e[fe[f4]] === E_ON) fon++;
+                    if (fe[f4 + 1] >= 0 && e[fe[f4 + 1]] === E_ON) fon++;
+                    if (fe[f4 + 2] >= 0 && e[fe[f4 + 2]] === E_ON) fon++;
+                    if (fe[f4 + 3] >= 0 && e[fe[f4 + 3]] === E_ON) fon++;
+                    if (fon < sc.n) { forbid = true; break; }
+                  }
+                }
+                if (forbid) setEdge(ex, E_OFF);
+              }
               break;
             }
           }
@@ -679,16 +731,22 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       for (let i = 0; i < N; i++) {
         if (cell[i] === UNKNOWN) setCell(i, OFF);
       }
+      if (hasSlither) {
+        for (let x = 0; x < P.numEdges; x++) {
+          if (edgeA[x] >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
+        }
+      }
       st.cycle = true;
     } else {
       st.cycle = false;
     }
-    if (cHead === cTail && kHead === kTail) break;
+    if (cHead === cTail && kHead === kTail && fHead === fTail) break;
   }
 
   // O(touched) cleanup of queued flags on early contradiction exit
   while (cHead !== cTail) { inCellQ[qCell[cHead]] = 0; cHead = (cHead + 1) & qMask; }
   while (kHead !== kTail) { inClueQ[qClue[kHead]] = 0; kHead = (kHead + 1) & qMask; }
+  while (fHead !== fTail) { inFaceQ[qFace[fHead]] = 0; fHead = (fHead + 1) & qMask; }
   lastPropChanges = changes;
   return ok;
 }
@@ -763,13 +821,49 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
       return;
     }
 
-    // If a cycle is already closed covering all LOOP cells, propagate() finished the board.
+    // If a cycle is already closed covering all LOOP cells, verify active constraints (e.g. Slitherlink) and record.
     if (st.cycle) {
-      solutions.push(st);
+      if (!P.hasSlither || isSlitherSatisfied(P, e)) solutions.push(st);
       return;
     }
 
-    // Only reachable if there are 0 LOOP cells (e.g., a puzzle with no circles at all):
+    // If there are no undecided LOOP vertices yet (e.g., pure Slitherlink before the first line is forced),
+    // branch directly on an undecided edge of the tightest unsatisfied Slitherlink face.
+    if (P.hasSlither) {
+      let bestEdge = -1, bestPri = -1;
+      const fe = P.faceEdges;
+      for (let si = 0; si < P.slither.length; si++) {
+        const sc = P.slither[si];
+        if (sc.n === 0) continue;
+        const f4 = sc.f * 4;
+        let on = 0, unk = 0, firstUnk = -1;
+        for (let d = 0; d < 4; d++) {
+          const y = fe[f4 + d];
+          if (y < 0) continue;
+          if (e[y] === E_ON) on++;
+          else if (e[y] === E_UNKNOWN) { unk++; if (firstUnk < 0) firstUnk = y; }
+        }
+        if (unk === 0) continue;
+        const need = sc.n - on;
+        if (need <= 0) continue;
+        const pri = sc.n * 20 + (4 - unk) * 4 + (need === 1 ? 2 : 0);
+        if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
+      }
+      if (bestEdge >= 0) {
+        const onFirst = rng ? rng() < 0.5 : true;
+        const v0 = onFirst ? E_ON : E_OFF;
+        const v1 = onFirst ? E_OFF : E_ON;
+        const a = cloneState(st);
+        a.e[bestEdge] = v0;
+        dfs(a, bestEdge, -1);
+        if (solutions.length >= limit || exceeded) return;
+        st.e[bestEdge] = v1;
+        dfs(st, bestEdge, -1);
+        return;
+      }
+    }
+
+    // Only reachable if there are 0 LOOP cells (e.g., a puzzle with no circles/numbers at all):
     // branch on an UNKNOWN cell being LOOP or OFF.
     let ci = -1;
     if (rng) {
@@ -948,6 +1042,8 @@ export function isSolved(P, edges) {
     }
   }
 
+  if (!isSlitherSatisfied(P, edges)) return false;
+
   return true;
 }
 
@@ -960,42 +1056,42 @@ export function cluesToString(clues) {
   return (clues || []).map((c) => `${c.r}:${c.c}:${c.t}`).join(';');
 }
 
-/** Serialize fullBoard flag, voids, circle clues, and given edges/walls into the CSV clues field. */
+/** Serialize fullBoard flag, voids, circle clues, Slitherlink face numbers, and given edges/walls into the CSV clues field. */
 export function puzzleCluesToString(p) {
   const parts = [];
   if (p.fullBoard) parts.push('full');
   for (const v of p.voids || []) parts.push(`${v.r}:${v.c}:X`);
   for (const c of p.clues || []) parts.push(`${c.r}:${c.c}:${c.t}`);
+  serializeSlither(p, parts);
   for (const gv of p.givens || []) parts.push(`${gv.r}:${gv.c}:${gv.dir}${gv.v}`);
   return parts.join(';');
 }
 
-/** Parse the CSV clues field into `{ clues, fullBoard, givens, voids }`. */
+/** Parse the CSV clues field into `{ clues, slither, fullBoard, givens, voids }`. */
 export function parseCluesField(s) {
-  const clues = [];
-  const givens = [];
-  const voids = [];
-  let fullBoard = false;
-  if (!s) return { clues, fullBoard, givens, voids };
+  const acc = { clues: [], slither: [], givens: [], voids: [], fullBoard: false };
+  if (!s) return acc;
   for (const tok of s.split(';')) {
     if (!tok) continue;
-    if (tok === 'full') { fullBoard = true; continue; }
+    if (tok === 'full') { acc.fullBoard = true; continue; }
     const parts = tok.split(':');
     if (parts.length !== 3 || !/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) {
       throw new Error(`bad clue "${tok}"`);
     }
     const r = +parts[0], c = +parts[1], tag = parts[2];
     if (tag === 'W' || tag === 'B' || tag === 'G') {
-      clues.push({ r, c, t: tag });
+      acc.clues.push({ r, c, t: tag });
     } else if (tag === 'X') {
-      voids.push({ r, c });
+      acc.voids.push({ r, c });
     } else if (tag === 'H0' || tag === 'H1' || tag === 'V0' || tag === 'V1') {
-      givens.push({ r, c, dir: tag[0], v: tag[1] === '1' ? 1 : 0 });
+      acc.givens.push({ r, c, dir: tag[0], v: tag[1] === '1' ? 1 : 0 });
+    } else if (parseSlitherToken(r, c, tag, acc)) {
+      // handled by Slitherlink variant
     } else {
       throw new Error(`bad clue "${tok}"`);
     }
   }
-  return { clues, fullBoard, givens, voids };
+  return acc;
 }
 
 export function cluesFromString(s) {
@@ -1019,7 +1115,7 @@ export function parseCsv(text) {
     const t = line.trim();
     if (!t || t.startsWith('#') || t.startsWith('name,')) continue;
     const [name, rows, cols, cluesStr, solution, rules, tier, score] = t.split(',');
-    const { clues, fullBoard, givens, voids } = parseCluesField(cluesStr);
+    const { clues, slither, fullBoard, givens, voids } = parseCluesField(cluesStr);
     const rec = {
       name,
       rows: +rows,
@@ -1030,6 +1126,7 @@ export function parseCsv(text) {
       tier: tier || '',
       score: score === undefined || score === '' ? null : +score,
     };
+    if (slither.length) rec.slither = slither;
     if (fullBoard) rec.fullBoard = true;
     if (givens.length) rec.givens = givens;
     if (voids.length) rec.voids = voids;
@@ -1078,24 +1175,28 @@ export function symmetryKey(p) {
         return [(r * C + c) * 2 + (dir === 'V' ? 1 : 0), `${r}:${c}:${dir}${gv.v}`];
       }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
     }
-    const key = `${prefix}${R}x${C}|${items}${vPart}${gPart}`;
+    const sPart = symmetrySlither(p, swap, flipR, flipC);
+    const key = `${prefix}${R}x${C}|${items}${sPart}${vPart}${gPart}`;
     if (best === null || key < best) best = key;
   }
   return best;
 }
 
-/** Orientation-specific short stable hash of size + clues (+ fullBoard / voids / givens), for localStorage save keys. */
+/** Orientation-specific short stable hash of size + clues (+ slither / fullBoard / voids / givens), for localStorage save keys. */
 export function puzzleHash(p) {
   if (p.hashKey) return p.hashKey;
   const sorted = [...p.clues].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c));
+  const sortedS = p.slither && p.slither.length
+    ? [...p.slither].sort((a, b) => (a.r * (p.cols - 1) + a.c) - (b.r * (p.cols - 1) + b.c))
+    : null;
   const sortedV = p.voids && p.voids.length
     ? [...p.voids].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
     : null;
   const sortedG = p.givens && p.givens.length
     ? [...p.givens].sort((a, b) => ((a.r * p.cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * p.cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)))
     : null;
-  const body = (p.fullBoard || sortedV || sortedG)
-    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, givens: sortedG || [] })
+  const body = (p.fullBoard || sortedS || sortedV || sortedG)
+    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], givens: sortedG || [] })
     : cluesToString(sorted);
   const s = `${p.rows}x${p.cols}|${body}`;
   let h = 5381;

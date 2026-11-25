@@ -7,6 +7,7 @@ import {
 import { ruleLabel, oddOpenEnds, checkerImbalance, chokepointCheck } from './rating.js';
 import { replayImagine } from './imagine.js';
 import { faceCoords } from './faceparity.js';
+import { describeSlitherChainStep, explainSlitherStep } from './variants/slitherlink.js';
 
 export const cellName = (P, i) => `${colName(i % P.cols)}${((i / P.cols) | 0) + 1}`;
 export const edgeName = (P, x) => {
@@ -76,6 +77,8 @@ export function describeMarks(P, targets) {
 
 /** One short clause describing a single derived step inside an imagined chain. */
 function describeChainStep(P, s) {
+  const slText = describeSlitherChainStep(P, s, { faceName });
+  if (slText) return slText;
   const { rule, info, sets } = s;
   const c = info && info.cell !== undefined ? cellName(P, info.cell) : '';
   switch (rule) {
@@ -168,8 +171,12 @@ function describeContradiction(P, broke, finalState) {
       return { text: `the black circle at ${cellName(P, broke.cell)} would go straight instead of turning`, cells: [broke.cell], area: [] };
     case 'grayBroken':
       return { text: `the gray circle at ${cellName(P, broke.cell)} cannot be either white or black`, cells: [broke.cell], area: [] };
+    case 'slitherBroken':
+      return { text: `the ${broke.n} square ${faceName(P, broke.face)} cannot reach ${broke.n} segments`, cells: [], area: [] };
     case 'earlyClose':
-      return { text: `the loop closes early while ${cellName(P, broke.cell)} is still outside it`, cells: [broke.cell], area: [] };
+      return broke.face !== undefined
+        ? { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [] }
+        : { text: `the loop closes early while ${cellName(P, broke.cell)} is still outside it`, cells: [broke.cell], area: [] };
     case 'twoLoops':
       return { text: 'two separate closed loops form', cells: [], area: [] };
     case 'offLine':
@@ -486,15 +493,19 @@ export function explainStep(P, step, st = null) {
         : `Inside/outside shading puts ${sideName(info.parA)} on both sides of ${edgeName(P, info.edge)}, so the loop cannot pass between them (cross out ${edgeName(P, info.edge)}).`;
       break;
     }
-    case 'faceCircle': {
+    case 'faceCircle':
+    case 'faceSlither': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       roles.clue.push(...(info.clues || []));
       nudgeRoles.focus.push(a, b);
       nudgeRoles.clue.push(...(info.clues || []));
-      nudge = info.clues && info.clues.length
-        ? `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`
-        : `Look at ${edgeName(P, info.edge)} — use relative Inside/Outside shading to compare the squares on either side.`;
+      const isSl = rule === 'faceSlither';
+      nudge = isSl
+        ? `Look at ${edgeName(P, info.edge)} — use Inside/Outside shading around the numbered squares to compare the two sides.`
+        : info.clues && info.clues.length
+          ? `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`
+          : `Look at ${edgeName(P, info.edge)} — use relative Inside/Outside shading to compare the squares on either side.`;
       faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: !!info.anchored };
       const label = (par) => (info.anchored ? (par === 1 ? 'Inside' : 'Outside') : (par === 1 ? 'Side A' : 'Side B'));
       const describeLink = (s, destPar) => {
@@ -511,6 +522,16 @@ export function explainStep(P, step, st = null) {
             return `by the 3-to-1 corner rule at black circle ${cellName(P, s.reason.cell)}, ${dst} is ${col}`;
           case 'blackLeg':
             return `black circle ${cellName(P, s.reason.cell)}'s forced 2-step leg makes ${dst} ${col}`;
+          case 'slither0':
+            return `the 0 square ${faceName(P, s.reason.face)} keeps ${dst} ${col}`;
+          case 'slither33':
+            return `the adjacent 3 squares ${faceName(P, s.reason.face)} and ${faceName(P, s.reason.face2)} make ${dst} ${col}`;
+          case 'slitherDiag33':
+            return `the diagonal 3 squares ${faceName(P, s.reason.face)} and ${faceName(P, s.reason.face2)} make ${dst} ${col}`;
+          case 'slitherCount':
+            return `the ${s.reason.n} square ${faceName(P, s.reason.face)} makes ${dst} ${col}`;
+          case 'slitherMod2':
+            return `even/odd parity around the ${s.reason.n} square ${faceName(P, s.reason.face)} makes ${dst} ${col}`;
           default:
             return `${dst} is ${col}`;
         }
@@ -531,9 +552,10 @@ export function explainStep(P, step, st = null) {
       const sideStr = info.val === E_ON
         ? `puts opposite sides (${label(info.parA)} and ${label(info.parB)}) across ${edgeName(P, info.edge)}, so draw ${edgeName(P, info.edge)}`
         : `puts ${label(info.parA)} on both sides of ${edgeName(P, info.edge)}, so cross out ${edgeName(P, info.edge)}`;
+      const heading = isSl ? 'Inside/outside shading' : 'Circle shading';
       text = chainDesc
-        ? `Circle shading: ${chainDesc}. That ${sideStr}.`
-        : `Circle shading ${sideStr}.`;
+        ? `${heading}: ${chainDesc}. That ${sideStr}.`
+        : `${heading} ${sideStr}.`;
       break;
     }
     case 'twoEndsJoin': {
@@ -737,6 +759,18 @@ export function explainStep(P, step, st = null) {
       break;
     }
     default: {
+      const slFaces = { in: [], out: [], clue: [], focus: [] };
+      const slExp = explainSlitherStep(P, { rule, info, targets }, { cellName, faceName, describeMarks, roles, nudgeRoles, faces: slFaces });
+      if (slExp) {
+        nudge = slExp.nudge;
+        text = slExp.text;
+        if (slFaces.focus.length || slFaces.clue.length) faces = slFaces;
+        for (const x of [...targets.segOn, ...targets.segOff]) {
+          const [a, b] = edgeCells(P, x);
+          if (!nudgeRoles.focus.length && !slFaces.focus.length) nudgeRoles.focus.push(a, b);
+        }
+        break;
+      }
       for (const x of [...targets.segOn, ...targets.segOff]) {
         const [a, b] = edgeCells(P, x);
         nudgeRoles.focus.push(a, b);

@@ -74,6 +74,14 @@ for (const ex of examples) {
       const r = (f / fc) | 0, c = f % fc;
       g += `<rect x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4" fill="rgba(245,166,85,0.28)" stroke="rgba(230,140,50,0.75)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
     }
+    for (const f of ex.faces.clue || []) {
+      const r = (f / fc) | 0, c = f % fc;
+      g += `<rect x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4" fill="rgba(25,118,210,0.22)"/>`;
+    }
+    for (const f of ex.faces.focus || []) {
+      const r = (f / fc) | 0, c = f % fc;
+      g += `<rect x="${vx(c) + 2}" y="${vy(r) + 2}" width="${S - 4}" height="${S - 4}" rx="4" fill="rgba(244,236,156,0.8)"/>`;
+    }
   }
 
   // Role tints
@@ -109,6 +117,11 @@ for (const ex of examples) {
     for (let i = 0; i < P.N; i++) {
       if ((P.hasVoids && P.isVoid[i]) || P.clue[i]) continue;
       g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="2.3" fill="#666666"/>`;
+    }
+  }
+  if (P.hasSlither) {
+    for (const sc of P.slither) {
+      g += `<text x="${vx(sc.c) + S / 2}" y="${vy(sc.r) + S / 2}" font-size="${S * 0.48}" font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="#111111">${sc.n}</text>`;
     }
   }
 

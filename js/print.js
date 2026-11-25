@@ -96,6 +96,11 @@ export function boardSvg(P, sol = null) {
       g += `<circle class="full-dot" cx="${c}" cy="${r}" r="0.065" fill="#555"/>`;
     }
   }
+  if (P.hasSlither) {
+    for (const sc of P.slither) {
+      g += `<text class="slither-num" x="${sc.c + 0.5}" y="${sc.r + 0.5}" font-size="0.52" font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="${INK}">${sc.n}</text>`;
+    }
+  }
   if (sol) {
     for (let x = 0; x < P.numEdges; x++) {
       if (sol.e[x] !== E_ON) continue;

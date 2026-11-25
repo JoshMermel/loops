@@ -16,6 +16,7 @@
 //   - same parity     -> E_OFF (cross)
 //   - opposite parity -> E_ON (loop segment)
 import { WHITE, BLACK, E_UNKNOWN, E_ON, E_OFF } from './logic.js';
+import { applySlitherParity } from './variants/slitherlink.js';
 
 /** Convert dual face index (0..F-1) to { r, c } or null for EXT. */
 export function faceCoords(P, f) {
@@ -42,7 +43,7 @@ let bfsQueue = new Int32Array(0);
  * Note: when `buildGraph: false`, the returned closures reference module-level scratch buffers
  * (`fpParent`/`fpDiff`) that are reused by the next fast-mode call — do not retain across calls.
  */
-export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } = {}) {
+export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, useSlither = false } = {}) {
   const { rows, cols } = P;
   const fr = rows - 1, fc = cols - 1;
   if (fr <= 0 || fc <= 0) {
@@ -164,11 +165,12 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
     link(a, b, ev === E_ON ? 1 : 0, buildGraph ? { kind: ev === E_ON ? 'edgeOn' : 'edgeOff', edge: x } : null);
   }
 
-  if (useCircles) {
-    const clue = st.clue || P.clue;
-    const whites = st.hasGray ? P.clueCells.filter((i) => clue[i] === WHITE) : P.whites;
-    const blacks = st.hasGray ? P.clueCells.filter((i) => clue[i] === BLACK) : P.blacks;
+  const clue = st.clue || P.clue;
+  const whites = useCircles ? (st.hasGray ? P.clueCells.filter((i) => clue[i] === WHITE) : P.whites) : [];
+  const blacks = useCircles ? (st.hasGray ? P.clueCells.filter((i) => clue[i] === BLACK) : P.blacks) : [];
+  const runSlither = Boolean(useSlither && P.hasSlither);
 
+  if (whites.length > 0) {
     // 2. White circles: both diagonal corner pairs have opposite parity
     for (let wi = 0; wi < whites.length; wi++) {
       const cell = whites[wi];
@@ -181,8 +183,10 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
       link(nw, se, 1, reason);
       link(ne, sw, 1, reason);
     }
+  }
 
-    // 3. Black circles: iterate 3-to-1 diagonal law and forced 2-step straight legs to fixed point
+  if (blacks.length > 0 || runSlither) {
+    // 3. Black circles + Slitherlink face parity: iterate to fixed point so clues cross-pollinate on hybrids
     const forceBlackLeg = (bi, d) => {
       let changed = false;
       const e1 = P.ed[bi * 4 + d], e2 = P.ed2[bi * 4 + d], n1 = P.nb[bi * 4 + d];
@@ -199,9 +203,20 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } 
       return changed;
     };
 
+    const slitherCtx = runSlither ? {
+      EXT,
+      canonFace,
+      relate,
+      link: (u, v, xor, reason) => link(u, v, xor, buildGraph ? reason : null),
+      hasConflict: () => conflict,
+      markConflict: () => { conflict = true; },
+    } : null;
+
     let progress = true;
     while (progress && !conflict) {
       progress = false;
+      if (runSlither && applySlitherParity(P, st, slitherCtx)) progress = true;
+      if (conflict) break;
       for (let k = 0; k < blacks.length; k++) {
         const bi = blacks[k];
         const br = (bi / cols) | 0, bc = bi % cols;
@@ -324,9 +339,9 @@ function shortestPath(adj, src, dst, maxDepth = Infinity) {
  * - `useCircles: false, anchoredOnly: true` -> `findFaceShade` (exact match to Auto-Shade: border-anchored lines & X's only)
  * - `useCircles: true, anchoredOnly: false` -> `findFaceCircle` (full white-diagonal, black 3-to-1, and relative Side A/B parity)
  */
-function findFaceParityCore(P, st, opts, { useCircles, anchoredOnly }) {
+function findFaceParityCore(P, st, opts, { useCircles, useSlither = false, anchoredOnly }) {
   const fast = !!(opts && opts.fast);
-  const fp = buildFaceParity(P, st, { buildGraph: !fast, useCircles });
+  const fp = buildFaceParity(P, st, { buildGraph: !fast, useCircles, useSlither });
   if (fp.conflict || fp.F === 0) return [];
   const { EXT, compress, diff, relate, adj, edgeFaceA, edgeFaceB } = fp;
 
@@ -464,5 +479,11 @@ export function findFaceShade(P, st, opts = null) {
 
 /** Advanced circle/relative Inside/Outside parity: includes white diagonals, black 3-to-1 corners, and unanchored chains. */
 export function findFaceCircle(P, st, opts = null) {
-  return findFaceParityCore(P, st, opts, { useCircles: true, anchoredOnly: false });
+  return findFaceParityCore(P, st, opts, { useCircles: true, useSlither: false, anchoredOnly: false });
+}
+
+/** Slitherlink (and hybrid Slitherlink+Masyu) Inside/Outside parity across numbered faces and circles. */
+export function findFaceSlither(P, st, opts = null) {
+  if (!P.hasSlither) return [];
+  return findFaceParityCore(P, st, opts, { useCircles: true, useSlither: true, anchoredOnly: false });
 }

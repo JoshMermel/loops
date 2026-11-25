@@ -253,6 +253,35 @@
               </figure>
             </div>
           </div>
+          <div class="help-rule-card help-rule-card--wide" id="help-card-slither" hidden>
+            <div class="help-rule-title">Slitherlink numbers (0–3)</div>
+            <p class="help-rule-desc">Each number inside a square tells how many of its <b>4 surrounding grid sides</b> belong to the loop. Tap any square (even a numbered one) to shade it Inside or Outside.</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid Slitherlink numbers matching surrounding segments">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="45" y="22" width="22" height="22"/>
+                  <rect class="face-in" x="45" y="44" width="22" height="22"/>
+                  <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <g class="hr-dot"><circle cx="23" cy="22" r="1.5"/><circle cx="45" cy="22" r="1.5"/><circle cx="67" cy="22" r="1.5"/><circle cx="89" cy="22" r="1.5"/><circle cx="23" cy="44" r="1.5"/><circle cx="45" cy="44" r="1.5"/><circle cx="67" cy="44" r="1.5"/><circle cx="89" cy="44" r="1.5"/><circle cx="23" cy="66" r="1.5"/><circle cx="45" cy="66" r="1.5"/><circle cx="67" cy="66" r="1.5"/><circle cx="89" cy="66" r="1.5"/></g>
+                  <path class="hr-line" d="M45 22H67V66H45Z"/>
+                  <text class="hr-num" x="56" y="33">3</text>
+                  <text class="hr-num" x="78" y="55">1</text>
+                </svg>
+                <figcaption class="ok-text">✓ Exact side counts</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Invalid Slitherlink 2 surrounded by 3 loop segments">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <g class="hr-dot"><circle cx="23" cy="22" r="1.5"/><circle cx="45" cy="22" r="1.5"/><circle cx="67" cy="22" r="1.5"/><circle cx="89" cy="22" r="1.5"/><circle cx="23" cy="44" r="1.5"/><circle cx="45" cy="44" r="1.5"/><circle cx="67" cy="44" r="1.5"/><circle cx="89" cy="44" r="1.5"/><circle cx="23" cy="66" r="1.5"/><circle cx="45" cy="66" r="1.5"/><circle cx="67" cy="66" r="1.5"/><circle cx="89" cy="66" r="1.5"/></g>
+                  <path class="hr-line-bad" d="M45 22H67V66H45Z"/>
+                  <text class="hr-num bad" x="56" y="33">2</text>
+                </svg>
+                <figcaption class="bad-text">✕ 3 sides around a 2</figcaption>
+              </figure>
+            </div>
+          </div>
         </div>
         <h3>Controls</h3>
         <ul class="help-controls">

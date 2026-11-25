@@ -11,7 +11,7 @@ The same rule table powers both difficulty grading and live hints (see [README.m
 - The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.
 - **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
 - **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).
-- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, and Swiss cheese).
+- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, Swiss cheese, and Slitherlink & Hybrids).
 
 ## How the examples work
 
@@ -627,3 +627,96 @@ Checkerboard light/dark dot counts in a full-board region force its exit segment
 ### Swiss cheese
 
 Cutout holes cannot be entered. Every enclosed hole lies entirely **Inside** or entirely **Outside** the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, `chokepoint`, `faceShade`, and `faceCircle` — work naturally around and across interior holes.
+
+### Slitherlink & Hybrids
+
+Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrid** books, numbered squares share the same single loop with Masyu circles or the Full-board rule.
+
+#### slitherZero
+
+*Beginner, cost 2*
+
+A 0 square has no loop segments around it.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slitherCount
+
+*Beginner, cost 2*
+
+A numbered square whose remaining edges match its count must fill or cross them out.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slitherCorner
+
+*Beginner, cost 3*
+
+A 3, 1, or 2 at a blocked corner forces its corner or outer extension segments.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slitherAdjacent3
+
+*Beginner, cost 5*
+
+Two orthogonally adjacent 3s force three parallel segments and cross out the shared-vertex extensions.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slitherDiag3
+
+*Beginner, cost 6*
+
+Two diagonally adjacent 3s force both outer corners on.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slither3LineIn
+
+*Beginner, cost 6*
+
+A segment entering a corner of a 3 forces its two opposite sides on and blocks the other exit.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slither1LineIn
+
+*Medium, cost 12*
+
+A segment forced into a corner of a 1 crosses out its two opposite sides.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### slitherDiag32
+
+*Medium, cost 14*
+
+A diagonal chain of 2s between two 3s forces both outer corners on.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+#### faceSlither
+
+*Hard, cost 38*
+
+Inside/outside shading around numbered Slitherlink squares (and circles on hybrids) forces an edge.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+

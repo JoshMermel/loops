@@ -67,6 +67,18 @@ if (process.argv.includes('--worker')) {
       if (seenG.has(ek)) return fail('duplicate given edge');
       seenG.add(ek);
     }
+    const seenS = new Set();
+    for (const sc of raw.slither || []) {
+      if (sc.r < 0 || sc.c < 0 || sc.r >= raw.rows - 1 || sc.c >= raw.cols - 1) return fail('slither clue outside the board');
+      if (sc.n !== 0 && sc.n !== 1 && sc.n !== 2 && sc.n !== 3) return fail(`bad slither value "${sc.n}"`);
+      const fk = sc.r * (raw.cols - 1) + sc.c;
+      if (seenS.has(fk)) return fail('duplicate slither clue on one square');
+      seenS.add(fk);
+      if (seenV.has(sc.r * raw.cols + sc.c) || seenV.has(sc.r * raw.cols + sc.c + 1)
+        || seenV.has((sc.r + 1) * raw.cols + sc.c) || seenV.has((sc.r + 1) * raw.cols + sc.c + 1)) {
+        return fail('slither clue touches a void cell');
+      }
+    }
 
     let P;
     try { P = compile(raw); } catch (e) { return fail(`does not compile: ${e.message}`); }
@@ -101,6 +113,7 @@ if (process.argv.includes('--worker')) {
         rows: raw.rows,
         cols: raw.cols,
         clues: raw.clues,
+        ...(raw.slither && raw.slither.length ? { slither: raw.slither } : {}),
         ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
         fullBoard: false,
@@ -111,6 +124,28 @@ if (process.argv.includes('--worker')) {
       }
       if (alt.exceeded && alt.count < 2) return fail('fullBoard necessity not proved: hit node cap');
       if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
+    }
+
+    // Verify mutual necessity on Slitherlink + Masyu hybrids: neither clue set alone may be unique
+    if (P.hasSlither && P.clueCells.length > 0 && !P.fullBoard && !entry.hidden) {
+      const baseOpts = {
+        name: raw.name,
+        rows: raw.rows,
+        cols: raw.cols,
+        ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
+        ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
+      };
+      const onlySlither = compile({ ...baseOpts, clues: [], slither: raw.slither });
+      let altS = solve(onlySlither, { limit: 2, maxNodes: 50000 });
+      if (altS.count < 2 && altS.exceeded) altS = solve(onlySlither, { limit: 2, maxNodes: 500000, rng: makeRng(23456 + from + k) });
+      if (altS.exceeded && altS.count < 2) return fail('hybrid circle necessity not proved: hit node cap');
+      if (altS.count < 2) return fail('Masyu circles are redundant on hybrid (uniquely solvable from Slitherlink alone)');
+
+      const onlyMasyu = compile({ ...baseOpts, clues: raw.clues, slither: [] });
+      let altM = solve(onlyMasyu, { limit: 2, maxNodes: 50000 });
+      if (altM.count < 2 && altM.exceeded) altM = solve(onlyMasyu, { limit: 2, maxNodes: 500000, rng: makeRng(34567 + from + k) });
+      if (altM.exceeded && altM.count < 2) return fail('hybrid Slitherlink necessity not proved: hit node cap');
+      if (altM.count < 2) return fail('Slitherlink numbers are redundant on hybrid (uniquely solvable from Masyu alone)');
     }
   });
 

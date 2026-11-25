@@ -1,6 +1,7 @@
-// Live circle error feedback from player edge marks and gray labels alone (never looks at the stored solution).
-// Returns an array of 'bad' | '' per clue in P.clues (only broken circles are marked; completion is left to the player).
+// Live circle & Slitherlink error feedback from player edge marks and gray labels alone (never looks at the stored solution).
+// Returns an array of 'bad' | '' per clue (only broken clues are marked; completion is left to the player).
 import { NONE, WHITE, BLACK, GRAY } from './logic.js';
+export { slitherStates } from './variants/slitherlink.js';
 
 export function clueStates(P, marks) {
   const { ed, ed2, nb } = P;
@@ -108,7 +109,21 @@ export function earlyLoopEdges(P, marks) {
     const missesClue = (compClues.get(r) || 0) < totalClues;
     const missesFull = P.fullBoard && edges.length < P.activeCount;
     const hasOtherSegments = edges.length < totalOn;
-    if (missesClue || missesFull || hasOtherSegments) {
+    let missesSlither = false;
+    if (P.hasSlither && !hasOtherSegments) {
+      const fe = P.faceEdges;
+      for (let k = 0; k < P.slither.length; k++) {
+        const sc = P.slither[k];
+        const f4 = sc.f * 4;
+        let on = 0;
+        for (let d = 0; d < 4; d++) {
+          const x = fe[f4 + d];
+          if (x >= 0 && e[x] === 1) on++;
+        }
+        if (on !== sc.n) { missesSlither = true; break; }
+      }
+    }
+    if (missesClue || missesFull || missesSlither || hasOtherSegments) {
       for (const x of edges) bad.add(x);
     }
   }

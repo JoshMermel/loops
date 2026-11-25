@@ -657,3 +657,43 @@ test('shaped boards: unified interior-hole shading, Auto-Shade propagation acros
   assert.equal(mc2.edges[2 * (2 * 6 + 0)], 2, 'Auto-X+Auto-Shade must cross indented border next to OUT face');
   assert.equal(mc2.edges[2 * (0 * 6 + 0)], 0, 'missing void edges must never be marked');
 });
+
+test('Slitherlink Auto-X marks 0 faces and satisfied numbered faces, chains with Auto-Shade, and unwinds cleanly', () => {
+  const P = compile({
+    name: 'sl_ax', rows: 4, cols: 4, clues: [],
+    slither: [{ r: 0, c: 0, n: 0 }, { r: 1, c: 1, n: 2 }],
+  });
+  const m = blank(P);
+  const f0Edges = [0, 1, 2, 3].map((d) => P.faceEdges[0 * 4 + d]);
+  const fMid = 1 * 3 + 1;
+  const fMidEdges = [0, 1, 2, 3].map((d) => P.faceEdges[fMid * 4 + d]);
+
+  // 1. Turning Auto-X on immediately crosses out all 4 edges around the 0 square, and Auto-Shade paints face(0,0) Outside
+  reconcileAutoX(P, m, true);
+  reconcileAutoShade(P, m, true);
+  for (const x of f0Edges) {
+    assert.equal(m.edges[x], 2, 'all 4 sides of a 0 square must auto-X');
+    assert.equal(m.autoE[x], 1);
+  }
+  assert.equal(m.faces[0], FACE_OUT, '0 square on border must auto-shade Outside via its Auto-X edges');
+  // The 2 square has 0 drawn lines, so its sides stay open (bookkeeping only)
+  for (const x of fMidEdges) assert.equal(m.edges[x], 0);
+
+  // 2. Drawing 1 segment on the 2 square does not satisfy it yet; drawing 2 segments auto-Xes its remaining 2 sides
+  m.edges[fMidEdges[0]] = 1;
+  reconcileAutoX(P, m, true);
+  assert.equal(m.edges[fMidEdges[2]], 0);
+  assert.equal(m.edges[fMidEdges[3]], 0);
+
+  m.edges[fMidEdges[1]] = 1;
+  reconcileAutoX(P, m, true);
+  assert.equal(m.edges[fMidEdges[2]], 2, 'satisfied 2 square must auto-X remaining sides');
+  assert.equal(m.edges[fMidEdges[3]], 2);
+  assert.equal(m.autoE[fMidEdges[2]], 1);
+
+  // 3. Erasing one drawn segment cleanly unwinds those Auto-X marks
+  m.edges[fMidEdges[1]] = 0;
+  reconcileAutoX(P, m, true);
+  assert.equal(m.edges[fMidEdges[2]], 0);
+  assert.equal(m.edges[fMidEdges[3]], 0);
+});

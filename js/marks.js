@@ -6,6 +6,7 @@
 // Auto-Shade:   m.autoF[f] = 1 when face f's tint was placed automatically by Auto-Shade mode (0 for manual).
 // Gray labels:  m.grays[k] = 0 unlabeled, 1 White, 2 Black (indexed by P.grays[k]); m.autoG[k] = 1 if auto-labeled.
 import { NONE, WHITE, BLACK } from './logic.js';
+import { autoXSlither } from './variants/slitherlink.js';
 
 export const FACE_BLANK = 0, FACE_IN = 1, FACE_OUT = 2;
 
@@ -151,7 +152,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   }
 
   // Rule 4: dead-end intersections (1 exit) and dead-end pockets (2-exit corridor returning to same node)
-  let hasAnyClueOrSeg = P.clueCells.length > 0;
+  let hasAnyClueOrSeg = P.clueCells.length > 0 || Boolean(P.hasSlither && P.slither.some((s) => s.n > 0));
   if (!hasAnyClueOrSeg) for (let i = 0; i < N; i++) if (deg[i] > 0) { hasAnyClueOrSeg = true; break; }
 
   const availEdges = (i) => {
@@ -166,6 +167,11 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   let changed = true;
   while (changed) {
     changed = false;
+    // Slitherlink bookkeeping: a 0 face or any face with `n` drawn segments auto-X's its remaining open sides
+    if (P.hasSlither && autoXSlither(P, w, add)) {
+      changed = true;
+      continue;
+    }
     // Rule 4: dead-end intersections & pockets (disabled on fullBoard since every intersection must be visited)
     if (!P.fullBoard) {
       for (let i = 0; i < N; i++) {
