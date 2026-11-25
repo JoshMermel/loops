@@ -1,0 +1,24 @@
+{
+  "name": "Masyu",
+  "short_name": "Masyu",
+  "description": "13,500+ verified unique Masyu pearl-loop logic puzzles with human-style hints.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#f5f5f5",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -54,7 +54,7 @@ Follows the puzzle-toolkit build order (see [README.md](README.md)).
 
 - [x] **Board rotation** (`js/rotate.js`) for tall rectangular boards (auto-landscape + Turn button).
 - [ ] **Two-press step-by-step hints** (like `polyomino-panel`: first press shows where to look, second press shows the full deduction and ghost marks).
-- [ ] **Offline play** (`sw.js` service worker opt-in in Settings, as in `polyomino-panel`).
+- [x] **Offline play** (`sw.js`, `js/offline.js`, `manifest.webmanifest`): opt-in **Offline play** toggle in Settings that registers the service worker, precaches the app shell (`masyu-app-v1`) and all shipped puzzle books (`masyu-books-v1`, ~6.6 MB) with live download progress, supports on-demand updates and full cache cleanup when turned off, and silently syncs newly added books when online.
 - [ ] **Playwright PNG screenshots** (`tools/capture_how_to_images.py`) once Playwright is installed, to compare against the pure-Node SVG illustrations.
 - [ ] **Phone / touch testing** of edge-tap vs cell-drag hit margins (`EDGE_MARGIN` in `js/board.js`).
 - [ ] **Variants (separate branches, reusing topology + rule table + book machinery):**

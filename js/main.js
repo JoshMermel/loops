@@ -18,6 +18,9 @@ import {
   lightColors, resolvePalette, eyesOf, alikeMatrix,
 } from './palettes.js';
 import { parseSelection, planPrint, buildPrintRoot } from './print.js';
+import {
+  isOfflineSupported, getOfflineStatus, enableOffline, disableOffline, syncMissingBooks,
+} from './offline.js';
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -662,7 +665,11 @@ async function openBook(bookId, idx = 0) {
   try {
     raw = await fetchBook(entry);
   } catch {
-    if (seq === openBookSeq) toast(`Could not load "${entry.name}".`);
+    if (seq === openBookSeq) {
+      toast(navigator.onLine === false
+        ? `You're offline — "${entry.name}" isn't saved for offline play.`
+        : `Could not load "${entry.name}".`);
+    }
     return;
   }
   if (seq !== openBookSeq) return;
@@ -698,6 +705,7 @@ async function init() {
   if (!known) bookId = manifest.default || state.books[0].id;
   const idx = !known ? 0 : params.has('puzzle') ? +params.get('puzzle') - 1 : (last && last.book === bookId ? last.idx : 0);
   await openBook(bookId, Number.isFinite(idx) ? idx : 0);
+  syncMissingBooks(state.books);
 }
 
 // ------------------------------------------------------------ UI wiring & modals
@@ -942,6 +950,7 @@ const disarmClear = () => { clearBtn.classList.remove('danger-btn--confirm'); cl
 const settingsModal = setupModal('settings-modal', 'settings-btn', () => {
   $('setting-dark-mode').checked = document.documentElement.dataset.theme === 'dark';
   disarmClear();
+  syncOfflineUI();
 });
 const helpModal = setupModal('help-modal', 'help-btn');
 // Don't auto-open help if deep-linking directly to a puzzle (e.g. from docs/how_to_solve.md or armory)
@@ -1069,6 +1078,120 @@ clearBtn.addEventListener('click', () => {
 });
 
 $('csv-btn').addEventListener('click', () => $('csv-file').click());
+
+// ---- Offline play (opt-in service worker)
+const offlineToggle = $('setting-offline');
+const offlineDesc = $('offline-desc');
+const offlineActions = $('offline-actions');
+const offlineRefreshBtn = $('offline-refresh-btn');
+let offlineAbort = null;
+let offlineJob = null;
+let offlineBusy = false;
+
+function renderOfflineStatus(status) {
+  const count = status.total ? `all ${status.total} puzzle books` : 'all puzzle books';
+  if (!status.supported) {
+    offlineToggle.checked = false;
+    offlineToggle.disabled = true;
+    offlineActions.hidden = true;
+    offlineDesc.textContent = 'Unavailable in this browser or private window';
+    return;
+  }
+  offlineToggle.disabled = false;
+  offlineToggle.checked = status.enabled;
+  offlineActions.hidden = !status.enabled;
+  offlineRefreshBtn.disabled = offlineBusy || navigator.onLine === false;
+  if (!status.enabled) {
+    offlineDesc.textContent = `Save the app and ${count} (~6.6 MB) to play without internet`;
+  } else if (status.total > 0 && status.cached >= status.total) {
+    offlineDesc.textContent = `Ready offline — all ${status.total} books saved`;
+  } else {
+    offlineDesc.textContent = `${status.cached} of ${status.total} books saved — connect to finish downloading`;
+  }
+}
+
+async function syncOfflineUI() {
+  if (offlineBusy) return;
+  renderOfflineStatus(await getOfflineStatus(state.books));
+}
+
+async function runOfflineSync(force) {
+  if (!isOfflineSupported()) return;
+  if (offlineAbort) offlineAbort.abort();
+  if (offlineJob) await offlineJob.catch(() => {});
+
+  const ctrl = new AbortController();
+  offlineAbort = ctrl;
+  offlineBusy = true;
+  offlineToggle.checked = true;
+  offlineActions.hidden = false;
+  offlineRefreshBtn.disabled = true;
+  const verb = force ? 'Updating offline copy' : 'Downloading books';
+  offlineDesc.textContent = force ? 'Updating offline copy…' : 'Setting up offline play…';
+
+  const job = enableOffline(state.books, {
+    force,
+    signal: ctrl.signal,
+    onProgress: (done, total) => {
+      if (ctrl.signal.aborted) return;
+      offlineDesc.textContent = total ? `${verb}… ${done} / ${total}` : `${verb}…`;
+    },
+  });
+  offlineJob = job;
+
+  let res = null;
+  let failed = false;
+  try {
+    res = await job;
+  } catch {
+    failed = true;
+  } finally {
+    if (offlineJob === job) {
+      offlineJob = null;
+      offlineAbort = null;
+      offlineBusy = false;
+    }
+  }
+
+  if (ctrl.signal.aborted) return;
+  await syncOfflineUI();
+  if (failed) {
+    toast('Could not enable offline play.');
+  } else if (force) {
+    toast(res?.ok ? 'Offline copy updated.' : 'Some books could not be updated.');
+  }
+}
+
+offlineToggle.addEventListener('change', async () => {
+  if (offlineToggle.checked) {
+    await runOfflineSync(false);
+    return;
+  }
+  if (offlineAbort) offlineAbort.abort();
+  if (offlineJob) await offlineJob.catch(() => {});
+  offlineBusy = true;
+  offlineRefreshBtn.disabled = true;
+  offlineActions.hidden = true;
+  offlineDesc.textContent = 'Removing offline copy…';
+  try {
+    await disableOffline();
+  } finally {
+    offlineBusy = false;
+  }
+  await syncOfflineUI();
+});
+
+offlineRefreshBtn.addEventListener('click', () => {
+  if (navigator.onLine === false) {
+    toast('Connect to the internet to update your offline copy.');
+    return;
+  }
+  runOfflineSync(true);
+});
+
+window.addEventListener('online', () => { syncOfflineUI(); syncMissingBooks(state.books); });
+window.addEventListener('offline', () => { syncOfflineUI(); });
+syncOfflineUI();
 $('csv-file').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
