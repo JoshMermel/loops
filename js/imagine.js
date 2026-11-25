@@ -763,7 +763,7 @@ function candidateEdges(P, st, frontierOnly = false) {
  *     fixed point is also an exact pre-filter for area contradictions.
  * Optional `costCap`: skip candidates that cannot beat `costCap` (strictly `< costCap`).
  */
-export function bestImagine(P, st, { costCap = Infinity } = {}) {
+export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) {
   const frontierOnly = costCap <= 84;
   const edges = candidateEdges(P, st, frontierOnly);
   if (!edges.length) return null;
@@ -820,11 +820,15 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
   // if an easy hit already achieves cost <= AREA_MIN_COST, we skip the O(edges) Tarjan/parity area scan!
   easyHits.sort((a, b) => (b.isFront ? 1 : 0) - (a.isFront ? 1 : 0) || a.rawSteps.length - b.rawSteps.length);
   let best = null;
-  const evalCandidates = (list) => {
+  const evalCandidates = (list, limit) => {
+    let accepted = 0;
     for (const c of list) {
+      if (accepted >= limit) break;
       const cap = best ? best.cost : costCap;
       const pr = pruneChain(P, st, c.edge, c.hyp, c.rawSteps, c.area, cap);
       if (!pr || pr.cost >= costCap) continue;
+      if (without && without.includes(pr.rule)) continue;
+      accepted++;
       if (!best || pr.cost < best.cost) {
         best = {
           edge: c.edge,
@@ -842,12 +846,15 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
         };
       }
     }
+    return accepted;
   };
-  evalCandidates(easyHits.slice(0, MAX_CAND));
+  const easyChecked = without
+    ? evalCandidates(easyHits, MAX_CAND)
+    : (evalCandidates(easyHits.slice(0, MAX_CAND), MAX_CAND), easyHits.length);
 
   // Area contradictions require >= 1 easy step (min cost AREA_MIN_COST = 98); skip whenever effectiveCap <= AREA_MIN_COST
   const effectiveCap = best ? Math.min(costCap, best.cost) : costCap;
-  if (easyHits.length < MAX_CAND && effectiveCap > AREA_MIN_COST) {
+  if (easyChecked < MAX_CAND && effectiveCap > AREA_MIN_COST) {
     const areaHits = [];
     for (let ei = 0; ei < edges.length; ei++) {
       const x = edges[ei];
@@ -871,7 +878,8 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
       }
     }
     areaHits.sort((a, b) => a.rawSteps.length - b.rawSteps.length);
-    evalCandidates(areaHits.slice(0, Math.max(0, MAX_CAND - easyHits.length)));
+    const areaBudget = Math.max(0, MAX_CAND - easyChecked);
+    evalCandidates(without ? areaHits : areaHits.slice(0, areaBudget), areaBudget);
   }
   return best;
 }

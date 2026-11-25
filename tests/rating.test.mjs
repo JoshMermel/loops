@@ -453,4 +453,20 @@ test('named Medium/Hard pattern rules fire cleanly and respect negative/boundary
   stBad.e[eBetween(Pbad, 1, 0, 2, 0)] = E_OFF;
   assert.equal(RULES.find((r) => r.id === 'parityPocket').find(Pbad, stBad, {}).length, 0);
   assert.equal(RULES.find((r) => r.id === 'chokepoint').find(Pbad, stBad, {}).length, 0);
+
+  // 14. nextSteps(..., without) filtering one imagine tier still finds costlier allowed imagine tiers
+  const exp12 = parseCsv(fs.readFileSync(path.join(root, 'data', '12x12-expert.csv'), 'utf8'));
+  const p11 = compile({ ...exp12.find((p) => p.name === '12X12-EXPERT-011') });
+  const st11 = initialState(p11);
+  let sawFiltered = false;
+  for (let k = 0; k < 100; k++) {
+    const base = nextSteps(p11, { cell: st11.cell.slice(), e: st11.e.slice(), cycle: st11.cycle });
+    if (!base) break;
+    if (base.rule === 'imagineLocal') {
+      const alt = nextSteps(p11, { cell: st11.cell.slice(), e: st11.e.slice(), cycle: st11.cycle }, null, ['imagineLocal', 'tryEdge']);
+      if (alt && (alt.rule === 'imagineTrace' || alt.rule === 'imagineChain')) { sawFiltered = true; break; }
+    }
+    for (const f of base.firings) applySets(st11, f.sets);
+  }
+  assert.equal(sawFiltered, true, 'excluding imagineLocal must still allow imagineTrace/imagineChain');
 });

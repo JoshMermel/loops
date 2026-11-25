@@ -14,9 +14,10 @@ import { TIERS } from '../js/rating.js';
 import { arg, verifyPuzzle } from './_cli.mjs';
 
 const sizeStr = arg('size', '8x8');
-const [cols, rows] = sizeStr.toLowerCase().split('x').map(Number);
-if (!cols || !rows || cols < 4 || rows < 4) {
-  console.error(`Invalid --size "${sizeStr}" (use COLSxROWS, each >= 4)`);
+const sizeParts = sizeStr.toLowerCase().split('x');
+const [cols, rows] = sizeParts.map(Number);
+if (sizeParts.length !== 2 || !Number.isInteger(cols) || !Number.isInteger(rows) || cols < 4 || rows < 4) {
+  console.error(`Invalid --size "${sizeStr}" (use COLSxROWS integers, each >= 4)`);
   process.exit(1);
 }
 const count = Math.trunc(+arg('count', 10));
@@ -30,6 +31,10 @@ if (!Number.isFinite(count) || count < 1 || !Number.isFinite(seed) || !Number.is
 const style = arg('style', 'balanced'); // balanced | white | black | sparse
 const layout = arg('layout', 'none');   // none | checkerboard | interior | frame | stripes | rot180 | mirror | transpose | rot90 | yinyang | yinyang-mirror | yinyang-transpose | cookie | cookie-horiz | cookie-diag | lattice
 const minFill = arg('min-fill', null) !== null ? +arg('min-fill') : null;
+if (minFill !== null && (!Number.isFinite(minFill) || minFill <= 0 || minFill > 1)) {
+  console.error(`Invalid --min-fill "${arg('min-fill')}" (must be in (0, 1])`);
+  process.exit(1);
+}
 const tier = arg('tier', 'any');        // any | Beginner | Medium | Hard | Expert | Expert+
 const maxTier = arg('max-tier', 'Expert');
 const validTiers = new Set(['any', ...TIERS, 'Expert+']);
@@ -42,6 +47,10 @@ if (!TIERS.includes(maxTier)) {
   process.exit(1);
 }
 const keepFrac = arg('keep', null) !== null ? +arg('keep') : null;
+if (keepFrac !== null && (!Number.isFinite(keepFrac) || keepFrac < 0 || keepFrac > 1)) {
+  console.error(`Invalid --keep "${arg('keep')}" (must be in [0, 1])`);
+  process.exit(1);
+}
 const prefix = arg('prefix', `${layout !== 'none' ? layout : style}_${cols}x${rows}`);
 const defaultOut = path.join('tools', 'library', `${prefix}.csv`);
 const outPath = arg('out', defaultOut);

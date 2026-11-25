@@ -393,7 +393,31 @@ test('Auto-Shade propagates from manual faces across lines and X-es, never overw
   applyAutoShade(P, m, false);
   assert.equal(m.faces[f(0, 0)], FACE_IN, 'manual face stays when Auto-Shade is turned OFF');
   assert.equal(m.faces[f(0, 1)], FACE_BLANK, 'auto face clears when Auto-Shade is turned OFF');
-  assert.equal(m.faces[f(0, 2)], FACE_BLANK, 'auto face clears when Auto-Shade is turned OFF');
+  // Manual face conflicting with a border line clears the entire parity-connected component regardless of order
+  const P2 = compile({ name: 'conf_order', rows: 4, cols: 4, clues: [] });
+  const m2 = blank(P2);
+  const f2 = (r, c) => r * 3 + c;
+  m2.edges[2 * (0 * 4 + 0)] = 1; // top border -> face (0,0) = IN
+  m2.edges[2 * (1 * 4 + 0)] = 2; // X linking face (0,0) <-> (1,0)
+  m2.edges[2 * (2 * 4 + 0)] = 2; // X linking face (1,0) <-> (2,0)
+  m2.faces[f2(1, 0)] = FACE_OUT; // wrong manual OUT on middle face
+  m2.autoF[f2(1, 0)] = 0;
+  const comp2 = autoShadeCompute(P2, m2);
+  assert.equal(comp2.color[f2(0, 0)], 0);
+  assert.equal(comp2.color[f2(1, 0)], 0);
+  assert.equal(comp2.color[f2(2, 0)], 0, 'wrong manual shade must not flood past a border conflict');
+
+  // Mirror symmetry: conflict between two manual faces clears the whole component in both directions
+  const P3 = compile({ name: 'conf_mirror', rows: 3, cols: 4, clues: [] });
+  const m3 = blank(P3);
+  m3.edges[2 * (0 * 4 + 1) + 1] = 2; // X between (0,0) and (0,1)
+  m3.edges[2 * (0 * 4 + 2) + 1] = 1; // line between (0,1) and (0,2)
+  m3.faces[1] = FACE_IN; m3.autoF[1] = 0;
+  m3.faces[2] = FACE_IN; m3.autoF[2] = 0;
+  const comp3 = autoShadeCompute(P3, m3);
+  assert.equal(comp3.color[0], 0);
+  assert.equal(comp3.color[1], 0);
+  assert.equal(comp3.color[2], 0);
 });
 
 test('facesFromSolvedLoop computes exact Inside/Outside shading for all dual squares', () => {

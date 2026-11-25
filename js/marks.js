@@ -259,12 +259,9 @@ export function autoShadeCompute(P, m) {
 
   const mark = (f, col) => {
     if (f < 0 || (col !== FACE_IN && col !== FACE_OUT)) return;
-    const prev = mask[f];
-    const next = prev | col;
-    if (next !== prev) {
-      mask[f] = next;
-      if (next === FACE_IN || next === FACE_OUT) queue.push(f);
-    }
+    if (mask[f] & col) return;
+    mask[f] |= col;
+    queue.push(f, col);
   };
 
   // Seed 1: manual face marks (never auto-placed ones)
@@ -292,12 +289,12 @@ export function autoShadeCompute(P, m) {
     else if (m.edges[eRight] === 2) mark(faceAt(r, fc - 1), FACE_OUT);
   }
 
-  // Propagate via BFS across interior lines (opposite) and interior X's (same) only
+  // Propagate both color bits independently via BFS across interior lines (opposite) and interior X's (same)
+  // so any conflicted parity component clears to 0 regardless of seed or face-index order.
   let head = 0;
   while (head < queue.length) {
     const f = queue[head++];
-    const col = mask[f];
-    if (col !== FACE_IN && col !== FACE_OUT) continue; // skip conflicted face
+    const col = queue[head++];
     const r = (f / fc) | 0, c = f % fc;
 
     const nbrs = [

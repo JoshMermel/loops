@@ -1516,7 +1516,7 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
   const imagined = (costCap = Infinity) => {
     if (noImagine) return null;
     if (found === undefined || (found === null && costCap > foundCap)) {
-      found = bestImagine(P, st, { costCap });
+      found = bestImagine(P, st, { costCap, without });
       foundCap = costCap;
     }
     return imagineAllowed(found) ? found : null;
