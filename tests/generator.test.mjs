@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
 import { rate } from '../js/rating.js';
-import { randomLoop, allowedClues, tightLoop, generatePuzzle, makeRng, maskPoints, quadrantStats } from '../js/generator.js';
+import {
+  randomLoop, allowedClues, tightLoop, generatePuzzle, makeRng, maskPoints, quadrantStats,
+  checkMazeGraph, mazeWalls, randomWalledLoop,
+} from '../js/generator.js';
 
 test('tightLoop returns cur.P.clue and cur.P.clueAt matching cur.clues even when final annealing steps reject', () => {
   for (let seed = 1; seed <= 20; seed++) {
@@ -216,4 +219,32 @@ test('generatePuzzle enforces balanced four-quadrant loop and clue coverage on l
   assert.equal(ql.minClues, 0);
   assert.ok(ql.fills[0] > 0);
   assert.equal(ql.minFill, 0);
+});
+
+test('maze generators produce 2-edge-connected wall layouts and verified unique wall-necessary puzzles', () => {
+  for (const style of ['maze-rooms', 'maze-braided', 'maze-barriers']) {
+    const rng = makeRng(314);
+    for (let k = 0; k < 5; k++) {
+      const walls = mazeWalls(style, 8, 8, rng);
+      assert.ok(walls.length >= 6, `${style} #${k} produced too few walls (${walls.length})`);
+      assert.equal(checkMazeGraph(8, 8, walls).ok, true, `${style} #${k} failed 2-edge-connectivity check`);
+      const P0 = compile({ name: 'mz0', rows: 8, cols: 8, clues: [], givens: walls });
+      const lp = randomWalledLoop(P0, rng);
+      assert.equal(lp.valid, true, `${style} #${k} randomWalledLoop invalid`);
+      assert.equal(isSolved(P0, lp.edges), true, `${style} #${k} randomWalledLoop violated walls or loop rules`);
+    }
+
+    const p = generatePuzzle({ rows: 8, cols: 8, seed: 42, style, budgetMs: 8000 });
+    assert.ok(p, `failed to generate 8x8 ${style} puzzle`);
+    assert.equal(p.fullBoard, false);
+    assert.ok(p.givens && p.givens.length >= 6);
+    assert.ok(p.givens.every((g) => g.v === 0));
+    assert.ok(p.clues.some((c) => c.t === 'W') && p.clues.some((c) => c.t === 'B'));
+    assert.equal(isSolved(p, decodeSolution(p, p.solution).e), true);
+    assert.equal(rate(p).solved, true);
+    // Wall necessity: dropping all walls leaves >= 2 solutions
+    const noWalls = compile({ name: 'nw', rows: p.rows, cols: p.cols, clues: p.clues });
+    const alt = solve(noWalls, { limit: 2, maxNodes: 50000 });
+    assert.equal(alt.count, 2, `${style} puzzle should require its walls`);
+  }
 });

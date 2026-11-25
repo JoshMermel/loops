@@ -1,6 +1,6 @@
 // Printable Masyu booklets: fixed black-and-white SVG laid out by cell size to fit both A4 and Letter.
 // Every page header links back to the site. Everything except buildPrintRoot is pure (tested in tests/print.test.mjs).
-import { E_ON } from './logic.js';
+import { E_ON, E_OFF } from './logic.js';
 import { tilesOutlinePath } from './board.js';
 
 const INK = '#111', GRID = '#8c8c8c';
@@ -77,11 +77,14 @@ export function boardSvg(P, sol = null) {
   const pad = 0.55;
   const w = cols - 1, h = rows - 1;
   let g = `<rect x="${-pad}" y="${-pad}" width="${w + 2 * pad}" height="${h + 2 * pad}" fill="#fff"/>`;
+  const givenE = P.hasGivens ? P.givenE : null;
   if (P.hasVoids) {
     const outline = tilesOutlinePath(rows, cols, (r, c) => !P.isVoid[r * cols + c], -0.5, -0.5, 1, 1, 0.14);
     g += `<path class="shape-outline" fill="#fff" fill-rule="evenodd" stroke="#b5b5b5" stroke-width="0.035" d="${outline}"/>`;
+  }
+  if (P.hasVoids || givenE) {
     for (let x = 0; x < P.numEdges; x++) {
-      if (P.edgeA[x] < 0) continue;
+      if (P.edgeA[x] < 0 || (givenE && givenE[x] === E_OFF)) continue;
       const a = P.edgeA[x], b = P.edgeB[x];
       g += `<line x1="${a % cols}" y1="${(a / cols) | 0}" x2="${b % cols}" y2="${(b / cols) | 0}" stroke="${GRID}" stroke-width="0.03"/>`;
     }
@@ -108,10 +111,10 @@ export function boardSvg(P, sol = null) {
       const x1 = gv.c, y1 = gv.r, x2 = gv.dir === 'H' ? gv.c + 1 : gv.c, y2 = gv.dir === 'V' ? gv.r + 1 : gv.r;
       if (gv.v === 1) {
         if (!sol) g += `<line class="given-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${INK}" stroke-width="0.16" stroke-linecap="round"/>`;
+      } else if (gv.dir === 'H') {
+        g += `<line class="given-wall" x1="${gv.c + 0.5}" y1="${gv.r - 0.5}" x2="${gv.c + 0.5}" y2="${gv.r + 0.5}" stroke="${INK}" stroke-width="0.11" stroke-linecap="round"/>`;
       } else {
-        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = 0.11;
-        const p = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
-        g += `<path class="given-wall" d="${p}" stroke="${INK}" stroke-width="0.065" stroke-linecap="round" fill="none"/>`;
+        g += `<line class="given-wall" x1="${gv.c - 0.5}" y1="${gv.r + 0.5}" x2="${gv.c + 0.5}" y2="${gv.r + 0.5}" stroke="${INK}" stroke-width="0.11" stroke-linecap="round"/>`;
       }
     }
   }

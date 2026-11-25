@@ -709,10 +709,11 @@ export class Board {
       g += `<path class="void-cutout-frame" d="${shape.voidHatchPath}"/>`;
     }
 
-    // Lattice tracks (only active edges so cutouts have no stray tracks)
-    if (P.hasVoids) {
+    // Lattice tracks (only active non-wall edges so cutouts and maze walls have no stray tracks)
+    const givenE = P.hasGivens ? P.givenE : null;
+    if (P.hasVoids || givenE) {
       for (let x = 0; x < P.numEdges; x++) {
-        if (P.edgeA[x] < 0) continue;
+        if (P.edgeA[x] < 0 || (givenE && givenE[x] === E_OFF)) continue;
         const [x1, y1, x2, y2] = segCoords(x);
         g += `<line class="grid-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
       }
@@ -741,7 +742,6 @@ export class Board {
 
     // Drawn loop segments directly along the lattice tracks (behind all pearls so circles read crisply)
     const pc = this.opts.pathColors;
-    const givenE = P.hasGivens ? P.givenE : null;
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 1 || !show.has(`l${x}`)) continue;
       const [x1, y1, x2, y2] = segCoords(x);
@@ -804,18 +804,26 @@ export class Board {
       }
     }
 
-    // Small crisp ✕ marks on crossed-out lattice tracks (auto-placed fainter; permanent given walls bolder/darker)
+    // Small crisp ✕ marks on crossed-out lattice tracks (auto-placed fainter); permanent given walls render as continuous perpendicular bars
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 2) continue;
+      if (givenE && givenE[x] === E_OFF) continue;
       const [x1, y1, x2, y2] = segCoords(x);
-      const isGivenWall = givenE && givenE[x] === E_OFF;
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = isGivenWall ? S * 0.105 : S * 0.085;
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.085;
       const path = `M${mx - d} ${my - d}L${mx + d} ${my + d}M${mx - d} ${my + d}L${mx + d} ${my - d}`;
-      if (isGivenWall) {
-        g += `<path class="wall-given-halo" d="${path}"/><path class="wall-given" d="${path}"/>`;
-      } else {
-        const autoCls = marks.autoE && marks.autoE[x] ? ' auto' : '';
-        g += `<path class="edge-x-halo${autoCls}" d="${path}"/><path class="edge-x${autoCls}" d="${path}"/>`;
+      const autoCls = marks.autoE && marks.autoE[x] ? ' auto' : '';
+      g += `<path class="edge-x-halo${autoCls}" d="${path}"/><path class="edge-x${autoCls}" d="${path}"/>`;
+    }
+    if (givenE) {
+      for (let x = 0; x < P.numEdges; x++) {
+        if (givenE[x] !== E_OFF || P.edgeA[x] < 0) continue;
+        const [x1, y1, x2, y2] = segCoords(x);
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        if ((x & 1) === 0) {
+          g += `<line class="wall-given" x1="${mx}" y1="${my - S / 2}" x2="${mx}" y2="${my + S / 2}"/>`;
+        } else {
+          g += `<line class="wall-given" x1="${mx - S / 2}" y1="${my}" x2="${mx + S / 2}" y2="${my}"/>`;
+        }
       }
     }
 

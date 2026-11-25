@@ -4,7 +4,7 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## Variants & future twists
 
-- [ ] **Pre-walled / maze Masyu:** standard Masyu puzzles with permanent given walls (`H0`/`V0`, already supported by the engine & UI) forming rooms, corridors, and mazes.
+- [ ] **Expand favorite Maze books:** prototype books for **Rooms & doorways**, **Braided maze**, and **Barrier walls** (24 puzzles each) are live under `🏛️ Mazes` — playtest and scale up whichever styles feel best (and retire any that don't).
 - [ ] **New circle types:**
   - **Strict / double-turn whites & numbered blacks:** e.g. marked white circles that must turn on *both* sides, and/or numbered black circles whose straight legs have a required length.
   - **Anti-Masyu (inverted pearls):** inverted rules (white turns and immediately turns on ≥1 side; black goes straight and stays straight on both sides), standalone or mixed with standard circles.

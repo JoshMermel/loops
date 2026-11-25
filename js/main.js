@@ -1020,6 +1020,8 @@ function renderHelpModal() {
   const hasGray = Boolean(P && P.grays && P.grays.length > 0);
   const isFull = Boolean(P && P.fullBoard);
   const hasGivens = Boolean(P && P.hasGivens);
+  const hasWalls = Boolean(P && P.hasGivens && P.givens.some((g) => g.v === 0));
+  const hasGivenLines = Boolean(P && P.hasGivens && P.givens.some((g) => g.v === 1));
   const hasVoids = Boolean(P && P.hasVoids);
 
   const intro = $('help-intro');
@@ -1030,6 +1032,8 @@ function renderHelpModal() {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and every circle, with no crossings or branches.';
     } else if (hasVoids) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle while avoiding the cutout holes, with no crossings or branches. Empty intersections are optional.';
+    } else if (hasWalls) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle without crossing any solid walls, with no crossings or branches. Empty intersections are optional.';
     } else {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle, with no crossings or branches. Empty intersections are optional.';
     }
@@ -1040,17 +1044,23 @@ function renderHelpModal() {
   $('help-card-gray').hidden = !hasGray;
   $('help-card-full').hidden = !isFull;
   $('help-card-voids').hidden = !hasVoids;
+  $('help-card-walls').hidden = !hasWalls || isFull;
 
   if (isFull) {
     $('help-full-title').textContent = hasGivens ? 'Full board & givens (special rule)' : 'Full board (special rule)';
+    const givenNote = hasGivenLines && hasWalls
+      ? 'Dark pre-filled segments and solid walls are permanent givens.'
+      : hasGivenLines
+        ? 'Dark pre-filled segments are permanent givens.'
+        : 'Solid walls permanently block the loop from crossing between adjacent intersections.';
     $('help-full-desc').innerHTML = hasGivens
-      ? 'The loop must visit <b>every</b> intersection dot — none may be left empty. Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.'
+      ? `The loop must visit <b>every</b> intersection dot — none may be left empty. ${givenNote}`
       : 'The loop must visit <b>every</b> intersection dot — none may be left empty.';
     $('help-full-ok').textContent = hasGivens ? '✓ Every dot + givens' : '✓ Visits every dot';
     const fullSvg = $('help-card-full').querySelector('svg');
     if (fullSvg) {
-      fullSvg.querySelector('.hr-given')?.toggleAttribute('hidden', !hasGivens);
-      fullSvg.querySelector('.hr-wall')?.toggleAttribute('hidden', !hasGivens);
+      fullSvg.querySelector('.hr-given')?.toggleAttribute('hidden', !hasGivenLines);
+      fullSvg.querySelector('.hr-wall')?.toggleAttribute('hidden', !hasWalls);
     }
   }
 
@@ -1059,7 +1069,7 @@ function renderHelpModal() {
 
   const link = $('help-guide-link');
   if (link) {
-    const hash = hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
+    const hash = hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : hasWalls ? '#variant-mazes' : '';
     link.setAttribute('href', `docs/how_to_solve.html${hash}`);
   }
 }

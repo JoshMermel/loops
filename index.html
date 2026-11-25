@@ -209,7 +209,7 @@
                   <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
                   <path class="hr-line" d="M23 22H89V66H67V44H45V66H23Z"/>
                   <path class="hr-given" d="M23 22H45"/>
-                  <path class="hr-wall" d="M52.5 62.5L59.5 69.5M52.5 69.5L59.5 62.5"/>
+                  <line class="hr-wall" x1="56" y1="55" x2="56" y2="77"/>
                 </svg>
                 <figcaption class="ok-text" id="help-full-ok">✓ Visits every dot</figcaption>
               </figure>
@@ -250,6 +250,34 @@
                   <path class="hr-line" d="M12 22H34V66H12Z"/>
                 </svg>
                 <figcaption class="ok-text">✓ Hole Outside the loop</figcaption>
+              </figure>
+            </div>
+          </div>
+          <div class="help-rule-card help-rule-card--wide" id="help-card-walls" hidden>
+            <div class="help-rule-title">Maze walls (special rule)</div>
+            <p class="help-rule-desc">Solid walls permanently block the loop from crossing between adjacent intersections. Route through doorways and around barriers — never across a wall.</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid loop passing through a doorway between solid walls">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 22H45M67 22H89M23 44H89M23 66H45M67 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <g class="hr-dot"><circle cx="23" cy="22" r="1.5"/><circle cx="45" cy="22" r="1.5"/><circle cx="67" cy="22" r="1.5"/><circle cx="89" cy="22" r="1.5"/><circle cx="23" cy="44" r="1.5"/><circle cx="45" cy="44" r="1.5"/><circle cx="67" cy="44" r="1.5"/><circle cx="89" cy="44" r="1.5"/><circle cx="23" cy="66" r="1.5"/><circle cx="45" cy="66" r="1.5"/><circle cx="67" cy="66" r="1.5"/><circle cx="89" cy="66" r="1.5"/></g>
+                  <path class="hr-line" d="M45 22V44H89"/>
+                  <line class="hr-wall" x1="56" y1="8" x2="56" y2="33"/>
+                  <line class="hr-wall" x1="56" y1="55" x2="56" y2="80"/>
+                </svg>
+                <figcaption class="ok-text">✓ Passes through doorway</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Invalid loop crossing a solid wall">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 22H45M67 22H89M23 44H89M23 66H45M67 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <g class="hr-dot"><circle cx="23" cy="22" r="1.5"/><circle cx="45" cy="22" r="1.5"/><circle cx="67" cy="22" r="1.5"/><circle cx="89" cy="22" r="1.5"/><circle cx="23" cy="44" r="1.5"/><circle cx="45" cy="44" r="1.5"/><circle cx="67" cy="44" r="1.5"/><circle cx="89" cy="44" r="1.5"/><circle cx="23" cy="66" r="1.5"/><circle cx="45" cy="66" r="1.5"/><circle cx="67" cy="66" r="1.5"/><circle cx="89" cy="66" r="1.5"/></g>
+                  <path class="hr-line-bad" d="M23 22H89"/>
+                  <line class="hr-wall" x1="56" y1="8" x2="56" y2="33"/>
+                  <line class="hr-wall" x1="56" y1="55" x2="56" y2="80"/>
+                </svg>
+                <figcaption class="bad-text">✕ Cannot cross walls</figcaption>
               </figure>
             </div>
           </div>
