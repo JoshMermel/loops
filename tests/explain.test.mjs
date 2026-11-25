@@ -1,11 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  compile, solve, encodeSolution, isSolved, E_ON, E_OFF,
+  compile, parseCsv, solve, encodeSolution, isSolved, E_ON, E_OFF,
 } from '../js/logic.js';
 import { rate, nextSteps } from '../js/rating.js';
-import { explainStep, describeMarks } from '../js/explain.js';
+import { explainStep, describeMarks, targetsOf } from '../js/explain.js';
 import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -54,7 +59,6 @@ test('computeHint reports stuck when no rule applies', () => {
 test('following hints from an empty board solves every Beginner and Medium puzzle', () => {
   const rng = mulberry32(2026);
   let testedBegMed = 0;
-  let sawImagine = false;
 
   for (let attempt = 0; attempt < 1200 && testedBegMed < 35; attempt++) {
     const rows = 4 + (attempt % 3); // 4, 5, 6
@@ -101,7 +105,6 @@ test('following hints from an empty board solves every Beginner and Medium puzzl
       const first = h.hints[0];
       assert.ok(first.text && first.text.length > 10, `empty hint text for ${h.rule}`);
       if (h.rule === 'imagineLocal' || h.rule === 'imagineTrace' || h.rule === 'imagineChain') {
-        sawImagine = true;
         assert.ok(first.text.includes('Imagine'), `imagine hint should explain hypothesis: ${first.text}`);
         assert.ok(first.text.includes('So '), `imagine hint should state verdict: ${first.text}`);
       }
@@ -117,30 +120,30 @@ test('following hints from an empty board solves every Beginner and Medium puzzl
 });
 
 test('imagine explanation describes the chain of consequences, not just the verdict', () => {
-  // Construct a board where an imagine step fires: e.g. 5x5 with whites/blacks forcing a short chain
-  const P = compile({
-    name: 'img_test', rows: 5, cols: 5,
-    clues: [
-      { r: 0, c: 2, t: 'W' },
-      { r: 2, c: 0, t: 'W' },
-      { r: 2, c: 4, t: 'W' },
-      { r: 4, c: 2, t: 'W' },
-      { r: 2, c: 2, t: 'B' },
-    ],
-  });
-  const st = { cell: new Int8Array(P.N), e: new Int8Array(P.numEdges), cycle: false };
-  for (const i of P.clueCells) st.cell[i] = 2;
-  // Advance past Beginner steps until imagine fires (or check rate steps)
-  const r = rate(P);
-  const imgStep = r.steps.find((s) => s.rule === 'imagineLocal' || s.rule === 'imagineTrace' || s.rule === 'imagineChain');
-  if (imgStep) {
+  // Use real puzzles from data/armory.csv that genuinely fire imagine rules
+  const armory = parseCsv(fs.readFileSync(path.join(root, 'data', 'armory.csv'), 'utf8'));
+  let checkedImagine = 0;
+  for (const raw of armory) {
+    if (!raw.rules.startsWith('imagine')) continue;
+    const P = compile({ ...raw });
+    const r = rate(P);
+    const imgStep = r.steps.find((s) => s.rule === 'imagineLocal' || s.rule === 'imagineTrace' || s.rule === 'imagineChain');
+    assert.ok(imgStep, `expected an imagine step on ${raw.name} (${raw.rules})`);
     const exp = explainStep(P, imgStep);
-    assert.ok(exp.text.startsWith('Imagine '));
-    assert.ok(exp.text.includes('So '));
+    assert.ok(exp.text.startsWith('Imagine '), `unexpected imagine text on ${raw.name}: ${exp.text}`);
+    assert.ok(exp.text.includes('So '), `missing verdict on ${raw.name}: ${exp.text}`);
     assert.ok(exp.text.length > 40);
+    assert.ok(!/\b(faceShade|faceCircle|whiteStraight|blackWall|forcedExits)\b/.test(exp.text), `leaked rule id: ${exp.text}`);
+    checkedImagine++;
   }
-  // Also test describeMarks formatting
-  const txt = describeMarks(P, { segOn: [0], segOff: [1] });
+  assert.ok(checkedImagine >= 3, `expected >= 3 imagine puzzles in armory, checked ${checkedImagine}`);
+
+  // Also test targetsOf deduplication and describeMarks formatting
+  const P0 = compile({ name: 'fmt', rows: 4, cols: 4, clues: [] });
+  assert.deepEqual(targetsOf([['e', 0, E_ON], ['e', 0, E_ON], ['e', 1, E_OFF], ['e', 1, E_OFF]]), {
+    segOn: [0], segOff: [1],
+  });
+  const txt = describeMarks(P0, { segOn: [0], segOff: [1] });
   assert.ok(txt.includes('draw '));
   assert.ok(txt.includes('cross out '));
 });

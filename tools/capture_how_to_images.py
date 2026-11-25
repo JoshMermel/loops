@@ -35,6 +35,8 @@ def capture(page, base, ex, out_path):
             localStorage.setItem(key, JSON.stringify(save));
             localStorage.setItem('ms_dark', '0');
             localStorage.setItem('ms_seenHelp', '1');
+            localStorage.setItem('ms_autoX', '0');
+            localStorage.setItem('ms_autoShade', '0');
         }""",
         [key, save],
     )

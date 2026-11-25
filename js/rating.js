@@ -5,7 +5,7 @@
 // A puzzle's `tier` is the tier of the hardest rule it needed; its `score` is the sum of step costs
 // (+100 per undecided cell if the rules get stuck, which makes it Expert, "beyond the hints").
 import {
-  NONE, WHITE, BLACK, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
+  WHITE, BLACK, UNKNOWN, OFF, LOOP, E_UNKNOWN, E_ON, E_OFF,
   initialState, cloneState, isSolved,
 } from './logic.js';
 import { bestImagine, setFullContradiction, easyContradiction, MEDIUM_MAX, HARD_MAX } from './imagine.js';
@@ -656,15 +656,18 @@ function findThreeWhites(P, st) {
     for (const [d1, d2, p1, p2] of [[1, 3, 0, 2], [0, 2, 1, 3]]) {
       const a = P.nb[mid * 4 + d1], b = P.nb[mid * 4 + d2];
       if (a < 0 || b < 0 || P.clue[a] !== WHITE || P.clue[b] !== WHITE) continue;
-      // All three must cross along (p1, p2)
+      // All three must cross along (p1, p2); push each shared (d1,d2) edge once
       const sets = [];
+      let ok = true;
       for (const c of [a, mid, b]) {
         const ep1 = P.ed[c * 4 + p1], ep2 = P.ed[c * 4 + p2];
-        const ed1 = P.ed[c * 4 + d1], ed2 = P.ed[c * 4 + d2];
-        if (ep1 >= 0 && st.e[ep1] === E_UNKNOWN) sets.push(['e', ep1, E_ON]);
-        if (ep2 >= 0 && st.e[ep2] === E_UNKNOWN) sets.push(['e', ep2, E_ON]);
-        if (ed1 >= 0 && st.e[ed1] === E_UNKNOWN) sets.push(['e', ed1, E_OFF]);
-        if (ed2 >= 0 && st.e[ed2] === E_UNKNOWN) sets.push(['e', ed2, E_OFF]);
+        if (ep1 < 0 || ep2 < 0) { ok = false; break; }
+        if (st.e[ep1] === E_UNKNOWN) sets.push(['e', ep1, E_ON]);
+        if (st.e[ep2] === E_UNKNOWN) sets.push(['e', ep2, E_ON]);
+      }
+      if (!ok) continue;
+      for (const x of [P.ed[a * 4 + d1], P.ed[mid * 4 + d1], P.ed[mid * 4 + d2], P.ed[b * 4 + d2]]) {
+        if (x >= 0 && st.e[x] === E_UNKNOWN) sets.push(['e', x, E_OFF]);
       }
       if (sets.length) out.push({ sets, info: { cells: [a, mid, b], axis: p1 === 0 ? 'v' : 'h' } });
     }
@@ -683,13 +686,16 @@ function findTwoWhitesStraight(P, st) {
       if (far < 0 || st.e[far] !== E_ON) continue;
       const p1 = (d + 1) & 3, p2 = (d + 3) & 3;
       const sets = [];
+      let ok = true;
       for (const c of [w1, w2]) {
         const ep1 = P.ed[c * 4 + p1], ep2 = P.ed[c * 4 + p2];
-        const ea = P.ed[c * 4 + d], eb = P.ed[c * 4 + (d ^ 2)];
-        if (ep1 >= 0 && st.e[ep1] === E_UNKNOWN) sets.push(['e', ep1, E_ON]);
-        if (ep2 >= 0 && st.e[ep2] === E_UNKNOWN) sets.push(['e', ep2, E_ON]);
-        if (ea >= 0 && st.e[ea] === E_UNKNOWN) sets.push(['e', ea, E_OFF]);
-        if (eb >= 0 && st.e[eb] === E_UNKNOWN) sets.push(['e', eb, E_OFF]);
+        if (ep1 < 0 || ep2 < 0) { ok = false; break; }
+        if (st.e[ep1] === E_UNKNOWN) sets.push(['e', ep1, E_ON]);
+        if (st.e[ep2] === E_UNKNOWN) sets.push(['e', ep2, E_ON]);
+      }
+      if (!ok) continue;
+      for (const x of [P.ed[w1 * 4 + (d ^ 2)], P.ed[w1 * 4 + d], P.ed[w2 * 4 + d]]) {
+        if (x >= 0 && st.e[x] === E_UNKNOWN) sets.push(['e', x, E_OFF]);
       }
       if (sets.length) out.push({ sets, info: { w1, w2, farEdge: far, axis: p1 === 0 || p2 === 0 ? 'v' : 'h' } });
     }
@@ -1051,7 +1057,7 @@ function findTryEdge(P, st, { upto }) {
     for (const val of [E_ON, E_OFF]) {
       const s2 = cloneState(st);
       s2.e[x] = val;
-      const r = closure(P, s2, upto, best ? best.info.steps : Infinity);
+      const r = closure(P, s2, upto, best ? best.info.steps - 1 : Infinity);
       if (r.contradiction) {
         const cand = {
           sets: [['e', x, val === E_ON ? E_OFF : E_ON]],
@@ -1171,7 +1177,7 @@ export const ruleLabel = (id) => (id === 'unsolved' ? 'none of the current rules
 const IMAGINE_AFTER = 18; // Beginner + local Medium + faceShade (<= 18) always run before searching imagined chains
 
 /** Apply all non-costly rules below `upto` until fixed point, contradiction, or `maxSteps`. Mutates `st`. */
-export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity) {
+export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity, checkContra = true) {
   const allowed = Array.isArray(upto) ? new Set(upto) : null;
   const limit = allowed ? RULES.length : upto;
   let steps = 0;
@@ -1192,7 +1198,7 @@ export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity) {
       }
       if (!freeFired) break;
     }
-    if (contradiction(P, st)) return { contradiction: true, steps, trace };
+    if (checkContra && contradiction(P, st)) return { contradiction: true, steps, trace };
     if (steps >= maxSteps) return { contradiction: false, steps, trace };
     let fired = false;
     for (let r = 0; r < limit; r++) {
@@ -1215,11 +1221,8 @@ export function closure(P, st, upto = FIRST_LOOKAHEAD, maxSteps = Infinity) {
   return { contradiction: false, steps, trace };
 }
 
-/**
- * Find the cheapest applicable rule in `st`, returning { rule, tier, weight, firings } or null.
- * Applies silent bookkeeping to `st` first (recording any active bookkeeping rules in `bookkeeping`).
- */
-export function nextSteps(P, st, bookkeeping = null, without = null) {
+/** Drain all free bookkeeping rules into `st`, returning false on conflict. */
+function runFreeBookkeeping(P, st, bookkeeping = null) {
   for (;;) {
     let any = false;
     for (const r of RULES) {
@@ -1227,15 +1230,23 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
       let changed = false;
       for (const f of r.find(P, st, {})) {
         if (applySets(st, f.sets)) { any = true; changed = true; }
-        else return null;
+        else return false;
       }
       if (changed && bookkeeping) bookkeeping[r.id] = true;
     }
     if (!any) break;
   }
+  return true;
+}
+
+/**
+ * Find the cheapest applicable rule in `st`, returning { rule, tier, weight, firings } or null.
+ * Applies silent bookkeeping to `st` first (recording any active bookkeeping rules in `bookkeeping`).
+ */
+export function nextSteps(P, st, bookkeeping = null, without = null) {
+  if (!runFreeBookkeeping(P, st, bookkeeping)) return null;
   const noImagine = !!without && (
     without.includes('imagineLocal') || without.includes('imagineTrace') || without.includes('imagineChain')
-    || without.includes('imagine') || without.includes('imagineLong')
   );
   let found;
   let foundCap = 0;
@@ -1283,15 +1294,6 @@ export function nextStep(P, st, bookkeeping = null, without = null) {
   return { rule: r.rule, tier: r.tier, weight: r.weight, extra, sets: f.sets, info: f.info };
 }
 
-/** Fully decided? Either a complete valid loop is drawn (all remaining cells off) or every edge is decided. */
-export function isComplete(P, st) {
-  if (isSolved(P, st.e)) return true;
-  for (let x = 0; x < P.numEdges; x++) {
-    if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
-  }
-  return true;
-}
-
 /**
  * Solve like a human. Never looks at P.solution.
  * Returns { solved, rules, tier, score, steps, counts, state }.
@@ -1317,9 +1319,9 @@ export function rate(P, { without = null } = {}) {
     counts[step.rule] = (counts[step.rule] || 0) + 1;
   }
 
-  // Final tidy bookkeeping (e.g. closedLoopRestOff)
+  // Final tidy bookkeeping (e.g. closedLoopRestOff) — never re-run expensive non-free finders
   const finalBk = {};
-  nextStep(P, st, finalBk, without);
+  runFreeBookkeeping(P, st, finalBk);
   for (const id of Object.keys(finalBk)) {
     const rule = RULES.find((q) => q.id === id);
     steps.push({ rule: id, tier: rule.tier, weight: rule.weight, sets: [], info: { bookkeeping: true } });
@@ -1358,20 +1360,12 @@ export function rate(P, { without = null } = {}) {
   return { solved, rules: hardest, tier: tierOfRule(hardest), score, steps, counts, state: st };
 }
 
-export function ratePuzzle(P) {
-  const r = rate(P);
-  P.rules = r.rules; P.tier = r.tier; P.score = r.score;
-  return r;
-}
-
-export const compareRatings = (a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.score - b.score;
-
 /**
  * Sound rule solvability check (fast, excludes costly/lookahead rules by default).
  * Because every rule below FIRST_LOOKAHEAD is sound, a puzzle they solve is guaranteed to have a unique solution.
  */
 export function solvedByRules(P, upto = FIRST_LOOKAHEAD) {
   const st = initialState(P);
-  const r = closure(P, st, upto);
+  const r = closure(P, st, upto, Infinity, false);
   return { solved: !r.contradiction && isSolved(P, st.e), state: st, steps: r.steps };
 }

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { RULES, TIERS, TIER_INFO, HUMAN_ORDER } from '../js/rating.js';
 import { MEDIUM_MAX, HARD_MAX } from '../js/imagine.js';
+import { repoRoot } from './_cli.mjs';
 
 const imagineCostLabel = (r) => (
   r.id === 'imagineLocal' ? `cost 22–${MEDIUM_MAX} (dynamic)`
@@ -13,7 +14,7 @@ const imagineCostLabel = (r) => (
         : `cost ${r.cost}`
 );
 
-const root = new URL('..', import.meta.url).pathname;
+const root = repoRoot(import.meta.url);
 const examples = JSON.parse(fs.readFileSync(path.join(root, 'docs', 'examples', 'examples.json'), 'utf8'));
 const byRule = new Map(examples.map((e) => [e.rule, e]));
 
@@ -43,10 +44,10 @@ say(
   '',
   '## Rules of Masyu',
   '',
-  '- Draw **one single closed loop** through cell centres orthogonally, with no crossings or branches.',
-  '- The loop must visit **every circle** (white and black). Empty cells may or may not be visited.',
-  '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** in at least one of the two adjacent cells along the loop.',
-  '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both adjacent cells along the loop (at least two segments straight in each exit direction).',
+  '- Draw **one single closed loop** along the grid lines orthogonally, with no crossings or branches.',
+  '- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.',
+  '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.',
+  '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).',
   '',
   '## How the examples work',
   '',
@@ -86,13 +87,13 @@ for (const tier of TIERS.filter((t) => RULES.some((r) => r.tier === t && !r.free
         '',
       );
     } else {
-      say('*No puzzle in the current starter corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*', '');
+      say('*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*', '');
     }
     say('---', '');
   }
 }
 
-fs.writeFileSync(path.join(root, 'docs', 'how_to_solve.md'), out.join('\n').replace(/\n---\n\n$/, '\n'), 'utf8');
+fs.writeFileSync(path.join(root, 'docs', 'how_to_solve.md'), out.join('\n').replace(/\n---\n$/, '\n'), 'utf8');
 
 // Also generate a clean, standalone docs/how_to_solve.html for GitHub Pages (since .nojekyll serves raw .md).
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

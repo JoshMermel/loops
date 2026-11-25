@@ -7,10 +7,10 @@ The same rule table powers both difficulty grading and live hints (see [README.m
 
 ## Rules of Masyu
 
-- Draw **one single closed loop** through cell centres orthogonally, with no crossings or branches.
-- The loop must visit **every circle** (white and black). Empty cells may or may not be visited.
-- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** in at least one of the two adjacent cells along the loop.
-- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both adjacent cells along the loop (at least two segments straight in each exit direction).
+- Draw **one single closed loop** along the grid lines orthogonally, with no crossings or branches.
+- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.
+- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
+- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).
 
 ## How the examples work
 
@@ -209,7 +209,7 @@ An empty cell whose only two exits meet one path cannot be on the loop.
 
 A loop cell with three exits where two meet one path must use the third.
 
-*No puzzle in the current starter corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
 
 ---
 
@@ -247,7 +247,7 @@ A white circle cannot use an axis whose two neighbors are both unable to turn.
 
 A black circle cannot extend toward a circle two cells away that cannot accept a straight segment.
 
-*No puzzle in the current starter corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
 
 ---
 
@@ -359,7 +359,7 @@ Imagine a segment on or off and trace one single thread 2–3 steps ahead until 
 
 The loop crosses the border of any rectangle or band an even number of times.
 
-*No puzzle in the current starter corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
 
 ---
 
@@ -421,4 +421,3 @@ Trying a segment one way leads to a contradiction.
 
 > Hint says: "Imagine a segment at C3–C4 and follow the forced deductions (starting with: the black circle at D3 is blocked left and goes two cells right; then C2 must use C2–D2; then the black circle at D3 cannot enter D2 and goes two cells down; reaching a contradiction after 3 steps). So cross out C3–C4."
 
----

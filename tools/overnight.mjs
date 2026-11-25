@@ -3,18 +3,15 @@
 // Runs in chunks with a stop time and prints a live summary after each chunk.
 //
 // Usage:
-//   node tools/overnight.mjs --sizes 6x6,8x8,10x10,12x12 --minutes 60 --chunk 10 --seed 100
+//   node tools/overnight.mjs --sizes 8x8,12x12,16x16 --minutes 60 --chunk 10 --seed 100
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { parseCsv } from '../js/logic.js';
+import { arg } from './_cli.mjs';
 
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(`--${name}`);
-  return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : def;
-};
-
-const sizes = arg('sizes', '6x6,8x8,10x10,12x12').split(',');
+const sizes = arg('sizes', '8x8,12x12,16x16').split(',');
 const minutes = +arg('minutes', 60);
 const chunk = +arg('chunk', 10);
 const style = arg('style', 'balanced');
@@ -29,11 +26,11 @@ if (fs.existsSync(stateFile)) {
 }
 
 const stopAt = Date.now() + minutes * 60 * 1000;
-const genScript = new URL('./generate.mjs', import.meta.url).pathname;
+const genScript = fileURLToPath(new URL('./generate.mjs', import.meta.url));
 
 console.log(`Overnight runner: sizes=${sizes.join(',')} style=${style} minutes=${minutes} dir=${dir}`);
 
-const tiers = ['Beginner', 'Medium', 'Hard'];
+const tiers = ['Beginner', 'Medium', 'Hard', 'Expert'];
 
 while (Date.now() < stopAt) {
   state.round++;
@@ -68,8 +65,8 @@ while (Date.now() < stopAt) {
     const outPath = path.join(dir, `${style}_${size}.csv`);
     if (!fs.existsSync(outPath)) continue;
     const ps = parseCsv(fs.readFileSync(outPath, 'utf8'));
-    const c = { Beginner: 0, Medium: 0, Hard: 0 };
+    const c = { Beginner: 0, Medium: 0, Hard: 0, Expert: 0 };
     for (const p of ps) c[p.tier] = (c[p.tier] || 0) + 1;
-    console.log(`  ${size}: ${ps.length} total (B=${c.Beginner} M=${c.Medium} H=${c.Hard})`);
+    console.log(`  ${size}: ${ps.length} total (B=${c.Beginner} M=${c.Medium} H=${c.Hard} E=${c.Expert})`);
   }
 }

@@ -73,8 +73,8 @@ test('hints and auto-marks work identically on rotated puzzles', () => {
     faces: new Uint8Array(numFacesOf(rotP)),
     autoF: new Uint8Array(numFacesOf(rotP)),
   };
-  reconcileAutoX(rotP, null, m, true, { useShade: true });
-  reconcileAutoShade(rotP, null, m, true);
+  reconcileAutoX(rotP, m, true, { useShade: true });
+  reconcileAutoShade(rotP, m, true);
   const hint = computeHint(rotP, m);
   assert.equal(hint.kind, 'step');
   assert.ok(hint.hints.length > 0);

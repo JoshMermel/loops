@@ -35,8 +35,9 @@ export function cycleFaceMarkReverse(cur) {
  * (ignoring any existing auto-placed X's or auto-shades so removing a causing mark cleanly unwinds cascades).
  * When `useShade` is true (both Auto-X and Auto-Shade enabled), also crosses out edges separating
  * two identically shaded squares (including outer-border edges adjacent to an Outside-shaded square).
+ * Returns a Uint8Array(numEdges) where 1 indicates the edge is forced to X.
  */
-export function autoXReasons(P, m, { useShade = false } = {}) {
+export function autoXForced(P, m, { useShade = false } = {}) {
   const { N, numEdges, ed, ed2, clue, whites, blacks } = P;
   const autoE = m.autoE;
   const w = new Uint8Array(numEdges);
@@ -45,12 +46,10 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
     w[x] = (m.edges[x] === 2 && autoE && autoE[x]) ? 0 : m.edges[x];
   }
 
-  const reasons = new Map();
-  const add = (x, r) => {
+  const forced = new Uint8Array(numEdges);
+  const add = (x) => {
     if (x < 0 || w[x] === 1) return false;
-    let s = reasons.get(x);
-    if (!s) reasons.set(x, (s = new Set()));
-    s.add(r);
+    forced[x] = 1;
     if (w[x] === 0) { w[x] = 2; return true; }
     return false;
   };
@@ -65,7 +64,7 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
     if (deg[i] !== 2) continue;
     for (let d = 0; d < 4; d++) {
       const x = ed[i * 4 + d];
-      if (x >= 0 && w[x] !== 1) add(x, `full:${i}`);
+      if (x >= 0 && w[x] !== 1) add(x);
     }
   }
 
@@ -75,7 +74,7 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
       const e1 = ed[i * 4 + d], e2 = ed[i * 4 + (d ^ 2)], ext1 = ed2[i * 4 + d];
       if (e1 >= 0 && e2 >= 0 && ext1 >= 0 && w[e1] === 1 && w[e2] === 1 && w[ext1] === 1) {
         const oppExt = ed2[i * 4 + (d ^ 2)];
-        if (oppExt >= 0 && w[oppExt] !== 1) add(oppExt, `white:${i}:${d}`);
+        if (oppExt >= 0 && w[oppExt] !== 1) add(oppExt);
       }
     }
   }
@@ -86,7 +85,7 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
       const e1 = ed[i * 4 + d];
       if (e1 >= 0 && w[e1] === 1) {
         const opp = ed[i * 4 + (d ^ 2)];
-        if (opp >= 0 && w[opp] !== 1) add(opp, `black:${i}:${d}`);
+        if (opp >= 0 && w[opp] !== 1) add(opp);
       }
     }
   }
@@ -117,7 +116,7 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
         lastX = x;
       }
       if (avail === 1 && lastX >= 0) {
-        if (add(lastX, `dead:${i}`)) changed = true;
+        if (add(lastX)) changed = true;
       }
     }
     if (changed) continue;
@@ -153,8 +152,7 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
       const w1 = walk(eA);
       if (w1.closed) {
         if (hasAnyClueOrSeg) {
-          const tag = `pocket:${Math.min(...w1.edges)}`;
-          for (const x of w1.edges) if (add(x, tag)) changed = true;
+          for (const x of w1.edges) if (add(x)) changed = true;
         }
         continue;
       }
@@ -165,9 +163,8 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
         if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
         if (!impossible) for (let i = 0; i < N; i++) if (i !== t && deg[i] > 0) { impossible = true; break; }
         if (impossible) {
-          const allEdges = w1.edges.concat(w2.edges);
-          const tag = `pocket:${t}:${Math.min(...allEdges)}`;
-          for (const x of allEdges) if (add(x, tag)) changed = true;
+          for (const x of w1.edges) if (add(x)) changed = true;
+          for (const x of w2.edges) if (add(x)) changed = true;
         }
       }
     }
@@ -179,13 +176,12 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
       const fr = P.rows - 1, fc = P.cols - 1;
       const sh = autoShadeCompute(P, { edges: w, faces: m.faces, autoF: m.autoF });
       const colAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? sh.color[r * fc + c] : FACE_OUT);
-      const faceIdx = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : -1);
       for (let r = 0; r < P.rows; r++) {
         for (let c = 0; c < fc; c++) {
           const x = 2 * (r * P.cols + c);
           const cA = colAt(r - 1, c), cB = colAt(r, c);
           if (cA && cA === cB) {
-            if (add(x, `shade:${faceIdx(r - 1, c)}:${faceIdx(r, c)}:${cA}`)) changed = true;
+            if (add(x)) changed = true;
           }
         }
       }
@@ -194,23 +190,23 @@ export function autoXReasons(P, m, { useShade = false } = {}) {
           const x = 2 * (r * P.cols + c) + 1;
           const cA = colAt(r, c - 1), cB = colAt(r, c);
           if (cA && cA === cB) {
-            if (add(x, `shade:${faceIdx(r, c - 1)}:${faceIdx(r, c)}:${cA}`)) changed = true;
+            if (add(x)) changed = true;
           }
         }
       }
     }
   }
 
-  return reasons;
+  return forced;
 }
 
-export function reconcileAutoX(P, _prev, cur, enabled = true, opts = undefined) {
+export function reconcileAutoX(P, cur, enabled = true, opts = undefined) {
   if (!cur.autoE) cur.autoE = new Uint8Array(P.numEdges);
-  const now = enabled ? autoXReasons(P, cur, opts) : null;
+  const now = enabled ? autoXForced(P, cur, opts) : null;
 
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
-    const forced = !!now && now.has(x);
+    const forced = !!now && !!now[x];
     if (cur.edges[x] === 2 && cur.autoE[x]) {
       if (!forced) { cur.edges[x] = 0; cur.autoE[x] = 0; }
     } else if (cur.edges[x] === 0 && forced) {
@@ -223,7 +219,7 @@ export function applyAutoX(P, m, on, opts = undefined) {
   if (!m.autoE) m.autoE = new Uint8Array(P.numEdges);
   const was = Uint8Array.from(m.edges);
   if (on) {
-    reconcileAutoX(P, null, m, true, opts);
+    reconcileAutoX(P, m, true, opts);
   } else {
     for (let x = 0; x < P.numEdges; x++) {
       if (m.edges[x] === 2 && m.autoE[x]) { m.edges[x] = 0; m.autoE[x] = 0; }
@@ -250,21 +246,19 @@ const flipColor = (v) => (v === FACE_IN ? FACE_OUT : v === FACE_OUT ? FACE_IN : 
  *   2. Across a crossed-out edge (edges[x] === 2): same color (IN <-> IN, OUT <-> OUT)
  *
  * Intentionally does NOT infer from white or black circles (those deductions live in Hint / rating.js).
- * Returns { color: Uint8Array(F), reasons: Array<Set<string>> } where color[f] is 0 (none), 1 (IN), 2 (OUT);
+ * Returns { color: Uint8Array(F) } where color[f] is 0 (none), 1 (IN), 2 (OUT);
  * conflicting deductions (both IN and OUT reached) leave color[f] = 0 so conflicts never corrupt the board.
  */
 export function autoShadeCompute(P, m) {
   const fr = P.rows - 1, fc = P.cols - 1, F = Math.max(0, fr * fc);
   const mask = new Uint8Array(F); // bit 0 = IN (1), bit 1 = OUT (2), 3 = conflict
-  const reasons = Array.from({ length: F }, () => new Set());
-  if (F === 0) return { color: new Uint8Array(0), reasons };
+  if (F === 0) return { color: new Uint8Array(0) };
 
   const faceAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : -1);
   const queue = [];
 
-  const mark = (f, col, reason) => {
+  const mark = (f, col) => {
     if (f < 0 || (col !== FACE_IN && col !== FACE_OUT)) return;
-    reasons[f].add(`${col}:${reason}`);
     const prev = mask[f];
     const next = prev | col;
     if (next !== prev) {
@@ -276,26 +270,26 @@ export function autoShadeCompute(P, m) {
   // Seed 1: manual face marks (never auto-placed ones)
   if (m.faces) {
     for (let f = 0; f < F; f++) {
-      if (m.faces[f] && !(m.autoF && m.autoF[f])) mark(f, m.faces[f], `man:${f}`);
+      if (m.faces[f] && !(m.autoF && m.autoF[f])) mark(f, m.faces[f]);
     }
   }
 
   // Seed 2: outer perimeter edges (adjacent to virtual exterior OUT)
   for (let c = 0; c < fc; c++) {
     const eTop = 2 * c;
-    if (m.edges[eTop] === 1) mark(faceAt(0, c), FACE_IN, `eb:${eTop}`);
-    else if (m.edges[eTop] === 2) mark(faceAt(0, c), FACE_OUT, `eb:${eTop}`);
+    if (m.edges[eTop] === 1) mark(faceAt(0, c), FACE_IN);
+    else if (m.edges[eTop] === 2) mark(faceAt(0, c), FACE_OUT);
     const eBot = 2 * ((P.rows - 1) * P.cols + c);
-    if (m.edges[eBot] === 1) mark(faceAt(fr - 1, c), FACE_IN, `eb:${eBot}`);
-    else if (m.edges[eBot] === 2) mark(faceAt(fr - 1, c), FACE_OUT, `eb:${eBot}`);
+    if (m.edges[eBot] === 1) mark(faceAt(fr - 1, c), FACE_IN);
+    else if (m.edges[eBot] === 2) mark(faceAt(fr - 1, c), FACE_OUT);
   }
   for (let r = 0; r < fr; r++) {
     const eLeft = 2 * (r * P.cols) + 1;
-    if (m.edges[eLeft] === 1) mark(faceAt(r, 0), FACE_IN, `eb:${eLeft}`);
-    else if (m.edges[eLeft] === 2) mark(faceAt(r, 0), FACE_OUT, `eb:${eLeft}`);
+    if (m.edges[eLeft] === 1) mark(faceAt(r, 0), FACE_IN);
+    else if (m.edges[eLeft] === 2) mark(faceAt(r, 0), FACE_OUT);
     const eRight = 2 * (r * P.cols + P.cols - 1) + 1;
-    if (m.edges[eRight] === 1) mark(faceAt(r, fc - 1), FACE_IN, `eb:${eRight}`);
-    else if (m.edges[eRight] === 2) mark(faceAt(r, fc - 1), FACE_OUT, `eb:${eRight}`);
+    if (m.edges[eRight] === 1) mark(faceAt(r, fc - 1), FACE_IN);
+    else if (m.edges[eRight] === 2) mark(faceAt(r, fc - 1), FACE_OUT);
   }
 
   // Propagate via BFS across interior lines (opposite) and interior X's (same) only
@@ -316,8 +310,8 @@ export function autoShadeCompute(P, m) {
       const g = faceAt(nr, nc);
       if (g < 0) continue;
       const ev = m.edges[x];
-      if (ev === 1) mark(g, flipColor(col), `e:${x}:${f}`);
-      else if (ev === 2) mark(g, col, `e:${x}:${f}`);
+      if (ev === 1) mark(g, flipColor(col));
+      else if (ev === 2) mark(g, col);
     }
   }
 
@@ -325,14 +319,14 @@ export function autoShadeCompute(P, m) {
   for (let f = 0; f < F; f++) {
     if (mask[f] === FACE_IN || mask[f] === FACE_OUT) color[f] = mask[f];
   }
-  return { color, reasons };
+  return { color };
 }
 
 /**
- * Reconcile automatic Inside/Outside face shading in `cur` against `prev` (null = fresh board or switch turned on).
+ * Reconcile automatic Inside/Outside face shading in `cur` from current manual marks and edges.
  * Manual face marks (`autoF[f] === 0`) are never overwritten.
  */
-export function reconcileAutoShade(P, _prev, cur, enabled = true) {
+export function reconcileAutoShade(P, cur, enabled = true) {
   const F = numFacesOf(P);
   if (!cur.faces) cur.faces = new Uint8Array(F);
   if (!cur.autoF) cur.autoF = new Uint8Array(F);
@@ -356,7 +350,7 @@ export function applyAutoShade(P, m, on) {
   if (!m.autoF) m.autoF = new Uint8Array(F);
   const was = Uint8Array.from(m.faces);
   if (on) {
-    reconcileAutoShade(P, null, m, true);
+    reconcileAutoShade(P, m, true);
   } else {
     for (let f = 0; f < F; f++) {
       if (m.faces[f] !== 0 && m.autoF[f]) { m.faces[f] = 0; m.autoF[f] = 0; }

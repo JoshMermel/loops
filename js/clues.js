@@ -17,6 +17,7 @@ export function clueStates(P, marks) {
 
     if (P.clue[i] === WHITE) {
       if (dirsOn.length === 2 && ((dirsOn[0] ^ dirsOn[1]) & 1) === 1) return 'bad';
+      for (const d of dirsOn) if (blocked(ed[i * 4 + (d ^ 2)])) return 'bad';
       const u = ed[i * 4 + 0], r = ed[i * 4 + 1], dn = ed[i * 4 + 2], l = ed[i * 4 + 3];
       const vBlock = blocked(u) || blocked(dn);
       const hBlock = blocked(r) || blocked(l);

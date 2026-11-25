@@ -158,4 +158,18 @@ test('generatePuzzle enforces balanced four-quadrant loop and clue coverage on l
   const qs = quadrantStats(p12.rows, p12.cols, sol.e, p12.clues);
   assert.ok(qs.minFill >= 0.45, `expected minQuadFill >= 0.45, got ${qs.minFill} (${qs.fills})`);
   assert.ok(qs.minClues >= 2, `expected minQuadClues >= 2, got ${qs.minClues} (${qs.clues})`);
+
+  // Direct quadrantStats check on an odd rectangular 5x7 board with a loop only in the top-left quadrant
+  const P = compile({ name: 'q_lopsided', rows: 5, cols: 7, clues: [{ r: 0, c: 0, t: 'W' }, { r: 1, c: 1, t: 'B' }] });
+  const edges = new Uint8Array(P.numEdges);
+  // 2x2 loop in top-left: (0,0)-(0,1)-(1,1)-(1,0)-(0,0)
+  edges[P.ed[0 * 4 + 1]] = 1;
+  edges[P.ed[1 * 4 + 2]] = 1;
+  edges[P.ed[(1 * 7 + 1) * 4 + 3]] = 1;
+  edges[P.ed[(1 * 7 + 0) * 4 + 0]] = 1;
+  const ql = quadrantStats(5, 7, edges, P.clues);
+  assert.equal(ql.clues[0], 2);
+  assert.equal(ql.minClues, 0);
+  assert.ok(ql.fills[0] > 0);
+  assert.equal(ql.minFill, 0);
 });

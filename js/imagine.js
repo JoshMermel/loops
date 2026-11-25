@@ -1,7 +1,7 @@
 // "Imagine a segment on or off": unified short-to-medium lookahead rule for Masyu rating and Hint.
 //
 // A hypothesis (e[x] = E_ON or e[x] = E_OFF on an undecided frontier edge) is followed with the easy
-// Beginner rules + bookkeeping until something breaks (easy contradiction, or within AREA_FACTS steps
+// Beginner rules + bookkeeping until something breaks (easy contradiction, or within AREA_STEPS steps
 // a topological/parity contradiction). The derivation is then pruned by ablation to keep ONLY the steps
 // the contradiction really depends on, and priced by the pruned chain length.
 import {
@@ -10,7 +10,7 @@ import {
 } from './logic.js';
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
-export const HARD_MAX = 75;   // imagineTrace (46..60) sits in Hard; imagineChain (>= 80) sits in Expert
+export const HARD_MAX = 75;   // imagineTrace (36..60) sits in Hard; imagineChain (>= 80) sits in Expert
 export const AREA_MIN_COST = 98; // minimum possible cost for an area contradiction (1+ step: 80 + 4 + 14)
 
 /** Sound lower bound on classifyImagine() cost given kept step count, area flag, and frontier flag. */
@@ -25,7 +25,7 @@ export function minImagineCost(nSteps, area, isFrontier) {
 /**
  * Classify a pruned imagined chain by human cognitive load into:
  *   - imagineLocal (Medium, 22..26): 1-step tight local breakage from a circle/open end
- *   - imagineTrace (Hard, 42..60): single connected thread, <= 2 steps (dist <= 4) or 3 steps (dist <= 3), no area
+ *   - imagineTrace (Hard, 36..60): single connected thread, <= 2 steps (dist <= 4) or 3 steps (dist <= 3), no area
  *   - imagineChain (Expert, >= 80): long (4+ steps), multi-front/branching, non-frontier, or area contradiction
  */
 export function classifyImagine(P, baseState, edge, steps, broke, area) {
@@ -773,11 +773,17 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
     cycle: false,
   };
 
-  // Check once whether `st` is already a propagate() fixed point so trial calls can use O(local) seedEdge
+  // Check once whether `st` is already a propagate() fixed point (including UNKNOWN->LOOP endpoints)
+  // so trial calls can safely use O(local) seedEdge
   stProp.cell.set(st.cell);
   stProp.e.set(st.e);
   stProp.cycle = st.cycle;
-  const baseFixed = propagate(P, stProp) && lastPropChanges === 0;
+  let baseFixed = propagate(P, stProp) && lastPropChanges === 0;
+  if (baseFixed) {
+    for (let i = 0; i < P.N; i++) {
+      if (stProp.cell[i] !== st.cell[i]) { baseFixed = false; break; }
+    }
+  }
 
   const needMask = edges.length * 2;
   if (scratchChangedMask.length < needMask) scratchChangedMask = new Uint8Array(needMask);
@@ -817,7 +823,7 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
       const cap = best ? best.cost : costCap;
       const pr = pruneChain(P, st, c.edge, c.hyp, c.rawSteps, c.area, cap);
       if (!pr || pr.cost >= costCap) continue;
-      if (!best || pr.cost < best.cost || (pr.cost === best.cost && c.hyp === E_ON && best.hyp === E_OFF)) {
+      if (!best || pr.cost < best.cost) {
         best = {
           edge: c.edge,
           hyp: c.hyp,
@@ -852,9 +858,9 @@ export function bestImagine(P, st, { costCap = Infinity } = {}) {
         stProp.e.set(st.e);
         stProp.cycle = st.cycle;
         stProp.e[x] = val;
-        propagate(P, stProp, baseFixed ? x : -1, -1);
-        // skipEasy=true: propagate already guaranteed no easy contradiction
-        if (fullContradiction(P, stProp, true)) {
+        // skipEasy=true when propagate succeeded (already guaranteed no easy contradiction);
+        // if propagate contradicted beyond MAX_STEPS, still check for a shorter <=AREA_STEPS area hit
+        if (!propagate(P, stProp, baseFixed ? x : -1, -1) || fullContradiction(P, stProp, true)) {
           const r = runHypothesis(P, st, x, val, { maxSteps: AREA_STEPS, checkArea: true });
           if (r.broke) {
             areaHits.push({ edge: x, hyp: val, rawSteps: r.steps, area: r.area });

@@ -11,7 +11,7 @@ import {
   facesFromSolvedLoop,
 } from './marks.js';
 import { clueStates, earlyLoopEdges } from './clues.js';
-import { Board } from './board.js';
+import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
 import {
   PRESETS, CUSTOM, MIN_CUSTOM, MAX_CUSTOM, sanitizeCustom, validId,
@@ -88,7 +88,7 @@ const emptyMarks = (P) => ({
 });
 const freshMarks = (P) => {
   const m = emptyMarks(P);
-  if (settings.autoShade) reconcileAutoShade(P, null, m, true);
+  if (settings.autoShade) reconcileAutoShade(P, m, true);
   return m;
 };
 const cloneMarks = (m) => ({
@@ -114,9 +114,9 @@ function edgeBetween(P, a, b) {
   return -1;
 }
 
-const reconcileAuto = (P, prev, m) => {
-  reconcileAutoX(P, prev, m, settings.autoX, { useShade: settings.autoShade });
-  reconcileAutoShade(P, prev, m, settings.autoShade);
+const reconcileAuto = (P, m) => {
+  reconcileAutoX(P, m, settings.autoX, { useShade: settings.autoShade });
+  reconcileAutoShade(P, m, settings.autoShade);
 };
 
 const isAutoX = (m, x) => m.edges[x] === 2 && !!m.autoE[x];
@@ -124,20 +124,18 @@ const isAutoX = (m, x) => m.edges[x] === 2 && !!m.autoE[x];
 function cycleEdge(x) {
   const P = state.P, m = state.marks;
   if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x)) return;
-  const prev = snapshot();
   m.edges[x] = cycleEdgeMark(m.edges[x]);
   m.autoE[x] = 0;
-  reconcileAuto(P, prev, m);
+  reconcileAuto(P, m);
   refresh();
 }
 
 function toggleEdge(x) {
   const P = state.P, m = state.marks;
   if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x)) return;
-  const prev = snapshot();
   m.edges[x] = toggleEdgeCross(m.edges[x]);
   m.autoE[x] = 0;
-  reconcileAuto(P, prev, m);
+  reconcileAuto(P, m);
   refresh();
 }
 
@@ -147,12 +145,11 @@ function cycleFace(f, reverse = false) {
     state.facePaintVal = null;
     return;
   }
-  const prev = snapshot();
   const next = reverse ? cycleFaceMarkReverse(m.faces[f]) : cycleFaceMark(m.faces[f]);
   m.faces[f] = next;
   m.autoF[f] = 0;
   state.facePaintVal = next;
-  reconcileAuto(P, prev, m);
+  reconcileAuto(P, m);
   refresh();
 }
 
@@ -162,17 +159,15 @@ function paintFaceStep(f) {
   if (val === null || val === undefined || f < 0 || f >= m.faces.length) return;
   if (m.faces[f] && m.autoF[f]) return;
   if (m.faces[f] === val) return;
-  const prev = snapshot();
   m.faces[f] = val;
   m.autoF[f] = 0;
-  reconcileAuto(P, prev, m);
+  reconcileAuto(P, m);
   refresh();
 }
 
 function dragStep(a, b, first) {
   const P = state.P, m = state.marks;
-  const prev = snapshot();
-  state.dragStack.push(prev);
+  state.dragStack.push(snapshot());
   const x = edgeBetween(P, a, b);
   if (x < 0) return;
   if (first) state.drawMode = m.edges[x] === 1 ? 0 : 1;
@@ -187,14 +182,13 @@ function dragStep(a, b, first) {
   } else {
     return;
   }
-  reconcileAuto(P, prev, m);
+  reconcileAuto(P, m);
   refresh();
 }
 
 function crossStep(a, b, first) {
   const P = state.P, m = state.marks;
-  const prev = snapshot();
-  state.dragStack.push(prev);
+  state.dragStack.push(snapshot());
   const x = edgeBetween(P, a, b);
   if (x < 0 || isAutoX(m, x)) {
     if (first) state.drawMode = null;
@@ -213,7 +207,7 @@ function crossStep(a, b, first) {
   } else {
     return;
   }
-  reconcileAuto(P, prev, m);
+  reconcileAuto(P, m);
   refresh();
 }
 
@@ -279,7 +273,7 @@ function viewportSpace() {
 }
 
 function applyBoardSize(px) {
-  const width = Math.round((board.size().W * px) / 44);
+  const width = Math.round((board.size().W * px) / CELL_SIZE);
   $('board').style.width = `${width}px`;
   $('game-container').style.maxWidth = `${Math.max(640, width + 24)}px`;
 }
@@ -290,13 +284,13 @@ function fitBoard() {
   const { availW, availH } = viewportSpace();
   const layout = chooseLayout(baseP.rows, baseP.cols, availW, availH, state.rotOverride);
   if (layout.rotated !== state.rotated) {
+    if (board.gesture) board.cancel();
     const xf = layout.rotated
       ? (m) => rotateMarksCW(baseP, state.rotP, m)
       : (m) => unrotateMarksCW(baseP, state.rotP, m);
     state.marks = xf(state.marks);
     state.undo = state.undo.map(xf);
     state.redo = state.redo.map(xf);
-    if (state.pending) state.pending = xf(state.pending);
     state.rotated = layout.rotated;
     state.P = state.rotated ? state.rotP : baseP;
     state.hint = null;
@@ -382,7 +376,7 @@ function load(P) {
       if (s.af && s.af.length === F) {
         for (let f = 0; f < F; f++) m.autoF[f] = +s.af[f];
       }
-      if (!settings.autoX) applyAutoX(P, m, false);
+      applyAutoX(P, m, settings.autoX, { useShade: settings.autoShade });
       applyAutoShade(P, m, settings.autoShade);
       if (settings.autoShade && isSolved(P, m.edges)) paintSolvedFaces(P, m);
       return m;
@@ -595,8 +589,11 @@ function renderCurrentHint() {
 async function fetchBook(entry) {
   if (entry.puzzles) return entry.puzzles;
   if (state.loaded.has(entry.id)) return state.loaded.get(entry.id);
-  const text = await (await fetch(entry.file)).text();
+  const res = await fetch(entry.file);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
   const raw = parseCsv(text);
+  if (!raw.length) throw new Error('empty book');
   state.loaded.set(entry.id, raw);
   return raw;
 }
@@ -621,7 +618,7 @@ function showInfo() {
 function openPuzzle(idx) {
   const book = state.book;
   if (!book || !book.puzzles.length) return;
-  idx = Math.max(0, Math.min(idx, book.puzzles.length - 1));
+  idx = Math.max(0, Math.min(Math.trunc(idx) || 0, book.puzzles.length - 1));
   state.idx = idx;
   const raw = book.puzzles[idx];
   const baseP = raw.N ? raw : compile(raw);
@@ -656,10 +653,19 @@ function openPuzzle(idx) {
   updateUrl();
 }
 
+let openBookSeq = 0;
 async function openBook(bookId, idx = 0) {
   const entry = state.books.find((b) => b.id === bookId);
   if (!entry) return;
-  const raw = await fetchBook(entry);
+  const seq = ++openBookSeq;
+  let raw;
+  try {
+    raw = await fetchBook(entry);
+  } catch {
+    if (seq === openBookSeq) toast(`Could not load "${entry.name}".`);
+    return;
+  }
+  if (seq !== openBookSeq) return;
   state.book = { id: entry.id, name: entry.name, puzzles: raw };
   state.rotOverride = null;
   recordBookSolved(state.book);
@@ -708,10 +714,23 @@ $('check-btn').addEventListener('click', checkSoFar);
 $('hint-btn').addEventListener('click', hint);
 
 const modals = [];
-function setupModal(modalId, openBtnId, onOpen) {
+function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
   const modal = $(modalId), openBtn = $(openBtnId);
-  const close = () => { modal.classList.add('modal-hidden'); openBtn.focus(); };
-  const open = () => { onOpen?.(); modal.classList.remove('modal-hidden'); modal.querySelector('[data-close]').focus(); };
+  modal.inert = true;
+  modal.setAttribute('aria-hidden', 'true');
+  const close = () => {
+    modal.classList.add('modal-hidden');
+    modal.inert = true;
+    modal.setAttribute('aria-hidden', 'true');
+    $(returnFocusId).focus();
+  };
+  const open = () => {
+    onOpen?.();
+    modal.inert = false;
+    modal.removeAttribute('aria-hidden');
+    modal.classList.remove('modal-hidden');
+    modal.querySelector('[data-close]').focus();
+  };
   openBtn.addEventListener('click', open);
   modal.querySelector('[data-close]').addEventListener('click', close);
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
@@ -817,6 +836,7 @@ function syncBookButton() {
   name.className = 'book-btn-name';
   const entry = state.books.find((b) => state.book && b.id === state.book.id);
   name.textContent = entry ? entry.name : 'Choose a book';
+  btn.setAttribute('aria-label', entry ? `Book: ${entry.name}. Choose a book` : 'Choose a book');
   btn.append(name);
 }
 
@@ -950,18 +970,16 @@ $('setting-auto-x').addEventListener('change', (e) => {
   settings.autoX = e.target.checked;
   store.set('ms_autoX', settings.autoX ? '1' : '0');
   if (state.P) {
+    const syncOne = (m) => {
+      applyAutoX(state.P, m, settings.autoX, { useShade: settings.autoShade });
+      if (settings.autoShade) {
+        reconcileAutoShade(state.P, m, true);
+        if (isSolved(state.P, m.edges)) paintSolvedFaces(state.P, m);
+      }
+    };
     const before = snapshot();
-    const xOpts = { useShade: settings.autoShade };
-    applyAutoX(state.P, state.marks, settings.autoX, xOpts);
-    if (settings.autoShade) reconcileAutoShade(state.P, before, state.marks, true);
-    for (const m of [...state.undo, ...state.redo]) {
-      const mPrev = {
-        edges: m.edges.slice(), autoE: m.autoE.slice(),
-        faces: m.faces.slice(), autoF: m.autoF.slice(),
-      };
-      applyAutoX(state.P, m, settings.autoX, xOpts);
-      if (settings.autoShade) reconcileAutoShade(state.P, mPrev, m, true);
-    }
+    syncOne(state.marks);
+    for (const m of [...state.undo, ...state.redo]) syncOne(m);
     if (!sameMarks(before, state.marks)) { save(); refresh(); }
   }
 });
@@ -972,13 +990,8 @@ $('setting-auto-shade').addEventListener('change', (e) => {
   store.set('ms_autoShade', settings.autoShade ? '1' : '0');
   if (state.P) {
     const syncOne = (m) => {
-      const mPrev = {
-        edges: m.edges.slice(), autoE: m.autoE.slice(),
-        faces: m.faces.slice(), autoF: m.autoF.slice(),
-      };
       if (settings.autoX) {
-        if (settings.autoShade) applyAutoX(state.P, m, true, { useShade: true });
-        else reconcileAutoX(state.P, mPrev, m, true, { useShade: false });
+        applyAutoX(state.P, m, true, { useShade: settings.autoShade });
       }
       applyAutoShade(state.P, m, settings.autoShade);
       if (settings.autoShade && isSolved(state.P, m.edges)) paintSolvedFaces(state.P, m);
@@ -987,6 +1000,7 @@ $('setting-auto-shade').addEventListener('change', (e) => {
     syncOne(state.marks);
     for (const m of [...state.undo, ...state.redo]) syncOne(m);
     if (!sameMarks(before, state.marks)) { save(); refresh(); }
+    else board.render(state.marks, analyse());
   }
 });
 
@@ -1059,7 +1073,15 @@ $('csv-file').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  const text = await f.text(), puzzles = parseCsv(text);
+  let text, puzzles;
+  try {
+    text = await f.text();
+    puzzles = parseCsv(text);
+    for (const p of puzzles) compile(p);
+  } catch {
+    toast('Could not read that CSV file.');
+    return;
+  }
   if (!puzzles.length) { toast('No puzzles found in that file.'); return; }
   rememberFileBook(f.name, text);
   const id = `file:${f.name}`;
@@ -1107,10 +1129,11 @@ function setupPrint() {
     const total = state.book ? state.book.puzzles.length : 0;
     $('print-book-name').textContent = state.book ? state.book.name : '';
     $('print-book-total').textContent = total;
-    sel.value = total <= 1 ? '1' : `${state.idx + 1}-${Math.min(total, state.idx + 10)}`;
+    const from = state.idx + 1, to = Math.min(total, state.idx + 10);
+    sel.value = total <= 1 ? '1' : (from === to ? String(from) : `${from}-${to}`);
     update();
     if (matchMedia('(pointer: fine)').matches) setTimeout(() => { sel.focus(); sel.select(); }, 0);
-  });
+  }, 'settings-btn');
 
   sel.addEventListener('input', update);
   sizeSel.addEventListener('change', () => { store.set('ms_printSize', sizeSel.value); update(); });
@@ -1136,16 +1159,22 @@ setupPrint();
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (board.gesture) { board.cancel(); return; }
-    modals.find(({ modal }) => !modal.classList.contains('modal-hidden'))?.close();
+    const openModal = modals.find(({ modal }) => !modal.classList.contains('modal-hidden'));
+    if (openModal) { openModal.close(); return; }
+    if (state.hint || !$('toast').hidden) {
+      state.hint = null;
+      hideToast();
+      if (state.P) board.render(state.marks, analyse());
+    }
     return;
   }
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-  if (modalOpen()) return;
+  if (modalOpen() || board.gesture) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
   else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
-  else if (e.key === 'ArrowLeft') step(-1);
-  else if (e.key === 'ArrowRight') step(1);
+  else if (!mod && !e.altKey && e.key === 'ArrowLeft') step(-1);
+  else if (!mod && !e.altKey && e.key === 'ArrowRight') step(1);
 });
 
 // Expose a small test/screenshot hook on localhost (used by tools/capture_how_to_images.py)
@@ -1155,10 +1184,9 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     applyHint() {
       if (!state.hint || state.hint.kind !== 'step') return false;
       const item = state.hint.hints[state.hint.index];
-      const prev = snapshot();
       for (const x of item.targets.segOn) { state.marks.edges[x] = 1; state.marks.autoE[x] = 0; }
       for (const x of item.targets.segOff) { state.marks.edges[x] = 2; state.marks.autoE[x] = 0; }
-      reconcileAuto(state.P, prev, state.marks);
+      reconcileAuto(state.P, state.marks);
       refresh();
       return true;
     },

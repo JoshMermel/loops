@@ -1,10 +1,15 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  compile, solve, initialState, isSolved, encodeSolution, E_ON, E_OFF, OFF, LOOP,
+  compile, parseCsv, solve, initialState, isSolved, decodeSolution, encodeSolution, E_ON, E_OFF, OFF, LOOP,
 } from '../js/logic.js';
 import { RULES, rate, solvedByRules, nextSteps, applySets, TIERS } from '../js/rating.js';
 import { findFaceShade, findFaceCircle } from '../js/faceparity.js';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -221,6 +226,47 @@ test('faceShade only uses border-anchored lines/X while faceCircle adds white di
   const hit2 = f2.find((x) => x.info.edge === eLeftB);
   assert.ok(hit2, 'expected black-circle 3-to-1 rule to force SW=IN and cross out (2,1)-(2,2)');
   assert.deepEqual(hit2.sets, [['e', eLeftB, E_OFF]]);
+
+  // Unanchored relative coloring: 5x5 with two interior whites at (1,1) and (2,2) (no border edges marked).
+  // (1,1) ties NW(0,0)!=SE(1,1) and NE(0,1)!=SW(1,0); (2,2) ties NW(1,1)!=SE(2,2) and NE(1,2)!=SW(2,1).
+  // Plus a drawn segment (1,2)-(2,2) or X between (1,1) and (2,1) relates faces without touching the border!
+  const P3 = compile({
+    name: 'fp_rel', rows: 5, cols: 5,
+    clues: [{ r: 1, c: 1, t: 'W' }, { r: 2, c: 2, t: 'W' }],
+  });
+  const st3 = initialState(P3);
+  // Draw interior segment (1,1)-(1,2) -> face(0,1) != face(1,1); draw (1,2)-(2,2) -> face(1,1) != face(1,2).
+  // White at (1,1) gives face(0,1) != face(1,0), so face(1,0) == face(1,1), forcing interior edge (1,1)-(2,1) OFF!
+  st3.e[P3.ed[(1 * 5 + 1) * 4 + 1]] = E_ON;
+  const f3 = findFaceCircle(P3, st3);
+  const eDown11 = P3.ed[(1 * 5 + 1) * 4 + 2]; // (1,1)-(2,1)
+  const hit3 = f3.find((x) => x.info.edge === eDown11);
+  assert.ok(hit3, 'expected unanchored relative coloring to deduce interior edge (1,1)-(2,1)');
+  assert.equal(hit3.info.anchored, false);
+  assert.deepEqual(hit3.sets, [['e', eDown11, E_OFF]]);
+});
+
+test('armory soundness sweep verifies 20+ human rules against unique solutions and checks no duplicate sets', () => {
+  const armory = parseCsv(fs.readFileSync(path.join(root, 'data', 'armory.csv'), 'utf8'));
+  const rulesSeen = new Set();
+  for (const raw of armory) {
+    const P = compile({ ...raw });
+    const sol = decodeSolution(P, P.solution);
+    const r = rate(P);
+    assert.equal(r.solved, true, `armory puzzle ${raw.name} should solve`);
+    for (const s of r.steps) {
+      if (!s.info?.bookkeeping) rulesSeen.add(s.rule);
+      const seenEdges = new Set();
+      for (const [k, idx, v] of s.sets) {
+        if (k === 'e') {
+          assert.equal(seenEdges.has(idx), false, `duplicate edge ${idx} emitted by ${s.rule} on ${raw.name}`);
+          seenEdges.add(idx);
+          assert.equal(sol.e[idx], v, `unsound edge deduction by ${s.rule} on ${raw.name}`);
+        }
+      }
+    }
+  }
+  assert.ok(rulesSeen.size >= 22, `expected >= 22 distinct non-free rules across armory, saw ${rulesSeen.size}`);
 });
 
 test('difficulty tier assignments match the calibrated rule ladder', () => {

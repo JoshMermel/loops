@@ -58,7 +58,7 @@ test('basic Masyu rules: white circle in 2x2 has 0 solutions (cannot go straight
   assert.equal(referenceCount(P), 0);
 });
 
-test('basic Masyu rules: white circle in middle of 3x3 edge has 1 solution', () => {
+test('basic Masyu rules: white circle in middle of 3x3 edge has multiple valid solutions', () => {
   // White at (0,1) must go horizontally (0,0)-(0,1)-(0,2) and turns at both (0,0) and (0,2).
   // Wait: it can go down to row 1 (a 2x3 rectangle) OR down to row 2 (3x3 border), OR detour through (1,1)!
   const P = compile({ name: 'w3', rows: 3, cols: 3, clues: [{ r: 0, c: 1, t: 'W' }] });
@@ -212,4 +212,43 @@ test('CSV roundtrip, symmetryKey, and puzzleHash', () => {
   // Clue order does not change puzzleHash
   const pReordered = { rows: 4, cols: 5, clues: [p.clues[1], p.clues[0]] };
   assert.equal(puzzleHash(p), puzzleHash(pReordered));
+});
+
+test('incremental propagate(P, st, seedEdge) matches full propagate() and compile() resets cached CSR tables', () => {
+  const P = compile({
+    name: 'inc', rows: 6, cols: 6,
+    clues: [
+      { r: 0, c: 2, t: 'W' }, { r: 1, c: 1, t: 'B' }, { r: 2, c: 4, t: 'W' },
+      { r: 3, c: 2, t: 'W' }, { r: 4, c: 4, t: 'B' }, { r: 5, c: 1, t: 'W' },
+    ],
+  });
+  const base = initialState(P);
+  assert.equal(propagate(P, base), true);
+
+  for (let x = 0; x < P.numEdges; x++) {
+    if (P.edgeA[x] < 0 || base.e[x] !== 0) continue;
+    for (const val of [E_ON, E_OFF]) {
+      const sFull = { cell: base.cell.slice(), e: base.e.slice(), cycle: base.cycle };
+      const sInc = { cell: base.cell.slice(), e: base.e.slice(), cycle: base.cycle };
+      sFull.e[x] = val;
+      sInc.e[x] = val;
+      const okFull = propagate(P, sFull);
+      const okInc = propagate(P, sInc, x, -1);
+      assert.equal(okInc, okFull, `contradiction mismatch on edge ${x}=${val}`);
+      if (okFull) {
+        assert.deepEqual(sInc.e, sFull.e, `edge state mismatch on edge ${x}=${val}`);
+        assert.deepEqual(sInc.cell, sFull.cell, `cell state mismatch on edge ${x}=${val}`);
+      }
+    }
+  }
+
+  // Re-compiling a mutated puzzle object must invalidate cached _ecOff/_ecData
+  const raw = { name: 'recompile', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'W' }] };
+  compile(raw);
+  const st1 = initialState(raw);
+  propagate(raw, st1);
+  assert.ok(raw._ecOff !== null);
+  raw.clues = [{ r: 1, c: 1, t: 'B' }];
+  compile(raw);
+  assert.equal(raw._ecOff, null, 'compile() must reset cached CSR edge-clue table');
 });

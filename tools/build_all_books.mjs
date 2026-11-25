@@ -3,10 +3,12 @@
 // Guarantees zero duplicates across books (--exclude).
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { repoRoot } from './_cli.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
-const buildScript = new URL('./build_book.mjs', import.meta.url).pathname;
+const root = repoRoot(import.meta.url);
+const buildScript = fileURLToPath(new URL('./build_book.mjs', import.meta.url));
 const manifestPath = path.join(root, 'data', 'manifest.json');
 
 fs.mkdirSync(path.join(root, 'data'), { recursive: true });

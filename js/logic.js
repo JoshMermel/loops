@@ -21,9 +21,6 @@ export function colName(c) {
 
 export const DR = [-1, 0, 1, 0];
 export const DC = [0, 1, 0, -1];
-export const oppositeDir = (d) => d ^ 2;
-export const turnDir = (d) => (d + 1) & 3;
-export const perpDirs = (d) => [(d + 1) & 3, (d + 3) & 3];
 
 export const NONE = 0, WHITE = 1, BLACK = 2;
 export const UNKNOWN = 0, OFF = 1, LOOP = 2;
@@ -84,8 +81,9 @@ export function compile(p) {
   }
 
   return Object.assign(p, {
-    N, K: 4, numEdges, clue, clueAt, clueCells, whites, blacks,
+    N, numEdges, clue, clueAt, clueCells, whites, blacks,
     nb, ed, step2, ed2, edgeA, edgeB,
+    _ecOff: null, _ecData: null,
   });
 }
 
@@ -536,7 +534,7 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
         if (key === bestKey) ties.push(i);
       } else if (key > bestKey) {
         bestKey = key; bi = i;
-        if (key === 113) break; // maximum possible priority (on=1, isClue=1, unk=1)
+        if (key === 112) break; // maximum possible priority after propagate() (on=1, isClue=1, unk=2)
       }
     }
     if (ties && ties.length) bi = ties[(rng() * ties.length) | 0];
@@ -712,8 +710,6 @@ export function isSolved(P, edges) {
 
   return true;
 }
-
-export const checkSolved = isSolved;
 
 // ---------------------------------------------------------------- CSV
 

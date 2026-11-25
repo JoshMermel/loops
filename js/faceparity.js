@@ -24,21 +24,6 @@ export function faceCoords(P, f) {
   return { r: (f / fc) | 0, c: f % fc };
 }
 
-/** Return the two dual face indices [fA, fB] flanking grid edge `x` (using EXT = (rows-1)*(cols-1) outside the board). */
-export function edgeDualFaces(P, x) {
-  const { rows, cols } = P;
-  const fr = rows - 1, fc = cols - 1, EXT = fr * fc;
-  const faceAt = (r, c) => (r >= 0 && c >= 0 && r < fr && c < fc ? r * fc + c : EXT);
-  const cell = x >> 1;
-  const r = (cell / cols) | 0, c = cell % cols;
-  if ((x & 1) === 0) {
-    // Horizontal edge (r, c)-(r, c+1) separates face (r-1, c) and face (r, c)
-    return [faceAt(r - 1, c), faceAt(r, c)];
-  }
-  // Vertical edge (r, c)-(r+1, c) separates face (r, c-1) and face (r, c)
-  return [faceAt(r, c - 1), faceAt(r, c)];
-}
-
 let fpParent = new Int32Array(0);
 let fpDiff = new Uint8Array(0);
 let fpStack = new Int32Array(0);
@@ -51,6 +36,11 @@ let bfsQueue = new Int32Array(0);
  * When `useCircles` is false, only links adjacent faces across known E_ON / E_OFF edges (matching Auto-Shade).
  * When `useCircles` is true, also applies white-circle diagonal flips and black-circle 3-to-1 / forced-leg rules.
  * Returns { EXT, F, find, compress, diff, relate, adj, conflict, edgeFaceA, edgeFaceB }.
+ */
+/**
+ * Build the signed union-find over dual faces (and optional proof graph when `buildGraph: true`).
+ * Note: when `buildGraph: false`, the returned closures reference module-level scratch buffers
+ * (`fpParent`/`fpDiff`) that are reused by the next fast-mode call — do not retain across calls.
  */
 export function buildFaceParity(P, st, { buildGraph = true, useCircles = true } = {}) {
   const { rows, cols } = P;
@@ -382,8 +372,14 @@ function findFaceParityCore(P, st, opts, { useCircles, anchoredOnly }) {
       chains = direct ? [pA, direct] : [pA, pB];
       let curP = 0;
       for (const s of pA) { curP ^= s.xor; recordFace(s.to, curP); }
-      curP = 0;
-      for (const s of pB) { curP ^= s.xor; recordFace(s.to, curP); }
+      if (direct) {
+        curP = parA;
+        recordFace(fA, parA);
+        for (const s of direct) { curP ^= s.xor; recordFace(s.to, curP); }
+      } else {
+        curP = 0;
+        for (const s of pB) { curP ^= s.xor; recordFace(s.to, curP); }
+      }
       recordFace(fA, parA);
       recordFace(fB, parA ^ rel);
     } else {
@@ -444,6 +440,3 @@ export function findFaceShade(P, st, opts = null) {
 export function findFaceCircle(P, st, opts = null) {
   return findFaceParityCore(P, st, opts, { useCircles: true, anchoredOnly: false });
 }
-
-/** Backwards-compatible alias for full dual-face parity. */
-export const findFaceParity = findFaceCircle;

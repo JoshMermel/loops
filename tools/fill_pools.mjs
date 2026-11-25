@@ -6,17 +6,14 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus-existing | bonus-sym | bonus-new | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import {
-  compile, solve, isSolved, decodeSolution, encodeSolution,
-  toCsvRow, parseCsv, CSV_HEADER, symmetryKey,
-} from '../js/logic.js';
-import { rate } from '../js/rating.js';
+import { toCsvRow, parseCsv, CSV_HEADER, symmetryKey } from '../js/logic.js';
 import { generatePuzzle, makeRng } from '../js/generator.js';
+import { repoRoot, arg, verifyPuzzle } from './_cli.mjs';
 
 function bucketOf(p, buckets) {
   if (p.rules === 'unsolved') return buckets['Expert+'] ? 'Expert+' : null;
@@ -85,13 +82,8 @@ if (!isMainThread) {
         });
         if (!p) continue;
         // Independent re-verification
-        const fresh = compile({ name: p.name, rows: p.rows, cols: p.cols, clues: p.clues });
-        const dec = decodeSolution(fresh, p.solution);
-        if (!isSolved(fresh, dec.e)) continue;
-        const exact = solve(fresh, { limit: 2, maxNodes: 500000 });
-        if (exact.exceeded || exact.count !== 1) continue;
-        if (encodeSolution(fresh, exact.solutions[0]) !== p.solution) continue;
-        const r = rate(fresh);
+        const r = verifyPuzzle(p);
+        if (!r) continue;
         p.rules = r.rules;
         p.tier = r.tier;
         p.score = r.score;
@@ -124,13 +116,8 @@ if (!isMainThread) {
         name: `${job.pool}_${seedStart}_${++seq}`,
       });
       if (!p) continue;
-      const fresh = compile({ name: p.name, rows: p.rows, cols: p.cols, clues: p.clues });
-      const dec = decodeSolution(fresh, p.solution);
-      if (!isSolved(fresh, dec.e)) continue;
-      const exact = solve(fresh, { limit: 2, maxNodes: 500000 });
-      if (exact.exceeded || exact.count !== 1) continue;
-      if (encodeSolution(fresh, exact.solutions[0]) !== p.solution) continue;
-      const r = rate(fresh);
+      const r = verifyPuzzle(p);
+      if (!r) continue;
       if (job.tier === 'Expert+') {
         if (r.solved) continue;
       } else {
@@ -146,14 +133,14 @@ if (!isMainThread) {
     process.exit(0);
   }
 } else {
-  const arg = (name, def = null) => {
-    const i = process.argv.indexOf(`--${name}`);
-    return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : def;
-  };
-
-  const numWorkers = Math.max(1, Math.min(os.cpus().length, +arg('workers', Math.max(1, os.cpus().length - 1))));
+  const rawWorkers = Number(arg('workers', Math.max(1, os.cpus().length - 1)));
+  if (!Number.isFinite(rawWorkers) || rawWorkers < 1) {
+    console.error(`Invalid --workers value: ${arg('workers')}`);
+    process.exit(1);
+  }
+  const numWorkers = Math.max(1, Math.min(os.cpus().length, Math.trunc(rawWorkers)));
   const onlyGroup = arg('only', 'all');
-  const libDir = path.resolve(new URL('..', import.meta.url).pathname, 'tools', 'library');
+  const libDir = path.resolve(repoRoot(import.meta.url), 'tools', 'library');
   fs.mkdirSync(libDir, { recursive: true });
 
   const JOBS = [
@@ -205,7 +192,7 @@ if (!isMainThread) {
       budgetSec: 300, perPuzzleMs: 35000,
     },
     {
-      group: 'giants-16x24', pool: 'balanced_16x24', cols: 16, rows: 24,
+      group: 'giants', pool: 'balanced_16x24', cols: 16, rows: 24,
       buckets: {
         Medium: { need: 34, maxScore: 1550 },
         Hard: { need: 38, minScore: 1480, maxScore: 2150 },
@@ -286,13 +273,6 @@ if (!isMainThread) {
       budgetSec: 360, perPuzzleMs: 25000,
     },
 
-    // ---- Oversized bonus tails (10 per bonus book) + Lattice showcase
-    { group: 'bonus-oversized', pool: 'white_12x12', cols: 12, rows: 12, style: 'white', total: 12, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'black_12x12', cols: 12, rows: 12, style: 'black', total: 12, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'tallsky_6x30', cols: 6, rows: 30, total: 14, budgetSec: 90, perPuzzleMs: 30000 },
-    { group: 'bonus-oversized', pool: 'sym_rot180_12x12', cols: 12, rows: 12, layout: 'rot180', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'sym_mirror_12x12', cols: 12, rows: 12, layout: 'mirror', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'sym_transpose_12x12', cols: 12, rows: 12, layout: 'transpose', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
     // ---- Bonus: Black & White Cookie (left/right, top/bottom, and diagonal W/B half-splits)
     {
       group: 'bonus-cookie', pool: 'cookie_vert_10x10', cols: 10, rows: 10, layout: 'cookie',
@@ -324,13 +304,10 @@ if (!isMainThread) {
       },
       budgetSec: 240, perPuzzleMs: 20000,
     },
-    { group: 'bonus-cookie', pool: 'cookie_vert_12x12', cols: 12, rows: 12, layout: 'cookie', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-cookie', pool: 'cookie_horiz_12x12', cols: 12, rows: 12, layout: 'cookie-horiz', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-cookie', pool: 'cookie_diag_12x12', cols: 12, rows: 12, layout: 'cookie-diag', total: 5, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'full_10x12', cols: 10, rows: 12, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 25000 },
-    { group: 'bonus-oversized', pool: 'lattice_13x13', cols: 13, rows: 13, layout: 'lattice', total: 14, budgetSec: 180, perPuzzleMs: 35000 },
 
     // ---- Bonus: Geometric Patterns & Wallpapers (all-square 9x9 / 10x10 / 13x13 masks for `bonus-patterns`)
+    { group: 'bonus-patterns', pool: 'lattice_9x9', cols: 9, rows: 9, layout: 'lattice', total: 25, budgetSec: 45, perPuzzleMs: 12000 },
+    { group: 'bonus-patterns', pool: 'lattice_13x13', cols: 13, rows: 13, layout: 'lattice', total: 14, budgetSec: 180, perPuzzleMs: 35000 },
     { group: 'bonus-patterns', pool: 'pat_blocks2x2_9x9', cols: 9, rows: 9, layout: 'blocks2x2', total: 25, budgetSec: 45, perPuzzleMs: 12000 },
     { group: 'bonus-patterns', pool: 'pat_quilt2x2_10x10', cols: 10, rows: 10, layout: 'quilt2x2', total: 25, budgetSec: 45, perPuzzleMs: 12000 },
     { group: 'bonus-patterns', pool: 'pat_circle_10x10', cols: 10, rows: 10, layout: 'circle-ring', total: 22, budgetSec: 90, perPuzzleMs: 15000 },
@@ -376,7 +353,15 @@ if (!isMainThread) {
     { group: 'bonus-finales', pool: 'full_12x20', cols: 12, rows: 20, minFill: 1.0, total: 12, budgetSec: 90, perPuzzleMs: 20000 },
   ];
 
-  const groups = onlyGroup === 'all' ? null : new Set(onlyGroup.split(','));
+  const knownGroups = new Set(JOBS.map((j) => j.group));
+  const groups = onlyGroup === 'all' ? null : new Set(onlyGroup.split(',').filter(Boolean));
+  if (groups) {
+    const unknown = [...groups].filter((g) => !knownGroups.has(g));
+    if (unknown.length) {
+      console.error(`Unknown --only group(s): ${unknown.join(', ')}. Known: ${[...knownGroups].join(', ')}`);
+      process.exit(1);
+    }
+  }
   const selected = groups ? JOBS.filter((j) => groups.has(j.group)) : JOBS;
 
   async function runBucketedJob(job, jobIdx) {

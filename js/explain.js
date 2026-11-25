@@ -1,8 +1,8 @@
 // Turns a step of the human-style solver (js/rating.js) into something the Hint button can show:
 // a clear English sentence, the cells to look at (by role), and the ghost marks to draw on the board.
 import {
-  WHITE, BLACK, OFF, LOOP, E_ON, E_OFF,
-  colName, edgeCells, cloneState,
+  E_ON, E_OFF,
+  colName, edgeCells,
 } from './logic.js';
 import { ruleLabel, oddOpenEnds, chokepointCheck } from './rating.js';
 import { replayImagine } from './imagine.js';
@@ -36,13 +36,14 @@ export const ROLES = {
   path: 'the ends of a path',
 };
 
-/** Extract ghost edge targets from a firing's `sets` (edge-only interaction: draw segments or cross out edges). */
+/** Extract deduplicated ghost edge targets from a firing's `sets` (edge-only interaction: draw segments or cross out edges). */
 export function targetsOf(sets) {
   const segOn = [], segOff = [];
+  const seenOn = new Set(), seenOff = new Set();
   for (const [kind, idx, v] of sets) {
     if (kind === 'e') {
-      if (v === E_ON) segOn.push(idx);
-      else if (v === E_OFF) segOff.push(idx);
+      if (v === E_ON && !seenOn.has(idx)) { seenOn.add(idx); segOn.push(idx); }
+      else if (v === E_OFF && !seenOff.has(idx)) { seenOff.add(idx); segOff.push(idx); }
     }
   }
   return { segOn, segOff };
@@ -91,8 +92,27 @@ function describeChainStep(P, s) {
     }
     case 'noEarlyClose':
       return `${edgeName(P, info.edge)} cannot close the loop early`;
+    case 'threeWhites':
+      return `the three white circles at ${joinList(info.cells.map((k) => cellName(P, k)))} must cross ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
+    case 'twoWhitesStraight':
+      return `the adjacent white circles at ${cellName(P, info.w1)} and ${cellName(P, info.w2)} must cross ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
+    case 'closingCell':
+      return `${edgeName(P, info.edge)} would leave ${c} with only one way out`;
+    case 'samePathExits':
+      return `the loop must extend out of ${cellName(P, info.ends[0])} and ${cellName(P, info.ends[1])} without closing early`;
+    case 'whiteNoTurnAxis':
+      return `the white circle at ${c} cannot turn along its blocked axis and must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
+    case 'blackBlockedTarget':
+      return `the black circle at ${c} must avoid its blocked side and go two cells ${DIR_WORD[info.dir]}`;
+    case 'faceShade':
+    case 'faceCircle':
+      return `inside/outside shading forces ${describeMarks(P, targetsOf(sets))}`;
+    case 'twoEndsJoin':
+      return `connecting the two open ends forces ${describeMarks(P, targetsOf(sets))}`;
+    case 'crossingParity':
+      return `loop crossing parity forces ${describeMarks(P, targetsOf(sets))}`;
     default:
-      return `${rule} forces ${describeMarks(P, targetsOf(sets))}`;
+      return `forced deductions require ${describeMarks(P, targetsOf(sets))}`;
   }
 }
 
@@ -277,14 +297,13 @@ export function explainStep(P, step, st = null) {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: true };
-      const colName = (par) => (par === 1 ? 'Inside' : 'Outside');
+      const sideName = (par) => (par === 1 ? 'Inside' : 'Outside');
       text = info.val === E_ON
-        ? `Inside/outside shading puts opposite sides (${colName(info.parA)} and ${colName(info.parB)}) across ${edgeName(P, info.edge)}, so the loop must cross between them (draw ${edgeName(P, info.edge)}).`
-        : `Inside/outside shading puts ${colName(info.parA)} on both sides of ${edgeName(P, info.edge)}, so the loop cannot pass between them (cross out ${edgeName(P, info.edge)}).`;
+        ? `Inside/outside shading puts opposite sides (${sideName(info.parA)} and ${sideName(info.parB)}) across ${edgeName(P, info.edge)}, so the loop must cross between them (draw ${edgeName(P, info.edge)}).`
+        : `Inside/outside shading puts ${sideName(info.parA)} on both sides of ${edgeName(P, info.edge)}, so the loop cannot pass between them (cross out ${edgeName(P, info.edge)}).`;
       break;
     }
-    case 'faceCircle':
-    case 'faceParity': {
+    case 'faceCircle': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       roles.clue.push(...(info.clues || []));
@@ -367,9 +386,7 @@ export function explainStep(P, step, st = null) {
     }
     case 'imagineLocal':
     case 'imagineTrace':
-    case 'imagineChain':
-    case 'imagine':
-    case 'imagineLong': {
+    case 'imagineChain': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       const hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;

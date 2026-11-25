@@ -9,7 +9,7 @@
 //      if the human rater gets stuck (Expert) or exceeds `maxTier`.
 // 3. Re-verify exact uniqueness (complete search, never trusting exceeded) and rate with js/rating.js.
 import {
-  compile, propagate, initialState, solve, isSolved, encodeSolution, E_ON, E_OFF, E_UNKNOWN,
+  compile, propagate, initialState, solve, isSolved, encodeSolution, WHITE, BLACK, E_ON, E_OFF, E_UNKNOWN,
 } from './logic.js';
 import { RULES, rate, solvedByRules, FIRST_LOOKAHEAD, TIERS } from './rating.js';
 
@@ -146,8 +146,8 @@ export function randomLoop(rows, cols, rng, { targetFill = null, steps = null } 
 }
 
 /** Find every cell on `edges` where a White ('W') or Black ('B') circle is legally allowed. */
-export function allowedClues(rows, cols, edges) {
-  const empty = compile({ name: 'tmp', rows, cols, clues: [] });
+export function allowedClues(rows, cols, edges, grid = null) {
+  const empty = grid || compile({ name: 'tmp', rows, cols, clues: [] });
   const whites = [], blacks = [];
   for (let i = 0; i < empty.N; i++) {
     const dirs = [];
@@ -169,7 +169,7 @@ export function allowedClues(rows, cols, edges) {
 
 /**
  * Symmetry/layout helpers for themed bonus corpuses.
- * Supported `layout` values:
+ * Supported `layout` values for clueFilterFor:
  *   'none'         normal unconstrained clues
  *   'checkerboard' clues only on (r + c) % 2 === 0 (no two circles ever touch orthogonally)
  *   'interior'     no clues on the outer perimeter (rows 0/R-1, cols 0/C-1)
@@ -179,8 +179,12 @@ export function allowedClues(rows, cols, edges) {
  *   'mirror'       exact left-right mirror symmetry (loop and circle colors)
  *   'transpose'    exact diagonal-mirror symmetry (r, c) <-> (c, r) (square boards)
  *   'rot90'        exact 90° 4-fold rotational symmetry (loop and circle colors; square boards)
- *   'yinyang'      180° opposite-color symmetry (every W sits opposite a B and vice versa)
- *   'lattice'      every even 1-based row & col (r%2===1, c%2===1) has a W or B circle (all present)
+ *   'yinyang' / 'yinyang-mirror' / 'yinyang-transpose'  opposite-color symmetry (W <-> B)
+ *   'cookie' / 'cookie-horiz' / 'cookie-diag'           half white, half black split
+ * Fixed-mask layouts (handled by `maskPoints` / `generateMaskPuzzle`):
+ *   'lattice', 'blocks2x2', 'quilt2x2', 'circle-ring', 'honeycomb', 'pillars', 'hourglass',
+ *   'brackets', 'x-bracket', 'spiral', 'stairs', 'small-x', 'bricks', 'dominoes',
+ *   'ltiles', 'mirror-ltiles', 'herringbone', 'slashes', 'zigzags'
  */
 function clueFilterFor(layout, rows, cols) {
   if (!layout || layout === 'none') return (cs) => cs;
@@ -402,13 +406,35 @@ export function tightLoop(rows, cols, rng, {
     : 0;
   const filterClues = clueFilterFor(layout, rows, cols);
   const stepsLimit = maxSteps ?? Math.max(500, Math.min(6000, F * 5 + (layout !== 'none' ? 300 : 0) + (minFill >= 0.95 ? 700 : 0)));
+  // Compile grid topology once and reuse across all annealing evaluations
+  const baseGrid = compile({ name: 'tl', rows, cols, clues: [] });
+  const tlClue = new Uint8Array(N);
+  const tlClueAt = new Int16Array(N);
 
   const evaluate = () => {
     const { edges, loopCells, minR, maxR, minC, maxC, emptyBorders, quadFills, qTot, minQuadFill } = toEdges();
-    const { whites, blacks } = allowedClues(rows, cols, edges);
+    const { whites, blacks } = allowedClues(rows, cols, edges, baseGrid);
     const pool = style === 'white' ? whites : style === 'black' ? blacks : whites.concat(blacks);
     const clues = filterClues(pool);
-    const P = compile({ name: 'tl', rows, cols, clues });
+    tlClue.fill(0);
+    tlClueAt.fill(-1);
+    const clueCells = [], wIdx = [], bIdx = [];
+    for (let k = 0; k < clues.length; k++) {
+      const cl = clues[k];
+      const i = cl.r * cols + cl.c;
+      tlClueAt[i] = k;
+      tlClue[i] = cl.t === 'W' ? WHITE : BLACK;
+      clueCells.push(i);
+      if (cl.t === 'W') wIdx.push(i); else bIdx.push(i);
+    }
+    const P = {
+      name: 'tl', rows, cols, clues,
+      N: baseGrid.N, K: 4, numEdges: baseGrid.numEdges,
+      clue: tlClue, clueAt: tlClueAt, clueCells, whites: wIdx, blacks: bIdx,
+      nb: baseGrid.nb, ed: baseGrid.ed, step2: baseGrid.step2, ed2: baseGrid.ed2,
+      edgeA: baseGrid.edgeA, edgeB: baseGrid.edgeB,
+      _ecOff: null, _ecData: null,
+    };
     const st = initialState(P);
     propagate(P, st);
     const unkEdges = [];
@@ -491,19 +517,6 @@ const BEGINNER_UPTO = RULES.findIndex((r) => r.tier !== 'Beginner');
 const MEDIUM_UPTO = RULES.findIndex((r) => r.tier !== 'Beginner' && r.tier !== 'Medium');
 
 /**
- * Generate one verified, rated Masyu puzzle.
- * Options:
- *   rows, cols           board dimensions (each >= 4)
- *   seed                 PRNG seed (or pass `rng` directly)
- *   style                'balanced' | 'white' | 'black' | 'sparse'
- *   maxTier              'Beginner' | 'Medium' | 'Hard'
- *   targetTier           'Beginner' | 'Medium' | 'Hard' | null
- *   keepFrac             0..1: optional minimum fraction of initial clues to keep
- *   budgetMs             time budget in ms (default 15000)
- *   verifyMaxNodes       node cap for complete uniqueness check (default 500000)
- *   name                 puzzle name
- */
-/**
  * Return the fixed dot coordinates [[r, c], ...] for a named geometric pattern mask, or null if not a mask layout.
  * All masks keep dots strictly inside the interior (1..rows-2, 1..cols-2) so loops route cleanly around them.
  */
@@ -547,8 +560,10 @@ export function maskPoints(layout, rows, cols) {
         [4, 4], [4, 5], [5, 4], [5, 5],
       ];
     case 'pillars': // 9x9: three bold solid vertical columns
+      if (rows !== 9 || cols !== 9) return [];
       return collect((r, c) => r >= 1 && r <= rows - 2 && (c === 1 || c === 4 || c === 7));
     case 'hourglass': // 10x10: top & bottom solid bars + X diagonals
+      if (rows !== 10 || cols !== 10) return [];
       return collect((r, c) => (
         r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
         && (r === 1 || r === rows - 2 || r === c || r + c === rows - 1)
@@ -578,6 +593,7 @@ export function maskPoints(layout, rows, cols) {
         [4, 2], [4, 3], [4, 4], [4, 5], [5, 5],
       ];
     case 'stairs': // 9x9: parallel stepped diagonal staircases
+      if (rows !== 9 || cols !== 9) return [];
       return collect((r, c) => (
         r >= 1 && r <= rows - 2 && c >= 1 && c <= cols - 2
         && (r - c === 0 || r - c === 1 || r - c === -4 || r - c === -3 || r - c === 4 || r - c === 5)
@@ -653,7 +669,7 @@ export function maskPoints(layout, rows, cols) {
  * (all dots present, none elsewhere) via guided W<->B hill-climbing toward uniqueness.
  */
 function generateMaskPuzzle({
-  rows, cols, pts, rand, deadline, maxTierIdx, targetTier, verifyMaxNodes, name, minLoopCells,
+  rows, cols, pts, rand, deadline, maxTierIdx, targetTier, wantUnsolved, allowUnsolved, verifyMaxNodes, name, minLoopCells,
 }) {
   const K = pts.length;
   if (K < 4) return null;
@@ -748,9 +764,14 @@ function generateMaskPuzzle({
     if (!checkBoundsAndFill(solStr)) continue;
 
     const rated = rate(P);
-    if (!rated.solved) continue;
-    if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
-    if (targetTier && rated.tier !== targetTier) continue;
+    if (wantUnsolved) {
+      if (rated.solved) continue;
+    } else if (!rated.solved) {
+      if (!allowUnsolved) continue;
+    } else {
+      if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+      if (targetTier && rated.tier !== targetTier) continue;
+    }
 
     P.solution = solStr;
     P.rules = rated.rules;
@@ -761,6 +782,23 @@ function generateMaskPuzzle({
   return null;
 }
 
+/**
+ * Generate one verified, rated Masyu puzzle.
+ * Options:
+ *   rows, cols           board dimensions (each >= 4)
+ *   seed                 PRNG seed (or pass `rng` directly)
+ *   style                'balanced' | 'white' | 'black' | 'sparse'
+ *   layout               clue filter or geometric pattern mask name (default 'none')
+ *   minFill              minimum loop fill fraction (e.g. 1.0 for Full board)
+ *   maxTier              'Beginner' | 'Medium' | 'Hard' | 'Expert' (default 'Expert')
+ *   targetTier           'Beginner' | 'Medium' | 'Hard' | 'Expert' | 'Expert+' | null
+ *   stripMode            'beginner' | 'medium' | 'deep' | null
+ *   allowUnsolved        allow Expert+ puzzles beyond the human rater
+ *   keepFrac             0..1: optional minimum fraction of initial clues to keep
+ *   budgetMs             time budget in ms (default 15000)
+ *   verifyMaxNodes       node cap for complete uniqueness check (default 500000)
+ *   name                 puzzle name
+ */
 export function generatePuzzle({
   rows,
   cols,
@@ -794,7 +832,8 @@ export function generatePuzzle({
   const pts = maskPoints(layout, rows, cols);
   if (pts) {
     return generateMaskPuzzle({
-      rows, cols, pts, rand, deadline, maxTierIdx, targetTier: wantUnsolved ? null : targetTier, verifyMaxNodes, name, minLoopCells,
+      rows, cols, pts, rand, deadline, maxTierIdx, targetTier: wantUnsolved ? null : targetTier,
+      wantUnsolved, allowUnsolved, verifyMaxNodes, name, minLoopCells,
     });
   }
   const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
@@ -851,10 +890,11 @@ export function generatePuzzle({
     const units = shuffle(buildUnits(current), rand);
     if (!pairedStrip && style === 'balanced' && base.whites.length > 0 && base.blacks.length > 0) {
       const wRatio = base.whites.length / current.length;
-      if (wRatio > 0.65) {
-        units.sort((a, b) => (a.items[0].t === 'W' ? -1 : 1) - (b.items[0].t === 'W' ? -1 : 1) + (rand() - 0.5) * 1.4);
-      } else if (wRatio < 0.35) {
-        units.sort((a, b) => (a.items[0].t === 'B' ? -1 : 1) - (b.items[0].t === 'B' ? -1 : 1) + (rand() - 0.5) * 1.4);
+      const overRep = wRatio > 0.65 ? 'W' : wRatio < 0.35 ? 'B' : null;
+      if (overRep) {
+        const keyed = units.map((u) => ({ u, k: (u.items[0].t === overRep ? 0 : 1) + rand() * 0.7 }));
+        keyed.sort((a, b) => a.k - b.k);
+        for (let i = 0; i < keyed.length; i++) units[i] = keyed[i].u;
       }
     }
 
@@ -945,7 +985,8 @@ export function generatePuzzle({
         let bestRated = null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
-          const cand = strippedBase.concat(...removed.slice(mid));
+          const cand = strippedBase.concat(...removed.slice(mid))
+            .sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
           const r = rate(compile({ name, rows, cols, clues: cand }));
           if (isWithin(r)) {
             lo = mid;

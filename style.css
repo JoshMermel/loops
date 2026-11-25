@@ -21,22 +21,20 @@
   --grid-dot: #bcbcbc;
   --pearl-ink: #111;
   --pearl-white-fill: #fff;
-  --pearl-ok: #2e7d32;
   --pearl-bad: #c62828;
   --loop: #1976d2;
-  --cell-x: #8a95a5;
   --edge-x: #757575;
-  --dot: #5b6d82;
-  --frame: #111;
   --axis: #888;
   --axis-here: #1976d2;
-  --cell-hover: rgba(0, 0, 0, 0.06);
   --edge-hover: rgba(25, 118, 210, 0.25);
   --face-in: rgba(38, 166, 154, 0.28);
   --face-out: rgba(245, 166, 85, 0.28);
+  --face-in-stroke: rgba(38, 166, 154, 0.7);
+  --face-out-stroke: rgba(230, 140, 50, 0.7);
   --face-hover: rgba(0, 0, 0, 0.05);
 
   --hint-focus: rgba(244, 236, 156, 0.8);
+  --hint-undecided: rgba(244, 236, 156, 0.4);
   --hint-clue: rgba(25, 118, 210, 0.26);
   --hint-range: rgba(25, 118, 210, 0.13);
   --hint-path: rgba(122, 81, 149, 0.28);
@@ -66,22 +64,20 @@
   --grid-dot: #505050;
   --pearl-ink: #e6e6e6;
   --pearl-white-fill: #222;
-  --pearl-ok: #66bb6a;
   --pearl-bad: #ef5350;
   --loop: #64b5f6;
-  --cell-x: #7e8b99;
   --edge-x: #aaa;
-  --dot: #8fa3b8;
-  --frame: #ccc;
   --axis: #999;
   --axis-here: #64b5f6;
-  --cell-hover: rgba(255, 255, 255, 0.08);
   --edge-hover: rgba(100, 181, 246, 0.35);
   --face-in: rgba(52, 211, 153, 0.36);
   --face-out: rgba(224, 155, 245, 0.46);
+  --face-in-stroke: rgba(52, 211, 153, 0.78);
+  --face-out-stroke: rgba(224, 155, 245, 0.78);
   --face-hover: rgba(255, 255, 255, 0.07);
 
   --hint-focus: rgba(255, 213, 79, 0.35);
+  --hint-undecided: rgba(255, 213, 79, 0.2);
   --hint-clue: rgba(100, 181, 246, 0.32);
   --hint-range: rgba(100, 181, 246, 0.16);
   --hint-path: rgba(179, 157, 219, 0.35);
@@ -168,9 +164,9 @@ button.ghost { background: transparent; }
 .line-end-halo { fill: none; stroke: var(--cell-bg); stroke-width: 4.5; stroke-linejoin: round; pointer-events: none; }
 
 /* ---- Hint overlays ---- */
-.hint-face-in { fill: var(--face-in); stroke: rgba(38, 166, 154, 0.7); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
-.hint-face-out { fill: var(--face-out); stroke: rgba(230, 140, 50, 0.7); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
-.hint-undecided { fill: rgba(244, 236, 156, 0.4); pointer-events: none; }
+.hint-face-in { fill: var(--face-in); stroke: var(--face-in-stroke); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.hint-face-out { fill: var(--face-out); stroke: var(--face-out-stroke); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.hint-undecided { fill: var(--hint-undecided); pointer-events: none; }
 .hint-area { fill: var(--hint-range); pointer-events: none; }
 .hint-clue { fill: var(--hint-clue); pointer-events: none; }
 .hint-path { fill: var(--hint-path); pointer-events: none; }
@@ -180,18 +176,15 @@ button.ghost { background: transparent; }
 .hatch-line { stroke: var(--hint-problem); opacity: 0.6; }
 .hint-exit { fill: none; stroke: var(--color-solved); stroke-width: 2.2; stroke-dasharray: 4 3; pointer-events: none; }
 .hint-focus-ring { fill: none; stroke: var(--hint-ink); stroke-width: 3; pointer-events: none; }
-.ghost-dot { fill: none; stroke: var(--hint-ink); stroke-width: 2.5; pointer-events: none; }
-.ghost-cell-x { stroke: var(--hint-ink); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 4 3; fill: none; pointer-events: none; }
 .chain-seg { stroke: var(--hint-problem); stroke-linecap: round; stroke-dasharray: 6 5; opacity: 0.92; pointer-events: none; }
 .ghost-seg { stroke: var(--hint-ink); stroke-linecap: round; stroke-dasharray: 5 4; pointer-events: none; }
 .ghost-x { stroke: var(--color-error); stroke-width: 2.8; stroke-linecap: round; fill: none; pointer-events: none; }
 .ghost-x-halo { stroke: var(--bg-white); stroke-width: 5.5; stroke-linecap: round; fill: none; pointer-events: none; }
 .wrong-seg { stroke: var(--color-error); stroke-linecap: round; opacity: 0.5; pointer-events: none; }
-.wrong { fill: none; stroke: var(--color-error); stroke-width: 3; stroke-dasharray: 5 3; pointer-events: none; }
 
 .toast {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 90vw;
-  background: var(--text-primary); color: var(--bg-white); padding: 8px 14px; border-radius: 8px; cursor: pointer; z-index: 1500;
+  background: var(--text-primary); color: var(--bg-white); padding: 8px 14px; border-radius: 8px; cursor: pointer; z-index: 2500;
 }
 .toast[hidden] { display: none; }
 .toast.below { position: static; transform: none; margin: 12px auto 0; width: min(560px, 94vw); }
@@ -200,14 +193,15 @@ button.ghost { background: transparent; }
 .toast.hint .hint-meta { font-size: 0.75rem; opacity: 0.78; margin-bottom: 3px; font-family: ui-monospace, Menlo, monospace; }
 .toast.hint .hint-more { margin-top: 5px; font-size: 0.8rem; opacity: 0.82; }
 .hint-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 0.75rem; opacity: 0.9; }
-.hint-legend .chip { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; border: 1px solid rgba(255, 255, 255, 0.6); }
+.hint-legend .chip { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; border: 1px solid color-mix(in srgb, currentColor 40%, transparent); }
 
 /* ---- Modals ---- */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
-  display: flex; justify-content: center; align-items: center; z-index: 2000; transition: opacity 0.2s;
+  display: flex; justify-content: center; align-items: center; z-index: 2000;
+  transition: opacity 0.2s, visibility 0.2s;
 }
-.modal-hidden { opacity: 0; pointer-events: none; }
+.modal-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .modal-box {
   background: var(--bg-white); border-radius: 8px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto;

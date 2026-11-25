@@ -18,15 +18,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
-  parseCsv, compile, solve, decodeSolution, encodeSolution, isSolved, symmetryKey, E_ON,
+  parseCsv, compile, solve, decodeSolution, encodeSolution, isSolved, symmetryKey,
 } from '../js/logic.js';
 import { rate, solvedByRules, FIRST_LOOKAHEAD } from '../js/rating.js';
+import { repoRoot, arg } from './_cli.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(`--${name}`);
-  return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : def;
-};
+const root = repoRoot(import.meta.url);
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'data', 'manifest.json'), 'utf8'));
 const loadBook = (entry) => parseCsv(fs.readFileSync(path.join(root, entry.file), 'utf8'));
 
@@ -82,14 +79,27 @@ if (process.argv.includes('--worker')) {
 }
 
 // Main coordinator
-const only = arg('book', '') ? arg('book').split(',') : null;
+const only = arg('book', '') ? arg('book').split(',').filter(Boolean) : null;
 const includeHidden = process.argv.includes('--all');
 const userChunk = arg('chunk', null);
 const chunk = userChunk ? +userChunk : 25;
 const jobs = Math.max(1, +arg('jobs', Math.max(2, os.availableParallelism() - 1)));
 const withRating = process.argv.includes('--rate');
 
+if (only) {
+  const knownIds = new Set(manifest.books.map((b) => b.id));
+  const unknown = only.filter((id) => !knownIds.has(id));
+  if (unknown.length) {
+    console.error(`Unknown --book id(s): ${unknown.join(', ')}. Known: ${[...knownIds].join(', ')}`);
+    process.exit(1);
+  }
+}
+
 const booksToAudit = manifest.books.filter((b) => (only ? only.includes(b.id) : includeHidden || !b.hidden));
+if (!booksToAudit.length) {
+  console.error('No books matched audit selection.');
+  process.exit(1);
+}
 const problems = [], tasks = [];
 const everywhere = new Map();
 let total = 0;

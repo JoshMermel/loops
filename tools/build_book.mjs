@@ -9,12 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseCsv, toCsv, symmetryKey } from '../js/logic.js';
 import { TIERS } from '../js/rating.js';
+import { repoRoot, arg, byOrder } from './_cli.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(`--${name}`);
-  return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : def;
-};
+const root = repoRoot(import.meta.url);
 const hasFlag = (name) => process.argv.includes(`--${name}`);
 
 const id = arg('id');
@@ -77,15 +74,9 @@ for (const ef of excludeFiles) {
   }
 }
 
-const byOrder = (a, b) => (
-  (a.rows * a.cols) - (b.rows * b.cols)
-  || TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier)
-  || (a.rules === 'unsolved' ? 1 : 0) - (b.rules === 'unsolved' ? 1 : 0)
-  || (a.score ?? 0) - (b.score ?? 0)
-);
-
 const seen = new Set(excluded);
 const locked = [];
+const lockedExpertPlus = [];
 const existingBookPath = path.join(root, 'data', `${id}.csv`);
 if (preserveExisting && fs.existsSync(existingBookPath)) {
   for (const p of parseCsv(fs.readFileSync(existingBookPath, 'utf8'))) {
@@ -93,7 +84,8 @@ if (preserveExisting && fs.existsSync(existingBookPath)) {
     const sk = symmetryKey(p);
     if (seen.has(sk)) continue;
     seen.add(sk);
-    locked.push(p);
+    if (p.rules === 'unsolved') lockedExpertPlus.push(p);
+    else locked.push(p);
   }
 }
 
@@ -333,9 +325,7 @@ if (tierShares) {
 }
 
 if (expertPlus > 0) {
-  const rawPlus = (balanceGroups && prefixes.length > 1)
-    ? pickBalancedAcrossGroups(expertPlusPool, expertPlus, prefixes).picked
-    : pickEvenly(expertPlusPool, expertPlus);
+  const rawPlus = pickWithLocked(lockedExpertPlus, expertPlusPool, expertPlus);
   const pickedPlus = (interleaveGroups && prefixes.length > 1)
     ? interleaveByGroup(rawPlus, prefixes, { limitRun: maxRun, seed: `${id}:expertPlus`, carry: runCarry })
     : rawPlus.sort(byOrder);

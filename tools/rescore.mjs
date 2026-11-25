@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { compile, parseCsv, toCsv } from '../js/logic.js';
-import { rate, TIERS } from '../js/rating.js';
+import { rate } from '../js/rating.js';
+import { repoRoot, byOrder } from './_cli.mjs';
 
 if (!isMainThread) {
   parentPort.on('message', ({ id, p }) => {
@@ -17,35 +18,39 @@ if (!isMainThread) {
     parentPort.postMessage({ id, rules: r.rules, tier: r.tier, score: r.score });
   });
 } else {
-  const root = new URL('..', import.meta.url).pathname;
+  const root = repoRoot(import.meta.url);
   const args = process.argv.slice(2);
   const dry = args.includes('--dry');
   const ji = args.indexOf('--jobs');
-  const jobs = Math.max(1, ji >= 0 ? +args[ji + 1] : os.availableParallelism());
+  const rawJobs = ji >= 0 ? Number(args[ji + 1]) : os.availableParallelism();
+  if (!Number.isFinite(rawJobs) || rawJobs < 1) {
+    console.error(`Invalid --jobs value: ${args[ji + 1]}`);
+    process.exit(1);
+  }
+  const jobs = Math.max(1, Math.trunc(rawJobs));
   let files = args.filter((a, i) => !a.startsWith('--') && !(ji >= 0 && i === ji + 1));
 
   if (!files.length) {
     const walk = (d) => (fs.existsSync(d)
       ? fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (
-        e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.csv') ? [path.join(d, e.name)] : []
+        e.isDirectory()
+          ? (e.name.startsWith('_') ? [] : walk(path.join(d, e.name)))
+          : e.name.endsWith('.csv') ? [path.join(d, e.name)] : []
       ))
       : []);
     files = [...walk(path.join(root, 'data')), ...walk(path.join(root, 'tools', 'library'))];
   }
 
-  const byOrder = (a, b) => (
-    (a.rows * a.cols) - (b.rows * b.cols)
-    || TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier)
-    || (a.score ?? 0) - (b.score ?? 0)
-  );
   const isSorted = (ps) => ps.every((p, i) => !i || byOrder(ps[i - 1], p) <= 0);
+  const dataDir = path.join(root, 'data') + path.sep;
 
   const books = [];
   const tasks = [];
   for (const f of files) {
     const ps = parseCsv(fs.readFileSync(f, 'utf8'));
     if (!ps.length) continue;
-    const book = { f, ps, wasSorted: isSorted(ps), changed: 0, left: ps.length };
+    const isShippedBook = path.resolve(f).startsWith(dataDir);
+    const book = { f, ps, isShippedBook, wasSorted: isSorted(ps), changed: 0, left: ps.length };
     books.push(book);
     ps.forEach((p, i) => tasks.push({ book, i, cells: p.rows * p.cols }));
   }
@@ -53,10 +58,17 @@ if (!isMainThread) {
   tasks.sort((a, b) => b.cells - a.cells);
 
   const finish = (book) => {
-    const { f, ps, wasSorted, changed } = book;
-    if (wasSorted) ps.sort(byOrder);
+    const { f, ps, isShippedBook, wasSorted, changed } = book;
+    // Never reorder shipped books in data/ (preserves sequential BOOK-001..N names)
+    let note = '';
+    if (wasSorted && !isShippedBook) {
+      ps.sort(byOrder);
+      note = ', kept sorted';
+    } else if (isShippedBook && wasSorted && !isSorted(ps)) {
+      note = ' (order shifted; rebuild books to re-sort & renumber)';
+    }
     if (!dry) fs.writeFileSync(f, toCsv(ps), 'utf8');
-    console.log(`${path.relative(root, f)}: ${ps.length} puzzles, ${changed} changed${wasSorted ? ', kept sorted' : ''}`);
+    console.log(`${path.relative(root, f)}: ${ps.length} puzzles, ${changed} changed${note}`);
   };
 
   let next = 0;

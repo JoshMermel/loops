@@ -8,17 +8,9 @@
 // Note: --size is COLSxROWS (e.g. 6x10 = 6 cols, 10 rows).
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  compile, solve, isSolved, decodeSolution, encodeSolution,
-  toCsvRow, parseCsv, CSV_HEADER, symmetryKey,
-} from '../js/logic.js';
-import { rate } from '../js/rating.js';
+import { toCsvRow, parseCsv, CSV_HEADER, symmetryKey } from '../js/logic.js';
 import { generatePuzzle, makeRng } from '../js/generator.js';
-
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(`--${name}`);
-  return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : def;
-};
+import { arg, verifyPuzzle } from './_cli.mjs';
 
 const sizeStr = arg('size', '8x8');
 const [cols, rows] = sizeStr.toLowerCase().split('x').map(Number);
@@ -70,6 +62,7 @@ while (added < count && Date.now() < deadline) {
     minFill,
     maxTier,
     targetTier: tier === 'any' ? null : tier,
+    allowUnsolved: tier === 'Expert+',
     keepFrac,
     budgetMs: remMs,
     name: puzName,
@@ -81,14 +74,9 @@ while (added < count && Date.now() < deadline) {
   if (seen.has(sk)) continue;
 
   // Independent re-verification before storing (never trust the generator's own claim)
-  const fresh = compile({ name: p.name, rows: p.rows, cols: p.cols, clues: p.clues });
-  const dec = decodeSolution(fresh, p.solution);
-  if (!isSolved(fresh, dec.e)) continue;
-  const exact = solve(fresh, { limit: 2, maxNodes: 500000 });
-  if (exact.exceeded || exact.count !== 1) continue;
-  if (encodeSolution(fresh, exact.solutions[0]) !== p.solution) continue;
-  const r = rate(fresh);
-  if (!r.solved) continue;
+  const r = verifyPuzzle(p);
+  if (!r) continue;
+  if (tier === 'Expert+' ? r.solved : !r.solved) continue;
   p.rules = r.rules;
   p.tier = r.tier;
   p.score = r.score;

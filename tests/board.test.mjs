@@ -85,6 +85,12 @@ test('clueStates marks broken (bad) circles and leaves valid/satisfied circles u
   // Cross out straight continuation of black circle's leg -> bad
   m.edges[P.ed2[3 * 4 + 2]] = 2;
   assert.equal(clueStates(P, m)[1], 'bad');
+
+  // Single segment into a border white circle facing off-board opposite edge -> bad immediately
+  const P2 = compile({ name: 'cs_bw', rows: 4, cols: 4, clues: [{ r: 0, c: 1, t: 'W' }] });
+  const mBW = { edges: new Uint8Array(P2.numEdges) };
+  mBW.edges[P2.ed[(0 * 4 + 1) * 4 + 2]] = 1; // down from top-border white circle
+  assert.equal(clueStates(P2, mBW)[0], 'bad');
 });
 
 test('earlyLoopEdges flags closed loops that miss clues or leave other segments, and ignores open paths or full single loops', () => {
@@ -243,6 +249,13 @@ test('advanceDrag avoids accidental 90° turns on wobbly straight drags, ignores
   ]);
   assert.deepEqual(b1.active, [e10_11, e11_01]);
 
+  // Pulling back into the 0.20..0.24 vertex-snap band must still backtrack cleanly (not fire reverse forward)
+  const b3 = runDrag([
+    [0.0, 1.0], [0.5, 1.0], [0.22, 1.0],
+  ]);
+  assert.deepEqual(b3.active, []);
+  assert.equal(b3.g.curCell, cell(1, 0));
+
   // Pulling all the way back to (1,0) undoes both segments cleanly
   const b2 = runDrag([
     [0.0, 1.0], [0.5, 1.0], [1.5, 1.0], [0.8, 1.0], [0.1, 1.0],
@@ -300,10 +313,10 @@ test('otherEnd finds far endpoint of an open path and ignores closed loops or br
   assert.equal(otherEnd(P, edges, 0), -1);
 });
 
-test('pathcolors keeps colors stable when extending or joining lines', () => {
+test('pathcolors keeps colors stable when extending, joining, splitting, or avoiding alike nearby colors', () => {
   const keeper = makeColorKeeper(16);
   const on = new Uint8Array(16);
-  on[0] = 1; // path A
+  on[0] = 1; // path A (oldest)
   on[6] = 1; // path B
   const roots1 = (x) => (x < 4 ? 0 : 6);
   const c1 = assignPathColors(keeper, on, roots1, 8, null);
@@ -315,4 +328,32 @@ test('pathcolors keeps colors stable when extending or joining lines', () => {
   const c2 = assignPathColors(keeper, on, roots1, 8, null);
   assert.equal(c2.get(0), colA);
   assert.equal(c2.get(6), colB);
+
+  // Joining path A and path B inherits the older path's color (colA)
+  on[4] = 1;
+  const cJoin = assignPathColors(keeper, on, () => 0, 8, null);
+  assert.equal(cJoin.get(0), colA);
+
+  // Splitting back apart keeps colA on the older half and assigns a distinct color to the new piece
+  on[4] = 0;
+  const cSplit = assignPathColors(keeper, on, roots1, 8, null);
+  assert.equal(cSplit.get(0), colA);
+  assert.notEqual(cSplit.get(6), colA);
+
+  // Near alike-color avoidance: when colors 0 & 1 are alike (1.0) and color 2 is distinct (0.0),
+  // an adjacent component avoids picking 1 next to 0
+  const kNear = makeColorKeeper(16);
+  const onN = new Uint8Array(16);
+  onN[0] = 1; // edge 0
+  const alike = [
+    [1, 1, 0],
+    [1, 1, 0],
+    [0, 0, 1],
+  ];
+  const near = { cols: 4, alike: (i, j) => alike[i][j] };
+  const cn1 = assignPathColors(kNear, onN, () => 0, 3, near);
+  onN[2] = 1; // adjacent edge on same row
+  const cn2 = assignPathColors(kNear, onN, (x) => x, 3, near);
+  assert.equal(cn2.get(0), cn1.get(0));
+  assert.equal(alike[cn2.get(0)][cn2.get(2)], 0, 'adjacent path should avoid alike color');
 });

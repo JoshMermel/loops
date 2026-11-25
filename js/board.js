@@ -30,7 +30,7 @@ const DRAG_TURN_MIN = 0.40;     // deeper travel required to commit a 90° turn 
 const DRAG_STRAIGHT_TOL = 0.22; // perpendicular drag tolerance when continuing straight
 const DRAG_FIRST_TOL = 0.20;    // perpendicular drag tolerance on the first segment
 const DRAG_TURN_TOL = 0.18;     // tighter perpendicular drag tolerance for a 90° turn
-const DRAG_BACKTRACK_T = 0.20;  // pull back within 20% of the previous vertex to undo the last dragged segment
+const DRAG_BACKTRACK_T = 0.25;  // pull back within 25% of the previous vertex to undo the last dragged segment (>= DRAG_VERTEX_RAD)
 const DRAG_BACKTRACK_TOL = 0.28;
 const DRAG_VERTEX_RAD = 0.24;   // vertex snap radius for fast multi-cell swipes
 const DRAG_SLOP_PX = 6; // ignore sub-6px pointer jitter before starting a drag
@@ -194,7 +194,8 @@ export function advanceDrag(P, g, gx, gy, step, undoStep = null, beginDrag = nul
   const nc = Math.max(0, Math.min(P.cols - 1, Math.round(px)));
   const nr = Math.max(0, Math.min(P.rows - 1, Math.round(py)));
   const v = nr * P.cols + nc;
-  if (v !== g.curCell && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
+  const prevBack = g.trail.length ? g.trail[g.trail.length - 1].a : -1;
+  if (v !== g.curCell && v !== prevBack && Math.hypot(px - nc, py - nr) <= DRAG_VERTEX_RAD + EPS) {
     // Don't let vertex snap bypass 90° turn hysteresis for an immediate neighbor unless very close to that vertex
     walkCells(g.curCell, v);
     return;
@@ -345,6 +346,10 @@ export class Board {
 
   setPuzzle(P) {
     this.P = P;
+    this.gesture = null;
+    this.hoverCell = -1;
+    this.hoverEdge = -1;
+    this.hoverFace = -1;
     this.colors = null;
     this.grace.reset();
     clearTimeout(this._badTimer);
@@ -376,9 +381,9 @@ export class Board {
     const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
     for (let x = 0; x < P.numEdges; x++) {
       if (marks.edges[x] !== 1) continue;
-      onOnly[x] = 1;
       const a = P.edgeA[x], b = P.edgeB[x];
       if (a < 0) continue;
+      onOnly[x] = 1;
       deg[a]++; deg[b]++;
       const ra = find(a), rb = find(b);
       if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
@@ -564,7 +569,8 @@ export class Board {
 
     // Hover feedback (track midpoint highlight, or open line-end rings on degree-1 endpoints)
     if (!this.gesture) {
-      if (this.hoverEdge >= 0) {
+      const hoverAutoX = this.hoverEdge >= 0 && marks.edges[this.hoverEdge] === 2 && marks.autoE && marks.autoE[this.hoverEdge];
+      if (this.hoverEdge >= 0 && !hoverAutoX) {
         const [x1, y1, x2, y2] = segCoords(this.hoverEdge);
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
         g += `<circle class="edge-hover" cx="${mx}" cy="${my}" r="${S * 0.16}"/>`;
@@ -612,11 +618,6 @@ export class Board {
     return { gx: sx - LABEL - PAD, gy: sy - LABEL - PAD };
   }
 
-  hitFromEvent(e) {
-    const c = this.coordsFromEvent(e);
-    return c ? hitTestCoords(this.P, c.gx, c.gy) : null;
-  }
-
   setHover(cell, edge, face = -1) {
     if (this.hoverCell === cell && this.hoverEdge === edge && this.hoverFace === face) return;
     this.hoverCell = cell;
@@ -626,7 +627,7 @@ export class Board {
   }
 
   down(e) {
-    if (!this.P || e.button === 1) return;
+    if (!this.P || this.gesture || (e.button !== 0 && e.button !== 2)) return;
     const c = this.coordsFromEvent(e);
     const hit = c ? hitTestCoords(this.P, c.gx, c.gy) : null;
     if (!hit) return;

@@ -9,8 +9,9 @@ import path from 'node:path';
 import { compile, parseCsv, toCsv, isSolved, symmetryKey } from '../js/logic.js';
 import { RULES } from '../js/rating.js';
 import { computeHint } from '../js/hintstep.js';
+import { repoRoot } from './_cli.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = repoRoot(import.meta.url);
 const manifestPath = path.join(root, 'data', 'manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 

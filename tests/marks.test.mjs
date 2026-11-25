@@ -58,19 +58,17 @@ test('Auto-X rule 1: cell with 2 segments X-es out its remaining incident edges'
   const P = compile({ name: 'r1', rows: 4, cols: 4, clues: [] });
   const m = blank(P);
   const c = 1 * 4 + 1; // interior cell (1,1)
-  const prev = snap(m);
   m.edges[P.ed[c * 4 + 0]] = 1; // U
   m.edges[P.ed[c * 4 + 1]] = 1; // R
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[c * 4 + 2]], 2); // D auto-X
   assert.equal(m.edges[P.ed[c * 4 + 3]], 2); // L auto-X
   assert.equal(m.autoE[P.ed[c * 4 + 2]], 1);
   assert.equal(m.autoE[P.ed[c * 4 + 3]], 1);
 
   // Erasing one of the two segments removes both auto-X marks
-  const prev2 = snap(m);
   m.edges[P.ed[c * 4 + 1]] = 0;
-  reconcileAutoX(P, prev2, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[c * 4 + 2]], 0);
   assert.equal(m.edges[P.ed[c * 4 + 3]], 0);
   assert.equal(m.autoE[P.ed[c * 4 + 2]], 0);
@@ -83,23 +81,20 @@ test('Auto-X rule 2: white circle requires both straight segments through the do
   const oppExt = P.ed2[w * 4 + 1]; // (2,3)-(2,4)
 
   // Step 1: Drawing only left half (2,0)-(2,1)-(2,2) must NOT eagerly auto-X (2,3)-(2,4)
-  let prev = snap(m);
   m.edges[P.ed[w * 4 + 3]] = 1;
   m.edges[P.ed2[w * 4 + 3]] = 1;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[oppExt], 0, 'must wait until right segment through white circle is also drawn');
 
   // Step 2: Now draw the opposite straight segment through the white circle: (2,2)-(2,3)
-  prev = snap(m);
   m.edges[P.ed[w * 4 + 1]] = 1;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[oppExt], 2, 'must auto-X straight continuation past right neighbor once both halves are drawn');
   assert.equal(m.autoE[oppExt], 1);
 
   // Step 3: Erasing either the right half (2,2)-(2,3) or outer left segment (2,0)-(2,1) cleanly removes the auto-X
-  prev = snap(m);
   m.edges[P.ed[w * 4 + 1]] = 0;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[oppExt], 0);
   assert.equal(m.autoE[oppExt], 0);
 });
@@ -108,9 +103,8 @@ test('Auto-X rule 3: black circle with a segment X-es out the opposite direction
   const P = compile({ name: 'r3', rows: 5, cols: 5, clues: [{ r: 2, c: 2, t: 'B' }] });
   const m = blank(P);
   const b = 2 * 5 + 2;
-  const prev = snap(m);
   m.edges[P.ed[b * 4 + 1]] = 1; // R
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[b * 4 + 3]], 2, 'opposite (L) must be auto-X');
   assert.equal(m.autoE[P.ed[b * 4 + 3]], 1);
   // U and D remain open
@@ -125,10 +119,9 @@ test('Auto-X rule 4: dead-end cell with 1 way out X-es that exit, cascades, and 
   const P = compile({ name: 'r4', rows: 4, cols: 4, clues: [] });
   const m = blank(P);
   const c01 = 0 * 4 + 1;
-  const prev = snap(m);
   m.edges[P.ed[c01 * 4 + 1]] = 1; // (0,1)-(0,2)
   m.edges[P.ed[c01 * 4 + 2]] = 1; // (0,1)-(1,1)
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
 
   const eCornerR = P.ed[0 * 4 + 1]; // (0,0)-(0,1)
   const eCornerD = P.ed[0 * 4 + 2]; // (0,0)-(1,0)
@@ -138,9 +131,8 @@ test('Auto-X rule 4: dead-end cell with 1 way out X-es that exit, cascades, and 
   assert.equal(m.autoE[eCornerD], 1);
 
   // Erase (0,1)-(0,2): BOTH auto-X edges (including cascaded dead-end) must vanish cleanly!
-  const prev2 = snap(m);
   m.edges[P.ed[c01 * 4 + 1]] = 0;
-  reconcileAutoX(P, prev2, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[eCornerR], 0);
   assert.equal(m.edges[eCornerD], 0);
   assert.equal(m.autoE[eCornerD], 0);
@@ -155,7 +147,6 @@ test('Auto-X rule 4b: dead-end pocket (E1-F1-F2 returning to E2) auto-Xes F1-F2 
     return -1;
   };
   const m = blank(P);
-  const prev = snap(m);
   // Segment E2-E3
   m.edges[edge(cell(1, 4), cell(2, 4))] = 1;
   // Blocking X's around the E1-F1-F2 pocket: D1-E1, F1-G1, F2-G2, F2-F3
@@ -167,7 +158,7 @@ test('Auto-X rule 4b: dead-end pocket (E1-F1-F2 returning to E2) auto-Xes F1-F2 
   m.edges[xF1G1] = 2;
   m.edges[xF2G2] = 2;
   m.edges[xF2F3] = 2;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
 
   const eE1E2 = edge(cell(0, 4), cell(1, 4));
   const eE1F1 = edge(cell(0, 4), cell(0, 5));
@@ -179,9 +170,8 @@ test('Auto-X rule 4b: dead-end pocket (E1-F1-F2 returning to E2) auto-Xes F1-F2 
   }
 
   // Opening one wall of the pocket (clearing F1-G1) cleanly unwinds all four auto-X edges
-  const prev2 = snap(m);
   m.edges[xF1G1] = 0;
-  reconcileAutoX(P, prev2, m, true);
+  reconcileAutoX(P, m, true);
   for (const x of [eE1E2, eE1F1, eF1F2, eE2F2]) {
     assert.equal(m.edges[x], 0, `expected pocket edge ${x} to unwind`);
     assert.equal(m.autoE[x], 0);
@@ -191,9 +181,8 @@ test('Auto-X rule 4b: dead-end pocket (E1-F1-F2 returning to E2) auto-Xes F1-F2 
 test('Auto-X rule 4 never auto-Xes the last exit of a circle cell', () => {
   const P = compile({ name: 'r4c', rows: 4, cols: 4, clues: [{ r: 0, c: 0, t: 'B' }] });
   const m = blank(P);
-  const prev = snap(m);
   m.edges[P.ed[0 * 4 + 1]] = 2; // manually cross out (0,0)-(0,1)
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[0 * 4 + 2]], 0, 'circle cell must not be treated as a dead-end');
 });
 
@@ -212,10 +201,9 @@ test('Auto-X switch ON/OFF preserves player manual X marks and stays locked whil
   assert.equal(m.autoE[manualX], 0, 'manual X must never become auto');
 
   // Reconcile keeps forced auto-X in place while Auto-X is ON
-  const prev = snap(m);
   m.edges[P.ed[b * 4 + 3]] = 0;
   m.autoE[P.ed[b * 4 + 3]] = 0;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[b * 4 + 3]], 2);
   assert.equal(m.autoE[P.ed[b * 4 + 3]], 1);
 
@@ -232,46 +220,39 @@ test('Removing a manual X (or manual shade) reveals an underlying auto-X (or aut
   const eU = P.ed[c * 4 + 0], eR = P.ed[c * 4 + 1], eD = P.ed[c * 4 + 2];
 
   // 1. Place manual X on eD
-  let prev = snap(m);
   m.edges[eD] = 2; m.autoE[eD] = 0;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[eD], 2);
   assert.equal(m.autoE[eD], 0);
 
   // 2. Place two segments on eU and eR (which also gives eD an Auto-X reason)
-  prev = snap(m);
   m.edges[eU] = 1; m.edges[eR] = 1;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[eD], 2);
   assert.equal(m.autoE[eD], 0, 'manual X stays manual while present');
 
   // 3. Remove manual X on eD -> underlying auto-X should immediately appear in its place!
-  prev = snap(m);
   m.edges[eD] = 0; m.autoE[eD] = 0;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[eD], 2, 'underlying auto-X should appear when manual X is removed');
   assert.equal(m.autoE[eD], 1);
 
   // 4. Auto-X stays locked while the causing segments remain, and unwinds once a causing segment is erased
-  prev = snap(m);
   m.edges[eU] = 0;
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[eD], 0, 'auto-X unwinds when its cause is erased');
   assert.equal(m.autoE[eD], 0);
 
   // Same behavior for manual face shade revealed as auto-shade
   const m2 = blank(P);
   const eTop = 2 * 0; // (0,0)-(0,1)
-  prev = snap(m2);
   m2.faces[0] = FACE_IN; m2.autoF[0] = 0;
-  reconcileAutoShade(P, prev, m2, true);
-  prev = snap(m2);
+  reconcileAutoShade(P, m2, true);
   m2.edges[eTop] = 1;
-  reconcileAutoShade(P, prev, m2, true);
+  reconcileAutoShade(P, m2, true);
   assert.equal(m2.autoF[0], 0, 'manual shade stays manual');
-  prev = snap(m2);
   m2.faces[0] = FACE_BLANK; m2.autoF[0] = 0;
-  reconcileAutoShade(P, prev, m2, true);
+  reconcileAutoShade(P, m2, true);
   assert.equal(m2.faces[0], FACE_IN, 'underlying auto-shade should appear when manual shade is removed');
   assert.equal(m2.autoF[0], 1);
 });
@@ -281,10 +262,9 @@ test('checkMarksAgainstSolution does not blame auto-placed X consequences for a 
   P.solution = '6ac5#53a9';
   const m = blank(P);
   // Put a wrong segment on (0,1)-(1,1) AND (0,1)-(0,2) so (0,1) has 2 segments -> Auto-X crosses (0,0)-(0,1) which IS on the real loop!
-  const prev = snap(m);
   m.edges[P.ed[(0 * 3 + 1) * 4 + 2]] = 1; // wrong segment
   m.edges[P.ed[(0 * 3 + 1) * 4 + 1]] = 1; // right segment
-  reconcileAutoX(P, prev, m, true);
+  reconcileAutoX(P, m, true);
   assert.equal(m.edges[P.ed[0 * 3 + 1]], 2); // auto-X on true edge (0,0)-(0,1)
   assert.equal(m.autoE[P.ed[0 * 3 + 1]], 1);
   const chk = checkMarksAgainstSolution(P, m);
@@ -311,15 +291,14 @@ test('Auto-Shade does not infer from border or interior white circles (keeps cir
   const fc = P.cols - 1;
   const f = (r, c) => r * fc + c;
   const m = blank(P);
-  reconcileAutoShade(P, null, m, true);
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[f(0, 1)], FACE_BLANK);
   assert.equal(m.faces[f(0, 2)], FACE_BLANK);
   assert.equal(m.faces[f(1, 0)], FACE_BLANK);
 
   // Even when a player manually shades (0, 1) = IN, Auto-Shade does not jump across interior white circle (1, 1)
-  const prev = snap(m);
   m.faces[f(0, 1)] = FACE_IN;
-  reconcileAutoShade(P, prev, m, true);
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[f(1, 0)], FACE_BLANK);
 });
 
@@ -333,7 +312,6 @@ test('Auto-Shade propagates from perimeter lines (IN) and X-es (OUT), across int
   // Draw interior line (1,0)-(1,1) -> flips across into face (1,0) = OUT
   // Draw interior X (1,1)-(2,1) -> keeps color across into face (1,1) = OUT
   // Draw top border X (0,2)-(0,3) -> face (0,2) = OUT
-  const prev = snap(m);
   const eTop0 = 2 * (0 * 4 + 0);
   const eMid0 = 2 * (1 * 4 + 0);
   const eVert11 = 2 * (1 * 4 + 1) + 1;
@@ -342,7 +320,7 @@ test('Auto-Shade propagates from perimeter lines (IN) and X-es (OUT), across int
   m.edges[eMid0] = 1;
   m.edges[eVert11] = 2;
   m.edges[eTop2] = 2;
-  reconcileAutoShade(P, prev, m, true);
+  reconcileAutoShade(P, m, true);
 
   assert.equal(m.faces[f(0, 0)], FACE_IN);
   assert.equal(m.faces[f(1, 0)], FACE_OUT);
@@ -350,9 +328,8 @@ test('Auto-Shade propagates from perimeter lines (IN) and X-es (OUT), across int
   assert.equal(m.faces[f(0, 2)], FACE_OUT);
 
   // Erase top border line (0,0)-(0,1): entire chain (0,0), (1,0), (1,1) must unwind; (0,2) stays OUT
-  const prev2 = snap(m);
   m.edges[eTop0] = 0;
-  reconcileAutoShade(P, prev2, m, true);
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[f(0, 0)], FACE_BLANK);
   assert.equal(m.faces[f(1, 0)], FACE_BLANK);
   assert.equal(m.faces[f(1, 1)], FACE_BLANK);
@@ -364,11 +341,10 @@ test('Auto-X -> Auto-Shade chaining: dead-end Auto-X on border immediately paint
   const P = compile({ name: 'chain', rows: 4, cols: 4, clues: [] });
   const m = blank(P);
   const c01 = 1;
-  const prev = snap(m);
   m.edges[P.ed[c01 * 4 + 1]] = 1; // (0,1)-(0,2) -> face (0,1) = IN
   m.edges[P.ed[c01 * 4 + 2]] = 1; // (0,1)-(1,1)
-  reconcileAutoX(P, prev, m, true);
-  reconcileAutoShade(P, prev, m, true);
+  reconcileAutoX(P, m, true);
+  reconcileAutoShade(P, m, true);
 
   assert.equal(m.faces[0], FACE_OUT, 'corner face (0,0) bordered by Auto-X must become OUT');
   assert.equal(m.faces[1], FACE_IN, 'face (0,1) bordered by top line must become IN');
@@ -389,10 +365,9 @@ test('Auto-Shade propagates from manual faces across lines and X-es, never overw
   m.edges[e02] = 2;
 
   // Player manually shades face (0,0) = IN -> across line (0,1) becomes OUT, across X (0,2) becomes OUT
-  const prev = snap(m);
   m.faces[f(0, 0)] = FACE_IN;
   m.autoF[f(0, 0)] = 0;
-  reconcileAutoShade(P, prev, m, true);
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[f(0, 1)], FACE_OUT);
   assert.equal(m.faces[f(0, 2)], FACE_OUT);
   assert.equal(m.autoF[f(0, 1)], 1);
@@ -400,10 +375,9 @@ test('Auto-Shade propagates from manual faces across lines and X-es, never overw
   assert.equal(shadeConflicts(P, m).size, 0);
 
   // Player manually shades (0,1) = IN (contradicts drawn line from (0,0)=IN)
-  const prev2 = snap(m);
   m.faces[f(0, 1)] = FACE_IN;
   m.autoF[f(0, 1)] = 0;
-  reconcileAutoShade(P, prev2, m, true);
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[f(0, 0)], FACE_IN, 'manual face must not be overwritten on conflict');
   assert.equal(m.faces[f(0, 1)], FACE_IN, 'manual face must not be overwritten on conflict');
   const bad = shadeConflicts(P, m);
@@ -412,10 +386,9 @@ test('Auto-Shade propagates from manual faces across lines and X-es, never overw
   assert.equal(autoShadeCompute(P, m).color[f(0, 1)], 0, 'conflicted face must not propagate corrupt color');
 
   // Clearing (0,1) restores auto OUT, and toggling Auto-Shade OFF preserves manual face (0,0)
-  const prev3 = snap(m);
   m.faces[f(0, 1)] = FACE_BLANK;
   m.autoF[f(0, 1)] = 0;
-  reconcileAutoShade(P, prev3, m, true);
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[f(0, 1)], FACE_OUT);
   applyAutoShade(P, m, false);
   assert.equal(m.faces[f(0, 0)], FACE_IN, 'manual face stays when Auto-Shade is turned OFF');
@@ -482,12 +455,10 @@ test('Auto-X + Auto-Shade places X between same-color squares and between Outsid
   const eTop0 = P.ed[(0 * 4 + 0) * 4 + 1]; // (0,0)-(0,1)
   const eTop1 = P.ed[(0 * 4 + 1) * 4 + 1]; // (0,1)-(0,2)
   const eMidV = P.ed[(0 * 4 + 1) * 4 + 2]; // (0,1)-(1,1) between face(0,0) and face(0,1)
-
-  let prev = snap(m);
   m.edges[eTop0] = 1;
   m.edges[eTop1] = 1;
-  reconcileAutoX(P, prev, m, true, { useShade: true });
-  reconcileAutoShade(P, prev, m, true);
+  reconcileAutoX(P, m, true, { useShade: true });
+  reconcileAutoShade(P, m, true);
   assert.equal(m.faces[0], FACE_IN);
   assert.equal(m.faces[1], FACE_IN);
   assert.equal(m.edges[eMidV], 2, 'edge between two Inside squares must auto-X');
@@ -497,11 +468,10 @@ test('Auto-X + Auto-Shade places X between same-color squares and between Outsid
   const fBR = 2 * 3 + 2;
   const eBotR = P.ed[(3 * 4 + 2) * 4 + 1]; // (3,2)-(3,3)
   const eRightB = P.ed[(2 * 4 + 3) * 4 + 2]; // (2,3)-(3,3)
-  prev = snap(m);
   m.faces[fBR] = FACE_OUT;
   m.autoF[fBR] = 0;
-  reconcileAutoX(P, prev, m, true, { useShade: true });
-  reconcileAutoShade(P, prev, m, true);
+  reconcileAutoX(P, m, true, { useShade: true });
+  reconcileAutoShade(P, m, true);
   assert.equal(m.edges[eBotR], 2, 'bottom-border edge next to Outside square must auto-X');
   assert.equal(m.autoE[eBotR], 1);
   assert.equal(m.edges[eRightB], 2, 'right-border edge next to Outside square must auto-X');
@@ -509,8 +479,7 @@ test('Auto-X + Auto-Shade places X between same-color squares and between Outsid
 
   // Turning Auto-Shade OFF (useShade=false) cleanly unwinds shade-derived border auto-X's
   // (while keeping Rule 1 full-cell auto-X on eMidV because (0,1) still has 2 segments!)
-  prev = snap(m);
-  reconcileAutoX(P, prev, m, true, { useShade: false });
+  reconcileAutoX(P, m, true, { useShade: false });
   applyAutoShade(P, m, false);
   assert.equal(m.edges[eBotR], 0, 'shade-derived border auto-X must unwind when Auto-Shade turns off');
   assert.equal(m.edges[eRightB], 0);
@@ -519,15 +488,13 @@ test('Auto-X + Auto-Shade places X between same-color squares and between Outsid
   // Test pure same-color interior auto-X WITHOUT Rule 1: two manual Inside faces (1,0) and (1,1) separated by (1,1)-(2,1)
   const m2 = blank(P);
   const eIntV = P.ed[(1 * 4 + 1) * 4 + 2]; // (1,1)-(2,1) between face(1,0) and face(1,1)
-  prev = snap(m2);
   m2.faces[1 * 3 + 0] = FACE_IN;
   m2.faces[1 * 3 + 1] = FACE_IN;
-  reconcileAutoX(P, prev, m2, true, { useShade: true });
+  reconcileAutoX(P, m2, true, { useShade: true });
   assert.equal(m2.edges[eIntV], 2, 'pure same-color interior edge must auto-X');
   assert.equal(m2.autoE[eIntV], 1);
   // Clearing one manual face cleanly unwinds the auto-X
-  prev = snap(m2);
   m2.faces[1 * 3 + 1] = FACE_BLANK;
-  reconcileAutoX(P, prev, m2, true, { useShade: true });
+  reconcileAutoX(P, m2, true, { useShade: true });
   assert.equal(m2.edges[eIntV], 0, 'clearing one same-color face must unwind the auto-X');
 });
