@@ -113,9 +113,9 @@
         <button data-close aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p>Draw <b>one single closed loop</b> along the grid lines visiting every circle, with no crossings or branches. Empty intersections are optional.</p>
+        <p id="help-intro">Draw <b>one single closed loop</b> along the grid lines visiting every circle, with no crossings or branches. Empty intersections are optional.</p>
         <div class="help-rules">
-          <div class="help-rule-card">
+          <div class="help-rule-card" id="help-card-white">
             <div class="help-rule-title">White circle (○)</div>
             <p class="help-rule-desc">Go <b>straight through</b>, and <b>turn 90°</b> immediately before or after (or both).</p>
             <div class="help-diagrams">
@@ -143,7 +143,7 @@
               </figure>
             </div>
           </div>
-          <div class="help-rule-card">
+          <div class="help-rule-card" id="help-card-black">
             <div class="help-rule-title">Black circle (●)</div>
             <p class="help-rule-desc"><b>Turn 90°</b> at the circle, and go straight for at least <b>2 segments</b> both ways.</p>
             <div class="help-diagrams">
@@ -169,16 +169,99 @@
               </figure>
             </div>
           </div>
+          <div class="help-rule-card help-rule-card--wide" id="help-card-gray" hidden>
+            <div class="help-rule-title">Gray circle (special rule)</div>
+            <p class="help-rule-desc">Secretly either a <b>white</b> or <b>black</b> circle — figuring out which is part of the puzzle. Tap a gray circle to label it white or black as an optional note.</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Gray circle acting as a white circle">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M12 22H100M12 44H100M12 66H100M12 22V66M34 22V66M56 22V66M78 22V66M100 22V66"/>
+                  <g class="hr-dot"><circle cx="12" cy="22" r="1.5"/><circle cx="34" cy="22" r="1.5"/><circle cx="56" cy="22" r="1.5"/><circle cx="78" cy="22" r="1.5"/><circle cx="100" cy="22" r="1.5"/><circle cx="12" cy="44" r="1.5"/><circle cx="34" cy="44" r="1.5"/><circle cx="78" cy="44" r="1.5"/><circle cx="100" cy="44" r="1.5"/><circle cx="12" cy="66" r="1.5"/><circle cx="34" cy="66" r="1.5"/><circle cx="56" cy="66" r="1.5"/><circle cx="78" cy="66" r="1.5"/><circle cx="100" cy="66" r="1.5"/></g>
+                  <path class="hr-line" d="M12 44H78V22"/>
+                  <circle class="pearl-white-fill" cx="56" cy="44" r="7.5"/>
+                  <path class="pearl-gray-quad-w" d="M56 44V36.5A7.5 7.5 0 0 1 63.5 44ZM56 44V51.5A7.5 7.5 0 0 1 48.5 44Z"/>
+                  <circle class="pearl-white-ring" cx="56" cy="44" r="7.5"/>
+                </svg>
+                <figcaption class="ok-text">✓ Can be white (straight + turn)</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Gray circle acting as a black circle">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 11H89M23 33H89M23 55H89M23 77H89M23 11V77M45 11V77M67 11V77M89 11V77"/>
+                  <g class="hr-dot"><circle cx="23" cy="11" r="1.5"/><circle cx="45" cy="11" r="1.5"/><circle cx="67" cy="11" r="1.5"/><circle cx="89" cy="11" r="1.5"/><circle cx="23" cy="33" r="1.5"/><circle cx="45" cy="33" r="1.5"/><circle cx="67" cy="33" r="1.5"/><circle cx="89" cy="33" r="1.5"/><circle cx="45" cy="55" r="1.5"/><circle cx="67" cy="55" r="1.5"/><circle cx="89" cy="55" r="1.5"/><circle cx="23" cy="77" r="1.5"/><circle cx="45" cy="77" r="1.5"/><circle cx="67" cy="77" r="1.5"/><circle cx="89" cy="77" r="1.5"/></g>
+                  <path class="hr-line" d="M23 11V55H67"/>
+                  <circle class="pearl-black-fill" cx="23" cy="55" r="7.5"/>
+                  <path class="pearl-gray-quad-b" d="M23 55V47.5A7.5 7.5 0 0 1 30.5 55ZM23 55V62.5A7.5 7.5 0 0 1 15.5 55Z"/>
+                  <circle class="pearl-black-ring" cx="23" cy="55" r="7.5"/>
+                </svg>
+                <figcaption class="ok-text">✓ Or black (turn + 2 straight)</figcaption>
+              </figure>
+            </div>
+          </div>
+          <div class="help-rule-card help-rule-card--wide" id="help-card-full" hidden>
+            <div class="help-rule-title" id="help-full-title">Full board (special rule)</div>
+            <p class="help-rule-desc" id="help-full-desc">The loop must visit <b>every</b> intersection dot — none may be left empty.</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid full-board loop visiting every intersection dot">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <path class="hr-line" d="M23 22H89V66H67V44H45V66H23Z"/>
+                  <path class="hr-given" d="M23 22H45"/>
+                  <path class="hr-wall" d="M52.5 62.5L59.5 69.5M52.5 69.5L59.5 62.5"/>
+                </svg>
+                <figcaption class="ok-text" id="help-full-ok">✓ Visits every dot</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Invalid full-board loop leaving an intersection empty">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <path class="hr-line-bad" d="M23 22H89V66H23Z"/>
+                  <circle class="grid-dot full-board" cx="45" cy="44" r="2.6"/>
+                  <circle class="grid-dot full-board" cx="67" cy="44" r="2.6"/>
+                  <circle class="trapped-cell" cx="45" cy="44" r="7.5"/>
+                  <circle class="trapped-cell" cx="67" cy="44" r="7.5"/>
+                </svg>
+                <figcaption class="bad-text">✕ Leaves dots unvisited</figcaption>
+              </figure>
+            </div>
+          </div>
+          <div class="help-rule-card help-rule-card--wide" id="help-card-voids" hidden>
+            <div class="help-rule-title">Swiss cheese holes (special rule)</div>
+            <p class="help-rule-desc">Cutout holes cannot be entered. Every hole sits entirely <b>Inside</b> or entirely <b>Outside</b> the loop — tap anywhere in a hole to shade it.</p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Swiss cheese hole shaded Inside the loop">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="34" y="22" width="44" height="44"/>
+                  <rect class="void-cutout" x="45" y="33" width="22" height="22" rx="4"/>
+                  <path class="hr-grid" d="M12 22H100M12 44H34M78 44H100M12 66H100M12 22V66M34 22V66M56 22V22M78 22V66M100 22V66"/>
+                  <path class="hr-line" d="M34 22H78V66H34Z"/>
+                </svg>
+                <figcaption class="ok-text">✓ Hole Inside the loop</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Swiss cheese hole shaded Outside the loop">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-out" x="34" y="22" width="44" height="44"/>
+                  <rect class="void-cutout" x="45" y="33" width="22" height="22" rx="4"/>
+                  <path class="hr-grid" d="M12 22H100M12 44H34M78 44H100M12 66H100M12 22V66M34 22V66M78 22V66M100 22V66"/>
+                  <path class="hr-line" d="M12 22H34V66H12Z"/>
+                </svg>
+                <figcaption class="ok-text">✓ Hole Outside the loop</figcaption>
+              </figure>
+            </div>
+          </div>
         </div>
         <h3>Controls</h3>
         <ul class="help-controls">
           <li><b>Draw / erase lines:</b> drag along grid lines (or tap a segment to cycle line / <b>✕</b> / blank).</li>
           <li><b>Place ✕ marks:</b> right-click or right-drag along grid lines.</li>
           <li><b>Shade squares:</b> tap or drag across squares to mark Inside / Outside.</li>
-          <li><b>Gray circles:</b> secretly either white or black. Tap a gray circle to label it white or black as a note (right-click cycles in reverse); labeling is optional.</li>
-          <li><b>Full board:</b> the loop must visit <b>every</b> intersection dot; dark pre-filled segments and bold <b>✕</b> walls are fixed givens.</li>
-          <li><b>Swiss cheese:</b> cutout holes cannot be entered; each hole is either entirely Inside or entirely Outside the loop (tap anywhere in a hole to shade it).</li>
-          <li><b>Need a nudge?</b> Press <b>Hint</b> once to see where to look, or twice for the full deduction — and browse the <a href="docs/how_to_solve.html">solving guide</a>.</li>
+          <li id="help-ctrl-gray" hidden><b>Label gray circles:</b> tap a gray circle to mark it white or black (right-click cycles in reverse); labeling is optional.</li>
+          <li id="help-ctrl-voids" hidden><b>Shade a hole:</b> tap anywhere inside a Swiss cheese hole to shade the whole hole Inside / Outside.</li>
+          <li><b>Need a nudge?</b> Press <b>Hint</b> once to see where to look, or twice for the full deduction — and browse the <a id="help-guide-link" href="docs/how_to_solve.html">solving guide</a>.</li>
         </ul>
         <p class="help-foot">
           New here? Start with <b>Gentle intro</b>. Progress stays in your browser (no accounts or tracking). Feedback? Let Josh know!

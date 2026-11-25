@@ -33,6 +33,7 @@
     h1 { margin: 0 0 8px; font-size: 1.9rem; }
     h2 { margin: 36px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); font-size: 1.35rem; }
     h3 { margin: 0 0 4px; font-size: 1.1rem; }
+    .variant-heading { margin: 26px 0 8px; font-size: 1.18rem; }
     p { margin: 0 0 12px; }
     ul { margin: 0 0 14px; padding-left: 22px; }
     li { margin: 4px 0; }
@@ -71,6 +72,7 @@
       <a href="#medium">Medium</a>
       <a href="#hard">Hard</a>
       <a href="#expert">Expert</a>
+      <a href="#variant-rules">Variant rules</a>
     </nav>
 
     <h2 id="rules">Rules of Masyu</h2>
@@ -79,32 +81,21 @@
       <li>Empty intersections may or may not be visited by the loop.</li>
       <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
       <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li><b>Gray circle:</b> secretly either a white circle or a black circle — the loop must visit it and satisfy either rule. Tap a gray circle in the app to label it white or black as a note (optional).</li>
-      <li><b>Full board:</b> the loop must visit <b>every</b> intersection on the grid. Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.</li>
+      <li>Some themed books add special rules — see <a href="#variant-rules"><b>Variant rules</b></a> below (Gray circles, Full board, and Swiss cheese).</li>
     </ul>
 
     <h2 id="bookkeeping">Bookkeeping</h2>
-    <p>6 bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:</p>
+    <p>5 core bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:</p>
     <ul>
       <li><code>edgesOffCellOff</code> (cost 1): A segment touching an off-loop cell is off.</li>
       <li><code>edgeEnds</code> (cost 1): A segment puts both of its cells on the loop.</li>
       <li><code>fullCell</code> (cost 1): A cell with two segments takes no more.</li>
       <li><code>isolatedCellOff</code> (cost 1): A cell with all its edges off is not on the loop.</li>
       <li><code>closedLoopRestOff</code> (cost 1): Once the single loop is closed, all remaining cells are off the loop.</li>
-      <li><code>grayFromShape</code> (cost 1): A gray circle with two drawn segments resolves to white (straight) or black (turn).</li>
     </ul>
 
     <h2 id="beginner">Beginner</h2>
     <p>A puzzle is rated <b>Beginner</b> when its hardest required step is in this tier: basic circle rules, rows of three white circles, dead ends, forced exits, and not closing the loop early.</p>
-
-    <section class="rule-card" id="grayMustBeBlack">
-      <h3><code>grayMustBeBlack</code></h3>
-      <div class="rule-meta">Beginner, cost 2</div>
-      <p>A gray circle that cannot go straight along either axis must be black.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=1"><img src="images/grayMustBeBlack.svg" alt="grayMustBeBlack hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-01 (8×8, the empty board). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The gray circle at A8 is in a corner and cannot go straight through, so it cannot be white — it must be a black circle."</blockquote>
-    </section>
 
     <section class="rule-card" id="whiteStraight">
       <h3><code>whiteStraight</code></h3>
@@ -131,15 +122,6 @@
       <a class="rule-img" href="../index.html?book=armory&amp;puzzle=4"><img src="images/blackWall.svg" alt="blackWall hint example" loading="lazy"></a>
       <p class="caption">ARMORY-04 (5×5, the empty board). Click the picture to open this puzzle in the app.</p>
       <blockquote>Hint says: "The black circle at E2 is too close to the up edge to go two straight cells up, so it must go two cells down."</blockquote>
-    </section>
-
-    <section class="rule-card" id="grayMustBeWhite">
-      <h3><code>grayMustBeWhite</code></h3>
-      <div class="rule-meta">Beginner, cost 3</div>
-      <p>A gray circle that cannot extend two straight segments along both axes must be white.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=5"><img src="images/grayMustBeWhite.svg" alt="grayMustBeWhite hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-05 (8×8, after 6 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The gray circle at G2 cannot be black because it lacks room for two straight segments horizontally — it must be a white circle."</blockquote>
     </section>
 
     <section class="rule-card" id="blackAdjacent">
@@ -244,15 +226,6 @@
       <blockquote>Hint says: "The touching white circles at E4 and E5 cannot join because E2–E3 already continues straight past E4; both must go horizontally."</blockquote>
     </section>
 
-    <section class="rule-card" id="grayWhiteNoTurn">
-      <h3><code>grayWhiteNoTurn</code></h3>
-      <div class="rule-meta">Medium, cost 12</div>
-      <p>A gray circle that cannot make a valid white-circle turn on either axis must be black.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=15"><img src="images/grayWhiteNoTurn.svg" alt="grayWhiteNoTurn hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-15 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "If the gray circle at E3 were white, it could not make a required 90° turn on either axis; so it must be a black circle."</blockquote>
-    </section>
-
     <section class="rule-card" id="whiteNoTurnAxis">
       <h3><code>whiteNoTurnAxis</code></h3>
       <div class="rule-meta">Medium, cost 14</div>
@@ -323,15 +296,6 @@
       <blockquote>Hint says: "Inside/outside shading puts Outside on both sides of F1–G1, so the loop cannot pass between them (cross out F1–G1)."</blockquote>
     </section>
 
-    <section class="rule-card" id="checkerPocket">
-      <h3><code>checkerPocket</code></h3>
-      <div class="rule-meta">Medium, cost 18</div>
-      <p>Checkerboard light/dark dot counts in a small full-board pocket force its exit segments.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=13"><img src="images/checkerPocket.svg" alt="checkerPocket hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-13 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 4 more segment ends and dark dots need 2 (difference 2), which forces draw C1–D1 and B2–B3; cross out C2–D2."</blockquote>
-    </section>
-
     <section class="rule-card" id="boxStrand">
       <h3><code>boxStrand</code></h3>
       <div class="rule-meta">Medium, cost 20</div>
@@ -360,15 +324,6 @@
       <a class="rule-img" href="../index.html?book=armory&amp;puzzle=23"><img src="images/corridorNoEarlyClose.svg" alt="corridorNoEarlyClose hint example" loading="lazy"></a>
       <p class="caption">ARMORY-23 (8×8, after 25 earlier hints). Click the picture to open this puzzle in the app.</p>
       <blockquote>Hint says: "The forced corridor (H1, G1, F1, E1, D1, C1, C2, C3, and C4) only connects the two ends of one open path (H2 and D4) while other loop cells lie outside it: entering it would close the loop early, so cross out 10 edges."</blockquote>
-    </section>
-
-    <section class="rule-card" id="checkerParity">
-      <h3><code>checkerParity</code></h3>
-      <div class="rule-meta">Hard, cost 36</div>
-      <p>Checkerboard light/dark dot counts in a full-board region force its exit segments.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=24"><img src="images/checkerParity.svg" alt="checkerParity hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-24 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 5 more segment ends and dark dots need 7 (difference 2), which forces draw A7–B7 and D7–E7; cross out B5–B6 and D5–D6."</blockquote>
     </section>
 
     <section class="rule-card" id="faceCircle">
@@ -461,6 +416,72 @@
       <p class="caption">ARMORY-30 (8×8, after 15 earlier hints). Click the picture to open this puzzle in the app.</p>
       <blockquote>Hint says: "Imagine no segment at B6–C6 and follow the forced deductions (starting with: the black circle at C6 is blocked left and goes two cells right; then the white circle at D5 must go horizontally; then the black circle at C6 cannot enter C5 and goes two cells down; reaching a contradiction after 3 steps). So draw B6–C6."</blockquote>
     </section>
+
+    <h2 id="variant-rules">Variant rules</h2>
+    <p>Extra rules and techniques used only in books with special rules:</p>
+    <nav class="toc" aria-label="Jump to variant">
+      <a href="#variant-gray">Gray circles</a>
+      <a href="#variant-full">Full board</a>
+      <a href="#variant-swiss">Swiss cheese</a>
+    </nav>
+
+    <h3 class="variant-heading" id="variant-gray">Gray circles</h3>
+    <p>Each gray circle is secretly either a <b>white</b> or a <b>black</b> circle — figuring out which is part of the puzzle. Tap a gray circle in the app to label it as an optional note.</p>
+
+    <ul>
+      <li><b>Bookkeeping:</b> <code>grayFromShape</code> (cost 1): A gray circle with two drawn segments resolves to white (straight) or black (turn).</li>
+    </ul>
+
+    <section class="rule-card" id="grayMustBeBlack">
+      <h3><code>grayMustBeBlack</code></h3>
+      <div class="rule-meta">Beginner, cost 2</div>
+      <p>A gray circle that cannot go straight along either axis must be black.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=1"><img src="images/grayMustBeBlack.svg" alt="grayMustBeBlack hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-01 (8×8, the empty board). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The gray circle at A8 is in a corner and cannot go straight through, so it cannot be white — it must be a black circle."</blockquote>
+    </section>
+
+    <section class="rule-card" id="grayMustBeWhite">
+      <h3><code>grayMustBeWhite</code></h3>
+      <div class="rule-meta">Beginner, cost 3</div>
+      <p>A gray circle that cannot extend two straight segments along both axes must be white.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=5"><img src="images/grayMustBeWhite.svg" alt="grayMustBeWhite hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-05 (8×8, after 6 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The gray circle at G2 cannot be black because it lacks room for two straight segments horizontally — it must be a white circle."</blockquote>
+    </section>
+
+    <section class="rule-card" id="grayWhiteNoTurn">
+      <h3><code>grayWhiteNoTurn</code></h3>
+      <div class="rule-meta">Medium, cost 12</div>
+      <p>A gray circle that cannot make a valid white-circle turn on either axis must be black.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=15"><img src="images/grayWhiteNoTurn.svg" alt="grayWhiteNoTurn hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-15 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "If the gray circle at E3 were white, it could not make a required 90° turn on either axis; so it must be a black circle."</blockquote>
+    </section>
+
+    <h3 class="variant-heading" id="variant-full">Full board</h3>
+    <p>The loop must visit <b>every</b> intersection on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.</p>
+
+    <section class="rule-card" id="checkerPocket">
+      <h3><code>checkerPocket</code></h3>
+      <div class="rule-meta">Medium, cost 18</div>
+      <p>Checkerboard light/dark dot counts in a small full-board pocket force its exit segments.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=13"><img src="images/checkerPocket.svg" alt="checkerPocket hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-13 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 4 more segment ends and dark dots need 2 (difference 2), which forces draw C1–D1 and B2–B3; cross out C2–D2."</blockquote>
+    </section>
+
+    <section class="rule-card" id="checkerParity">
+      <h3><code>checkerParity</code></h3>
+      <div class="rule-meta">Hard, cost 36</div>
+      <p>Checkerboard light/dark dot counts in a full-board region force its exit segments.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=24"><img src="images/checkerParity.svg" alt="checkerParity hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-24 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 5 more segment ends and dark dots need 7 (difference 2), which forces draw A7–B7 and D7–E7; cross out B5–B6 and D5–D6."</blockquote>
+    </section>
+
+    <h3 class="variant-heading" id="variant-swiss">Swiss cheese</h3>
+    <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, <code>chokepoint</code>, <code>faceShade</code>, and <code>faceCircle</code> — work naturally around and across interior holes.</p>
 
   </main>
 </body>

@@ -372,6 +372,8 @@ button.ghost { background: transparent; }
 /* ---- Help modal rule diagrams ---- */
 .help-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 14px; }
 .help-rule-card { background: var(--bg-light); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px 12px; }
+.help-rule-card--wide { grid-column: 1 / -1; }
+.help-rule-card--wide .help-diagrams { max-width: 280px; }
 .help-rule-title { font-weight: 700; font-size: 0.94rem; margin-bottom: 3px; }
 .help-rule-desc { margin: 0 0 8px; font-size: 0.84rem; color: var(--text-secondary); line-height: 1.35; }
 .help-diagrams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -383,6 +385,8 @@ button.ghost { background: transparent; }
 .hr-dot { fill: var(--grid-dot); }
 .hr-line { fill: none; stroke: var(--loop); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
 .hr-line-bad { fill: none; stroke: var(--color-error); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.hr-given { fill: none; stroke: var(--pearl-ink); stroke-width: 5; stroke-linecap: round; }
+.hr-wall { fill: none; stroke: var(--pearl-ink); stroke-width: 2.2; stroke-linecap: round; }
 .help-controls { margin: 4px 0 12px; padding-left: 20px; }
 .help-controls li { margin: 4px 0; font-size: 0.9rem; }
 .help-foot { margin: 0; font-size: 0.83rem; color: var(--text-secondary); }

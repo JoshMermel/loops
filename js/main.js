@@ -1014,7 +1014,56 @@ const settingsModal = setupModal('settings-modal', 'settings-btn', () => {
   disarmClear();
   syncOfflineUI();
 });
-const helpModal = setupModal('help-modal', 'help-btn');
+function renderHelpModal() {
+  const P = state.P;
+  const hasClues = !P || (P.clues && P.clues.length > 0);
+  const hasGray = Boolean(P && P.grays && P.grays.length > 0);
+  const isFull = Boolean(P && P.fullBoard);
+  const hasGivens = Boolean(P && P.hasGivens);
+  const hasVoids = Boolean(P && P.hasVoids);
+
+  const intro = $('help-intro');
+  if (intro) {
+    if (isFull && !hasClues) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b>, respecting all pre-filled segments and walls, with no crossings or branches.';
+    } else if (isFull) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and every circle, with no crossings or branches.';
+    } else if (hasVoids) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle while avoiding the cutout holes, with no crossings or branches. Empty intersections are optional.';
+    } else {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle, with no crossings or branches. Empty intersections are optional.';
+    }
+  }
+
+  $('help-card-white').hidden = !hasClues;
+  $('help-card-black').hidden = !hasClues;
+  $('help-card-gray').hidden = !hasGray;
+  $('help-card-full').hidden = !isFull;
+  $('help-card-voids').hidden = !hasVoids;
+
+  if (isFull) {
+    $('help-full-title').textContent = hasGivens ? 'Full board & givens (special rule)' : 'Full board (special rule)';
+    $('help-full-desc').innerHTML = hasGivens
+      ? 'The loop must visit <b>every</b> intersection dot — none may be left empty. Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.'
+      : 'The loop must visit <b>every</b> intersection dot — none may be left empty.';
+    $('help-full-ok').textContent = hasGivens ? '✓ Every dot + givens' : '✓ Visits every dot';
+    const fullSvg = $('help-card-full').querySelector('svg');
+    if (fullSvg) {
+      fullSvg.querySelector('.hr-given')?.toggleAttribute('hidden', !hasGivens);
+      fullSvg.querySelector('.hr-wall')?.toggleAttribute('hidden', !hasGivens);
+    }
+  }
+
+  $('help-ctrl-gray').hidden = !hasGray;
+  $('help-ctrl-voids').hidden = !hasVoids;
+
+  const link = $('help-guide-link');
+  if (link) {
+    const hash = hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
+    link.setAttribute('href', `docs/how_to_solve.html${hash}`);
+  }
+}
+const helpModal = setupModal('help-modal', 'help-btn', renderHelpModal);
 // Don't auto-open help if deep-linking directly to a puzzle (e.g. from docs/how_to_solve.md or armory)
 if (!store.get('ms_seenHelp') && !new URLSearchParams(location.search).has('book')) {
   store.set('ms_seenHelp', '1');

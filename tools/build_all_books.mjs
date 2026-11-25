@@ -58,7 +58,7 @@ const manifest = {
     {
       name: 'Gray circles',
       icon: '🔘',
-      blurb: 'Mystery gray circles that are secretly either white or black.',
+      blurb: 'Gray circles are secretly either white or black — figuring out which is part of the puzzle (tap any gray circle to label it).',
     },
     {
       name: 'Full board',
@@ -202,13 +202,13 @@ const recipes = [
     id: 'bonus-gray', name: 'Gray circles', label: '🔘 Gray circles (8×8)', group: 'Gray circles',
     glob: 'gray_8x8', tiers: '50,200,200,50', tierBands: '0:265,235:315,300:540,520:1500',
     expertPlus: 10, bonusGlob: 'gray_12x20', bonusCount: 10,
-    blurb: 'Mystery gray circles mixed with white and black — deduce which each one is (tap to label).',
+    blurb: 'Gray circles mixed with white and black — deduce which color each gray circle is (tap to label).',
   },
   {
     id: 'bonus-allgray', name: 'All gray', label: '🌫️ All gray (8×8)', group: 'Gray circles',
     glob: 'allgray_8x8', tiers: '50,200,200,50', tierBands: '0:270,245:325,310:520,500:1600',
     expertPlus: 10, bonusGlob: 'allgray_10x12', bonusCount: 10,
-    blurb: 'Every circle is a mystery gray circle — figure out white vs. black from scratch.',
+    blurb: 'Every circle is gray — figure out white vs. black for every dot from scratch (tap to label).',
   },
 
   // ---- Full board (top-level section: true full-board rule enforced)
@@ -286,7 +286,7 @@ const recipes = [
     blurb: 'Tall, narrow towers where the loop snakes up and down.',
   },
   {
-    id: 'bonus-symmetry', name: 'Exact symmetry', label: '🪞 Exact symmetry (10×10)', group: 'Bonus',
+    id: 'bonus-symmetry', name: 'Symmetry', label: '🪞 Symmetry (10×10)', group: 'Bonus',
     glob: 'sym_rot180_10x10,sym_mirror_10x10,sym_transpose_10x10',
     tiers: '50,200,200,50', tierBands: '0:365,315:420,375:600,570:1200', balanceGroups: true, interleaveGroups: true, maxRun: 3,
     expertPlus: 10, bonusGlob: 'sym_rot180_14x14,sym_mirror_14x14,sym_transpose_14x14', bonusCount: 10,

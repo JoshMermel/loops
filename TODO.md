@@ -4,7 +4,6 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## Variants & future twists
 
-- [x] **Shaped / cutout boards (Swiss cheese):** void intersections (`X`), exact rounded board silhouettes, dark/light hole contrast, unified single-target interior holes with Inside/Outside propagation, and four **🧀 Swiss cheese** books (`10×10`, `12×12`, `16×16`, `12×20` — 500 puzzles + Expert+ each).
 - [ ] **Pre-walled / maze Masyu:** standard Masyu puzzles with permanent given walls (`H0`/`V0`, already supported by the engine & UI) forming rooms, corridors, and mazes.
 - [ ] **New circle types:**
   - **Strict / double-turn whites & numbered blacks:** e.g. marked white circles that must turn on *both* sides, and/or numbered black circles whose straight legs have a required length.
@@ -28,10 +27,6 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## UI, polish & housekeeping
 
-- [ ] **Context-aware Help modal for special rules:** surface dedicated explanations (and diagrams) for active special rules — such as Gray circles, Full board, given lines/walls, and Shaped cutouts — when viewing a puzzle where those rules apply (instead of showing them all unconditionally or burying them in Controls).
-- [ ] **Split special-rule deductions in the solving guide:** consider moving variant-specific rules (Gray circles, Full-board checkerboard parity, etc.) into dedicated sections or separate docs within `docs/how_to_solve.{md,html}` so the core Masyu guide stays focused.
-- [ ] **Rename "Exact symmetry" to "Symmetry"** across the book picker, manifest, and docs.
-- [ ] **Clarify Gray circles category description:** note that figuring out each gray circle's identity (white vs. black) is part of the puzzle.
 - [ ] **Cross-machine completion sync / login (maybe):** optionally allow signing in to share puzzle completion status across devices (see Star Battle for reference).
 - [ ] **Phone / touch testing** of edge-tap vs cell-drag hit margins (`EDGE_MARGIN` in `js/board.js`).
 - [ ] **Playwright PNG screenshots** (`tools/capture_how_to_images.py`) once Playwright is installed, to compare against the pure-Node SVG illustrations.

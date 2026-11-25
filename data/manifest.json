@@ -36,7 +36,7 @@
     {
       "name": "Gray circles",
       "icon": "🔘",
-      "blurb": "Mystery gray circles that are secretly either white or black."
+      "blurb": "Gray circles are secretly either white or black — figuring out which is part of the puzzle (tap any gray circle to label it)."
     },
     {
       "name": "Full board",
@@ -271,7 +271,7 @@
       "file": "data/bonus-gray.csv",
       "count": 520,
       "group": "Gray circles",
-      "blurb": "Mystery gray circles mixed with white and black — deduce which each one is (tap to label)."
+      "blurb": "Gray circles mixed with white and black — deduce which color each gray circle is (tap to label)."
     },
     {
       "id": "bonus-allgray",
@@ -280,7 +280,7 @@
       "file": "data/bonus-allgray.csv",
       "count": 520,
       "group": "Gray circles",
-      "blurb": "Every circle is a mystery gray circle — figure out white vs. black from scratch."
+      "blurb": "Every circle is gray — figure out white vs. black for every dot from scratch (tap to label)."
     },
     {
       "id": "full-masyu-8x8",
@@ -392,8 +392,8 @@
     },
     {
       "id": "bonus-symmetry",
-      "name": "Exact symmetry",
-      "label": "🪞 Exact symmetry (10×10)",
+      "name": "Symmetry",
+      "label": "🪞 Symmetry (10×10)",
       "file": "data/bonus-symmetry.csv",
       "count": 520,
       "group": "Bonus",

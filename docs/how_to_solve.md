@@ -11,8 +11,7 @@ The same rule table powers both difficulty grading and live hints (see [README.m
 - The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.
 - **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
 - **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).
-- **Gray circle:** secretly either a white circle or a black circle — the loop must visit it and satisfy either the white or black rule. Tap a gray circle in the app to label it white or black as a note (labeling is optional).
-- **Full board:** the loop must visit **every** intersection on the grid. Dark pre-filled segments and bold **✕** walls are permanent givens.
+- Some themed books add special rules — see **[Variant rules](#variant-rules)** below (Gray circles, Full board, and Swiss cheese).
 
 ## How the examples work
 
@@ -21,32 +20,17 @@ The example puzzles live in a hidden book (`data/armory.csv`, `"hidden": true` i
 
 ## Bookkeeping
 
-6 bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:
+5 core bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:
 
 - `edgesOffCellOff` (cost 1): A segment touching an off-loop cell is off.
 - `edgeEnds` (cost 1): A segment puts both of its cells on the loop.
 - `fullCell` (cost 1): A cell with two segments takes no more.
 - `isolatedCellOff` (cost 1): A cell with all its edges off is not on the loop.
 - `closedLoopRestOff` (cost 1): Once the single loop is closed, all remaining cells are off the loop.
-- `grayFromShape` (cost 1): A gray circle with two drawn segments resolves to white (straight) or black (turn).
 
 ## Beginner
 
 A puzzle is rated **Beginner** when its hardest required step is in this tier: basic circle rules, rows of three white circles, dead ends, forced exits, and not closing the loop early.
-
-### grayMustBeBlack
-
-*Beginner, cost 2*
-
-A gray circle that cannot go straight along either axis must be black.
-
-<a href="../index.html?book=armory&puzzle=1"><img src="images/grayMustBeBlack.svg" width="480" alt="grayMustBeBlack hint example"></a>
-
-*ARMORY-01 (8×8, the empty board). Click the picture to open this puzzle in the app.*
-
-> Hint says: "The gray circle at A8 is in a corner and cannot go straight through, so it cannot be white — it must be a black circle."
-
----
 
 ### whiteStraight
 
@@ -87,20 +71,6 @@ A black circle blocked within two cells of a wall or cross must extend two cells
 *ARMORY-04 (5×5, the empty board). Click the picture to open this puzzle in the app.*
 
 > Hint says: "The black circle at E2 is too close to the up edge to go two straight cells up, so it must go two cells down."
-
----
-
-### grayMustBeWhite
-
-*Beginner, cost 3*
-
-A gray circle that cannot extend two straight segments along both axes must be white.
-
-<a href="../index.html?book=armory&puzzle=5"><img src="images/grayMustBeWhite.svg" width="480" alt="grayMustBeWhite hint example"></a>
-
-*ARMORY-05 (8×8, after 6 earlier hints). Click the picture to open this puzzle in the app.*
-
-> Hint says: "The gray circle at G2 cannot be black because it lacks room for two straight segments horizontally — it must be a white circle."
 
 ---
 
@@ -262,20 +232,6 @@ Two touching white circles with a straight segment entering one cannot connect, 
 
 ---
 
-### grayWhiteNoTurn
-
-*Medium, cost 12*
-
-A gray circle that cannot make a valid white-circle turn on either axis must be black.
-
-<a href="../index.html?book=armory&puzzle=15"><img src="images/grayWhiteNoTurn.svg" width="480" alt="grayWhiteNoTurn hint example"></a>
-
-*ARMORY-15 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.*
-
-> Hint says: "If the gray circle at E3 were white, it could not make a required 90° turn on either axis; so it must be a black circle."
-
----
-
 ### whiteNoTurnAxis
 
 *Medium, cost 14*
@@ -384,20 +340,6 @@ Basic inside/outside shading (crossing lines and X marks from the border) puts k
 
 ---
 
-### checkerPocket
-
-*Medium, cost 18*
-
-Checkerboard light/dark dot counts in a small full-board pocket force its exit segments.
-
-<a href="../index.html?book=armory&puzzle=13"><img src="images/checkerPocket.svg" width="480" alt="checkerPocket hint example"></a>
-
-*ARMORY-13 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.*
-
-> Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 4 more segment ends and dark dots need 2 (difference 2), which forces draw C1–D1 and B2–B3; cross out C2–D2."
-
----
-
 ### boxStrand
 
 *Medium, cost 20*
@@ -441,20 +383,6 @@ A forced multi-cell corridor joining the two ends of one path would close the lo
 *ARMORY-23 (8×8, after 25 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "The forced corridor (H1, G1, F1, E1, D1, C1, C2, C3, and C4) only connects the two ends of one open path (H2 and D4) while other loop cells lie outside it: entering it would close the loop early, so cross out 10 edges."
-
----
-
-### checkerParity
-
-*Hard, cost 36*
-
-Checkerboard light/dark dot counts in a full-board region force its exit segments.
-
-<a href="../index.html?book=armory&puzzle=24"><img src="images/checkerParity.svg" width="480" alt="checkerParity hint example"></a>
-
-*ARMORY-24 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.*
-
-> Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 5 more segment ends and dark dots need 7 (difference 2), which forces draw A7–B7 and D7–E7; cross out B5–B6 and D5–D6."
 
 ---
 
@@ -596,3 +524,92 @@ Trying a segment one way leads to a contradiction.
 
 > Hint says: "Imagine no segment at B6–C6 and follow the forced deductions (starting with: the black circle at C6 is blocked left and goes two cells right; then the white circle at D5 must go horizontally; then the black circle at C6 cannot enter C5 and goes two cells down; reaching a contradiction after 3 steps). So draw B6–C6."
 
+---
+
+## Variant rules
+
+Extra techniques used only in books with special rules:
+
+### Gray circles
+
+Each gray circle is secretly either a **white** or a **black** circle — figuring out which is part of the puzzle. Tap a gray circle in the app to label it as an optional note.
+
+- Bookkeeping: `grayFromShape` (cost 1): A gray circle with two drawn segments resolves to white (straight) or black (turn).
+
+#### grayMustBeBlack
+
+*Beginner, cost 2*
+
+A gray circle that cannot go straight along either axis must be black.
+
+<a href="../index.html?book=armory&puzzle=1"><img src="images/grayMustBeBlack.svg" width="480" alt="grayMustBeBlack hint example"></a>
+
+*ARMORY-01 (8×8, the empty board). Click the picture to open this puzzle in the app.*
+
+> Hint says: "The gray circle at A8 is in a corner and cannot go straight through, so it cannot be white — it must be a black circle."
+
+---
+
+#### grayMustBeWhite
+
+*Beginner, cost 3*
+
+A gray circle that cannot extend two straight segments along both axes must be white.
+
+<a href="../index.html?book=armory&puzzle=5"><img src="images/grayMustBeWhite.svg" width="480" alt="grayMustBeWhite hint example"></a>
+
+*ARMORY-05 (8×8, after 6 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "The gray circle at G2 cannot be black because it lacks room for two straight segments horizontally — it must be a white circle."
+
+---
+
+#### grayWhiteNoTurn
+
+*Medium, cost 12*
+
+A gray circle that cannot make a valid white-circle turn on either axis must be black.
+
+<a href="../index.html?book=armory&puzzle=15"><img src="images/grayWhiteNoTurn.svg" width="480" alt="grayWhiteNoTurn hint example"></a>
+
+*ARMORY-15 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "If the gray circle at E3 were white, it could not make a required 90° turn on either axis; so it must be a black circle."
+
+---
+
+### Full board
+
+The loop must visit **every** intersection on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens.
+
+#### checkerPocket
+
+*Medium, cost 18*
+
+Checkerboard light/dark dot counts in a small full-board pocket force its exit segments.
+
+<a href="../index.html?book=armory&puzzle=13"><img src="images/checkerPocket.svg" width="480" alt="checkerPocket hint example"></a>
+
+*ARMORY-13 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 4 more segment ends and dark dots need 2 (difference 2), which forces draw C1–D1 and B2–B3; cross out C2–D2."
+
+---
+
+#### checkerParity
+
+*Hard, cost 36*
+
+Checkerboard light/dark dot counts in a full-board region force its exit segments.
+
+<a href="../index.html?book=armory&puzzle=24"><img src="images/checkerParity.svg" width="480" alt="checkerParity hint example"></a>
+
+*ARMORY-24 (8×8, after 8 earlier hints). Click the picture to open this puzzle in the app.*
+
+> Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 5 more segment ends and dark dots need 7 (difference 2), which forces draw A7–B7 and D7–E7; cross out B5–B6 and D5–D6."
+
+---
+
+### Swiss cheese
+
+Cutout holes cannot be entered. Every enclosed hole lies entirely **Inside** or entirely **Outside** the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, `chokepoint`, `faceShade`, and `faceCircle` — work naturally around and across interior holes.
