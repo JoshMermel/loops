@@ -44,6 +44,7 @@ const parseBands = (s) => {
 const tierBands = parseBands(arg('tier-bands', ''));
 const group = arg('group', null);
 const sub = arg('sub', null);
+const sub2 = arg('sub2', null);
 const blurb = arg('blurb', null);
 const hidden = hasFlag('hidden');
 const preserveExisting = hasFlag('preserve-existing');
@@ -436,6 +437,7 @@ const entry = {
 };
 if (group !== null) entry.group = group;
 if (sub !== null) { if (sub) entry.sub = sub; else delete entry.sub; }
+if (sub2 !== null) { if (sub2) entry.sub2 = sub2; else delete entry.sub2; }
 if (blurb !== null) entry.blurb = blurb;
 if (hidden) entry.hidden = true;
 

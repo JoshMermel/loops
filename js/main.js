@@ -911,17 +911,23 @@ function syncBookButton() {
   btn.append(name);
 }
 
-function renderBookPicker(view = {}) {
+function renderBookPicker(path = []) {
   const body = $('bp-body');
   body.textContent = '';
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const groups = [...state.groups];
   const listed = state.books.filter((b) => !b.hidden);
+  const bookPath = (b) => {
+    const p = [b.group || 'Your files'];
+    if (Array.isArray(b.sub)) p.push(...b.sub.filter(Boolean));
+    else if (b.sub) p.push(b.sub);
+    if (b.sub2) p.push(b.sub2);
+    return p;
+  };
   for (const b of listed) {
     const g = b.group || 'Your files';
     if (!groups.some((x) => x.name === g)) groups.push({ name: g, icon: '📂' });
   }
-  const booksOf = (g) => listed.filter((b) => (b.group || 'Your files') === g.name);
   const isCurrent = (b) => !!state.book && b.id === state.book.id;
   const solvedCounts = bookSolvedMap();
   const countText = (b) => {
@@ -930,7 +936,7 @@ function renderBookPicker(view = {}) {
     return { text: total === null ? '' : done ? `${done} / ${total} solved` : `${total} puzzles`, done: total !== null && done > 0 && done === total };
   };
   const pick = (b) => { bookModal.close(); if (!isCurrent(b)) openBook(b.id, 0); };
-  const show = (v) => renderBookPicker(v);
+  const show = (nextPath) => renderBookPicker(nextPath);
 
   const card = (icon, name, blurb, meta, current, onClick) => {
     const node = el('button', 'bp-card' + (current ? ' bp-current' : ''));
@@ -966,46 +972,66 @@ function renderBookPicker(view = {}) {
   };
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-  const group = view.group && groups.find((g) => g.name === view.group);
-  if (!group) {
+  if (!path.length) {
     const grid = el('div', 'bp-cards');
     for (const g of groups) {
-      const books = booksOf(g);
+      const books = listed.filter((b) => bookPath(b)[0] === g.name);
       if (!books.length) continue;
       const only = books.length === 1 ? books[0] : null;
       grid.append(card(g.icon, g.name, g.blurb || (only && only.blurb), only ? countText(only).text : plural(books.length, 'book'),
-        books.some(isCurrent), () => (only ? pick(only) : show({ group: g.name }))));
+        books.some(isCurrent), () => (only ? pick(only) : show([g.name]))));
     }
     body.append(grid);
     return;
   }
-  const books = booksOf(group);
-  const subs = [...new Set(books.map((b) => b.sub).filter(Boolean))];
-  const directBooks = books.filter((b) => !b.sub);
-  if (!subs.length || (subs.length === 1 && !directBooks.length)) {
-    header(group.name, group.blurb, '← All books', () => show({}));
-    bookList(books);
+
+  // Walk the metadata tree along `path`
+  const rootGroup = groups.find((g) => g.name === path[0]);
+  if (!rootGroup) { show([]); return; }
+  let meta = rootGroup;
+  for (let d = 1; d < path.length; d++) meta = meta?.subs?.[path[d]] || {};
+
+  const depth = path.length;
+  const inNode = listed.filter((b) => {
+    const bp = bookPath(b);
+    if (bp.length < depth) return false;
+    for (let i = 0; i < depth; i++) if (bp[i] !== path[i]) return false;
+    return true;
+  });
+
+  const childNames = [];
+  const metaSubKeys = meta?.subs ? Object.keys(meta.subs) : [];
+  for (const k of metaSubKeys) {
+    if (inNode.some((b) => bookPath(b)[depth] === k)) childNames.push(k);
+  }
+  for (const b of inNode) {
+    const k = bookPath(b)[depth];
+    if (k && !childNames.includes(k)) childNames.push(k);
+  }
+  const directBooks = inNode.filter((b) => bookPath(b).length === depth);
+
+  const title = depth === 1 ? path[0] : `${path[depth - 2]} · ${path[depth - 1]}`;
+  const backLabel = depth === 1 ? '← All books' : `← ${path[depth - 2]}`;
+  header(title, meta?.blurb, backLabel, () => show(path.slice(0, -1)));
+
+  if (!childNames.length || (childNames.length === 1 && !directBooks.length)) {
+    bookList(inNode);
     return;
   }
-  if (view.sub && subs.includes(view.sub)) {
-    header(`${group.name} · ${view.sub}`, group.subs?.[view.sub]?.blurb, `← ${group.name}`, () => show({ group: group.name }));
-    bookList(books.filter((b) => b.sub === view.sub));
-    return;
-  }
-  header(group.name, group.blurb, '← All books', () => show({}));
+
   const grid = el('div', 'bp-cards');
-  for (const s of subs) {
-    const inSub = books.filter((b) => b.sub === s);
-    const info = group.subs?.[s] || {};
-    const only = inSub.length === 1 ? inSub[0] : null;
-    grid.append(card(info.icon || group.icon, s, info.blurb || (only && only.blurb),
-      only ? countText(only).text : plural(inSub.length, 'book'),
-      inSub.some(isCurrent), () => (only ? pick(only) : show({ group: group.name, sub: s }))));
+  for (const name of childNames) {
+    const subBooks = inNode.filter((b) => bookPath(b)[depth] === name);
+    const info = meta?.subs?.[name] || {};
+    const only = subBooks.length === 1 ? subBooks[0] : null;
+    grid.append(card(info.icon || meta?.icon || rootGroup.icon, name, info.blurb || (only && only.blurb),
+      only ? countText(only).text : plural(subBooks.length, 'book'),
+      subBooks.some(isCurrent), () => (only ? pick(only) : show([...path, name]))));
   }
   body.append(grid);
   if (directBooks.length) bookList(directBooks);
 }
-const bookModal = setupModal('book-modal', 'book-btn', () => renderBookPicker({}));
+const bookModal = setupModal('book-modal', 'book-btn', () => renderBookPicker([]));
 
 // ---- Settings, palettes, help, print
 const clearBtn = $('clear-saves-btn');

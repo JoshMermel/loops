@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | intro-extra | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -469,6 +469,16 @@ if (!isMainThread) {
       buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
       budgetSec: 120, perPuzzleMs: 15000,
     },
+
+    // ---- Start here: Beginner intro pools for Slitherlink and Hamilton cycle
+    { group: 'intro-extra', pool: 'intro_slither_5x5', cols: 5, rows: 5, style: 'slither', tier: 'Beginner', total: 24, budgetSec: 30, perPuzzleMs: 6000 },
+    { group: 'intro-extra', pool: 'intro_slither_6x6', cols: 6, rows: 6, style: 'slither', tier: 'Beginner', total: 24, budgetSec: 30, perPuzzleMs: 8000 },
+    { group: 'intro-extra', pool: 'intro_ham_lines_4x6', cols: 4, rows: 6, style: 'full-lines', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 6000 },
+    { group: 'intro-extra', pool: 'intro_ham_walls_4x6', cols: 4, rows: 6, style: 'full-walls', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 6000 },
+    { group: 'intro-extra', pool: 'intro_ham_mixed_4x6', cols: 4, rows: 6, style: 'full-mixed', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 6000 },
+    { group: 'intro-extra', pool: 'intro_ham_lines_6x6', cols: 6, rows: 6, style: 'full-lines', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 8000 },
+    { group: 'intro-extra', pool: 'intro_ham_walls_6x6', cols: 6, rows: 6, style: 'full-walls', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 8000 },
+    { group: 'intro-extra', pool: 'intro_ham_mixed_6x6', cols: 6, rows: 6, style: 'full-mixed', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 8000 },
   ];
 
   const knownGroups = new Set(JOBS.map((j) => j.group));

@@ -4,32 +4,50 @@
     {
       "name": "Start here",
       "icon": "🌱",
-      "blurb": "Small 5×5 and 6×6 Masyu puzzles to learn the controls."
+      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, and Hamilton cycle."
     },
     {
       "name": "Masyu",
       "icon": "⚪",
-      "blurb": "Standard Masyu boards by size, from 8×8 up to full-page 16×24.",
+      "blurb": "Classic Masyu by size, plus Gray dots, Swiss cheese, and Bonus themes.",
       "subs": {
-        "8×8": {
-          "icon": "8️⃣",
-          "blurb": "Compact boards across all four difficulties."
+        "Classic": {
+          "icon": "📚",
+          "blurb": "Standard Masyu boards by size, from 8×8 up to full-page 16×24.",
+          "subs": {
+            "8×8": {
+              "icon": "8️⃣",
+              "blurb": "Compact boards across all four difficulties."
+            },
+            "12×12": {
+              "icon": "🔷",
+              "blurb": "Classic boards across all four difficulties."
+            },
+            "16×16": {
+              "icon": "🟦",
+              "blurb": "Big square boards across all four difficulties."
+            },
+            "12×20": {
+              "icon": "📏",
+              "blurb": "Tall magazine-page boards across all four difficulties."
+            },
+            "16×24": {
+              "icon": "📄",
+              "blurb": "Full-page 2:3 boards across all four difficulties."
+            }
+          }
         },
-        "12×12": {
-          "icon": "🔷",
-          "blurb": "Classic boards across all four difficulties."
+        "Gray dots": {
+          "icon": "🔘",
+          "blurb": "Gray circles are secretly either white or black — figuring out which is part of the puzzle (tap any gray circle to label it)."
         },
-        "16×16": {
-          "icon": "🟦",
-          "blurb": "Big square boards across all four difficulties."
+        "Swiss cheese": {
+          "icon": "🧀",
+          "blurb": "Boards punched with random interior holes across four sizes — each hole is entirely Inside or Outside the loop."
         },
-        "12×20": {
-          "icon": "📏",
-          "blurb": "Tall magazine-page boards across all four difficulties."
-        },
-        "16×24": {
-          "icon": "📄",
-          "blurb": "Full-page 2:3 boards across all four difficulties."
+        "Bonus": {
+          "icon": "🎁",
+          "blurb": "Themed variations with the same Masyu rules."
         }
       }
     },
@@ -47,32 +65,35 @@
       "name": "Hybrids",
       "icon": "🔀",
       "blurb": "Two loop puzzle rules combined on one board — every puzzle genuinely needs both."
-    },
-    {
-      "name": "Gray circles",
-      "icon": "🔘",
-      "blurb": "Masyu with gray circles that are secretly white or black (tap any gray circle to label it)."
-    },
-    {
-      "name": "Swiss cheese",
-      "icon": "🧀",
-      "blurb": "Masyu boards punched with random interior holes — each hole is entirely Inside or Outside the loop."
-    },
-    {
-      "name": "Masyu bonus",
-      "icon": "🎁",
-      "blurb": "Themed Masyu variations with the same circle rules."
     }
   ],
   "books": [
     {
       "id": "intro",
-      "name": "Gentle intro",
-      "label": "Gentle intro",
+      "name": "Masyu intro",
+      "label": "⚪ Masyu",
       "file": "data/intro.csv",
       "count": 100,
       "group": "Start here",
-      "blurb": "Small 5×5 and 6×6 Beginner warm-ups, easiest first."
+      "blurb": "Small 5×5 and 6×6 Beginner Masyu warm-ups, easiest first."
+    },
+    {
+      "id": "intro-slither",
+      "name": "Slitherlink intro",
+      "label": "🔢 Slitherlink",
+      "file": "data/intro-slither.csv",
+      "count": 40,
+      "group": "Start here",
+      "blurb": "Small Beginner Slitherlink warm-ups, easiest first."
+    },
+    {
+      "id": "intro-hamilton",
+      "name": "Hamilton cycle intro",
+      "label": "🔁 Hamilton cycle",
+      "file": "data/intro-hamilton.csv",
+      "count": 42,
+      "group": "Start here",
+      "blurb": "Small Beginner Hamilton cycle warm-ups with given lines & walls, easiest first."
     },
     {
       "id": "8x8-beginner",
@@ -81,7 +102,8 @@
       "file": "data/8x8-beginner.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "8×8",
+      "sub": "Classic",
+      "sub2": "8×8",
       "blurb": "Warm-up puzzles using the core circle rules."
     },
     {
@@ -91,7 +113,8 @@
       "file": "data/8x8-medium.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "8×8",
+      "sub": "Classic",
+      "sub2": "8×8",
       "blurb": "Local patterns, basic shading, and 1-step lookahead."
     },
     {
@@ -101,7 +124,8 @@
       "file": "data/8x8-hard.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "8×8",
+      "sub": "Classic",
+      "sub2": "8×8",
       "blurb": "Circle shading, topology, and short single-thread lookahead."
     },
     {
@@ -111,7 +135,8 @@
       "file": "data/8x8-expert.csv",
       "count": 510,
       "group": "Masyu",
-      "sub": "8×8",
+      "sub": "Classic",
+      "sub2": "8×8",
       "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
@@ -121,7 +146,8 @@
       "file": "data/12x12-beginner.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "12×12",
+      "sub": "Classic",
+      "sub2": "12×12",
       "blurb": "Warm-up puzzles using the core circle rules."
     },
     {
@@ -131,7 +157,8 @@
       "file": "data/12x12-medium.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "12×12",
+      "sub": "Classic",
+      "sub2": "12×12",
       "blurb": "Local patterns, basic shading, and 1-step lookahead."
     },
     {
@@ -141,7 +168,8 @@
       "file": "data/12x12-hard.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "12×12",
+      "sub": "Classic",
+      "sub2": "12×12",
       "blurb": "Circle shading, topology, and short single-thread lookahead."
     },
     {
@@ -151,7 +179,8 @@
       "file": "data/12x12-expert.csv",
       "count": 510,
       "group": "Masyu",
-      "sub": "12×12",
+      "sub": "Classic",
+      "sub2": "12×12",
       "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
@@ -161,7 +190,8 @@
       "file": "data/16x16-beginner.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "16×16",
+      "sub": "Classic",
+      "sub2": "16×16",
       "blurb": "Warm-up puzzles using the core circle rules."
     },
     {
@@ -171,7 +201,8 @@
       "file": "data/16x16-medium.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "16×16",
+      "sub": "Classic",
+      "sub2": "16×16",
       "blurb": "Local patterns, basic shading, and 1-step lookahead."
     },
     {
@@ -181,7 +212,8 @@
       "file": "data/16x16-hard.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "16×16",
+      "sub": "Classic",
+      "sub2": "16×16",
       "blurb": "Circle shading, topology, and short single-thread lookahead."
     },
     {
@@ -191,7 +223,8 @@
       "file": "data/16x16-expert.csv",
       "count": 510,
       "group": "Masyu",
-      "sub": "16×16",
+      "sub": "Classic",
+      "sub2": "16×16",
       "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
@@ -201,7 +234,8 @@
       "file": "data/12x20-beginner.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "12×20",
+      "sub": "Classic",
+      "sub2": "12×20",
       "blurb": "Warm-up puzzles using the core circle rules."
     },
     {
@@ -211,7 +245,8 @@
       "file": "data/12x20-medium.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "12×20",
+      "sub": "Classic",
+      "sub2": "12×20",
       "blurb": "Local patterns, basic shading, and 1-step lookahead."
     },
     {
@@ -221,7 +256,8 @@
       "file": "data/12x20-hard.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "12×20",
+      "sub": "Classic",
+      "sub2": "12×20",
       "blurb": "Circle shading, topology, and short single-thread lookahead."
     },
     {
@@ -231,7 +267,8 @@
       "file": "data/12x20-expert.csv",
       "count": 510,
       "group": "Masyu",
-      "sub": "12×20",
+      "sub": "Classic",
+      "sub2": "12×20",
       "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
@@ -241,7 +278,8 @@
       "file": "data/16x24-beginner.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "16×24",
+      "sub": "Classic",
+      "sub2": "16×24",
       "blurb": "Warm-up puzzles using the core circle rules."
     },
     {
@@ -251,7 +289,8 @@
       "file": "data/16x24-medium.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "16×24",
+      "sub": "Classic",
+      "sub2": "16×24",
       "blurb": "Local patterns, basic shading, and 1-step lookahead."
     },
     {
@@ -261,7 +300,8 @@
       "file": "data/16x24-hard.csv",
       "count": 500,
       "group": "Masyu",
-      "sub": "16×24",
+      "sub": "Classic",
+      "sub2": "16×24",
       "blurb": "Circle shading, topology, and short single-thread lookahead."
     },
     {
@@ -271,7 +311,8 @@
       "file": "data/16x24-expert.csv",
       "count": 510,
       "group": "Masyu",
-      "sub": "16×24",
+      "sub": "Classic",
+      "sub2": "16×24",
       "blurb": "Complex lookahead chains, plus 10 Expert+ puzzles beyond hints."
     },
     {
@@ -280,7 +321,8 @@
       "label": "🔘 Gray circles (8×8)",
       "file": "data/bonus-gray.csv",
       "count": 520,
-      "group": "Gray circles",
+      "group": "Masyu",
+      "sub": "Gray dots",
       "blurb": "Gray circles mixed with white and black — deduce which color each gray circle is (tap to label)."
     },
     {
@@ -289,7 +331,8 @@
       "label": "🌫️ All gray (8×8)",
       "file": "data/bonus-allgray.csv",
       "count": 520,
-      "group": "Gray circles",
+      "group": "Masyu",
+      "sub": "Gray dots",
       "blurb": "Every circle is gray — figure out white vs. black for every dot from scratch (tap to label)."
     },
     {
@@ -325,7 +368,8 @@
       "label": "🧀 10×10",
       "file": "data/swiss-10x10.csv",
       "count": 510,
-      "group": "Swiss cheese",
+      "group": "Masyu",
+      "sub": "Swiss cheese",
       "blurb": "Compact 10×10 boards with 3–5 interior cutout holes across all four difficulties, plus Expert+."
     },
     {
@@ -334,7 +378,8 @@
       "label": "🧀 12×12",
       "file": "data/swiss-12x12.csv",
       "count": 510,
-      "group": "Swiss cheese",
+      "group": "Masyu",
+      "sub": "Swiss cheese",
       "blurb": "Classic 12×12 boards with 5–8 interior cutout holes across all four difficulties, plus Expert+."
     },
     {
@@ -343,7 +388,8 @@
       "label": "🧀 16×16",
       "file": "data/swiss-16x16.csv",
       "count": 510,
-      "group": "Swiss cheese",
+      "group": "Masyu",
+      "sub": "Swiss cheese",
       "blurb": "Big 16×16 boards with 8–13 scattered cutout holes across all four difficulties, plus Expert+."
     },
     {
@@ -352,7 +398,8 @@
       "label": "🧀 12×20",
       "file": "data/swiss-12x20.csv",
       "count": 510,
-      "group": "Swiss cheese",
+      "group": "Masyu",
+      "sub": "Swiss cheese",
       "blurb": "Tall 12×20 boards with 8–13 scattered cutout holes across all four difficulties, plus Expert+."
     },
     {
@@ -361,7 +408,8 @@
       "label": "⚪ All white (8×8)",
       "file": "data/bonus-white.csv",
       "count": 520,
-      "group": "Masyu bonus",
+      "group": "Masyu",
+      "sub": "Bonus",
       "blurb": "Every circle is white — straight lines and forced turns."
     },
     {
@@ -370,7 +418,8 @@
       "label": "⚫ All black (10×10)",
       "file": "data/bonus-black.csv",
       "count": 520,
-      "group": "Masyu bonus",
+      "group": "Masyu",
+      "sub": "Bonus",
       "blurb": "Every circle is black — sharp corners and long legs."
     },
     {
@@ -379,7 +428,8 @@
       "label": "🍪 Black & White Cookie (10×10)",
       "file": "data/bonus-cookie.csv",
       "count": 520,
-      "group": "Masyu bonus",
+      "group": "Masyu",
+      "sub": "Bonus",
       "blurb": "The board is split in half with black dots on one side and white dots on the other."
     },
     {
@@ -388,7 +438,8 @@
       "label": "🏙️ Skyscraper (6×20)",
       "file": "data/bonus-skyscraper.csv",
       "count": 520,
-      "group": "Masyu bonus",
+      "group": "Masyu",
+      "sub": "Bonus",
       "blurb": "Tall, narrow towers where the loop snakes up and down."
     },
     {
@@ -397,7 +448,8 @@
       "label": "🪞 Symmetry (10×10)",
       "file": "data/bonus-symmetry.csv",
       "count": 520,
-      "group": "Masyu bonus",
+      "group": "Masyu",
+      "sub": "Bonus",
       "blurb": "Mirror, diagonal, and 180° symmetric clues and loops."
     },
     {
@@ -406,7 +458,8 @@
       "label": "💠 Patterns (9×9 – 13×13)",
       "file": "data/bonus-patterns.csv",
       "count": 294,
-      "group": "Masyu bonus",
+      "group": "Masyu",
+      "sub": "Bonus",
       "blurb": "Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more."
     },
     {
