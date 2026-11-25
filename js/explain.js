@@ -181,15 +181,17 @@ function describeContradiction(P, broke, finalState) {
 
 /**
  * Explain one solver step `{ rule, tier, weight, sets, info }` from position `st`.
- * Returns `{ rule, tier, weight, text, roles, targets, chain }`.
+ * Returns `{ rule, tier, weight, text, nudge, roles, nudgeRoles, targets, chain, faces }`.
  */
 export function explainStep(P, step, st = null) {
   const { rule, tier, weight, sets, info = {} } = step;
   const targets = targetsOf(sets);
   const roles = { clue: [], area: [], focus: [], problem: [], exit: [], path: [] };
+  const nudgeRoles = { clue: [], area: [], focus: [], problem: [], exit: [], path: [] };
   const chain = [];
   let faces = null;
   let text = '';
+  let nudge = '';
 
   const uniq = (arr) => [...new Set(arr.filter((v) => v >= 0))];
 
@@ -197,18 +199,24 @@ export function explainStep(P, step, st = null) {
     case 'whiteStraight': {
       const c = info.cell;
       roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the white circle at ${cellName(P, c)} — check which way the loop can pass straight through it.`;
       text = `The white circle at ${cellName(P, c)} cannot go ${info.axis === 'v' ? 'horizontally' : 'vertically'}, so the loop must go straight ${info.axis === 'v' ? 'vertically' : 'horizontally'} through it.`;
       break;
     }
     case 'blackExtend': {
       const c = info.cell;
       roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the black circle at ${cellName(P, c)} — a segment already leaves it, so check how far straight it must go.`;
       text = `The black circle at ${cellName(P, c)} leaves ${DIR_WORD[info.dir]}, so it must go straight two cells ${DIR_WORD[info.dir]} and cannot exit ${DIR_WORD[info.dir ^ 2]}.`;
       break;
     }
     case 'blackWall': {
       const c = info.cell;
       roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the black circle at ${cellName(P, c)} — check whether it has room for two straight segments in each direction.`;
       const why = info.nearEdge ? `too close to the ${DIR_WORD[info.blockedDir]} edge` : `blocked ${DIR_WORD[info.blockedDir]}`;
       text = `The black circle at ${cellName(P, c)} is ${why} to go two straight cells ${DIR_WORD[info.blockedDir]}, so it must go two cells ${DIR_WORD[info.dir]}.`;
       break;
@@ -216,6 +224,8 @@ export function explainStep(P, step, st = null) {
     case 'blackAdjacent': {
       const c = info.cell, o = info.other;
       roles.clue.push(c, o);
+      nudgeRoles.clue.push(c, o);
+      nudge = `Look at the touching black circles at ${cellName(P, c)} and ${cellName(P, o)} — can the loop connect them?`;
       text = `The touching black circles at ${cellName(P, c)} and ${cellName(P, o)} cannot connect (each must go straight through its neighbor), so ${cellName(P, c)} goes two cells ${DIR_WORD[info.dir]}.`;
       break;
     }
@@ -224,22 +234,28 @@ export function explainStep(P, step, st = null) {
       roles.clue.push(c);
       roles.focus.push(info.turnEnd);
       roles.path.push(info.straightEnd);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the white circle at ${cellName(P, c)} — remember the loop must turn 90° immediately before or after it.`;
       text = `The white circle at ${cellName(P, c)} goes straight through ${cellName(P, info.straightEnd)}, so the loop must turn at ${cellName(P, info.turnEnd)} (cross out ${edgeName(P, info.edge)}).`;
       break;
     }
     case 'deadEnd': {
       const c = info.cell;
       roles.focus.push(c);
+      nudgeRoles.focus.push(c);
+      nudge = `Look at ${cellName(P, c)} — count how many exits it has left.`;
       text = `${cellName(P, c)} has only one available exit left, so the loop cannot pass through it (cross out ${joinList(targets.segOff.map((x) => edgeName(P, x)))}).`;
       break;
     }
     case 'forcedExits': {
       const c = info.cell;
       roles.focus.push(c);
+      nudgeRoles.focus.push(c);
       for (const x of info.edges || []) {
         const [a, b] = edgeCells(P, x);
         roles.exit.push(a === c ? b : a);
       }
+      nudge = `Look at ${cellName(P, c)} — it is on the loop, so count how many available exits it has left.`;
       text = `${cellName(P, c)} is on the loop and has only two exits left, so it must use ${joinList(targets.segOn.map((x) => edgeName(P, x)))}.`;
       break;
     }
@@ -247,45 +263,63 @@ export function explainStep(P, step, st = null) {
       const c = info.cell;
       roles.clue.push(c);
       roles.problem.push(info.sideCell);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the black circle at ${cellName(P, c)} — check the segments around its neighbors to see which way it can extend.`;
       text = `The black circle at ${cellName(P, c)} cannot enter ${cellName(P, info.sideCell)} (which already has a perpendicular segment), so it must go two cells ${DIR_WORD[info.dir]}.`;
       break;
     }
     case 'whiteBothStraight': {
       const c = info.cell;
       roles.clue.push(c);
+      nudgeRoles.clue.push(c);
+      nudge = `Look at the white circle at ${cellName(P, c)} — check whether one direction would stop it from turning at either end.`;
       text = `If the white circle at ${cellName(P, c)} went ${info.blockedAxis === 'v' ? 'vertically' : 'horizontally'}, both ends would go straight without turning; so it must go straight ${info.axis === 'v' ? 'vertically' : 'horizontally'}.`;
       break;
     }
     case 'noEarlyClose': {
       roles.path.push(info.a, info.b);
+      nudgeRoles.path.push(info.a, info.b);
+      nudge = `Look at ${cellName(P, info.a)} and ${cellName(P, info.b)} — check if they are both ends of the same open path.`;
       text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path while other loop cells lie outside it, so ${edgeName(P, info.edge)} cannot connect them.`;
       break;
     }
     case 'samePathExits': {
       roles.focus.push(info.cell);
       roles.path.push(info.a, info.b);
+      nudgeRoles.focus.push(info.cell);
+      nudgeRoles.path.push(info.a, info.b);
+      nudge = `Look at ${cellName(P, info.cell)} and the two ends of the same path (${cellName(P, info.a)} and ${cellName(P, info.b)}) — avoid closing the loop early.`;
       text = `${cellName(P, info.cell)} is on the loop with three exits, and two of them (${cellName(P, info.a)} and ${cellName(P, info.b)}) lead to the ends of one path; using both would close the loop early, so it must take ${edgeName(P, info.edge)}.`;
       break;
     }
     case 'closingCell': {
       roles.focus.push(info.cell);
       roles.path.push(info.a, info.b);
+      nudgeRoles.focus.push(info.cell);
+      nudgeRoles.path.push(info.a, info.b);
+      nudge = `Look at ${cellName(P, info.cell)} — check what happens if the loop passes through it between ${cellName(P, info.a)} and ${cellName(P, info.b)}.`;
       text = `${cellName(P, info.cell)} has only two exits left, and both lead to the ends of one path (${cellName(P, info.a)} and ${cellName(P, info.b)}): using it would close the loop early, so cross out ${joinList(targets.segOff.map((x) => edgeName(P, x)))}.`;
       break;
     }
     case 'threeWhites': {
       roles.clue.push(...info.cells);
+      nudgeRoles.clue.push(...info.cells);
+      nudge = `Look at the three white circles in a row (${joinList(info.cells.map((i) => cellName(P, i)))}) — can the loop run along the row?`;
       text = `Three white circles in a row (${joinList(info.cells.map((i) => cellName(P, i)))}) cannot go along the row because the middle circle would fail to turn at either end; all three must cross ${info.axis === 'v' ? 'vertically' : 'horizontally'}.`;
       break;
     }
     case 'twoWhitesStraight': {
       roles.clue.push(info.w1, info.w2);
+      nudgeRoles.clue.push(info.w1, info.w2);
+      nudge = `Look at the touching white circles at ${cellName(P, info.w1)} and ${cellName(P, info.w2)} — check if the loop can join them.`;
       text = `The touching white circles at ${cellName(P, info.w1)} and ${cellName(P, info.w2)} cannot join because ${edgeName(P, info.farEdge)} already continues straight past ${cellName(P, info.w1)}; both must go ${info.axis === 'v' ? 'vertically' : 'horizontally'}.`;
       break;
     }
     case 'whiteNoTurnAxis': {
       roles.clue.push(info.cell);
       roles.problem.push(...(info.ends || []));
+      nudgeRoles.clue.push(info.cell);
+      nudge = `Look at the white circle at ${cellName(P, info.cell)} — check whether one axis can make a required 90° turn at either end.`;
       const reasonText = (cell, r) => {
         const nm = cellName(P, cell);
         if (r === 'white') return `${nm} is a white circle`;
@@ -301,6 +335,8 @@ export function explainStep(P, step, st = null) {
     }
     case 'blackBlockedTarget': {
       roles.clue.push(info.cell, info.target);
+      nudgeRoles.clue.push(info.cell, info.target);
+      nudge = `Look at the black circle at ${cellName(P, info.cell)} and the circle at ${cellName(P, info.target)} — check whether the black circle can extend toward it.`;
       const why = info.reason === 'whiteWall'
         ? `the white circle at ${cellName(P, info.target)} cannot continue straight through`
         : `the black circle at ${cellName(P, info.target)} already continues straight out the far side`;
@@ -311,17 +347,24 @@ export function explainStep(P, step, st = null) {
       roles.clue.push(info.cell);
       roles.path.push(info.cell, info.target);
       roles.focus.push(info.mid);
+      nudgeRoles.clue.push(info.cell);
+      nudgeRoles.path.push(info.cell, info.target);
+      nudge = `Look at the black circle at ${cellName(P, info.cell)} and the other end of its path at ${cellName(P, info.target)} — avoid closing the loop early.`;
       text = `${cellName(P, info.cell)} and ${cellName(P, info.target)} are the two ends of one open path while other loop cells lie outside it, so the black circle at ${cellName(P, info.cell)} cannot extend two cells ${DIR_WORD[info.blockedDir]} into ${cellName(P, info.target)}; it must go two cells ${DIR_WORD[info.dir]}.`;
       break;
     }
     case 'blackTwoDiagWhites': {
       roles.clue.push(info.cell, ...info.whites);
+      nudgeRoles.clue.push(info.cell, ...info.whites);
+      nudge = `Look at the black circle at ${cellName(P, info.cell)} and the two diagonal white circles at ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])} — can the black circle send a ray between them?`;
       text = `The black circle at ${cellName(P, info.cell)} cannot send a ray ${DIR_WORD[info.blockedDir]} between the two diagonal white circles at ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])} (doing so would block whichever side its second leg takes); so it must go two cells ${DIR_WORD[info.dir]}.`;
       break;
     }
     case 'blackWhiteNoTurn': {
       roles.clue.push(info.cell, info.target);
       roles.problem.push(info.farCell);
+      nudgeRoles.clue.push(info.cell, info.target);
+      nudge = `Look at the black circle at ${cellName(P, info.cell)} and the white circle at ${cellName(P, info.target)} — check whether the white circle could still turn if the black circle extends into it.`;
       const farNm = cellName(P, info.farCell);
       const why = info.reason === 'white'
         ? `${farNm} is another white circle`
@@ -335,6 +378,9 @@ export function explainStep(P, step, st = null) {
       roles.focus.push(info.cell);
       roles.clue.push(info.white);
       roles.problem.push(...info.neighbors);
+      nudgeRoles.focus.push(info.cell);
+      nudgeRoles.clue.push(info.white);
+      nudge = `Look at ${cellName(P, info.cell)} beside the white circle at ${cellName(P, info.white)} — check what happens to the white circle if the loop passes through ${cellName(P, info.cell)}.`;
       text = `${cellName(P, info.cell)} has only two exits left, pointing to ${cellName(P, info.neighbors[0])} and ${cellName(P, info.neighbors[1])}, which both already have a segment; passing through ${cellName(P, info.cell)} would fill both neighbors and cut off the white circle at ${cellName(P, info.white)} on both axes, so cross out ${joinList(targets.segOff.map((x) => edgeName(P, x)))}.`;
       break;
     }
@@ -342,24 +388,35 @@ export function explainStep(P, step, st = null) {
       roles.focus.push(...info.active);
       roles.clue.push(info.white);
       roles.problem.push(info.dead);
+      nudgeRoles.focus.push(...info.active);
+      nudgeRoles.clue.push(info.white);
+      nudge = `Look at the 2×2 area around the white circle at ${cellName(P, info.white)} — check what happens if the two nearby open ends connect.`;
       text = `Drawing ${edgeName(P, info.edge)} would fill both ${cellName(P, info.active[0])} and ${cellName(P, info.active[1])}, turning ${cellName(P, info.dead)} into a dead end and cutting off the white circle at ${cellName(P, info.white)} on both axes; so cross out ${edgeName(P, info.edge)}.`;
       break;
     }
     case 'boxStrand': {
       roles.focus.push(info.a, info.b);
       roles.problem.push(info.active, info.stranded);
+      nudgeRoles.focus.push(info.a, info.b);
+      nudgeRoles.area.push(info.a, info.b, info.active, info.stranded);
+      nudge = `Look at the 2×2 box around ${cellName(P, info.a)} and ${cellName(P, info.b)} — check whether closing off one side strands an open end inside.`;
       text = `Drawing ${edgeName(P, info.edge)} would fill both ${cellName(P, info.a)} and ${cellName(P, info.b)}, sealing both escapes of the adjacent pair ${cellName(P, info.active)}–${cellName(P, info.stranded)} and stranding the open end at ${cellName(P, info.active)}; so cross out ${edgeName(P, info.edge)}.`;
       break;
     }
     case 'corridorNoEarlyClose': {
       roles.area.push(...info.cells);
       roles.path.push(info.a, info.b);
+      nudgeRoles.area.push(...info.cells);
+      nudgeRoles.path.push(info.a, info.b);
+      nudge = `Look at the narrow corridor between ${cellName(P, info.a)} and ${cellName(P, info.b)} — check what happens to the loop if it enters.`;
       text = `The forced corridor (${joinList(info.cells.map((k) => cellName(P, k)))}) only connects the two ends of one open path (${cellName(P, info.a)} and ${cellName(P, info.b)}) while other loop cells lie outside it: entering it would close the loop early, so ${describeMarks(P, targets)}.`;
       break;
     }
     case 'faceShade': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
+      nudgeRoles.focus.push(a, b);
+      nudge = `Look at ${edgeName(P, info.edge)} — use Inside/Outside shading to compare the two squares on either side of it.`;
       faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: true };
       const sideName = (par) => (par === 1 ? 'Inside' : 'Outside');
       text = info.val === E_ON
@@ -371,6 +428,9 @@ export function explainStep(P, step, st = null) {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       roles.clue.push(...(info.clues || []));
+      nudgeRoles.focus.push(a, b);
+      nudgeRoles.clue.push(...(info.clues || []));
+      nudge = `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`;
       faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: !!info.anchored };
       const label = (par) => (info.anchored ? (par === 1 ? 'Inside' : 'Outside') : (par === 1 ? 'Side A' : 'Side B'));
       const describeLink = (s, destPar) => {
@@ -415,6 +475,9 @@ export function explainStep(P, step, st = null) {
     case 'twoEndsJoin': {
       roles.area.push(...(info.area || []));
       roles.path.push(info.u, info.v, info.uFar, info.vFar);
+      nudgeRoles.area.push(...(info.area || []));
+      nudgeRoles.path.push(info.u, info.v, info.uFar, info.vFar);
+      nudge = `Look at the highlighted area — only two open ends enter it, so check how they must pair up.`;
       text = `The highlighted area has only two open ends (${cellName(P, info.u)} and ${cellName(P, info.v)}), so they must connect inside it; that makes ${cellName(P, info.uFar)} and ${cellName(P, info.vFar)} ends of one path, so ${edgeName(P, info.edge)} cannot close them early.`;
       break;
     }
@@ -423,6 +486,9 @@ export function explainStep(P, step, st = null) {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       roles.area.push(...(info.area || []));
+      nudgeRoles.focus.push(a, b);
+      nudgeRoles.area.push(...(info.area || []));
+      nudge = `Look at ${edgeName(P, info.edge)} and the highlighted area — check how the loop stays connected in and out of it.`;
       if (info.cut !== undefined && info.cut >= 0) roles.problem.push(info.cut);
       text = info.kind === 'disconnected'
         ? `Without ${edgeName(P, info.edge)}, loop cells in the highlighted area would be completely cut off from the rest of the loop, so ${edgeName(P, info.edge)} must be drawn.`
@@ -435,6 +501,9 @@ export function explainStep(P, step, st = null) {
       roles.focus.push(a, b);
       roles.area.push(...(info.area || []));
       roles.path.push(...(info.ends || []));
+      nudgeRoles.focus.push(a, b);
+      nudgeRoles.area.push(...(info.area || []));
+      nudge = `Look at ${edgeName(P, info.edge)} and the highlighted area — count how many open ends would be trapped inside.`;
       const hypTxt = info.hyp === E_ON ? `drawing ${edgeName(P, info.edge)}` : `crossing out ${edgeName(P, info.edge)}`;
       const resTxt = info.hyp === E_ON ? `cross out ${edgeName(P, info.edge)}` : `draw ${edgeName(P, info.edge)}`;
       text = `If you tried ${hypTxt}, the highlighted area would be sealed off with ${plural(info.ends.length, 'open end')} (odd, so they can't all pair up); therefore ${resTxt}.`;
@@ -444,6 +513,9 @@ export function explainStep(P, step, st = null) {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       roles.area.push(...(info.area || []));
+      nudgeRoles.focus.push(a, b);
+      nudgeRoles.area.push(...(info.area || []));
+      nudge = `Look at the highlighted rectangle and ${edgeName(P, info.edge)} — count how many times the loop crosses its border (it must be even).`;
       const act = info.val === E_ON ? `must be drawn` : `cannot be drawn`;
       text = `The loop must cross the border of the highlighted rectangle an even number of times (${info.on} crossings so far, 1 undecided), so ${edgeName(P, info.edge)} ${act}.`;
       break;
@@ -453,6 +525,8 @@ export function explainStep(P, step, st = null) {
     case 'imagineChain': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
+      nudgeRoles.focus.push(a, b);
+      nudge = `Look at ${edgeName(P, info.edge)} — try imagining a segment there (or crossing it out) and follow the forced moves.`;
       const hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;
       const verdict = info.deduce === E_ON ? `draw ${edgeName(P, info.edge)}` : `cross out ${edgeName(P, info.edge)}`;
       let finalState = null;
@@ -478,6 +552,8 @@ export function explainStep(P, step, st = null) {
     case 'tryEdge': {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
+      nudgeRoles.focus.push(a, b);
+      nudge = `Look at ${edgeName(P, info.edge)} — try imagining a segment there (or crossing it out) and follow the forced moves.`;
       const hypStr = info.hyp === E_ON ? `a segment at ${edgeName(P, info.edge)}` : `no segment at ${edgeName(P, info.edge)}`;
       const verdict = info.hyp === E_ON ? `cross out ${edgeName(P, info.edge)}` : `draw ${edgeName(P, info.edge)}`;
       const traceClauses = (info.trace || []).slice(0, 4).map((t) => describeChainStep(P, t));
@@ -488,10 +564,18 @@ export function explainStep(P, step, st = null) {
       break;
     }
     default: {
+      for (const x of [...targets.segOn, ...targets.segOff]) {
+        const [a, b] = edgeCells(P, x);
+        nudgeRoles.focus.push(a, b);
+      }
+      nudge = `Look at the highlighted area (${ruleLabel(rule)}).`;
       text = `${ruleLabel(rule)}: ${describeMarks(P, targets)}.`;
     }
   }
 
-  for (const k of Object.keys(roles)) roles[k] = uniq(roles[k]);
-  return { rule, tier, weight, text, roles, targets, chain: uniq(chain), faces };
+  for (const k of Object.keys(roles)) {
+    roles[k] = uniq(roles[k]);
+    nudgeRoles[k] = uniq(nudgeRoles[k]);
+  }
+  return { rule, tier, weight, text, nudge, roles, nudgeRoles, targets, chain: uniq(chain), faces };
 }

@@ -8,7 +8,7 @@ import {
 } from '../js/logic.js';
 import { rate, nextSteps } from '../js/rating.js';
 import { explainStep, describeMarks, targetsOf } from '../js/explain.js';
-import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
+import { computeHint, advanceHint, checkMarksAgainstSolution } from '../js/hintstep.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -177,4 +177,88 @@ test('faceCircle and faceShade explanations include shading text and Inside/Outs
   }, st2);
   assert.ok(exp2.text.includes('Inside/outside shading'), `unexpected text: ${exp2.text}`);
   assert.ok(exp2.faces && exp2.faces.in.length === 1 && exp2.faces.out.length === 1);
+});
+
+test('advanceHint implements two-press progression, multi-firing cycling, dismiss recovery, and immediate wrong/stuck', () => {
+  let calls = 0;
+  const twoFirings = () => {
+    calls++;
+    return { kind: 'step', rule: 'blackWall', tier: 'Beginner', weight: 2, hints: [{ text: 'A' }, { text: 'B' }] };
+  };
+
+  // Press 1 -> stage 1 on firing 0
+  let h = advanceHint(null, twoFirings);
+  assert.equal(calls, 1);
+  assert.equal(h.stage, 1);
+  assert.equal(h.index, 0);
+  assert.equal(h.visible, true);
+
+  // Dismiss toast -> re-pressing restores stage 1 without advancing or recomputing
+  h = advanceHint({ ...h, visible: false }, twoFirings);
+  assert.equal(calls, 1);
+  assert.equal(h.stage, 1);
+  assert.equal(h.index, 0);
+  assert.equal(h.visible, true);
+
+  // Press 2 while visible -> stage 2 (full deduction) on firing 0
+  h = advanceHint(h, twoFirings);
+  assert.equal(h.stage, 2);
+  assert.equal(h.index, 0);
+
+  // Press 3 -> firing 1 resets to stage 1 (nudge first on new spot)
+  h = advanceHint(h, twoFirings);
+  assert.equal(h.stage, 1);
+  assert.equal(h.index, 1);
+
+  // Press 4 -> stage 2 on firing 1; Press 5 -> wraps to firing 0 stage 1
+  h = advanceHint(h, twoFirings);
+  assert.equal(h.stage, 2);
+  assert.equal(h.index, 1);
+  h = advanceHint(h, twoFirings);
+  assert.equal(h.stage, 1);
+  assert.equal(h.index, 0);
+
+  // Single firing stays idempotent at stage 2
+  const oneFiring = () => ({ kind: 'step', rule: 'deadEnd', tier: 'Beginner', weight: 4, hints: [{ text: 'Only' }] });
+  let s = advanceHint(null, oneFiring);
+  assert.equal(s.stage, 1);
+  s = advanceHint(s, oneFiring);
+  assert.equal(s.stage, 2);
+  s = advanceHint(s, oneFiring);
+  assert.equal(s.stage, 2);
+  assert.equal(s.index, 0);
+
+  // Full option jumps directly to stage 2
+  const direct = advanceHint(null, oneFiring, { full: true });
+  assert.equal(direct.stage, 2);
+
+  // Wrong / stuck always show immediately at stage 2
+  const wrong = advanceHint(null, () => ({ kind: 'wrong', wrongEdges: [3], total: 1 }));
+  assert.equal(wrong.stage, 2);
+  assert.equal(wrong.visible, true);
+  const stuck = advanceHint(null, () => ({ kind: 'stuck', undecided: [0, 1] }));
+  assert.equal(stuck.stage, 2);
+  assert.equal(stuck.visible, true);
+});
+
+test('every armory rule produces a non-spoiling nudge and at least one nudgeRoles highlight', () => {
+  const armory = parseCsv(fs.readFileSync(path.join(root, 'data', 'armory.csv'), 'utf8'));
+  const seenRules = new Set();
+  for (const raw of armory) {
+    const P = compile({ ...raw });
+    const r = rate(P);
+    for (const s of r.steps) {
+      if (s.weight <= 1) continue; // skip free bookkeeping rules
+      const exp = explainStep(P, s);
+      seenRules.add(s.rule);
+      assert.ok(exp.nudge && exp.nudge.length > 15, `missing nudge for ${s.rule}`);
+      assert.notEqual(exp.nudge, exp.text, `nudge should not duplicate full text for ${s.rule}`);
+      const count = Object.values(exp.nudgeRoles).reduce((acc, arr) => acc + arr.length, 0);
+      assert.ok(count > 0, `nudgeRoles must highlight at least one cell for ${s.rule}`);
+      assert.equal(exp.nudgeRoles.problem.length, 0, `nudgeRoles.problem should be empty for ${s.rule}`);
+      assert.equal(exp.nudgeRoles.exit.length, 0, `nudgeRoles.exit should be empty for ${s.rule}`);
+      assert.ok(!/\b(So draw|So cross out|must go two cells|must use)\b/.test(exp.nudge), `nudge leaked answer for ${s.rule}: ${exp.nudge}`);
+    }
+  }
+  assert.ok(seenRules.size >= 25, `expected >= 25 rules covered across armory, saw ${seenRules.size}`);
 });

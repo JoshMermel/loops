@@ -72,3 +72,35 @@ export function computeHint(P, marks) {
 
   return { kind: 'step', rule: res.rule, tier: res.tier, weight: res.weight, hints };
 }
+
+/**
+ * Pure two-press progressive hint state transition.
+ *   - First press on a board state -> stage 1 (where to look, no ghost marks / chains / face spoiler)
+ *   - Second press while stage 1 is visible -> stage 2 (full deduction + ghost marks)
+ *   - Further presses when multiple firings exist -> next firing at stage 1
+ *   - Re-pressing after dismissing the toast re-shows the same stage without skipping ahead.
+ *   - Mistakes (`wrong`) and `stuck` always display immediately at stage 2.
+ */
+export function advanceHint(current, computeFn, { full = false } = {}) {
+  if (!current) {
+    const res = computeFn();
+    if (res.kind !== 'step') return { ...res, index: 0, stage: 2, visible: true };
+    return { ...res, index: 0, stage: full ? 2 : 1, visible: true };
+  }
+  if (current.kind !== 'step') return { ...current, visible: true };
+  if (!current.visible) {
+    return { ...current, stage: full ? 2 : current.stage, visible: true };
+  }
+  if (current.stage < 2) {
+    return { ...current, stage: 2, visible: true };
+  }
+  if (current.hints.length > 1) {
+    return {
+      ...current,
+      index: (current.index + 1) % current.hints.length,
+      stage: full ? 2 : 1,
+      visible: true,
+    };
+  }
+  return { ...current, stage: 2, visible: true };
+}

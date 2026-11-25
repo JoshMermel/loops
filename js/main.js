@@ -3,7 +3,7 @@ import {
   compile, parseCsv, puzzleHash, isSolved, decodeSolution,
 } from './logic.js';
 import { TIER_INFO, beyondHints } from './rating.js';
-import { computeHint, checkMarksAgainstSolution } from './hintstep.js';
+import { computeHint, advanceHint, checkMarksAgainstSolution } from './hintstep.js';
 import { ROLES, describeMarks } from './explain.js';
 import {
   cycleEdgeMark, toggleEdgeCross, cycleFaceMark, cycleFaceMarkReverse, numFacesOf,
@@ -518,36 +518,26 @@ function showHintToast(meta, text, extraLine, usedRoles, faceLabels = null) {
   el.hidden = false;
 }
 
-function hint() {
+function hint(opts = {}) {
   if (!state.P) return;
   if (state.solved) { toast('Already solved!'); return; }
 
-  // Cycle through firings if Hint is pressed again on the same board position
-  if (state.hint && state.hint.kind === 'step') {
-    if (state.hint.visible && state.hint.hints.length > 1) {
-      state.hint.index = (state.hint.index + 1) % state.hint.hints.length;
-    }
-    state.hint.visible = true;
-    renderCurrentHint();
-    return;
-  }
+  state.hint = advanceHint(state.hint, () => computeHint(state.P, state.marks), opts);
+  const h = state.hint;
 
-  const res = computeHint(state.P, state.marks);
-  if (res.kind === 'wrong') {
-    state.hint = { ...res, visible: true };
-    board.render(state.marks, analyse(), { wrongEdges: res.wrongEdges });
+  if (h.kind === 'wrong') {
+    board.render(state.marks, analyse(), { wrongEdges: h.wrongEdges });
     showHintToast(
       'Mistake found',
-      `${res.total} mark${res.total === 1 ? '' : 's'} (highlighted in red) disagree${res.total === 1 ? 's' : ''} with the solution. Fix or undo ${res.total === 1 ? 'it' : 'them'} first.`,
+      `${h.total} mark${h.total === 1 ? '' : 's'} (highlighted in red) disagree${h.total === 1 ? 's' : ''} with the solution. Fix or undo ${h.total === 1 ? 'it' : 'them'} first.`,
       null,
       [],
     );
     return;
   }
 
-  if (res.kind === 'stuck') {
-    state.hint = { ...res, visible: true };
-    board.render(state.marks, analyse(), { undecided: res.undecided });
+  if (h.kind === 'stuck') {
+    board.render(state.marks, analyse(), { undecided: h.undecided });
     showHintToast(
       'Solver stuck',
       'None of the hint rules can find a next step here (tinted cells still have undecided edges).',
@@ -557,21 +547,19 @@ function hint() {
     return;
   }
 
-  state.hint = { ...res, index: 0, visible: true };
   renderCurrentHint();
 }
 
 function renderCurrentHint() {
   const h = state.hint;
   const item = h.hints[h.index];
-  board.render(state.marks, analyse(), {
-    roles: item.roles,
-    targets: item.targets,
-    chain: item.chain,
-    faces: item.faces,
-  });
-  const usedRoles = Object.keys(item.roles).filter((k) => item.roles[k].length > 0);
-  const faceLabels = item.faces && (item.faces.in.length || item.faces.out.length)
+  const full = h.stage >= 2;
+  const roles = full ? item.roles : item.nudgeRoles;
+  board.render(state.marks, analyse(), full
+    ? { roles, targets: item.targets, chain: item.chain, faces: item.faces }
+    : { roles });
+  const usedRoles = Object.keys(roles).filter((k) => roles[k].length > 0);
+  const faceLabels = full && item.faces && (item.faces.in.length || item.faces.out.length)
     ? {
         hasIn: item.faces.in.length > 0,
         hasOut: item.faces.out.length > 0,
@@ -579,7 +567,13 @@ function renderCurrentHint() {
         outLabel: item.faces.anchored ? 'Outside' : 'Side B',
       }
     : null;
-  const meta = `${h.tier} · ${h.rule} (cost ${h.weight})${h.hints.length > 1 ? ` · ${h.index + 1}/${h.hints.length}` : ''}`;
+  const count = h.hints.length > 1 ? ` · ${h.index + 1}/${h.hints.length}` : '';
+  if (!full) {
+    const meta = `${h.tier} · ${h.rule}${count} · where to look`;
+    showHintToast(meta, item.nudge, 'Press Hint again for the full deduction.', usedRoles, null);
+    return;
+  }
+  const meta = `${h.tier} · ${h.rule} (cost ${h.weight})${count}`;
   const move = describeMarks(state.P, item.targets);
   const more = h.hints.length > 1
     ? `Move: ${move}. Press Hint again for another firing of ${h.rule}.`
@@ -719,7 +713,7 @@ $('redo-btn').addEventListener('click', redo);
 $('reset-btn').addEventListener('click', reset);
 $('turn-btn').addEventListener('click', toggleTurn);
 $('check-btn').addEventListener('click', checkSoFar);
-$('hint-btn').addEventListener('click', hint);
+$('hint-btn').addEventListener('click', () => hint());
 
 const modals = [];
 function setupModal(modalId, openBtnId, onOpen, returnFocusId = openBtnId) {
@@ -1313,7 +1307,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
       refresh();
       return true;
     },
-    showHint: hint,
+    showHint: (opts) => hint(opts),
   };
 }
 

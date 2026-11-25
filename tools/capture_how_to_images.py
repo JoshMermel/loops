@@ -44,6 +44,7 @@ def capture(page, base, ex, out_path):
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(150)
     page.click("#hint-btn")
+    page.click("#hint-btn")
     page.wait_for_timeout(150)
     box = page.evaluate(
         """() => {
