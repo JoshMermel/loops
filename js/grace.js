@@ -15,3 +15,50 @@ export function makeGrace() {
     reset() { shown = new Set(); waiting = new Set(); waitKey = ''; },
   };
 }
+
+/**
+ * Short grace period before Auto-X / Auto-Shade fire after a single tap into an intermediate
+ * cycle state (e.g. empty -> line when double-tapping to place X), preventing flicker between taps.
+ */
+export function makeAutoGrace({
+  delayMs = 320,
+  setTimer = (fn, ms) => setTimeout(fn, ms),
+  clearTimer = (id) => clearTimeout(id),
+} = {}) {
+  let key = null;
+  let timer = null;
+  let pendingFn = null;
+  return {
+    isPending(targetKey = null) {
+      return key !== null && (targetKey === null || key === targetKey);
+    },
+    schedule(targetKey, onFire) {
+      if (timer !== null) clearTimer(timer);
+      key = targetKey;
+      pendingFn = onFire;
+      timer = setTimer(() => {
+        const fn = pendingFn;
+        key = null;
+        timer = null;
+        pendingFn = null;
+        if (fn) fn();
+      }, delayMs);
+    },
+    flush(exceptKey = null) {
+      if (key === null || (exceptKey !== null && key === exceptKey)) return false;
+      const fn = pendingFn;
+      if (timer !== null) clearTimer(timer);
+      key = null;
+      timer = null;
+      pendingFn = null;
+      if (fn) fn();
+      return true;
+    },
+    cancel() {
+      if (timer !== null) clearTimer(timer);
+      key = null;
+      timer = null;
+      pendingFn = null;
+    },
+  };
+}

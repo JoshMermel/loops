@@ -10,7 +10,7 @@ import {
   facesFromSolvedLoop,
 } from '../js/marks.js';
 import { checkMarksAgainstSolution } from '../js/hintstep.js';
-import { makeGrace } from '../js/grace.js';
+import { makeGrace, makeAutoGrace } from '../js/grace.js';
 
 const blank = (P) => ({
   edges: new Uint8Array(P.numEdges),
@@ -51,6 +51,45 @@ test('makeGrace delays newly bad items until commit and clears immediately', () 
 
   const r3 = g.update(new Set(), false);
   assert.equal(r3.show.size, 0);
+});
+
+test('makeAutoGrace defers auto-marks for double-tap, skips flush on same target, and flushes on other targets', () => {
+  let nextId = 1;
+  const timers = new Map();
+  const ag = makeAutoGrace({
+    delayMs: 320,
+    setTimer: (fn, ms) => { const id = nextId++; timers.set(id, { fn, ms }); return id; },
+    clearTimer: (id) => { timers.delete(id); },
+  });
+
+  let fired = 0;
+  ag.schedule('e:5', () => { fired++; });
+  assert.equal(ag.isPending(), true);
+  assert.equal(ag.isPending('e:5'), true);
+  assert.equal(ag.isPending('e:6'), false);
+  assert.equal(timers.size, 1);
+
+  // Second tap on same edge: flush('e:5') is a no-op and cancel() prevents the pending timer from firing
+  assert.equal(ag.flush('e:5'), false);
+  assert.equal(fired, 0);
+  ag.cancel();
+  assert.equal(ag.isPending(), false);
+  assert.equal(timers.size, 0);
+
+  // Single tap on e:5 followed by tap on different edge e:6 flushes e:5 immediately
+  ag.schedule('e:5', () => { fired++; });
+  assert.equal(ag.flush('e:6'), true);
+  assert.equal(fired, 1);
+  assert.equal(ag.isPending(), false);
+  assert.equal(timers.size, 0);
+
+  // Single tap left undisturbed fires when timer expires
+  ag.schedule('f:2', () => { fired++; });
+  const [{ fn, ms }] = [...timers.values()];
+  assert.equal(ms, 320);
+  fn();
+  assert.equal(fired, 2);
+  assert.equal(ag.isPending(), false);
 });
 
 // ---- Auto-X tests

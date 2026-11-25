@@ -12,6 +12,7 @@ import {
   facesFromSolvedLoop,
 } from './marks.js';
 import { clueStates, slitherStates, earlyLoopEdges, trappedFullCells } from './clues.js';
+import { makeAutoGrace } from './grace.js';
 import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
 import {
@@ -136,35 +137,89 @@ function edgeBetween(P, a, b) {
   return -1;
 }
 
+const AUTO_GRACE_MS = 320;
+const autoGrace = makeAutoGrace({ delayMs: AUTO_GRACE_MS });
+let autoGraceMissed = false;
+
 const reconcileAuto = (P, m) => {
   reconcileAutoGray(P, m);
   reconcileAutoX(P, m, settings.autoX, { useShade: settings.autoShade });
   reconcileAutoShade(P, m, settings.autoShade);
 };
 
+function commitAutoGrace() {
+  if (!state.P || !state.marks) return;
+  if (board.gesture) {
+    // User already has a pointer down (e.g. starting the 2nd tap); wait until gesture resolves
+    autoGraceMissed = true;
+    return;
+  }
+  autoGraceMissed = false;
+  reconcileAuto(state.P, state.marks);
+  save();
+  refresh();
+  if (state.solved) markSolved();
+}
+
+function flushAuto(exceptKey = null) {
+  autoGraceMissed = false;
+  if (!autoGrace.isPending() || (exceptKey !== null && autoGrace.isPending(exceptKey))) return false;
+  autoGrace.cancel();
+  if (!state.P || !state.marks) return false;
+  reconcileAuto(state.P, state.marks);
+  save();
+  refresh();
+  if (state.pending) state.pending = snapshot();
+  return true;
+}
+
+const faceGraceKey = (P, f) => (P.hasVoids && P.faceHoleId && P.faceHoleId[f] >= 0 ? `fh:${P.faceHoleId[f]}` : `f:${f}`);
+
 const isAutoX = (m, x) => m.edges[x] === 2 && !!m.autoE[x];
 
 function cycleGray(cell, reverse = false) {
   const P = state.P, m = state.marks;
+  const key = `g:${cell}`;
+  flushAuto(key);
   const k = P.grayAt ? P.grayAt[cell] : -1;
   if (k < 0 || (m.grays[k] && m.autoG[k])) return;
-  m.grays[k] = reverse ? cycleGrayLabelReverse(m.grays[k]) : cycleGrayLabel(m.grays[k]);
+  const prev = m.grays[k];
+  const next = reverse ? cycleGrayLabelReverse(prev) : cycleGrayLabel(prev);
+  m.grays[k] = next;
   m.autoG[k] = 0;
-  reconcileAuto(P, m);
+  const defer = !reverse && prev === 0 && next === WHITE && (settings.autoX || settings.autoShade);
+  if (defer) {
+    autoGrace.schedule(key, commitAutoGrace);
+  } else {
+    autoGrace.cancel();
+    reconcileAuto(P, m);
+  }
   refresh();
 }
 
 function cycleEdge(x) {
   const P = state.P, m = state.marks;
+  const key = `e:${x}`;
+  flushAuto(key);
   if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x) || isGivenEdge(P, x)) return;
-  m.edges[x] = cycleEdgeMark(m.edges[x]);
+  const prev = m.edges[x];
+  const next = cycleEdgeMark(prev);
+  m.edges[x] = next;
   m.autoE[x] = 0;
-  reconcileAuto(P, m);
+  // Brief grace period on empty -> line so double-tapping to place an X doesn't flash Auto-X / Auto-Shade
+  const defer = prev === 0 && next === 1 && (settings.autoX || settings.autoShade) && !isSolved(P, m.edges);
+  if (defer) {
+    autoGrace.schedule(key, commitAutoGrace);
+  } else {
+    autoGrace.cancel();
+    reconcileAuto(P, m);
+  }
   refresh();
 }
 
 function toggleEdge(x) {
   const P = state.P, m = state.marks;
+  flushAuto();
   if (x < 0 || P.edgeA[x] < 0 || isAutoX(m, x) || isGivenEdge(P, x)) return;
   m.edges[x] = toggleEdgeCross(m.edges[x]);
   m.autoE[x] = 0;
@@ -174,14 +229,24 @@ function toggleEdge(x) {
 
 function cycleFace(f, reverse = false) {
   const P = state.P, m = state.marks;
+  const key = faceGraceKey(P, f);
+  flushAuto(key);
   if (f < 0 || f >= m.faces.length || (P.hasVoids && P.faceExterior[f]) || (m.faces[f] && m.autoF[f])) {
     state.facePaintVal = null;
     return;
   }
-  const next = reverse ? cycleFaceMarkReverse(m.faces[f]) : cycleFaceMark(m.faces[f]);
+  const prev = m.faces[f];
+  const next = reverse ? cycleFaceMarkReverse(prev) : cycleFaceMark(prev);
   setFaceGroup(P, m, f, next, 0);
   state.facePaintVal = next;
-  reconcileAuto(P, m);
+  // Brief grace period on blank -> Inside so double-tapping to shade Outside doesn't flash Auto-Shade / Auto-X
+  const defer = !reverse && prev === 0 && next === 1 && (settings.autoX || settings.autoShade);
+  if (defer) {
+    autoGrace.schedule(key, commitAutoGrace);
+  } else {
+    autoGrace.cancel();
+    reconcileAuto(P, m);
+  }
   refresh();
 }
 
@@ -192,6 +257,8 @@ function paintFaceStep(f) {
   if (P.hasVoids && P.faceExterior[f]) return;
   if (m.faces[f] && m.autoF[f]) return;
   if (m.faces[f] === val) return;
+  autoGrace.cancel();
+  autoGraceMissed = false;
   setFaceGroup(P, m, f, val, 0);
   reconcileAuto(P, m);
   refresh();
@@ -199,6 +266,7 @@ function paintFaceStep(f) {
 
 function dragStep(a, b, first) {
   const P = state.P, m = state.marks;
+  if (first) flushAuto();
   state.dragStack.push(snapshot());
   const x = edgeBetween(P, a, b);
   if (x < 0 || isGivenEdge(P, x)) {
@@ -223,6 +291,7 @@ function dragStep(a, b, first) {
 
 function crossStep(a, b, first) {
   const P = state.P, m = state.marks;
+  if (first) flushAuto();
   state.dragStack.push(snapshot());
   const x = edgeBetween(P, a, b);
   if (x < 0 || isAutoX(m, x) || isGivenEdge(P, x)) {
@@ -248,6 +317,8 @@ function crossStep(a, b, first) {
 
 function undoDragStep() {
   if (!state.dragStack.length) return;
+  autoGrace.cancel();
+  autoGraceMissed = false;
   state.marks = state.dragStack.pop();
   refresh();
 }
@@ -258,32 +329,41 @@ function endGesture(cancelled) {
   state.dragStack = [];
   state.facePaintVal = null;
   if (!before) return;
-  if (cancelled) { state.marks = before; refresh(); return; }
+  if (cancelled) { autoGrace.cancel(); autoGraceMissed = false; state.marks = before; refresh(); return; }
   if (!sameMarks(before, state.marks)) {
     state.undo.push(before);
     state.redo = [];
     save();
   }
+  if (autoGraceMissed) commitAutoGrace();
   if (state.solved) markSolved();
   updateButtons();
 }
 
 function undo() {
   if (!state.undo.length) return;
+  autoGrace.cancel();
+  autoGraceMissed = false;
   state.redo.push(snapshot());
   state.marks = state.undo.pop();
+  reconcileAuto(state.P, state.marks);
   save(); refresh();
 }
 
 function redo() {
   if (!state.redo.length) return;
+  autoGrace.cancel();
+  autoGraceMissed = false;
   state.undo.push(snapshot());
   state.marks = state.redo.pop();
+  reconcileAuto(state.P, state.marks);
   save(); refresh();
 }
 
 function reset() {
   if (isPristine(state.marks)) return;
+  autoGrace.cancel();
+  autoGraceMissed = false;
   state.undo.push(snapshot());
   state.redo = [];
   state.marks = freshMarks(state.P);
@@ -322,6 +402,7 @@ function fitBoard() {
   const { availW, availH } = viewportSpace();
   const layout = chooseLayout(baseP.rows, baseP.cols, availW, availH, state.rotOverride);
   if (layout.rotated !== state.rotated) {
+    flushAuto();
     if (board.gesture) board.cancel();
     const xf = layout.rotated
       ? (m) => rotateMarksCW(baseP, state.rotP, m)
@@ -340,6 +421,7 @@ function fitBoard() {
   applyBoardSize(layout.px);
 }
 window.addEventListener('resize', fitBoard);
+window.addEventListener('pagehide', () => flushAuto());
 
 function toggleTurn() {
   const baseP = state.baseP;
@@ -512,6 +594,7 @@ $('toast').addEventListener('click', dismissToast);
 
 function checkSoFar() {
   if (!state.P) return;
+  flushAuto();
   dismissToast();
   if (state.solved) { toast('Solved!'); return; }
   if (!state.P.solution) { toast('No stored solution to check against.'); return; }
@@ -577,6 +660,7 @@ function showHintToast(meta, text, extraLine, usedRoles, faceLabels = null) {
 
 function hint(opts = {}) {
   if (!state.P) return;
+  flushAuto();
   if (state.solved) { toast('Already solved!'); return; }
 
   state.hint = advanceHint(state.hint, () => computeHint(state.P, state.marks), { full: !settings.incrementalHints, ...opts });
@@ -673,6 +757,7 @@ function showInfo() {
 function openPuzzle(idx) {
   const book = state.book;
   if (!book || !book.puzzles.length) return;
+  flushAuto();
   if (board.gesture) board.cancel();
   idx = Math.max(0, Math.min(Math.trunc(idx) || 0, book.puzzles.length - 1));
   state.idx = idx;
@@ -1130,6 +1215,8 @@ $('setting-color-lines').addEventListener('change', (e) => {
 
 $('setting-auto-x').checked = settings.autoX;
 $('setting-auto-x').addEventListener('change', (e) => {
+  autoGrace.cancel();
+  autoGraceMissed = false;
   settings.autoX = e.target.checked;
   store.set('ms_autoX', settings.autoX ? '1' : '0');
   if (state.P) {
@@ -1149,6 +1236,8 @@ $('setting-auto-x').addEventListener('change', (e) => {
 
 $('setting-auto-shade').checked = settings.autoShade;
 $('setting-auto-shade').addEventListener('change', (e) => {
+  autoGrace.cancel();
+  autoGraceMissed = false;
   settings.autoShade = e.target.checked;
   store.set('ms_autoShade', settings.autoShade ? '1' : '0');
   if (state.P) {
