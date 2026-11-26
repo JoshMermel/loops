@@ -183,9 +183,8 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     return out;
   };
 
-  // Slitherlink & Mid-loop bookkeeping (only needs one pass since `add` never turns an edge ON)
+  // Slitherlink bookkeeping (only needs one pass since `add` never turns an edge ON)
   if (P.hasSlither) autoXSlither(P, w, add);
-  if (P.hasMidloop) autoXMidloop(P, w, add);
 
   const reqCell = new Uint8Array(N);
   for (let i = 0; i < N; i++) if (clue[i] !== NONE) reqCell[i] = 1;
@@ -207,6 +206,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   let changed = true;
   while (changed) {
     changed = false;
+    if (P.hasMidloop && autoXMidloop(P, w, add)) changed = true;
     // Rule 4: dead-end intersections & pockets (disabled on fullBoard since every intersection must be visited)
     if (!P.fullBoard) {
       for (let i = 0; i < N; i++) {

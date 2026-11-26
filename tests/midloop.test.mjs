@@ -248,6 +248,36 @@ test('Mid-loop live error states, early loop detection, Auto-X, and symmetry det
   const forced = autoXForced(Pv, mAx);
   assert.equal(forced[Pv.ed[(1 * 4 + 1) * 4 + 1]], 1, 'right of vertex dot should auto-X');
   assert.equal(forced[Pv.ed[(1 * 4 + 1) * 4 + 3]], 1, 'left of vertex dot should auto-X');
+  // Only up drawn (lenNeg=1, lenPos=0): conservative Option 1 should NOT cap past (2,1) yet
+  assert.equal(forced[Pv.ed[(2 * 4 + 1) * 4 + 2]], 0, 'unequal branches should not auto-X cap');
+
+  // Once both branches are drawn to length 1 and top hits border (0,1), bottom tip (2,1)->(3,1) auto-X's!
+  mAx.edges[Pv.ed[(1 * 4 + 1) * 4 + 2]] = 1; // down from (1,1) to (2,1)
+  const forcedEq = autoXForced(Pv, mAx);
+  assert.equal(forcedEq[Pv.ed[(2 * 4 + 1) * 4 + 2]], 1, 'equal-length branch capped by border should auto-X far tip');
+
+  // Edge dot touching border (k=0): does NOT cap before edge is drawn; DOES cap once edge is drawn
+  const Pe = compile({ name: 'mid_ax_e', rows: 4, cols: 5, clues: [], midloop: [{ r: 1, c: 0, dir: 'H' }] });
+  const mPe = { edges: new Uint8Array(Pe.numEdges), autoE: new Uint8Array(Pe.numEdges) };
+  assert.equal(autoXForced(Pe, mPe)[Pe.ed[(1 * 5 + 1) * 4 + 1]], 0, 'untouched border edge dot should not auto-X');
+  mPe.edges[Pe.midloop[0].edge] = 1;
+  assert.equal(autoXForced(Pe, mPe)[Pe.ed[(1 * 5 + 1) * 4 + 1]], 1, 'drawn border edge dot should auto-X right continuation');
+
+  // Edge dot 1 cell from border: conservative Option 1 waits until BOTH branches are drawn to length 1
+  const Pe1 = compile({ name: 'mid_ax_e1', rows: 4, cols: 6, clues: [], midloop: [{ r: 1, c: 1, dir: 'H' }] });
+  const mPe1 = { edges: new Uint8Array(Pe1.numEdges), autoE: new Uint8Array(Pe1.numEdges) };
+  mPe1.edges[Pe1.midloop[0].edge] = 1;          // (1,1)-(1,2)
+  mPe1.edges[Pe1.ed[(1 * 6 + 2) * 4 + 1]] = 1;  // (1,2)-(1,3): right branch len=1, left branch len=0
+  assert.equal(autoXForced(Pe1, mPe1)[Pe1.ed[(1 * 6 + 3) * 4 + 1]], 0, 'Option 1: do not cap before left branch also reaches len 1');
+  mPe1.edges[Pe1.ed[(1 * 6 + 1) * 4 + 3]] = 1;  // (1,0)-(1,1): now left branch len=1 (hits border)
+  assert.equal(autoXForced(Pe1, mPe1)[Pe1.ed[(1 * 6 + 3) * 4 + 1]], 1, 'Option 1: cap right tip once both branches have len 1');
+
+  // Manual X or 90° turn on one tip caps the equal-length opposite tip too
+  const Pe2 = compile({ name: 'mid_ax_e2', rows: 4, cols: 6, clues: [], midloop: [{ r: 1, c: 2, dir: 'H' }] });
+  const mPe2 = { edges: new Uint8Array(Pe2.numEdges), autoE: new Uint8Array(Pe2.numEdges) };
+  mPe2.edges[Pe2.midloop[0].edge] = 1;          // (1,2)-(1,3)
+  mPe2.edges[Pe2.ed[(1 * 6 + 2) * 4 + 0]] = 1;  // 90° turn up at (1,2) -> left branch capped at len=0
+  assert.equal(autoXForced(Pe2, mPe2)[Pe2.ed[(1 * 6 + 3) * 4 + 1]], 1, '90° turn on one tip caps equal-length opposite tip');
 });
 
 test('generatePuzzle supports midloop, midloop-masyu, midloop-slither, and midloop-full with necessity checks', () => {

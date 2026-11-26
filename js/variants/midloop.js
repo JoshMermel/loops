@@ -391,25 +391,74 @@ export function propagateMidloopDot(P, st, k, setEdge, setCell) {
   return true;
 }
 
-/** Auto-X bookkeeping for Mid-loop: a vertex dot with 1 drawn segment auto-X's its perpendicular edges. */
+/**
+ * Auto-X bookkeeping for Mid-loop:
+ *  1. Vertex dot with 1 drawn straight segment -> auto-X its two perpendicular edges.
+ *  2. Equal-length capped run (strict Option 1): once a dot's axis is drawn and both branches
+ *     have equal contiguous drawn length `k`, if one tip is already stopped (border/void, X, or
+ *     drawn 90° turn), auto-X the straight continuation past the opposite tip.
+ */
 export function autoXMidloop(P, w, add) {
   if (!P.hasMidloop) return false;
-  const { ed, midloop } = P;
+  const { ed, nb, midloop } = P;
   let changed = false;
+  const hasPerp = (cell, axis) => {
+    const p0 = ed[cell * 4 + AXIS_PERP0[axis]];
+    const p1 = ed[cell * 4 + AXIS_PERP1[axis]];
+    return (p0 >= 0 && w[p0] === 1) || (p1 >= 0 && w[p1] === 1);
+  };
   for (let k = 0; k < midloop.length; k++) {
     const m = midloop[k];
-    if (m.dir !== 'C') continue;
-    const i4 = m.cell * 4;
-    const u = ed[i4], r = ed[i4 + 1], dn = ed[i4 + 2], l = ed[i4 + 3];
-    const vOn = (u >= 0 && w[u] === 1) || (dn >= 0 && w[dn] === 1);
-    const hOn = (r >= 0 && w[r] === 1) || (l >= 0 && w[l] === 1);
-    if (vOn && !hOn) {
-      if (r >= 0 && w[r] !== 1 && add(r)) changed = true;
-      if (l >= 0 && w[l] !== 1 && add(l)) changed = true;
-    } else if (hOn && !vOn) {
-      if (u >= 0 && w[u] !== 1 && add(u)) changed = true;
-      if (dn >= 0 && w[dn] !== 1 && add(dn)) changed = true;
+    let axis = -1, startNeg = -1, startPos = -1;
+    if (m.dir !== 'C') {
+      if (w[m.edge] !== 1) continue;
+      axis = m.axis;
+      startNeg = m.a;
+      startPos = m.b;
+    } else {
+      const i4 = m.cell * 4;
+      const u = ed[i4], r = ed[i4 + 1], dn = ed[i4 + 2], l = ed[i4 + 3];
+      const uOn = u >= 0 && w[u] === 1;
+      const dOn = dn >= 0 && w[dn] === 1;
+      const rOn = r >= 0 && w[r] === 1;
+      const lOn = l >= 0 && w[l] === 1;
+      const vOn = uOn || dOn;
+      const hOn = rOn || lOn;
+      if (vOn && !hOn) {
+        if (r >= 0 && w[r] !== 1 && add(r)) changed = true;
+        if (l >= 0 && w[l] !== 1 && add(l)) changed = true;
+        if (uOn && dOn) { axis = 0; startNeg = m.cell; startPos = m.cell; }
+      } else if (hOn && !vOn) {
+        if (u >= 0 && w[u] !== 1 && add(u)) changed = true;
+        if (dn >= 0 && w[dn] !== 1 && add(dn)) changed = true;
+        if (lOn && rOn) { axis = 1; startNeg = m.cell; startPos = m.cell; }
+      }
     }
+    if (axis < 0) continue;
+
+    const dNeg = AXIS_NEG[axis], dPos = AXIS_POS[axis];
+    let lenNeg = 0, tipNeg = startNeg;
+    while (true) {
+      const x = ed[tipNeg * 4 + dNeg];
+      if (x < 0 || w[x] !== 1) break;
+      lenNeg++;
+      tipNeg = nb[tipNeg * 4 + dNeg];
+    }
+    let lenPos = 0, tipPos = startPos;
+    while (true) {
+      const x = ed[tipPos * 4 + dPos];
+      if (x < 0 || w[x] !== 1) break;
+      lenPos++;
+      tipPos = nb[tipPos * 4 + dPos];
+    }
+    if (lenNeg !== lenPos) continue;
+
+    const nextNeg = ed[tipNeg * 4 + dNeg];
+    const nextPos = ed[tipPos * 4 + dPos];
+    const negStopped = nextNeg < 0 || w[nextNeg] === 2 || hasPerp(tipNeg, axis);
+    const posStopped = nextPos < 0 || w[nextPos] === 2 || hasPerp(tipPos, axis);
+    if (negStopped && nextPos >= 0 && w[nextPos] !== 1 && add(nextPos)) changed = true;
+    if (posStopped && nextNeg >= 0 && w[nextNeg] !== 1 && add(nextNeg)) changed = true;
   }
   return changed;
 }
