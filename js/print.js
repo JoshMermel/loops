@@ -132,6 +132,16 @@ export function boardSvg(P, sol = null) {
       g += `<circle class="black-circle" cx="${cl.c}" cy="${cl.r}" r="0.225" fill="${INK}"/>`;
     }
   }
+  // Mid-loop midpoint dots (distinct bullseye in B&W print so they stay distinguishable from Masyu pearls)
+  if (P.hasMidloop) {
+    for (const md of P.midloop) {
+      const mx = md.dir === 'H' ? md.c + 0.5 : md.c;
+      const my = md.dir === 'V' ? md.r + 0.5 : md.r;
+      g += `<circle class="midloop-halo" cx="${mx}" cy="${my}" r="0.17" fill="#fff"/>`;
+      g += `<circle class="midloop-dot" cx="${mx}" cy="${my}" r="0.15" fill="${INK}"/>`;
+      g += `<circle class="midloop-core" cx="${mx}" cy="${my}" r="0.055" fill="#fff"/>`;
+    }
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" class="print-board" viewBox="${-pad} ${-pad} ${w + 2 * pad} ${h + 2 * pad}">${g}</svg>`;
 }
 

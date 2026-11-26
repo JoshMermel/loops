@@ -12,9 +12,13 @@ import {
   isSlitherSatisfied, isSlitherEdge, firstUnsatisfiedSlitherOnClose,
   CORNER_SPEC, isBlockedDir,
 } from './variants/slitherlink.js';
+import {
+  isMidloopSatisfied, isMidloopEdge, firstUnsatisfiedMidloopOnClose,
+  findEasyMidloopStep, midloopContradiction,
+} from './variants/midloop.js';
 
 const isFrontierEdge = (P, st, x) => (
-  st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP || isSlitherEdge(P, x)
+  st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP || isSlitherEdge(P, x) || isMidloopEdge(P, x)
 );
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
@@ -403,6 +407,14 @@ export function easyContradiction(P, st, scope = null) {
         if (on !== sc.n) return { kind: 'earlyClose', face: sc.f, n: sc.n };
       }
     }
+    if (P.hasMidloop && !isMidloopSatisfied(P, e)) {
+      const bad = midloopContradiction(P, st);
+      return bad || { kind: 'earlyClose', midIdx: 0 };
+    }
+  }
+  if (P.hasMidloop) {
+    const mc = midloopContradiction(P, st);
+    if (mc) return mc;
   }
   return null;
 }
@@ -509,6 +521,15 @@ function findEasyStep(P, st, forbid, scope = null) {
     if (forbid && forbid.has(sig)) return null;
     return { rule, sets: fresh, sig, info };
   };
+
+  // 0a. Mid-loop easy rules
+  if (P.hasMidloop) {
+    const ms = findEasyMidloopStep(P, st);
+    if (ms) {
+      const emitted = tryEmit(ms.rule, ms.sets, ms.info);
+      if (emitted) return emitted;
+    }
+  }
 
   // 0b. Slitherlink easy rules (slitherZero / slitherCount / slitherCorner 3&1 / slitherLineIn)
   if (P.hasSlither) {
@@ -830,8 +851,12 @@ function findEasyStep(P, st, forbid, scope = null) {
       for (let i = 0; i < N; i++) if (cell[i] === LOOP) loopCount++;
     }
     const slFace = pathVerts < loopCount ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
-    if (pathVerts < loopCount || slFace >= 0) {
-      const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], slFace >= 0 ? { edge: x, a, b, slitherFace: slFace } : { edge: x, a, b });
+    const midIdx = (pathVerts < loopCount || slFace >= 0) ? -1 : firstUnsatisfiedMidloopOnClose(P, st, x);
+    if (pathVerts < loopCount || slFace >= 0 || midIdx >= 0) {
+      const info = slFace >= 0 ? { edge: x, a, b, slitherFace: slFace }
+        : midIdx >= 0 ? { edge: x, a, b, midIdx }
+        : { edge: x, a, b };
+      const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], info);
       if (step) return step;
     }
   }
@@ -848,8 +873,8 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
   const st = cloneState(baseState);
   if (grayCell >= 0) st.clue[grayCell] = val;
   else st.e[edge] = val;
-  // On gray puzzles (small N), run unscoped so mid-chain gray->W/B promotions never miss dirty-cone wakeups
-  if (st.hasGray) scoped = false;
+  // On gray or Mid-loop puzzles, run unscoped so mid-chain gray promotions and row/col Mid-loop wakeups never miss dirty cones
+  if (st.hasGray || P.hasMidloop) scoped = false;
 
   let scope = null;
   let dirtyAdded = false;

@@ -11,6 +11,7 @@
 // while localStorage saves stay in canonical base orientation.
 import { compile, puzzleHash } from './logic.js';
 import { rotateSlitherCW } from './variants/slitherlink.js';
+import { rotateMidloopCW } from './variants/midloop.js';
 import { numFacesOf } from './marks.js';
 
 export const MIN_PX = 26;
@@ -24,6 +25,7 @@ export function rotatePuzzleCW(P) {
   const R = P.rows, C = P.cols;
   const clues = P.clues.map((cl) => ({ r: cl.c, c: R - 1 - cl.r, t: cl.t }));
   const slither = rotateSlitherCW(P);
+  const midloop = rotateMidloopCW(P);
   const voids = (P.voids || []).map((v) => ({ r: v.c, c: R - 1 - v.r }));
   const givens = (P.givens || []).map((gv) => (
     gv.dir === 'H'
@@ -50,6 +52,7 @@ export function rotatePuzzleCW(P) {
     cols: R,
     clues,
     ...(slither.length ? { slither } : {}),
+    ...(midloop.length ? { midloop } : {}),
     ...(P.fullBoard ? { fullBoard: true } : {}),
     ...(voids.length ? { voids } : {}),
     ...(givens.length ? { givens } : {}),

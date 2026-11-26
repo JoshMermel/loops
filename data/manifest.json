@@ -4,7 +4,7 @@
     {
       "name": "Start here",
       "icon": "🌱",
-      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, and Hamilton cycle."
+      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, and Hamilton cycle."
     },
     {
       "name": "Masyu",
@@ -57,6 +57,11 @@
       "blurb": "Each numbered square tells how many of its four sides belong to the single closed loop."
     },
     {
+      "name": "Mid-loop",
+      "icon": "🎯",
+      "blurb": "Pass straight through every teal dot at the exact midpoint of its straight loop segment."
+    },
+    {
       "name": "Hamilton cycle",
       "icon": "🔁",
       "blurb": "Visit every single dot on the grid — guided by given lines, given walls, or both."
@@ -77,6 +82,18 @@
         "Slitherlink + Hamilton cycle": {
           "icon": "🔢🔁",
           "blurb": "Slitherlink numbers on a Hamilton cycle that visits every single dot."
+        },
+        "Mid-loop + Masyu": {
+          "icon": "🎯⚪",
+          "blurb": "Teal midpoint dots and Masyu circles sharing one single closed loop."
+        },
+        "Mid-loop + Slitherlink": {
+          "icon": "🎯🔢",
+          "blurb": "Teal midpoint dots and numbered Slitherlink squares sharing one single closed loop."
+        },
+        "Mid-loop + Hamilton cycle": {
+          "icon": "🎯🔁",
+          "blurb": "Teal midpoint dots on a Hamilton cycle that visits every single dot."
         }
       }
     }
@@ -99,6 +116,15 @@
       "count": 40,
       "group": "Start here",
       "blurb": "Small Beginner Slitherlink warm-ups, easiest first."
+    },
+    {
+      "id": "intro-midloop",
+      "name": "Mid-loop intro",
+      "label": "🎯 Mid-loop",
+      "file": "data/intro-midloop.csv",
+      "count": 24,
+      "group": "Start here",
+      "blurb": "Small Beginner Mid-loop warm-ups, easiest first."
     },
     {
       "id": "intro-hamilton",
@@ -549,6 +575,24 @@
       "blurb": "Pure Slitherlink where every single numbered square is a 3."
     },
     {
+      "id": "midloop-small",
+      "name": "Mid-loop — Small",
+      "label": "Small (7×7)",
+      "file": "data/midloop-small.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "blurb": "Compact 7×7 Mid-loop boards across all four difficulties."
+    },
+    {
+      "id": "midloop-classic",
+      "name": "Mid-loop — Classic",
+      "label": "Classic (10×10)",
+      "file": "data/midloop-classic.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "blurb": "Classic 10×10 Mid-loop boards across all four difficulties."
+    },
+    {
       "id": "full-masyu-8x8",
       "name": "Masyu + Hamilton cycle",
       "label": "⚪🔁 Classic (8×8)",
@@ -587,6 +631,36 @@
       "group": "Hybrids",
       "blurb": "Every clue is a 2 on a Hamilton cycle that visits every single dot.",
       "sub": "Slitherlink + Hamilton cycle"
+    },
+    {
+      "id": "hybrid-midloop-masyu",
+      "name": "Mid-loop + Masyu",
+      "label": "🎯⚪ Classic (8×8)",
+      "file": "data/hybrid-midloop-masyu.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Mid-loop + Masyu",
+      "blurb": "Teal midpoint dots and Masyu circles share one single loop — every puzzle genuinely requires both."
+    },
+    {
+      "id": "hybrid-midloop-slither",
+      "name": "Mid-loop + Slitherlink",
+      "label": "🎯🔢 Classic (8×8)",
+      "file": "data/hybrid-midloop-slither.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Mid-loop + Slitherlink",
+      "blurb": "Teal midpoint dots and Slitherlink numbers share one single loop — every puzzle genuinely requires both."
+    },
+    {
+      "id": "hybrid-midloop-full",
+      "name": "Mid-loop + Hamilton cycle",
+      "label": "🎯🔁 Classic (8×8)",
+      "file": "data/hybrid-midloop-full.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Mid-loop + Hamilton cycle",
+      "blurb": "Teal midpoint dots on a Hamilton cycle that visits every single dot."
     },
     {
       "id": "armory",

@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | midloop | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -519,6 +519,35 @@ if (!isMainThread) {
     { group: 'intro-extra', pool: 'intro_ham_lines_6x6', cols: 6, rows: 6, style: 'full-lines', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 8000 },
     { group: 'intro-extra', pool: 'intro_ham_walls_6x6', cols: 6, rows: 6, style: 'full-walls', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 8000 },
     { group: 'intro-extra', pool: 'intro_ham_mixed_6x6', cols: 6, rows: 6, style: 'full-mixed', tier: 'Beginner', total: 9, budgetSec: 30, perPuzzleMs: 8000 },
+
+    // ---- Mid-loop & Hybrids (prototype token books: 24 puzzles each + Beginner intro)
+    { group: 'midloop', pool: 'intro_midloop_6x6', cols: 6, rows: 6, style: 'midloop', tier: 'Beginner', total: 16, budgetSec: 30, perPuzzleMs: 6000 },
+    { group: 'midloop', pool: 'intro_midloop_7x7', cols: 7, rows: 7, style: 'midloop', tier: 'Beginner', total: 16, budgetSec: 30, perPuzzleMs: 8000 },
+    {
+      group: 'midloop', pool: 'midloop_7x7', cols: 7, rows: 7, style: 'midloop',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop', pool: 'midloop_10x10', cols: 10, rows: 10, style: 'midloop',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 150, perPuzzleMs: 15000,
+    },
+    {
+      group: 'midloop', pool: 'hybrid_midloop_masyu_8x8', cols: 8, rows: 8, style: 'midloop-masyu',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'midloop', pool: 'hybrid_midloop_slither_8x8', cols: 8, rows: 8, style: 'midloop-slither',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'midloop', pool: 'hybrid_midloop_full_8x8', cols: 8, rows: 8, style: 'midloop-full',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
   ];
 
   const knownGroups = new Set(JOBS.map((j) => j.group));

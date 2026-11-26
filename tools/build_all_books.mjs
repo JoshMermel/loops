@@ -19,7 +19,7 @@ const manifest = {
     {
       name: 'Start here',
       icon: '🌱',
-      blurb: 'Small Beginner warm-ups to learn Masyu, Slitherlink, and Hamilton cycle.',
+      blurb: 'Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, and Hamilton cycle.',
     },
     {
       name: 'Masyu',
@@ -72,6 +72,11 @@ const manifest = {
       blurb: 'Each numbered square tells how many of its four sides belong to the single closed loop.',
     },
     {
+      name: 'Mid-loop',
+      icon: '🎯',
+      blurb: 'Pass straight through every teal dot at the exact midpoint of its straight loop segment.',
+    },
+    {
       name: 'Hamilton cycle',
       icon: '🔁',
       blurb: 'Visit every single dot on the grid — guided by given lines, given walls, or both.',
@@ -93,6 +98,18 @@ const manifest = {
           icon: '🔢🔁',
           blurb: 'Slitherlink numbers on a Hamilton cycle that visits every single dot.',
         },
+        'Mid-loop + Masyu': {
+          icon: '🎯⚪',
+          blurb: 'Teal midpoint dots and Masyu circles sharing one single closed loop.',
+        },
+        'Mid-loop + Slitherlink': {
+          icon: '🎯🔢',
+          blurb: 'Teal midpoint dots and numbered Slitherlink squares sharing one single closed loop.',
+        },
+        'Mid-loop + Hamilton cycle': {
+          icon: '🎯🔁',
+          blurb: 'Teal midpoint dots on a Hamilton cycle that visits every single dot.',
+        },
       },
     },
   ],
@@ -109,6 +126,11 @@ const recipes = [
     id: 'intro-slither', name: 'Slitherlink intro', label: '🔢 Slitherlink', group: 'Start here',
     glob: 'intro_slither_5x5,intro_slither_6x6', limit: 40, onlyTier: 'Beginner', balanceGroups: true,
     blurb: 'Small Beginner Slitherlink warm-ups, easiest first.',
+  },
+  {
+    id: 'intro-midloop', name: 'Mid-loop intro', label: '🎯 Mid-loop', group: 'Start here',
+    glob: 'intro_midloop_6x6,intro_midloop_7x7', limit: 24, onlyTier: 'Beginner', balanceGroups: true,
+    blurb: 'Small Beginner Mid-loop warm-ups, easiest first.',
   },
   {
     id: 'intro-hamilton', name: 'Hamilton cycle intro', label: '🔁 Hamilton cycle', group: 'Start here',
@@ -367,6 +389,18 @@ const recipes = [
     blurb: 'Pure Slitherlink where every single numbered square is a 3.',
   },
 
+  // ---- Mid-loop (token books)
+  {
+    id: 'midloop-small', name: 'Mid-loop — Small', label: 'Small (7×7)', group: 'Mid-loop',
+    glob: 'midloop_7x7', tiers: '4,8,8,4',
+    blurb: 'Compact 7×7 Mid-loop boards across all four difficulties.',
+  },
+  {
+    id: 'midloop-classic', name: 'Mid-loop — Classic', label: 'Classic (10×10)', group: 'Mid-loop',
+    glob: 'midloop_10x10', tiers: '4,8,8,4',
+    blurb: 'Classic 10×10 Mid-loop boards across all four difficulties.',
+  },
+
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)
   {
     id: 'full-masyu-8x8', name: 'Masyu + Hamilton cycle', label: '⚪🔁 Classic (8×8)', group: 'Hybrids', sub: 'Masyu + Hamilton cycle',
@@ -387,6 +421,21 @@ const recipes = [
     id: 'hybrid-slither2-full', name: 'All 2s + Hamilton cycle', label: '2️⃣🔁 All 2s (6×7)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
     glob: 'hybrid_slither2_full_6x7', tiers: '50,200,200,50',
     blurb: 'Every clue is a 2 on a Hamilton cycle that visits every single dot.',
+  },
+  {
+    id: 'hybrid-midloop-masyu', name: 'Mid-loop + Masyu', label: '🎯⚪ Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Masyu',
+    glob: 'hybrid_midloop_masyu_8x8', tiers: '4,8,8,4',
+    blurb: 'Teal midpoint dots and Masyu circles share one single loop — every puzzle genuinely requires both.',
+  },
+  {
+    id: 'hybrid-midloop-slither', name: 'Mid-loop + Slitherlink', label: '🎯🔢 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
+    glob: 'hybrid_midloop_slither_8x8', tiers: '4,8,8,4',
+    blurb: 'Teal midpoint dots and Slitherlink numbers share one single loop — every puzzle genuinely requires both.',
+  },
+  {
+    id: 'hybrid-midloop-full', name: 'Mid-loop + Hamilton cycle', label: '🎯🔁 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Hamilton cycle',
+    glob: 'hybrid_midloop_full_8x8', tiers: '4,8,8,4',
+    blurb: 'Teal midpoint dots on a Hamilton cycle that visits every single dot.',
   },
 ];
 

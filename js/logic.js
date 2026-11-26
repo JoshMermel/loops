@@ -14,6 +14,10 @@ import {
   compileSlither, serializeSlither, parseSlitherToken, symmetrySlither,
   isSlitherSatisfied, propagateSlitherFace, firstUnsatisfiedSlitherOnClose,
 } from './variants/slitherlink.js';
+import {
+  compileMidloop, serializeMidloop, parseMidloopToken, symmetryMidloop,
+  isMidloopSatisfied, propagateMidloopDot, firstUnsatisfiedMidloopOnClose,
+} from './variants/midloop.js';
 
 /** Column letters like a spreadsheet: 0 -> A, 25 -> Z, 26 -> AA. */
 export function colName(c) {
@@ -218,6 +222,7 @@ export function compile(p) {
     _ecOff: null, _ecData: null, _syms: null,
   });
   compileSlither(compiled, p);
+  compileMidloop(compiled, p);
   return compiled;
 }
 
@@ -228,6 +233,13 @@ export function initialState(P) {
   } else {
     if (P.hasVoids) for (let i = 0; i < P.N; i++) if (P.isVoid[i]) cell[i] = OFF;
     for (const i of P.clueCells) cell[i] = LOOP;
+    if (P.hasMidloop) {
+      for (let k = 0; k < P.midloop.length; k++) {
+        const m = P.midloop[k];
+        cell[m.a] = LOOP;
+        cell[m.b] = LOOP;
+      }
+    }
   }
   const e = new Int8Array(P.numEdges);
   if (P.hasGivens) {
@@ -269,10 +281,23 @@ let scratchClueQ = new Int16Array(0);
 let scratchInClueQ = new Uint8Array(0);
 let scratchFaceQ = new Int16Array(0);
 let scratchInFaceQ = new Uint8Array(0);
+let scratchMidQ = new Int16Array(0);
+let scratchInMidQ = new Uint8Array(0);
+let scratchMidCap = 0;
 let scratchQCap = 0;
 
 /** Number of edge assignments or cell=OFF deductions made by the most recent propagate() call. */
 export let lastPropChanges = 0;
+
+function ensureMidScratch(M) {
+  if (scratchInMidQ.length < M) scratchInMidQ = new Uint8Array(M);
+  if (scratchMidCap <= M) {
+    let cap = 64;
+    while (cap <= M) cap <<= 1;
+    scratchMidCap = cap;
+    scratchMidQ = new Int16Array(cap);
+  }
+}
 
 function ensurePropScratch(N) {
   if (scratchVis.length < N) {
@@ -353,6 +378,12 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const hasSlither = Boolean(P.hasSlither);
   const slitherNum = P.slitherNum;
   const edgeFaces = P.edgeFaces;
+  const hasMidloop = Boolean(P.hasMidloop);
+  if (hasMidloop) ensureMidScratch(P.midloop.length);
+  const qMid = scratchMidQ, inMidQ = scratchInMidQ;
+  const midMask = scratchMidCap - 1;
+  const midByRow = P.midloopByRow, midByCol = P.midloopByCol;
+  let mHead = 0, mTail = 0;
 
   const pushCell = (i) => {
     if (!inCellQ[i]) {
@@ -375,7 +406,21 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       fTail = (fTail + 1) & qMask;
     }
   };
+  const pushMid = (k) => {
+    if (!inMidQ[k]) {
+      inMidQ[k] = 1;
+      qMid[mTail] = k;
+      mTail = (mTail + 1) & midMask;
+    }
+  };
   const frMax = P.rows - 1, fcMax = P.cols - 1, pCols = P.cols;
+  const pushVertexMid = (v) => {
+    const r = (v / pCols) | 0, c = v % pCols;
+    const rl = midByRow[r];
+    for (let j = 0; j < rl.length; j++) pushMid(rl[j]);
+    const cl = midByCol[c];
+    for (let j = 0; j < cl.length; j++) pushMid(cl[j]);
+  };
   const pushVertexFaces = (v) => {
     const r = (v / pCols) | 0, c = v % pCols;
     if (r > 0) {
@@ -401,6 +446,10 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       pushVertexFaces(a);
       pushVertexFaces(b);
     }
+    if (hasMidloop) {
+      pushVertexMid(a);
+      pushVertexMid(b);
+    }
   };
 
   const setCell = (i, v) => {
@@ -409,7 +458,10 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (cur !== UNKNOWN) { ok = false; return; }
     cell[i] = v;
     if (v === LOOP) needLoopCheck = true;
-    else changes++;
+    else {
+      changes++;
+      if (hasMidloop) pushVertexMid(i);
+    }
     pushCell(i);
   };
   const setEdge = (x, v) => {
@@ -422,6 +474,8 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (v === E_ON) needLoopCheck = true;
     wakeEdge(x);
   };
+  const setEdgeOk = (x, v) => { setEdge(x, v); return ok; };
+  const setCellOk = (i, v) => { setCell(i, v); return ok; };
   const setGray = (i, v) => {
     const cur = clue[i];
     if (cur === v) return;
@@ -442,6 +496,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   } else if (seedCell >= 0) {
     if (cell[seedCell] === LOOP) needLoopCheck = true;
     pushCell(seedCell);
+    if (hasMidloop) pushVertexMid(seedCell);
   } else {
     needLoopCheck = true;
     for (let i = 0; i < N; i++) pushCell(i);
@@ -449,11 +504,12 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     for (let bi = 0; bi < blacks.length; bi++) pushClue(blacks[bi]);
     if (grays) for (let gi = 0; gi < grays.length; gi++) pushClue(grays[gi]);
     if (hasSlither) for (let si = 0; si < P.slither.length; si++) pushFace(P.slither[si].f);
+    if (hasMidloop) for (let mi = 0; mi < P.midloop.length; mi++) pushMid(mi);
   }
 
   while (ok) {
-    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces whose neighborhood changed.
-    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail)) {
+    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces/midloop dots whose neighborhood changed.
+    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail || mHead !== mTail)) {
       while (ok && cHead !== cTail) {
         const i = qCell[cHead];
         cHead = (cHead + 1) & qMask;
@@ -637,6 +693,13 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
         inFaceQ[f] = 0;
         if (!propagateSlitherFace(P, st, f, setEdge)) ok = false;
       }
+
+      while (ok && mHead !== mTail) {
+        const mi = qMid[mHead];
+        mHead = (mHead + 1) & midMask;
+        inMidQ[mi] = 0;
+        if (!propagateMidloopDot(P, st, mi, setEdgeOk, setCellOk)) ok = false;
+      }
     }
     if (!ok || !needLoopCheck) break;
     needLoopCheck = false;
@@ -688,6 +751,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
               if (e[ex] === E_UNKNOWN) {
                 let forbid = len < loopCount;
                 if (!forbid && hasSlither) forbid = firstUnsatisfiedSlitherOnClose(P, st, ex) >= 0;
+                if (!forbid && hasMidloop) forbid = firstUnsatisfiedMidloopOnClose(P, st, ex) >= 0;
                 if (forbid) setEdge(ex, E_OFF);
               }
               break;
@@ -731,22 +795,24 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       for (let i = 0; i < N; i++) {
         if (cell[i] === UNKNOWN) setCell(i, OFF);
       }
-      if (hasSlither) {
+      if (hasSlither || hasMidloop) {
         for (let x = 0; x < P.numEdges; x++) {
           if (edgeA[x] >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
         }
       }
+      if (hasMidloop && !isMidloopSatisfied(P, e)) { ok = false; break; }
       st.cycle = true;
     } else {
       st.cycle = false;
     }
-    if (cHead === cTail && kHead === kTail && fHead === fTail) break;
+    if (cHead === cTail && kHead === kTail && fHead === fTail && mHead === mTail) break;
   }
 
   // O(touched) cleanup of queued flags on early contradiction exit
   while (cHead !== cTail) { inCellQ[qCell[cHead]] = 0; cHead = (cHead + 1) & qMask; }
   while (kHead !== kTail) { inClueQ[qClue[kHead]] = 0; kHead = (kHead + 1) & qMask; }
   while (fHead !== fTail) { inFaceQ[qFace[fHead]] = 0; fHead = (fHead + 1) & qMask; }
+  while (mHead !== mTail) { inMidQ[qMid[mHead]] = 0; mHead = (mHead + 1) & midMask; }
   lastPropChanges = changes;
   return ok;
 }
@@ -772,6 +838,7 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
     let bi = -1, bestKey = -1;
     const ties = rng ? [] : null;
     const hasSl = P.hasSlither, sn = P.slitherNum, ef = P.edgeFaces;
+    const hasMid = P.hasMidloop, midAtCell = P.midloopAtCell;
     for (let i = 0; i < N; i++) {
       if (cell[i] !== LOOP) continue;
       const i4 = i * 4;
@@ -782,7 +849,7 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
       if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x2 * 2] >= 0 && sn[ef[x2 * 2]] > 0) || (ef[x2 * 2 + 1] >= 0 && sn[ef[x2 * 2 + 1]] > 0))) touchSl = 1; } }
       if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x3 * 2] >= 0 && sn[ef[x3 * 2]] > 0) || (ef[x3 * 2 + 1] >= 0 && sn[ef[x3 * 2 + 1]] > 0))) touchSl = 1; } }
       if (unk === 0) continue;
-      const isClue = (clue[i] !== NONE || touchSl) ? 1 : 0;
+      const isClue = (clue[i] !== NONE || touchSl || (hasMid && midAtCell[i] >= 0)) ? 1 : 0;
       const key = on * 100 + isClue * 10 + (4 - unk);
       if (ties) {
         if (key > bestKey) { bestKey = key; ties.length = 0; }
@@ -822,9 +889,9 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
       return;
     }
 
-    // If a cycle is already closed covering all LOOP cells, verify active constraints (e.g. Slitherlink) and record.
+    // If a cycle is already closed covering all LOOP cells, verify active constraints (Slitherlink, Mid-loop) and record.
     if (st.cycle) {
-      if (!P.hasSlither || isSlitherSatisfied(P, e)) solutions.push(st);
+      if ((!P.hasSlither || isSlitherSatisfied(P, e)) && (!P.hasMidloop || isMidloopSatisfied(P, e))) solutions.push(st);
       return;
     }
 
@@ -1051,6 +1118,7 @@ export function isSolved(P, edges) {
   }
 
   if (!isSlitherSatisfied(P, edges)) return false;
+  if (!isMidloopSatisfied(P, edges)) return false;
 
   return true;
 }
@@ -1064,20 +1132,21 @@ export function cluesToString(clues) {
   return (clues || []).map((c) => `${c.r}:${c.c}:${c.t}`).join(';');
 }
 
-/** Serialize fullBoard flag, voids, circle clues, Slitherlink face numbers, and given edges/walls into the CSV clues field. */
+/** Serialize fullBoard flag, voids, circle clues, Slitherlink numbers, Mid-loop dots, and given edges/walls into the CSV clues field. */
 export function puzzleCluesToString(p) {
   const parts = [];
   if (p.fullBoard) parts.push('full');
   for (const v of p.voids || []) parts.push(`${v.r}:${v.c}:X`);
   for (const c of p.clues || []) parts.push(`${c.r}:${c.c}:${c.t}`);
   serializeSlither(p, parts);
+  serializeMidloop(p, parts);
   for (const gv of p.givens || []) parts.push(`${gv.r}:${gv.c}:${gv.dir}${gv.v}`);
   return parts.join(';');
 }
 
-/** Parse the CSV clues field into `{ clues, slither, fullBoard, givens, voids }`. */
+/** Parse the CSV clues field into `{ clues, slither, midloop, fullBoard, givens, voids }`. */
 export function parseCluesField(s) {
-  const acc = { clues: [], slither: [], givens: [], voids: [], fullBoard: false };
+  const acc = { clues: [], slither: [], midloop: [], givens: [], voids: [], fullBoard: false };
   if (!s) return acc;
   for (const tok of s.split(';')) {
     if (!tok) continue;
@@ -1095,6 +1164,8 @@ export function parseCluesField(s) {
       acc.givens.push({ r, c, dir: tag[0], v: tag[1] === '1' ? 1 : 0 });
     } else if (parseSlitherToken(r, c, tag, acc)) {
       // handled by Slitherlink variant
+    } else if (parseMidloopToken(r, c, tag, acc)) {
+      // handled by Mid-loop variant
     } else {
       throw new Error(`bad clue "${tok}"`);
     }
@@ -1125,7 +1196,7 @@ export function parseCsv(text) {
     const parts = t.split(',');
     if (parts.length < 4) throw new Error(`malformed CSV row: "${t.slice(0, 60)}"`);
     const [name, rows, cols, cluesStr, solution, rules, tier, score] = parts;
-    const { clues, slither, fullBoard, givens, voids } = parseCluesField(cluesStr);
+    const { clues, slither, midloop, fullBoard, givens, voids } = parseCluesField(cluesStr);
     const rec = {
       name,
       rows: +rows,
@@ -1137,6 +1208,7 @@ export function parseCsv(text) {
       score: score === undefined || score === '' ? null : +score,
     };
     if (slither.length) rec.slither = slither;
+    if (midloop.length) rec.midloop = midloop;
     if (fullBoard) rec.fullBoard = true;
     if (givens.length) rec.givens = givens;
     if (voids.length) rec.voids = voids;
@@ -1186,18 +1258,23 @@ export function symmetryKey(p) {
       }).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(';');
     }
     const sPart = symmetrySlither(p, swap, flipR, flipC);
-    const key = `${prefix}${R}x${C}|${items}${sPart}${vPart}${gPart}`;
+    const mPart = symmetryMidloop(p, swap, flipR, flipC);
+    const key = `${prefix}${R}x${C}|${items}${sPart}${mPart}${vPart}${gPart}`;
     if (best === null || key < best) best = key;
   }
   return best;
 }
 
-/** Orientation-specific short stable hash of size + clues (+ slither / fullBoard / voids / givens), for localStorage save keys. */
+/** Orientation-specific short stable hash of size + clues (+ slither / midloop / fullBoard / voids / givens), for localStorage save keys. */
 export function puzzleHash(p) {
   if (p.hashKey) return p.hashKey;
   const sorted = [...p.clues].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c));
   const sortedS = p.slither && p.slither.length
     ? [...p.slither].sort((a, b) => (a.r * (p.cols - 1) + a.c) - (b.r * (p.cols - 1) + b.c))
+    : null;
+  const dirOrd = (d) => (d === 'C' ? 0 : d === 'H' ? 1 : 2);
+  const sortedM = p.midloop && p.midloop.length
+    ? [...p.midloop].sort((a, b) => ((a.r * p.cols + a.c) * 3 + dirOrd(a.dir)) - ((b.r * p.cols + b.c) * 3 + dirOrd(b.dir)))
     : null;
   const sortedV = p.voids && p.voids.length
     ? [...p.voids].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
@@ -1205,8 +1282,8 @@ export function puzzleHash(p) {
   const sortedG = p.givens && p.givens.length
     ? [...p.givens].sort((a, b) => ((a.r * p.cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * p.cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)))
     : null;
-  const body = (p.fullBoard || sortedS || sortedV || sortedG)
-    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], givens: sortedG || [] })
+  const body = (p.fullBoard || sortedS || sortedM || sortedV || sortedG)
+    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], midloop: sortedM || [], givens: sortedG || [] })
     : cluesToString(sorted);
   const s = `${p.rows}x${p.cols}|${body}`;
   let h = 5381;

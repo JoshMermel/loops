@@ -32,6 +32,7 @@ const VALID_STYLES = new Set([
   'balanced', 'white', 'black', 'sparse', 'gray-mixed', 'gray-all',
   'full-masyu', 'full-lines', 'full-walls', 'full-mixed', 'full-swiss',
   'shaped', 'swiss-cheese', 'slither', 'slither-swiss', 'slither-all3', 'slither-all2-full', 'slither-masyu', 'slither-full',
+  'midloop', 'midloop-masyu', 'midloop-slither', 'midloop-full',
 ]);
 const style = arg('style', 'balanced');
 if (!VALID_STYLES.has(style)) {

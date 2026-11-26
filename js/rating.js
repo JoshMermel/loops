@@ -11,6 +11,7 @@ import {
 import { bestImagine, setFullContradiction, easyContradiction, MEDIUM_MAX, HARD_MAX } from './imagine.js';
 import { findFaceShade, findFaceCircle, findFaceSlither } from './faceparity.js';
 import { SLITHER_RULES, isSlitherEdge, firstUnsatisfiedSlitherOnClose } from './variants/slitherlink.js';
+import { MIDLOOP_RULES, firstUnsatisfiedMidloopOnClose } from './variants/midloop.js';
 
 export const TIERS = ['Beginner', 'Medium', 'Hard', 'Expert'];
 
@@ -766,8 +767,12 @@ function findNoEarlyClose(P, st, opts) {
     if (ra !== find(b)) continue;
     const missesLoop = size[ra] < loopCount;
     const slFace = missesLoop ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
-    if (missesLoop || slFace >= 0) {
-      out.push({ sets: [['e', x, E_OFF]], info: slFace >= 0 ? { edge: x, a, b, slitherFace: slFace } : { edge: x, a, b } });
+    const midIdx = (missesLoop || slFace >= 0) ? -1 : firstUnsatisfiedMidloopOnClose(P, st, x);
+    if (missesLoop || slFace >= 0 || midIdx >= 0) {
+      const info = slFace >= 0 ? { edge: x, a, b, slitherFace: slFace }
+        : midIdx >= 0 ? { edge: x, a, b, midIdx }
+        : { edge: x, a, b };
+      out.push({ sets: [['e', x, E_OFF]], info });
     }
   }
   return out;
@@ -1680,6 +1685,15 @@ export function detectSymmetries(P) {
         }
       }
     }
+    if (ok && P.hasMidloop) {
+      for (let i = 0; i < N && ok; i++) {
+        if ((P.midloopAtCell[i] >= 0) !== (P.midloopAtCell[cellMap[i]] >= 0)) ok = false;
+      }
+      for (let x = 0; x < numEdges && ok; x++) {
+        if (edgeA[x] < 0) continue;
+        if ((P.midloopAtEdge[x] >= 0) !== (P.midloopAtEdge[edgeMap[x]] >= 0)) ok = false;
+      }
+    }
     if (!ok) continue;
     out.push({ id: def.id, refl: def.refl, cellMap, edgeMap });
   }
@@ -2162,8 +2176,9 @@ export const RULES = [
   defRule({ id: 'closedLoopRestOff', tier: 'Beginner', weight: 1, free: true, find: findClosedLoopRestOff, label: 'once the single loop is closed, all remaining cells are off the loop' }),
   defRule({ id: 'grayFromShape', tier: 'Beginner', weight: 1, free: true, find: findGrayFromShape, label: 'a gray circle with two drawn segments resolves to white (straight) or black (turn)' }),
 
-  // Beginner (single-segment / direct rule violations + iconic three-whites + Slitherlink basics)
+  // Beginner (single-segment / direct rule violations + iconic three-whites + Slitherlink & Mid-loop basics)
   ...SLITHER_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, slitherOnly: true })),
+  ...MIDLOOP_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, midloopOnly: true })),
   defRule({ id: 'grayMustBeBlack', tier: 'Beginner', weight: 2, grayOnly: true, find: findGrayMustBeBlack, label: 'a gray circle that cannot go straight along either axis must be black' }),
   defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, circleOnly: true, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
   defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, circleOnly: true, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
@@ -2179,6 +2194,7 @@ export const RULES = [
 
   // Medium (local multi-segment inferences, Auto-Shade border parity, and 1-step local lookahead)
   ...SLITHER_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, slitherOnly: true })),
+  ...MIDLOOP_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, midloopOnly: true })),
   defRule({ id: 'whiteBothStraight', tier: 'Medium', weight: 10, circleOnly: true, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
   defRule({ id: 'closingCell', tier: 'Medium', weight: 11, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
   defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
@@ -2234,6 +2250,7 @@ const IMAGINE_AFTER = 20; // Beginner + local Medium + faceShade + boxStrand (<=
 
 const ruleApplies = (rule, P, st) => (
   (!rule.slitherOnly || P.hasSlither)
+  && (!rule.midloopOnly || P.hasMidloop)
   && (!rule.circleOnly || P.clueCells.length > 0)
   && (!rule.grayOnly || st.hasGray)
   && (!rule.fullBoardOnly || P.fullBoard)

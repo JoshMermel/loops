@@ -17,7 +17,7 @@ function isTurn(a, b, c, cols) {
  * Enumerates every undirected simple cycle on the grid and checks Masyu rules directly on the cycle's vertices.
  */
 export function referenceCount(p) {
-  const { rows, cols, clues = [], slither = [], fullBoard = false, givens = [], voids = [] } = p;
+  const { rows, cols, clues = [], slither = [], midloop = [], fullBoard = false, givens = [], voids = [] } = p;
   const N = rows * cols;
   const voidSet = new Set(voids.map((v) => v.r * cols + v.c));
   const activeCount = N - voidSet.size;
@@ -31,6 +31,17 @@ export function referenceCount(p) {
     const b = gv.dir === 'H' ? a + 1 : a + cols;
     if (gv.v === 1) reqEdges.add(edgeKey(a, b));
     else banEdges.add(edgeKey(a, b));
+  }
+  const midVerts = new Set();
+  const midEdges = new Set();
+  for (const md of midloop) {
+    if (md.dir === 'C') midVerts.add(md.r * cols + md.c);
+    else {
+      const a = md.r * cols + md.c;
+      const b = md.dir === 'H' ? a + 1 : a + cols;
+      midEdges.add(edgeKey(a, b));
+      reqEdges.add(edgeKey(a, b));
+    }
   }
 
   // Build plain adjacency list per vertex (skipping voids and banned given walls)
@@ -63,9 +74,10 @@ export function referenceCount(p) {
     const L = path.length;
     if (L < 4) return false;
     if (fullBoard && L !== activeCount) return false;
-    // Must visit every clue cell
+    // Must visit every clue cell and Mid-loop vertex dot
     for (const ci of clueType.keys()) if (!visited[ci]) return false;
-    // Must include every required given edge
+    for (const mi of midVerts) if (!visited[mi]) return false;
+    // Must include every required given edge (and Mid-loop edge dot)
     let cycEdges = null;
     if (reqEdges.size > 0 || slither.length > 0) {
       cycEdges = new Set();
@@ -73,6 +85,28 @@ export function referenceCount(p) {
       if (reqEdges.size > 0) {
         for (const rk of reqEdges) if (!cycEdges.has(rk)) return false;
       }
+    }
+    // Check Mid-loop dots independently by measuring straight runs along the cycle vertex list
+    if (midloop.length > 0) {
+      const turnIdx = [];
+      for (let k = 0; k < L; k++) {
+        if (isTurn(path[(k - 1 + L) % L], path[k], path[(k + 1) % L], cols)) turnIdx.push(k);
+      }
+      const exactVertMids = new Set();
+      const exactEdgeMids = new Set();
+      for (let ti = 0; ti < turnIdx.length; ti++) {
+        const s = turnIdx[ti];
+        const eIdx = turnIdx[(ti + 1) % turnIdx.length];
+        const runLen = (eIdx - s + L) % L;
+        if ((runLen & 1) === 0) {
+          exactVertMids.add(path[(s + (runLen >> 1)) % L]);
+        } else {
+          const half = runLen >> 1;
+          exactEdgeMids.add(edgeKey(path[(s + half) % L], path[(s + half + 1) % L]));
+        }
+      }
+      for (const mv of midVerts) if (!exactVertMids.has(mv)) return false;
+      for (const me of midEdges) if (!exactEdgeMids.has(me)) return false;
     }
     // Check Slitherlink face numbers independently
     for (const sc of slither) {

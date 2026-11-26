@@ -7,6 +7,7 @@
 // Gray labels:  m.grays[k] = 0 unlabeled, 1 White, 2 Black (indexed by P.grays[k]); m.autoG[k] = 1 if auto-labeled.
 import { NONE, WHITE, BLACK } from './logic.js';
 import { autoXSlither } from './variants/slitherlink.js';
+import { autoXMidloop, isMidloopSatisfied } from './variants/midloop.js';
 
 export const FACE_BLANK = 0, FACE_IN = 1, FACE_OUT = 2;
 
@@ -182,9 +183,27 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     return out;
   };
 
-  // Slitherlink bookkeeping: a 0 face or any face with `n` drawn segments auto-X's its remaining open sides
-  // (only needs one pass since `add` never turns an edge ON)
+  // Slitherlink & Mid-loop bookkeeping (only needs one pass since `add` never turns an edge ON)
   if (P.hasSlither) autoXSlither(P, w, add);
+  if (P.hasMidloop) autoXMidloop(P, w, add);
+
+  const isRequiredCell = (i) => {
+    if (clue[i] !== NONE) return true;
+    if (!P.hasMidloop) return false;
+    if (P.midloopAtCell[i] >= 0) return true;
+    const i4 = i * 4;
+    for (let d = 0; d < 4; d++) {
+      const x = ed[i4 + d];
+      if (x >= 0 && P.midloopAtEdge[x] >= 0) return true;
+    }
+    return false;
+  };
+  const cycleViolatesMidloop = (cycleEdges) => {
+    if (!P.hasMidloop) return false;
+    const cyc = new Uint8Array(numEdges);
+    for (let k = 0; k < cycleEdges.length; k++) cyc[cycleEdges[k]] = 1;
+    return !isMidloopSatisfied(P, cyc);
+  };
 
   let changed = true;
   while (changed) {
@@ -192,7 +211,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     // Rule 4: dead-end intersections & pockets (disabled on fullBoard since every intersection must be visited)
     if (!P.fullBoard) {
       for (let i = 0; i < N; i++) {
-        if (clue[i] !== NONE || deg[i] !== 0) continue;
+        if (isRequiredCell(i) || deg[i] !== 0) continue;
         let avail = 0, lastX = -1;
         for (let d = 0; d < 4; d++) {
           const x = ed[i * 4 + d];
@@ -209,7 +228,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
       const isCorridorNode = new Uint8Array(N);
       const nodeExits = new Array(N);
       for (let i = 0; i < N; i++) {
-        if (clue[i] !== NONE || deg[i] !== 0) continue;
+        if (isRequiredCell(i) || deg[i] !== 0) continue;
         const ex = availEdges(i);
         if (ex.length === 2) { isCorridorNode[i] = 1; nodeExits[i] = ex; }
       }
@@ -236,7 +255,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
 
         const w1 = walk(eA);
         if (w1.closed) {
-          const impossible = P.clueCells.length > 0 || anyDegGt0 || cycleViolatesSlither(w1.edges);
+          const impossible = P.clueCells.length > 0 || anyDegGt0 || cycleViolatesSlither(w1.edges) || cycleViolatesMidloop(w1.edges);
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
           }
@@ -249,6 +268,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
           if (!impossible && anyDegGt0) impossible = true;
           if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
+          if (!impossible && P.hasMidloop) impossible = cycleViolatesMidloop(w1.edges.concat(w2.edges));
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
             for (const x of w2.edges) if (add(x)) changed = true;

@@ -2,6 +2,8 @@
 // Returns an array of 'bad' | '' per clue (only broken clues are marked; completion is left to the player).
 import { NONE, WHITE, BLACK, GRAY } from './logic.js';
 export { slitherStates } from './variants/slitherlink.js';
+import { midloopStates, isMidloopSatisfied } from './variants/midloop.js';
+export { midloopStates };
 
 export function clueStates(P, marks) {
   const { ed, ed2, nb } = P;
@@ -123,7 +125,11 @@ export function earlyLoopEdges(P, marks) {
         if (on !== sc.n) { missesSlither = true; break; }
       }
     }
-    if (missesClue || missesFull || missesSlither || hasOtherSegments) {
+    let missesMidloop = false;
+    if (P.hasMidloop && !hasOtherSegments) {
+      missesMidloop = !isMidloopSatisfied(P, e);
+    }
+    if (missesClue || missesFull || missesSlither || missesMidloop || hasOtherSegments) {
       for (const x of edges) bad.add(x);
     }
   }

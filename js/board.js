@@ -622,6 +622,7 @@ export class Board {
     const wanted = new Set();
     (info.clueState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`c${k}`); });
     (info.slitherState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`s${k}`); });
+    (info.midloopState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`m${k}`); });
     if (info.badFaces) for (const f of info.badFaces) wanted.add(`f${f}`);
     if (info.earlyLoops) for (const x of info.earlyLoops) wanted.add(`l${x}`);
     if (info.trappedCells) for (const i of info.trappedCells) wanted.add(`t${i}`);
@@ -827,6 +828,19 @@ export class Board {
         }
       } else {
         g += `<circle class="pearl-black ${st}" cx="${cx}" cy="${cy}" r="${rBlack}"/>`;
+      }
+    }
+
+    // Mid-loop midpoint dots (distinct teal accent so they coexist cleanly with Masyu pearls)
+    if (P.hasMidloop) {
+      const mStates = info.midloopState || [];
+      const rMid = S * 0.165;
+      for (let k = 0; k < P.midloop.length; k++) {
+        const md = P.midloop[k];
+        const mx = md.dir === 'H' ? vx(md.c) + S / 2 : vx(md.c);
+        const my = md.dir === 'V' ? vy(md.r) + S / 2 : vy(md.r);
+        const st = mStates[k] === 'bad' && show.has(`m${k}`) ? ' bad' : '';
+        g += `<circle class="midloop-dot${st}" cx="${mx}" cy="${my}" r="${rMid}"/>`;
       }
     }
 

@@ -79,6 +79,23 @@ if (process.argv.includes('--worker')) {
         return fail('slither clue touches a void cell');
       }
     }
+    const seenM = new Set();
+    for (const md of raw.midloop || []) {
+      if (md.dir !== 'C' && md.dir !== 'H' && md.dir !== 'V') return fail(`bad midloop dir "${md.dir}"`);
+      if (md.r < 0 || md.c < 0 || (md.dir === 'C' ? (md.r >= raw.rows || md.c >= raw.cols)
+        : md.dir === 'H' ? (md.r >= raw.rows || md.c >= raw.cols - 1)
+        : (md.r >= raw.rows - 1 || md.c >= raw.cols))) {
+        return fail('midloop dot outside the board');
+      }
+      const mk = `${md.r}:${md.c}:${md.dir}`;
+      if (seenM.has(mk)) return fail('duplicate midloop dot');
+      seenM.add(mk);
+      if (md.dir === 'C') {
+        const idx = md.r * raw.cols + md.c;
+        if (seenV.has(idx)) return fail('midloop dot on void cell');
+        if (seen.has(idx)) return fail('midloop dot collides with circle clue');
+      }
+    }
 
     let P;
     try { P = compile(raw); } catch (e) { return fail(`does not compile: ${e.message}`); }
@@ -122,6 +139,7 @@ if (process.argv.includes('--worker')) {
         cols: raw.cols,
         clues: raw.clues,
         ...(raw.slither && raw.slither.length ? { slither: raw.slither } : {}),
+        ...(raw.midloop && raw.midloop.length ? { midloop: raw.midloop } : {}),
         ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
         fullBoard: false,
@@ -151,6 +169,38 @@ if (process.argv.includes('--worker')) {
       const altM = proveNonUnique(onlyMasyu, 34567 + from + k);
       if (altM.exceeded && altM.count < 2) return fail('hybrid Slitherlink necessity not proved: hit node cap');
       if (altM.count < 2) return fail('Slitherlink numbers are redundant on hybrid (uniquely solvable from Masyu alone)');
+    }
+
+    // Verify mutual necessity on Mid-loop + Masyu and Mid-loop + Slitherlink hybrids
+    if (P.hasMidloop && P.clueCells.length > 0 && !entry.hidden) {
+      const baseOpts = {
+        name: raw.name, rows: raw.rows, cols: raw.cols,
+        ...(P.fullBoard ? { fullBoard: true } : {}),
+        ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
+        ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
+      };
+      const altML = proveNonUnique(compile({ ...baseOpts, clues: [], midloop: raw.midloop }), 45678 + from + k);
+      if (altML.exceeded && altML.count < 2) return fail('hybrid circle necessity not proved: hit node cap');
+      if (altML.count < 2) return fail('Masyu circles are redundant on Mid-loop hybrid');
+
+      const altMS = proveNonUnique(compile({ ...baseOpts, clues: raw.clues }), 56789 + from + k);
+      if (altMS.exceeded && altMS.count < 2) return fail('hybrid Mid-loop necessity not proved: hit node cap');
+      if (altMS.count < 2) return fail('Mid-loop dots are redundant on Masyu hybrid');
+    }
+    if (P.hasMidloop && P.hasSlither && !entry.hidden) {
+      const baseOpts = {
+        name: raw.name, rows: raw.rows, cols: raw.cols,
+        ...(P.fullBoard ? { fullBoard: true } : {}),
+        ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
+        ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
+      };
+      const altML = proveNonUnique(compile({ ...baseOpts, clues: [], midloop: raw.midloop }), 67890 + from + k);
+      if (altML.exceeded && altML.count < 2) return fail('hybrid Slitherlink necessity not proved: hit node cap');
+      if (altML.count < 2) return fail('Slitherlink numbers are redundant on Mid-loop hybrid');
+
+      const altSL = proveNonUnique(compile({ ...baseOpts, clues: [], slither: raw.slither }), 78901 + from + k);
+      if (altSL.exceeded && altSL.count < 2) return fail('hybrid Mid-loop necessity not proved: hit node cap');
+      if (altSL.count < 2) return fail('Mid-loop dots are redundant on Slitherlink hybrid');
     }
   });
 

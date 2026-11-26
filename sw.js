@@ -31,6 +31,7 @@ const APP_SHELL = [
   'js/print.js',
   'js/rating.js',
   'js/rotate.js',
+  'js/variants/midloop.js',
   'js/variants/slitherlink.js',
 ];
 

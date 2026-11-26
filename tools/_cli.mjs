@@ -38,6 +38,7 @@ export function verifyPuzzle(p, { maxNodes = 500000 } = {}) {
     ...(p.voids && p.voids.length ? { voids: p.voids } : {}),
     ...(p.givens && p.givens.length ? { givens: p.givens } : {}),
     ...(p.slither && p.slither.length ? { slither: p.slither } : {}),
+    ...(p.midloop && p.midloop.length ? { midloop: p.midloop } : {}),
   });
   const dec = decodeSolution(fresh, p.solution);
   if (!isSolved(fresh, dec.e)) return null;

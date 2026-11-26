@@ -252,6 +252,48 @@ export function allowedSlither(rows, cols, edges, grid = null) {
   return out;
 }
 
+/** Find every exact geometric Mid-loop dot (vertex 'C' or edge 'H'/'V') on `edges`. */
+export function allowedMidloop(rows, cols, edges, grid = null) {
+  const empty = grid || compile({ name: 'tmp', rows, cols, clues: [] });
+  const { ed } = empty;
+  const out = [];
+  for (let r = 0; r < rows; r++) {
+    let c = 0;
+    while (c < cols - 1) {
+      const x = ed[(r * cols + c) * 4 + 1];
+      if (x < 0 || edges[x] !== E_ON) { c++; continue; }
+      const start = c;
+      while (c < cols - 1) {
+        const y = ed[(r * cols + c) * 4 + 1];
+        if (y < 0 || edges[y] !== E_ON) break;
+        c++;
+      }
+      const len = c - start;
+      if ((len & 1) === 0) out.push({ r, c: start + (len >> 1), dir: 'C' });
+      else out.push({ r, c: start + (len >> 1), dir: 'H' });
+    }
+  }
+  for (let c = 0; c < cols; c++) {
+    let r = 0;
+    while (r < rows - 1) {
+      const x = ed[(r * cols + c) * 4 + 2];
+      if (x < 0 || edges[x] !== E_ON) { r++; continue; }
+      const start = r;
+      while (r < rows - 1) {
+        const y = ed[(r * cols + c) * 4 + 2];
+        if (y < 0 || edges[y] !== E_ON) break;
+        r++;
+      }
+      const len = r - start;
+      if ((len & 1) === 0) out.push({ r: start + (len >> 1), c, dir: 'C' });
+      else out.push({ r: start + (len >> 1), c, dir: 'V' });
+    }
+  }
+  const dirOrd = (d) => (d === 'C' ? 0 : d === 'H' ? 1 : 2);
+  out.sort((a, b) => ((a.r * cols + a.c) * 3 + dirOrd(a.dir)) - ((b.r * cols + b.c) * 3 + dirOrd(b.dir)));
+  return out;
+}
+
 /**
  * Symmetry/layout helpers for themed bonus corpuses.
  * Supported `layout` values for clueFilterFor:
@@ -1962,6 +2004,271 @@ function generateSlitherPuzzle({
 }
 
 /**
+ * Generate one verified, rated Mid-loop or Mid-loop hybrid puzzle:
+ *   - 'midloop'         pure Mid-loop (teal midpoint dots only)
+ *   - 'midloop-masyu'   Mid-loop + Masyu hybrid (verified mutual necessity)
+ *   - 'midloop-slither' Mid-loop + Slitherlink hybrid (verified mutual necessity)
+ *   - 'midloop-full'    Mid-loop + Hamilton cycle hybrid (verified full-board necessity)
+ */
+function generateMidloopPuzzle({
+  rows, cols, style, layout = 'none', voids = null, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier,
+  wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
+}) {
+  const isFull = style === 'midloop-full';
+  const isMasyu = style === 'midloop-masyu';
+  const isSlither = style === 'midloop-slither';
+  const isSwiss = Boolean(voids && voids.length > 0);
+  if (isFull && ((rows * cols) & 1)) return null;
+  const N = rows * cols;
+  const fr = rows - 1, fc = cols - 1;
+  const pruneNodeCap = N >= 200 ? 10000 : N <= 64 ? 15000 : 25000;
+  const useVoids = isSwiss ? voids : [];
+  const empty = compile({
+    name: 'eml', rows, cols, clues: [],
+    ...(useVoids.length ? { voids: useVoids } : {}),
+    ...(isFull ? { fullBoard: true } : {}),
+  });
+  const compileM = (clues, slither, midloop, extra = {}) => compile({
+    name, rows, cols, clues,
+    ...(slither.length ? { slither } : {}),
+    ...(midloop.length ? { midloop } : {}),
+    ...(useVoids.length ? { voids: useVoids } : {}),
+    ...(isFull ? { fullBoard: true } : {}),
+    ...extra,
+  });
+
+  const solvedByPropagate = (P) => {
+    const st = initialState(P);
+    if (!propagate(P, st)) return false;
+    for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
+    return isSolved(P, st.e);
+  };
+  const isWithin = (r) => (allowUnsolved && !r.solved) || (r.solved && TIERS.indexOf(r.tier) <= effectiveMaxTier);
+  const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
+  const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
+  const reqQuadFill = (!isSwiss && rows >= 10 && cols >= 10) ? 0.35 : (!isSwiss && rows >= 8 && cols >= 8) ? 0.28 : 0;
+  const minClues = isMasyu ? (N >= 100 ? 5 : N >= 64 ? 4 : 3) : 0;
+  const minSlither = isSlither ? (N >= 100 ? 7 : N >= 64 ? 5 : 4) : 0;
+  const minMid = (isMasyu || isSlither) ? (N >= 100 ? 6 : N >= 64 ? 5 : 4) : Math.max(4, Math.floor(N * 0.10));
+
+  while (Date.now() < deadline) {
+    let edges;
+    if (isFull) {
+      const sample = solve(empty, { limit: 1, maxNodes: 4000, rng: rand });
+      if (sample.count === 0) continue;
+      edges = sample.solutions[0].e;
+    } else if (isSwiss) {
+      const res = randomShapedLoop(empty, rand, { targetFill: 0.45 + 0.16 * rand(), steps: Math.max(160, fr * fc * 24) });
+      if (!res.valid || res.loopCells < Math.max(10, Math.floor(empty.activeCount * 0.48))) continue;
+      edges = res.edges;
+    } else {
+      const res = randomLoop(rows, cols, rand, {
+        targetFill: 0.44 + 0.16 * rand(),
+        steps: Math.max(160, fr * fc * 24),
+      });
+      if (res.loopCells < minLoopCells || res.emptyBorders > 0) continue;
+      if (reqQuadFill > 0 && res.minQuadFill < reqQuadFill) continue;
+      edges = res.edges;
+    }
+
+    let midInit = allowedMidloop(rows, cols, edges, empty);
+    let cluesInit = [];
+    let slitherInit = [];
+    if (isMasyu) {
+      const { whites, blacks } = allowedClues(rows, cols, edges, empty);
+      const allC = whites.concat(blacks);
+      const midCSet = new Set(midInit.filter((m) => m.dir === 'C').map((m) => m.r * cols + m.c));
+      const dropMidC = new Set();
+      for (const cl of allC) {
+        const ci = cl.r * cols + cl.c;
+        if (midCSet.has(ci)) {
+          if (rand() < 0.5) { dropMidC.add(ci); cluesInit.push(cl); }
+        } else {
+          cluesInit.push(cl);
+        }
+      }
+      if (dropMidC.size) midInit = midInit.filter((m) => m.dir !== 'C' || !dropMidC.has(m.r * cols + m.c));
+      if (cluesInit.length < Math.max(4, minClues)) continue;
+      cluesInit.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+    } else if (isSlither) {
+      slitherInit = allowedSlither(rows, cols, edges, empty);
+      if (slitherInit.length < Math.max(4, minSlither)) continue;
+      slitherInit.sort((a, b) => (a.r * fc + a.c) - (b.r * fc + b.c));
+    }
+    if (midInit.length < Math.max(4, minMid)) continue;
+
+    // Verify full pool is uniquely solvable (with early tier reject on Beginner/Medium)
+    const P0 = compileM(cluesInit, slitherInit, midInit);
+    let baseTight = solvedByPropagate(P0);
+    if (!baseTight) {
+      if (beginnerOnly && !solvedByRules(P0, BEGINNER_UPTO).solved) continue;
+      const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
+      if (ex.exceeded || ex.count !== 1) continue;
+      if (mediumOnly && !solvedByRules(P0, MEDIUM_UPTO).solved) {
+        const r0 = rate(P0);
+        if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+      }
+    }
+
+    // Track active items across clues, slither, and midloop via O(1) Uint8Array mask
+    const cLen = cluesInit.length, sLen = slitherInit.length, mLen = midInit.length;
+    const totalItems = cLen + sLen + mLen;
+    const active = new Uint8Array(totalItems).fill(1);
+    let nC = cLen, nS = sLen, nM = mLen;
+
+    const kindOf = (idx) => (idx < cLen ? 0 : idx < cLen + sLen ? 1 : 2);
+    const canDrop = (idx) => {
+      const k = kindOf(idx);
+      return k === 0 ? nC > minClues : k === 1 ? nS > minSlither : nM > minMid;
+    };
+    const dropIdx = (idx) => {
+      active[idx] = 0;
+      const k = kindOf(idx);
+      if (k === 0) nC--; else if (k === 1) nS--; else nM--;
+    };
+    const extractActive = (skipIdx = -1) => {
+      const cs = [], ss = [], ms = [];
+      for (let i = 0; i < cLen; i++) if (active[i] && i !== skipIdx) cs.push(cluesInit[i]);
+      for (let i = 0; i < sLen; i++) if (active[cLen + i] && cLen + i !== skipIdx) ss.push(slitherInit[i]);
+      for (let i = 0; i < mLen; i++) if (active[cLen + sLen + i] && cLen + sLen + i !== skipIdx) ms.push(midInit[i]);
+      return { clues: cs, slither: ss, midloop: ms };
+    };
+    const buildOrder = () => {
+      const idxs = [];
+      for (let i = 0; i < totalItems; i++) if (active[i]) idxs.push(i);
+      if (isMasyu || isSlither) {
+        const keyed = idxs.map((i) => ({ i, k: (kindOf(i) === 2 ? 0.15 : 0) + rand() }));
+        keyed.sort((a, b) => a.k - b.k);
+        return keyed.map((x) => x.i);
+      }
+      return shuffle(idxs, rand);
+    };
+
+    // Pass 0: ultra-fast propagation-only pruning
+    if (baseTight) {
+      for (const idx of buildOrder()) {
+        if (Date.now() >= deadline) break;
+        if (!canDrop(idx)) continue;
+        const t = extractActive(idx);
+        if (solvedByPropagate(compileM(t.clues, t.slither, t.midloop))) dropIdx(idx);
+      }
+    }
+
+    // Pass 1: sound human-rule pruning
+    for (const idx of buildOrder()) {
+      if (Date.now() >= deadline) break;
+      if (!canDrop(idx)) continue;
+      const t = extractActive(idx);
+      if (solvedByRules(compileM(t.clues, t.slither, t.midloop), fastUpto).solved) dropIdx(idx);
+    }
+
+    // Pass 2: exact uniqueness pruning + binary-search rollback to effectiveMaxTier
+    let cachedRated = null;
+    let skipPass2 = beginnerOnly;
+    let r1Pre = null;
+    if (!skipPass2 && mediumOnly && Date.now() < deadline) {
+      const t = extractActive();
+      r1Pre = rate(compileM(t.clues, t.slither, t.midloop));
+      if (r1Pre.solved && r1Pre.tier === 'Medium') { cachedRated = r1Pre; skipPass2 = true; }
+    }
+    if (!skipPass2 && Date.now() < deadline) {
+      const rem = buildOrder();
+      const maxStrips = deepStrip ? rem.length
+        : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(2, Math.min(8, Math.ceil(rem.length * 0.30)))
+        : Math.max(3, Math.min(12, Math.ceil(rem.length * 0.50)));
+      let stripped = 0;
+      const removed = [];
+      for (const idx of rem) {
+        if (Date.now() >= deadline || stripped >= maxStrips) break;
+        if (!canDrop(idx)) continue;
+        const t = extractActive(idx);
+        const exact = solve(compileM(t.clues, t.slither, t.midloop), { limit: 2, maxNodes: pruneNodeCap });
+        if (exact.exceeded || exact.count !== 1) continue;
+        dropIdx(idx);
+        removed.push(idx);
+        stripped++;
+      }
+
+      const cur = extractActive();
+      const rated = (removed.length === 0 && r1Pre) ? r1Pre : rate(compileM(cur.clues, cur.slither, cur.midloop));
+      if (wantUnsolved || isWithin(rated)) {
+        cachedRated = rated;
+      } else if (removed.length > 0 && Date.now() < deadline) {
+        let lo = 0, hi = removed.length, bestMid = 0;
+        let bestRated = (r1Pre && isWithin(r1Pre)) ? r1Pre : null;
+        while (lo + 1 < hi && Date.now() < deadline) {
+          const mid = (lo + hi) >> 1;
+          for (let j = mid; j < removed.length; j++) active[removed[j]] = 1;
+          const cc = extractActive();
+          for (let j = mid; j < removed.length; j++) active[removed[j]] = 0;
+          const r = rate(compileM(cc.clues, cc.slither, cc.midloop));
+          if (isWithin(r)) { lo = mid; bestMid = mid; bestRated = r; }
+          else hi = mid;
+        }
+        for (let j = bestMid; j < removed.length; j++) active[removed[j]] = 1;
+        cachedRated = bestRated;
+      }
+    }
+
+    if (Date.now() >= deadline) break;
+    const fin = extractActive();
+    if (fin.midloop.length < minMid) continue;
+    // Require a mix of vertex dots and edge dots on pure Mid-loop boards >= 6x6
+    if (style === 'midloop' && rows >= 6 && cols >= 6) {
+      const hasC = fin.midloop.some((m) => m.dir === 'C');
+      const hasE = fin.midloop.some((m) => m.dir !== 'C');
+      if (!hasC || !hasE) continue;
+    }
+    if (isMasyu) {
+      const nW = fin.clues.filter((c) => c.t === 'W').length;
+      const nB = fin.clues.filter((c) => c.t === 'B').length;
+      if (fin.clues.length < minClues || (rows >= 5 && cols >= 5 && (nW < 1 || nB < 1))) continue;
+    }
+    if (isSlither) {
+      if (fin.slither.length < minSlither || new Set(fin.slither.map((s) => s.n)).size < 2) continue;
+    }
+
+    const P = compileM(fin.clues, fin.slither, fin.midloop);
+    const rated = cachedRated || rate(P);
+    if (wantUnsolved) {
+      if (rated.solved) continue;
+    } else if (!rated.solved) {
+      if (!allowUnsolved) continue;
+    } else {
+      if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+      if (targetTier && rated.tier !== targetTier) continue;
+    }
+
+    const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+    if (verify.exceeded || verify.count !== 1) continue;
+    const sol = verify.solutions[0];
+    if (!isSolved(P, sol.e)) continue;
+
+    // Hybrid necessity checks
+    const hasSecondSol = (altP) => {
+      if (solvedByPropagate(altP)) return false;
+      return solve(altP, { limit: 2, maxNodes: 30000, rng: rand }).count >= 2;
+    };
+    if (isMasyu) {
+      if (!hasSecondSol(compileM([], [], fin.midloop, { name: `${name}_ml` }))) continue;
+      if (!hasSecondSol(compileM(fin.clues, [], [], { name: `${name}_ms` }))) continue;
+    } else if (isSlither) {
+      if (!hasSecondSol(compileM([], [], fin.midloop, { name: `${name}_ml` }))) continue;
+      if (!hasSecondSol(compileM([], fin.slither, [], { name: `${name}_sl` }))) continue;
+    } else if (isFull) {
+      if (!hasSecondSol(compileM([], [], fin.midloop, { name: `${name}_nf`, fullBoard: false }))) continue;
+    }
+
+    P.solution = encodeSolution(P, sol);
+    P.rules = rated.rules;
+    P.tier = rated.tier;
+    P.score = rated.score;
+    return P;
+  }
+  return null;
+}
+
+/**
  * Generate one verified, rated Masyu puzzle.
  * Options:
  *   rows, cols           board dimensions (each >= 4)
@@ -2024,6 +2331,12 @@ export function generatePuzzle({
   }
   if (style === 'slither' || style === 'slither-swiss' || style === 'slither-all3' || style === 'slither-all2-full' || style === 'slither-masyu' || style === 'slither-full') {
     return generateSlitherPuzzle({
+      rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
+      wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
+    });
+  }
+  if (style === 'midloop' || style === 'midloop-masyu' || style === 'midloop-slither' || style === 'midloop-full') {
+    return generateMidloopPuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
     });

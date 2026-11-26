@@ -11,7 +11,7 @@ import {
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
 } from './marks.js';
-import { clueStates, slitherStates, earlyLoopEdges, trappedFullCells } from './clues.js';
+import { clueStates, slitherStates, midloopStates, earlyLoopEdges, trappedFullCells } from './clues.js';
 import { makeAutoGrace } from './grace.js';
 import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
@@ -381,6 +381,7 @@ function analyse() {
   return {
     clueState: state.solved ? state.P.clues.map(() => '') : clueStates(state.P, state.marks),
     slitherState: state.solved || !state.P.hasSlither ? [] : slitherStates(state.P, state.marks),
+    midloopState: state.solved || !state.P.hasMidloop ? [] : midloopStates(state.P, state.marks),
     badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
     trappedCells: state.solved ? new Set() : trappedFullCells(state.P, state.marks),
@@ -1155,6 +1156,7 @@ function renderHelpModal() {
   const P = state.P;
   const hasClues = !P || (P.clues && P.clues.length > 0);
   const hasSlither = Boolean(P && P.hasSlither);
+  const hasMidloop = Boolean(P && P.hasMidloop);
   const hasGray = Boolean(P && P.grays && P.grays.length > 0);
   const isFull = Boolean(P && P.fullBoard);
   const hasGivens = Boolean(P && P.hasGivens);
@@ -1162,7 +1164,15 @@ function renderHelpModal() {
 
   const intro = $('help-intro');
   if (intro) {
-    if (hasSlither && hasClues) {
+    if (hasMidloop && hasClues) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle and centered on every teal Mid-loop dot, with no crossings or branches.';
+    } else if (hasMidloop && hasSlither) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines matching every numbered square and centered on every teal Mid-loop dot, with no crossings or branches.';
+    } else if (hasMidloop && isFull) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and centered on every teal Mid-loop dot, with no crossings or branches.';
+    } else if (hasMidloop) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines passing straight through the exact midpoint of every teal Mid-loop dot, with no crossings or branches.';
+    } else if (hasSlither && hasClues) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle and matching every numbered square, with no crossings or branches.';
     } else if (hasSlither && isFull) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and matching every numbered square, with no crossings or branches.';
@@ -1191,6 +1201,7 @@ function renderHelpModal() {
   $('help-card-white').hidden = !hasClues;
   $('help-card-black').hidden = !hasClues;
   $('help-card-slither').hidden = !hasSlither;
+  $('help-card-midloop').hidden = !hasMidloop;
   $('help-card-gray').hidden = !hasGray;
   $('help-card-full').hidden = !isFull;
   $('help-card-voids').hidden = !hasVoids;

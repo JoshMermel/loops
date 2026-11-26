@@ -8,6 +8,7 @@ import { ruleLabel, oddOpenEnds, checkerImbalance, chokepointCheck } from './rat
 import { replayImagine } from './imagine.js';
 import { faceCoords } from './faceparity.js';
 import { describeSlitherChainStep, explainSlitherStep } from './variants/slitherlink.js';
+import { describeMidloopChainStep, explainMidloopStep } from './variants/midloop.js';
 
 export const cellName = (P, i) => `${colName(i % P.cols)}${((i / P.cols) | 0) + 1}`;
 export const edgeName = (P, x) => {
@@ -79,6 +80,8 @@ export function describeMarks(P, targets) {
 function describeChainStep(P, s) {
   const slText = describeSlitherChainStep(P, s, { faceName });
   if (slText) return slText;
+  const mlText = describeMidloopChainStep(P, s, { cellName, edgeName });
+  if (mlText) return mlText;
   const { rule, info, sets } = s;
   const c = info && info.cell !== undefined ? cellName(P, info.cell) : '';
   switch (rule) {
@@ -180,6 +183,16 @@ function describeContradiction(P, broke, finalState) {
         area: [],
         face: broke.face,
       };
+    case 'midloop': {
+      const m = P.midloop && P.midloop[broke.midIdx];
+      const loc = m ? (m.dir === 'C' ? cellName(P, m.cell) : edgeName(P, m.edge)) : cellName(P, broke.cell);
+      const cells = m ? (m.dir === 'C' ? [m.cell] : [m.a, m.b]) : [broke.cell];
+      return {
+        text: `the Mid-loop dot at ${loc} has no valid symmetric straight segment`,
+        cells,
+        area: [],
+      };
+    }
     case 'earlyClose':
       return broke.face !== undefined
         ? { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [], face: broke.face }
@@ -781,6 +794,16 @@ export function explainStep(P, step, st = null) {
         for (const x of [...targets.segOn, ...targets.segOff]) {
           const [a, b] = edgeCells(P, x);
           if (!nudgeRoles.focus.length && !slFaces.focus.length) nudgeRoles.focus.push(a, b);
+        }
+        break;
+      }
+      const mlExp = explainMidloopStep(P, { rule, info, targets }, { cellName, edgeName, describeMarks, roles, nudgeRoles });
+      if (mlExp) {
+        nudge = mlExp.nudge;
+        text = mlExp.text;
+        for (const x of [...targets.segOn, ...targets.segOff]) {
+          const [a, b] = edgeCells(P, x);
+          if (!nudgeRoles.focus.length && !nudgeRoles.clue.length) nudgeRoles.focus.push(a, b);
         }
         break;
       }

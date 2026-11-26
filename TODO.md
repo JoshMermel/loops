@@ -4,7 +4,18 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 ## Variants & future twists
 
-- [ ] **Grow Slitherlink & Hybrids:** expand the prototype Slitherlink / Hybrid books to full-size books (and more sizes / hybrids like Slitherlink + Swiss cheese, Slitherlink + Gray circles, or Slitherlink + Symmetry), add Slitherlink armory illustrations to `docs/how_to_solve.html`, and consider additional modular single-loop plugins in `js/variants/` (e.g., **Yajilin**, **Balance Loop**, **Castle Wall**, **Simple Loop**).
+- [ ] **New single-loop families in `js/variants/`:**
+  - **Mid-loop follow-ups:** grow prototype Mid-loop & Mid-loop Hybrid books to 500 once playtested, add Mid-loop variants (Swiss cheese, Symmetry, Skyscraper), and add Mid-loop armory illustrations to `docs/how_to_solve.html`.
+  - **Corral / Bag:** dual-square sightline numbers (strictly Inside the loop), standalone + hybrids with Masyu, Hamilton cycle (and visually distinct badges if paired with Slitherlink).
+  - **Castle Wall:** blocked void-cell arrow clues (Inside / Outside / Unknown) counting parallel loop segments along the row/column, standalone + hybrids.
+  - **Balance Loop / Yajilin / Simple Loop** (lower priority).
+- [ ] **More Hybrid gimmicks** (inside our `Hybrids` subcategories):
+  - *Masyu + Hamilton cycle:* All white, All black, Gray dots, Swiss cheese, Symmetry.
+  - *Slitherlink + Masyu:* All 2s + Masyu, All 3s + Masyu, Gray dots + Slitherlink, Swiss cheese, Symmetry.
+  - *Slitherlink + Hamilton cycle:* Swiss cheese, Symmetry, All 3s + Hamilton cycle (test uniqueness feasibility).
+- [ ] **More pure Slitherlink gimmicks:**
+  - Digit-restricted boards: No 3s (`0/1/2`), Even only (`0/2`), Odd only (`1/3`).
+  - Geometric clue masks (Slitherlink `Patterns`), plus larger sizes (`13×13`, `15×15`).
 - [ ] **New circle types:**
   - **Strict / double-turn whites & numbered blacks:** e.g. marked white circles that must turn on *both* sides, and/or numbered black circles whose straight legs have a required length.
   - **Anti-Masyu (inverted pearls):** inverted rules (white turns and immediately turns on ≥1 side; black goes straight and stays straight on both sides), standalone or mixed with standard circles.

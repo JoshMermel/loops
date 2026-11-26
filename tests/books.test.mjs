@@ -45,7 +45,7 @@ test('manifest.json matches every shipped CSV file, count, and section hierarchy
 
 test('following hints from an empty board solves shipped Beginner and Medium puzzles across sizes and variants', () => {
   const bookIds = [
-    'intro', 'intro-slither', 'intro-hamilton',
+    'intro', 'intro-slither', 'intro-midloop', 'intro-hamilton',
     '8x8-beginner', '8x8-medium', '12x12-beginner', '12x12-medium',
     '16x16-beginner', '16x16-medium', '12x20-beginner', '12x20-medium',
     '16x24-beginner', '16x24-medium',
@@ -53,6 +53,8 @@ test('following hints from an empty board solves shipped Beginner and Medium puz
     'full-swiss-10x10', 'full-sym-8x8',
     'slither-swiss-10x10', 'slither-sky-6x18', 'slither-sym-9x9', 'slither-all3-8x8',
     'hybrid-slither2-full',
+    'midloop-small', 'midloop-classic',
+    'hybrid-midloop-masyu', 'hybrid-midloop-slither', 'hybrid-midloop-full',
     'bonus-gray', 'swiss-10x10',
   ];
   for (const id of bookIds) {

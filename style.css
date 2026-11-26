@@ -30,6 +30,8 @@
   --pearl-gray-quad-w: #aeb5be;
   --pearl-gray-quad-b: #969ea8;
   --pearl-bad: #c62828;
+  --midloop-fill: #0d9488;
+  --midloop-stroke: #fff;
   --loop: #1976d2;
   --edge-x: #757575;
   --axis: #888;
@@ -81,6 +83,8 @@
   --pearl-gray-quad-w: #8a929c;
   --pearl-gray-quad-b: #7c8590;
   --pearl-bad: #ef5350;
+  --midloop-fill: #2dd4bf;
+  --midloop-stroke: #1b2226;
   --loop: #64b5f6;
   --edge-x: #aaa;
   --axis: #999;
@@ -187,6 +191,8 @@ svg [hidden] { display: none; }
 .pearl-white-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }
 .pearl-black { fill: var(--pearl-ink); stroke: var(--pearl-ink); stroke-width: 1; pointer-events: none; }
 .pearl-black.bad { fill: var(--pearl-bad); stroke: var(--pearl-bad); }
+.midloop-dot { fill: var(--midloop-fill); stroke: var(--midloop-stroke); stroke-width: 2; pointer-events: none; }
+.midloop-dot.bad { fill: var(--pearl-bad); stroke: var(--midloop-stroke); }
 .pearl-gray-fill { fill: var(--pearl-gray-fill); pointer-events: none; }
 .pearl-gray-ring { fill: none; stroke: var(--pearl-gray-ring); stroke-width: 2.4; pointer-events: none; }
 .pearl-gray-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }
