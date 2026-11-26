@@ -69,6 +69,7 @@ for (const p of candidates) {
 const variantCount = (p) => (
   (p.slither && p.slither.length ? 1 : 0)
   + (p.midloop && p.midloop.length ? 1 : 0)
+  + (p.castle && p.castle.length ? 1 : 0)
   + (p.fullBoard ? 1 : 0)
   + (p.voids && p.voids.length ? 1 : 0)
   + (p.clues.some((c) => c.t === 'G') ? 1 : 0)
@@ -77,15 +78,18 @@ const variantCount = (p) => (
 const isHybridCand = (p) => (
   (p.slither && p.slither.length ? 1 : 0)
   + (p.midloop && p.midloop.length ? 1 : 0)
+  + (p.castle && p.castle.length ? 1 : 0)
   + (p.clues && p.clues.length ? 1 : 0)
   + (p.fullBoard ? 1 : 0)
 ) >= 2;
-const familyQuota = { slither: 200, midloop: 150, full: 120, voids: 80, gray: 120, hybridSlitherMasyu: 60, hybridSlitherFull: 60, hybridFullMasyu: 60, hybridMidloop: 60 };
+const familyQuota = { slither: 200, midloop: 150, castle: 180, full: 120, voids: 80, gray: 120, hybridSlitherMasyu: 60, hybridSlitherFull: 60, hybridFullMasyu: 60, hybridMidloop: 60, hybridCastle: 60 };
 for (const p of candidates) {
   if (isHybridCand(p)) {
     const hasS = p.slither && p.slither.length > 0;
     const hasM = p.midloop && p.midloop.length > 0;
+    const hasCW = p.castle && p.castle.length > 0;
     const hasC = p.clues && p.clues.length > 0;
+    if (hasCW && familyQuota.hybridCastle > 0 && addCand(p)) { familyQuota.hybridCastle--; continue; }
     if (hasM && familyQuota.hybridMidloop > 0 && addCand(p)) { familyQuota.hybridMidloop--; continue; }
     if (hasS && hasC && familyQuota.hybridSlitherMasyu > 0 && addCand(p)) { familyQuota.hybridSlitherMasyu--; continue; }
     if (hasS && p.fullBoard && familyQuota.hybridSlitherFull > 0 && addCand(p)) { familyQuota.hybridSlitherFull--; continue; }
@@ -93,12 +97,13 @@ for (const p of candidates) {
   }
   if (p.slither && p.slither.length && familyQuota.slither > 0 && addCand(p)) familyQuota.slither--;
   else if (p.midloop && p.midloop.length && familyQuota.midloop > 0 && addCand(p)) familyQuota.midloop--;
+  else if (p.castle && p.castle.length && familyQuota.castle > 0 && addCand(p)) familyQuota.castle--;
   else if (p.fullBoard && familyQuota.full > 0 && addCand(p)) familyQuota.full--;
   else if (p.voids && p.voids.length && familyQuota.voids > 0 && addCand(p)) familyQuota.voids--;
   else if (p.clues.some((c) => c.t === 'G') && familyQuota.gray > 0 && addCand(p)) familyQuota.gray--;
 }
 for (const p of candidates) {
-  if (prioritized.length >= 1400) break;
+  if (prioritized.length >= 1600) break;
   addCand(p);
 }
 

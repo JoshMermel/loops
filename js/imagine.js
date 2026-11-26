@@ -16,9 +16,15 @@ import {
   firstUnsatisfiedMidloop, isMidloopEdge, firstUnsatisfiedMidloopOnClose,
   findEasyMidloopStep, findMediumMidloopStep, midloopContradiction,
 } from './variants/midloop.js';
+import {
+  isCastleSatisfied, firstUnsatisfiedCastleOnClose,
+  findEasyCastleStep, findMediumCastleStep, castleContradiction,
+} from './variants/castlewall.js';
 
-const isFrontierEdge = (P, st, x) => (
-  st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP || isSlitherEdge(P, x) || isMidloopEdge(P, x)
+export const isFrontierEdge = (P, st, x) => (
+  st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP
+  || isSlitherEdge(P, x) || isMidloopEdge(P, x)
+  || (P.hasCastle && P._ecwOff[x] < P._ecwOff[x + 1])
 );
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
@@ -350,6 +356,12 @@ export function easyContradiction(P, st, scope = null) {
     if (mc) return mc;
   }
 
+  // 3e. Castle Wall ray/parity contradiction
+  if (P.hasCastle) {
+    const cc = castleContradiction(P, st);
+    if (cc) return cc;
+  }
+
   // 4. Early closed loop (or 2 cycles) — skip when no E_ON edge was added in the hypothesis
   if (scope) {
     if (!scope.checkCycle) return null;
@@ -420,6 +432,10 @@ export function easyContradiction(P, st, scope = null) {
         const mc = midloopContradiction(P, st, null);
         return mc || { kind: 'earlyClose', midIdx: badMid };
       }
+    }
+    if (P.hasCastle && !isCastleSatisfied(P, e)) {
+      const cc = castleContradiction(P, st);
+      return cc || { kind: 'earlyClose', castleIdx: 0 };
     }
   }
   return null;
@@ -531,6 +547,12 @@ function findEasyStep(P, st, forbid, scope = null) {
   // 0a. Mid-loop easy rules (passes tryEmit so forbid ablation never skips later hits/rules)
   if (P.hasMidloop) {
     const emitted = findEasyMidloopStep(P, st, tryEmit, scope ? scope.mids : null);
+    if (emitted) return emitted;
+  }
+
+  // 0a2. Castle Wall easy rules
+  if (P.hasCastle) {
+    const emitted = findEasyCastleStep(P, st, tryEmit);
     if (emitted) return emitted;
   }
 
@@ -812,9 +834,13 @@ function findEasyStep(P, st, forbid, scope = null) {
     }
   }
 
-  // 7b. Mid-loop medium rules (keeps runHypothesis in sync with propagateMidloopDot, paralleling whiteBothStraight)
+  // 7b. Mid-loop & Castle Wall medium rules
   if (P.hasMidloop) {
     const emitted = findMediumMidloopStep(P, st, tryEmit, scope ? scope.mids : null);
+    if (emitted) return emitted;
+  }
+  if (P.hasCastle) {
+    const emitted = findMediumCastleStep(P, st, tryEmit);
     if (emitted) return emitted;
   }
 
@@ -861,9 +887,11 @@ function findEasyStep(P, st, forbid, scope = null) {
     }
     const slFace = pathVerts < loopCount ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
     const midIdx = (pathVerts < loopCount || slFace >= 0) ? -1 : firstUnsatisfiedMidloopOnClose(P, st, x);
-    if (pathVerts < loopCount || slFace >= 0 || midIdx >= 0) {
+    const castleIdx = (pathVerts < loopCount || slFace >= 0 || midIdx >= 0) ? -1 : firstUnsatisfiedCastleOnClose(P, st, x);
+    if (pathVerts < loopCount || slFace >= 0 || midIdx >= 0 || castleIdx >= 0) {
       const info = slFace >= 0 ? { edge: x, a, b, slitherFace: slFace }
         : midIdx >= 0 ? { edge: x, a, b, midIdx }
+        : castleIdx >= 0 ? { edge: x, a, b, castleIdx }
         : { edge: x, a, b };
       const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], info);
       if (step) return step;
@@ -1147,6 +1175,27 @@ function candidateEdges(P, st, frontierOnly = false) {
         if (n1 >= 0) { near[n1] = 1; const n2 = nb[n1 * 4 + dNeg]; if (n2 >= 0) near[n2] = 1; }
         n1 = nb[m.b * 4 + dPos];
         if (n1 >= 0) { near[n1] = 1; const n2 = nb[n1 * 4 + dPos]; if (n2 >= 0) near[n2] = 1; }
+      }
+    }
+  }
+  if (P.hasCastle) {
+    // Include ray edges of numbered Castle Wall clues and edges adjacent to W/B walls
+    for (let k = 0; k < P.castle.length; k++) {
+      const cw = P.castle[k];
+      for (let j = 0; j < cw.edges.length; j++) {
+        const x = cw.edges[j];
+        near[edgeA[x]] = 1; near[edgeB[x]] = 1;
+      }
+      if (cw.wall !== 'G') {
+        const r = cw.r, c = cw.c;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const rr = r + dr, cc = c + dc;
+            if (rr >= 0 && rr < P.rows && cc >= 0 && cc < P.cols && !P.isVoid[rr * P.cols + cc]) {
+              near[rr * P.cols + cc] = 1;
+            }
+          }
+        }
       }
     }
   }

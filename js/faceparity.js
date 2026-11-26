@@ -156,6 +156,15 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
     return canonFace(r < fr && c < fc ? r * fc + c : EXT);
   };
 
+  // 0. Castle Wall blocks: White ('W') is strictly Inside (1), Black ('B') is strictly Outside (0)
+  if (P.hasCastleWalls) {
+    for (let k = 0; k < P.castle.length; k++) {
+      const cw = P.castle[k];
+      if (cw.wall === 'G' || cw.isExterior || cw.face < 0) continue;
+      link(EXT, canonFace(cw.face), cw.wall === 'W' ? 1 : 0, buildGraph ? { kind: 'castleWall', cell: cw.cell, wall: cw.wall } : null);
+    }
+  }
+
   // 1. Known loop segments (E_ON -> opposite) and crosses (E_OFF -> same)
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;

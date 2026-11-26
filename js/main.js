@@ -11,7 +11,7 @@ import {
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
 } from './marks.js';
-import { clueStates, slitherStates, midloopStates, earlyLoopEdges, trappedFullCells } from './clues.js';
+import { clueStates, slitherStates, midloopStates, castleStates, earlyLoopEdges, trappedFullCells } from './clues.js';
 import { makeAutoGrace } from './grace.js';
 import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
@@ -382,6 +382,7 @@ function analyse() {
     clueState: state.solved ? state.P.clues.map(() => '') : clueStates(state.P, state.marks),
     slitherState: state.solved || !state.P.hasSlither ? [] : slitherStates(state.P, state.marks),
     midloopState: state.solved || !state.P.hasMidloop ? [] : midloopStates(state.P, state.marks),
+    castleState: state.solved || !state.P.hasCastle ? [] : castleStates(state.P, state.marks),
     badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
     trappedCells: state.solved ? new Set() : trappedFullCells(state.P, state.marks),
@@ -723,12 +724,18 @@ function renderCurrentHint() {
     state.P && state.P.hasMidloop
     && (h.rule.startsWith('mid') || (roles.clue && roles.clue.some((i) => state.P.midloopAtCell[i] >= 0)))
   );
+  const hasCastleClue = Boolean(
+    state.P && state.P.hasCastle
+    && (h.rule.startsWith('castle') || (roles.clue && roles.clue.some((i) => state.P.castleAtCell[i] >= 0)))
+  );
   const hasCircleClue = Boolean(roles.clue && state.P && roles.clue.some((i) => state.P.clue[i] !== 0));
   const clueLabel = hasClueFaces
     ? (roles.clue && roles.clue.length ? 'the clues' : 'the clue')
-    : hasMidClue
-      ? (hasCircleClue ? 'the clues' : 'the Mid-loop dot')
-      : null;
+    : hasCastleClue
+      ? (hasCircleClue || hasMidClue ? 'the clues' : 'the Castle Wall clue')
+      : hasMidClue
+        ? (hasCircleClue ? 'the clues' : 'the Mid-loop dot')
+        : null;
   const faceLabels = full && item.faces && (item.faces.in.length || item.faces.out.length)
     ? {
         hasIn: item.faces.in.length > 0,
@@ -1166,14 +1173,25 @@ function renderHelpModal() {
   const hasClues = !P || (P.clues && P.clues.length > 0);
   const hasSlither = Boolean(P && P.hasSlither);
   const hasMidloop = Boolean(P && P.hasMidloop);
+  const hasCastle = Boolean(P && P.hasCastle);
   const hasGray = Boolean(P && P.grays && P.grays.length > 0);
   const isFull = Boolean(P && P.fullBoard);
   const hasGivens = Boolean(P && P.hasGivens);
-  const hasVoids = Boolean(P && P.hasVoids);
+  const hasPlainVoids = Boolean(P && P.voids && P.voids.length > 0);
 
   const intro = $('help-intro');
   if (intro) {
-    if (hasMidloop && hasClues) {
+    if (hasCastle && hasClues) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines around the Castle Wall tiles, matching every arrow count, inside/outside wall color, and Masyu circle, with no crossings or branches.';
+    } else if (hasCastle && hasSlither) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines around the Castle Wall tiles, matching every arrow count, inside/outside wall color, and numbered square, with no crossings or branches.';
+    } else if (hasCastle && hasMidloop) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines around the Castle Wall tiles, matching every arrow count, wall color, and teal Mid-loop dot, with no crossings or branches.';
+    } else if (hasCastle && isFull) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every open intersection</b> around the Castle Wall tiles while matching every arrow count and wall color.';
+    } else if (hasCastle) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines around the blocked Castle Wall tiles — keeping white tiles <b>inside</b>, black tiles <b>outside</b>, and matching every numbered arrow count.';
+    } else if (hasMidloop && hasClues) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle and centered on every teal Mid-loop dot, with no crossings or branches.';
     } else if (hasMidloop && hasSlither) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines matching every numbered square and centered on every teal Mid-loop dot, with no crossings or branches.';
@@ -1200,7 +1218,7 @@ function renderHelpModal() {
       intro.innerHTML = `Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b>${givenPart}, with no crossings or branches.`;
     } else if (isFull) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> and every circle, with no crossings or branches.';
-    } else if (hasVoids) {
+    } else if (hasPlainVoids) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle while avoiding the cutout holes, with no crossings or branches. Empty intersections are optional.';
     } else {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every circle, with no crossings or branches. Empty intersections are optional.';
@@ -1211,9 +1229,10 @@ function renderHelpModal() {
   $('help-card-black').hidden = !hasClues;
   $('help-card-slither').hidden = !hasSlither;
   $('help-card-midloop').hidden = !hasMidloop;
+  $('help-card-castle').hidden = !hasCastle;
   $('help-card-gray').hidden = !hasGray;
   $('help-card-full').hidden = !isFull;
-  $('help-card-voids').hidden = !hasVoids;
+  $('help-card-voids').hidden = !hasPlainVoids;
 
   if (isFull) {
     const hasGivenLines = Boolean(hasGivens && P.givens.some((g) => g.v === 1));
@@ -1236,11 +1255,11 @@ function renderHelpModal() {
   }
 
   $('help-ctrl-gray').hidden = !hasGray;
-  $('help-ctrl-voids').hidden = !hasVoids;
+  $('help-ctrl-voids').hidden = !hasPlainVoids;
 
   const link = $('help-guide-link');
   if (link) {
-    const hash = hasMidloop ? '#variant-midloop' : hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
+    const hash = hasCastle ? '#variant-castlewall' : hasMidloop ? '#variant-midloop' : hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasPlainVoids ? '#variant-swiss' : '';
     link.setAttribute('href', `docs/how_to_solve.html${hash}`);
   }
 }

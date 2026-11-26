@@ -8,7 +8,7 @@ import {
 } from '../js/logic.js';
 import { rate } from '../js/rating.js';
 import {
-  classifyImagine, minImagineCost, bestImagine, replayImagine,
+  classifyImagine, minImagineCost, bestImagine, replayImagine, isFrontierEdge,
 } from '../js/imagine.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -66,7 +66,7 @@ test('bestImagine and replayImagine produce sound deductions consistent with cos
   assert.ok(hit, 'bestImagine should find a contradiction even when UNKNOWN->LOOP bookkeeping was omitted');
   assert.equal(sol.e[hit.edge], hit.deduce, 'imagined deduction must match the unique solution');
 
-  const isFront = stUnprop.cell[P.edgeA[hit.edge]] === LOOP || stUnprop.cell[P.edgeB[hit.edge]] === LOOP;
+  const isFront = isFrontierEdge(P, stUnprop, hit.edge);
   assert.ok(
     minImagineCost(hit.steps.length, hit.area, isFront) <= hit.cost,
     `minImagineCost lower bound violated on ${raw.name}`,

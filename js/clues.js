@@ -4,6 +4,8 @@ import { NONE, WHITE, BLACK, GRAY } from './logic.js';
 export { slitherStates } from './variants/slitherlink.js';
 import { midloopStates, isMidloopSatisfied } from './variants/midloop.js';
 export { midloopStates };
+import { castleStates, isCastleSatisfied } from './variants/castlewall.js';
+export { castleStates };
 
 export function clueStates(P, marks) {
   const { ed, ed2, nb } = P;
@@ -129,7 +131,11 @@ export function earlyLoopEdges(P, marks) {
     if (P.hasMidloop && !hasOtherSegments) {
       missesMidloop = !isMidloopSatisfied(P, e);
     }
-    if (missesClue || missesFull || missesSlither || missesMidloop || hasOtherSegments) {
+    let missesCastle = false;
+    if (P.hasCastle && !hasOtherSegments) {
+      missesCastle = !isCastleSatisfied(P, e);
+    }
+    if (missesClue || missesFull || missesSlither || missesMidloop || missesCastle || hasOtherSegments) {
       for (const x of edges) bad.add(x);
     }
   }

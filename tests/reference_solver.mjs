@@ -17,9 +17,9 @@ function isTurn(a, b, c, cols) {
  * Enumerates every undirected simple cycle on the grid and checks Masyu rules directly on the cycle's vertices.
  */
 export function referenceCount(p) {
-  const { rows, cols, clues = [], slither = [], midloop = [], fullBoard = false, givens = [], voids = [] } = p;
+  const { rows, cols, clues = [], slither = [], midloop = [], castle = [], fullBoard = false, givens = [], voids = [] } = p;
   const N = rows * cols;
-  const voidSet = new Set(voids.map((v) => v.r * cols + v.c));
+  const voidSet = new Set([...voids.map((v) => v.r * cols + v.c), ...castle.map((cw) => cw.r * cols + cw.c)]);
   const activeCount = N - voidSet.size;
   const clueType = new Map();
   for (const cl of clues) clueType.set(cl.r * cols + cl.c, cl.t);
@@ -79,7 +79,7 @@ export function referenceCount(p) {
     for (const mi of midVerts) if (!visited[mi]) return false;
     // Must include every required given edge (and Mid-loop edge dot)
     let cycEdges = null;
-    if (reqEdges.size > 0 || slither.length > 0) {
+    if (reqEdges.size > 0 || slither.length > 0 || castle.length > 0) {
       cycEdges = new Set();
       for (let k = 0; k < L; k++) cycEdges.add(edgeKey(path[k], path[(k + 1) % L]));
       if (reqEdges.size > 0) {
@@ -108,6 +108,41 @@ export function referenceCount(p) {
       for (const mv of midVerts) if (!exactVertMids.has(mv)) return false;
       for (const me of midEdges) if (!exactEdgeMids.has(me)) return false;
     }
+    // Check Castle Wall arrow counts & point-in-polygon W/B parity completely independently (ray-casting!)
+    if (castle.length > 0) {
+      for (const cw of castle) {
+        if (cw.dir) {
+          const dr = cw.dir === 'U' ? -1 : cw.dir === 'D' ? 1 : 0;
+          const dc = cw.dir === 'R' ? 1 : cw.dir === 'L' ? -1 : 0;
+          let cnt = 0;
+          let rr = cw.r + dr, cc = cw.c + dc;
+          while (rr >= 0 && rr < rows && cc >= 0 && cc < cols) {
+            const nr = rr + dr, nc = cc + dc;
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) break;
+            if (cycEdges.has(edgeKey(rr * cols + cc, nr * cols + nc))) cnt++;
+            rr = nr; cc = nc;
+          }
+          if (cnt !== cw.n) return false;
+        }
+        if (cw.wall === 'W' || cw.wall === 'B') {
+          // Independent ray-casting point-in-polygon test: shoot a horizontal ray from (cw.r + 0.5, cw.c + 0.5)
+          // wait: (cw.r, cw.c) is strictly not on the polygon, so shoot a horizontal ray along y = cw.r + 0.25 to +inf
+          // Wait: any vertical polygon edge from (r0, c0) to (r0+1, c0) with c0 > cw.c crosses y = cw.r + 0.25 iff r0 === cw.r!
+          // Even simpler: standard Jordan-curve ray from (cw.r, cw.c) along y = cw.r + 0.25? Since (cw.r, cw.c) is an isolated
+          // grid vertex not on the cycle, the 4 half-grid shifts (±0.25, ±0.25) all lie in the same region!
+          // Specifically, for point (cw.r + 0.25, cw.c + 0.25): a vertical edge (rr, cc)-(rr+1, cc) crosses the +x ray iff rr === cw.r && cc > cw.c!
+          let crossings = 0;
+          if (cw.r < rows - 1) {
+            for (let cc = cw.c + 1; cc < cols; cc++) {
+              if (cycEdges.has(edgeKey(cw.r * cols + cc, (cw.r + 1) * cols + cc))) crossings++;
+            }
+          }
+          const inside = (crossings & 1) === 1;
+          if ((cw.wall === 'W') !== inside) return false;
+        }
+      }
+    }
+
     // Check Slitherlink face numbers independently
     for (const sc of slither) {
       const a = sc.r * cols + sc.c;

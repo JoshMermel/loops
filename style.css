@@ -193,6 +193,24 @@ svg [hidden] { display: none; }
 :is(#board, .help-fig) .pearl-black.bad { fill: var(--pearl-bad); stroke: var(--pearl-bad); }
 :is(#board, .help-fig) .midloop-dot { fill: var(--midloop-fill); stroke: var(--midloop-stroke); stroke-width: 2; pointer-events: none; }
 :is(#board, .help-fig) .midloop-dot.bad { fill: var(--pearl-bad); stroke: var(--midloop-stroke); }
+:is(#board, .help-fig) .castle-tile-W { fill: #ffffff; stroke: #222222; stroke-width: 2.2; pointer-events: none; }
+:is(#board, .help-fig) .castle-tile-B { fill: #1f2429; stroke: #1f2429; stroke-width: 2.2; pointer-events: none; }
+:is(#board, .help-fig) .castle-tile-G { fill: #9aa3ad; stroke: #4b5563; stroke-width: 2; pointer-events: none; }
+:is(#board, .help-fig) .castle-tile-W.bad,
+:is(#board, .help-fig) .castle-tile-B.bad,
+:is(#board, .help-fig) .castle-tile-G.bad { stroke: var(--pearl-bad); stroke-width: 3; }
+:is(#board, .help-fig) .castle-text-W { fill: #111111; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+:is(#board, .help-fig) .castle-text-B { fill: #ffffff; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+:is(#board, .help-fig) .castle-text-G { fill: #ffffff; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+:is(#board, .help-fig) .castle-text-W.bad,
+:is(#board, .help-fig) .castle-text-B.bad,
+:is(#board, .help-fig) .castle-text-G.bad { fill: var(--pearl-bad); }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-W { fill: #f0f3f7; stroke: #111111; }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-B { fill: #0d1117; stroke: #8d96a0; }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-G { fill: #555f6d; stroke: #9aa4b2; }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-W.bad,
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-B.bad,
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-G.bad { stroke: var(--pearl-bad); }
 #board .pearl-gray-fill { fill: var(--pearl-gray-fill); pointer-events: none; }
 #board .pearl-gray-ring { fill: none; stroke: var(--pearl-gray-ring); stroke-width: 2.4; pointer-events: none; }
 #board .pearl-gray-ring.bad { stroke: var(--pearl-bad); stroke-width: 3.1; }

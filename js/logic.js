@@ -18,6 +18,10 @@ import {
   compileMidloop, serializeMidloop, parseMidloopToken, symmetryMidloop,
   isMidloopSatisfied, propagateMidloopDot, firstUnsatisfiedMidloopOnClose,
 } from './variants/midloop.js';
+import {
+  compileCastle, serializeCastle, parseCastleToken, symmetryCastle,
+  isCastleSatisfied, propagateCastleClue, propagateCastleParity, firstUnsatisfiedCastleOnClose,
+} from './variants/castlewall.js';
 
 /** Column letters like a spreadsheet: 0 -> A, 25 -> Z, 26 -> AA. */
 export function colName(c) {
@@ -45,8 +49,9 @@ export function compile(p) {
   const N = rows * cols;
   const numEdges = 2 * N;
 
-  // Optional cutout voids (intersections removed from the board)
+  // Optional cutout voids (intersections removed from the board) + Castle Wall blocked tiles
   const rawVoids = Array.isArray(p.voids) ? p.voids : [];
+  const rawCastle = Array.isArray(p.castle) ? p.castle : [];
   const isVoid = new Uint8Array(N);
   const voids = [];
   for (const v of rawVoids) {
@@ -58,8 +63,18 @@ export function compile(p) {
     isVoid[i] = 1;
     voids.push({ r: v.r, c: v.c });
   }
-  const hasVoids = voids.length > 0;
-  const activeCount = N - voids.length;
+  let castleVoidCount = 0;
+  for (const cw of rawCastle) {
+    if (!Number.isInteger(cw.r) || !Number.isInteger(cw.c) || cw.r < 0 || cw.c < 0 || cw.r >= rows || cw.c >= cols) {
+      throw new Error(`Castle Wall tile out of bounds at ${cw.r},${cw.c}`);
+    }
+    const i = cw.r * cols + cw.c;
+    if (isVoid[i]) throw new Error(`Castle Wall tile overlaps void or duplicate tile at ${cw.r},${cw.c}`);
+    isVoid[i] = 1;
+    castleVoidCount++;
+  }
+  const hasVoids = voids.length > 0 || castleVoidCount > 0;
+  const activeCount = N - voids.length - castleVoidCount;
   let activeLight = 0, activeDark = 0;
   for (let i = 0; i < N; i++) {
     if (isVoid[i]) continue;
@@ -223,6 +238,7 @@ export function compile(p) {
   });
   compileSlither(compiled, p);
   compileMidloop(compiled, p);
+  compileCastle(compiled, p);
   return compiled;
 }
 
@@ -385,6 +401,21 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const midByRow = P.midloopByRow, midByCol = P.midloopByCol;
   let mHead = 0, mTail = 0;
 
+  const hasCastle = Boolean(P.hasCastle);
+  if (hasCastle && P.castleImpossible) return false;
+  const ecwOff = P._ecwOff, ecwData = P._ecwData;
+  const cwLen = hasCastle ? P.castle.length : 0;
+  const qCw = hasCastle ? new Int32Array(cwLen + 1) : null;
+  const inCwQ = hasCastle ? new Uint8Array(cwLen) : null;
+  let cwHead = 0, cwTail = 0;
+  const pushCw = (k) => {
+    if (!inCwQ[k]) {
+      inCwQ[k] = 1;
+      qCw[cwTail++] = k;
+      if (cwTail > cwLen) cwTail = 0;
+    }
+  };
+
   const pushCell = (i) => {
     if (!inCellQ[i]) {
       inCellQ[i] = 1;
@@ -448,6 +479,10 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       for (let k = efOff[x]; k < fEnd; k++) pushFace(efData[k]);
     }
     if (hasMidloop) pushEdgeMid(x, a);
+    if (hasCastle) {
+      const cEnd = ecwOff[x + 1];
+      for (let k = ecwOff[x]; k < cEnd; k++) pushCw(ecwData[k]);
+    }
   };
 
   const setCell = (i, v) => {
@@ -503,11 +538,12 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (grays) for (let gi = 0; gi < grays.length; gi++) pushClue(grays[gi]);
     if (hasSlither) for (let si = 0; si < P.slither.length; si++) pushFace(P.slither[si].f);
     if (hasMidloop) for (let mi = 0; mi < P.midloop.length; mi++) pushMid(mi);
+    if (hasCastle) for (let ci = 0; ci < cwLen; ci++) if (P.castle[ci].dir) pushCw(ci);
   }
 
   while (ok) {
-    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces/midloop dots whose neighborhood changed.
-    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail || mHead !== mTail)) {
+    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces/midloop/castle clues whose neighborhood changed.
+    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail || mHead !== mTail || cwHead !== cwTail)) {
       while (ok && cHead !== cTail) {
         const i = qCell[cHead];
         cHead = (cHead + 1) & qMask;
@@ -698,8 +734,21 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
         inMidQ[mi] = 0;
         if (!propagateMidloopDot(P, st, mi, setEdgeOk, setCellOk)) ok = false;
       }
+
+      while (ok && cwHead !== cwTail) {
+        const ci = qCw[cwHead++];
+        if (cwHead > cwLen) cwHead = 0;
+        inCwQ[ci] = 0;
+        if (!propagateCastleClue(P, st, ci, setEdgeOk)) ok = false;
+      }
     }
-    if (!ok || !needLoopCheck) break;
+    if (!ok) break;
+    if (hasCastle && P.hasCastleWalls) {
+      const before = changes;
+      if (!propagateCastleParity(P, st, setEdgeOk)) { ok = false; break; }
+      if (changes > before) continue;
+    }
+    if (!needLoopCheck) break;
     needLoopCheck = false;
 
     // 5. Single closed loop constraint via direct path/cycle tracing over LOOP cells (degOn <= 2 everywhere).
@@ -750,6 +799,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
                 let forbid = len < loopCount;
                 if (!forbid && hasSlither) forbid = firstUnsatisfiedSlitherOnClose(P, st, ex) >= 0;
                 if (!forbid && hasMidloop) forbid = firstUnsatisfiedMidloopOnClose(P, st, ex) >= 0;
+                if (!forbid && hasCastle) forbid = firstUnsatisfiedCastleOnClose(P, st, ex) >= 0;
                 if (forbid) setEdge(ex, E_OFF);
               }
               break;
@@ -793,17 +843,18 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       for (let i = 0; i < N; i++) {
         if (cell[i] === UNKNOWN) setCell(i, OFF);
       }
-      if (hasSlither || hasMidloop) {
+      if (hasSlither || hasMidloop || hasCastle) {
         for (let x = 0; x < P.numEdges; x++) {
           if (edgeA[x] >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
         }
       }
       if (hasMidloop && !isMidloopSatisfied(P, e)) { ok = false; break; }
+      if (hasCastle && !isCastleSatisfied(P, e)) { ok = false; break; }
       st.cycle = true;
     } else {
       st.cycle = false;
     }
-    if (cHead === cTail && kHead === kTail && fHead === fTail && mHead === mTail) break;
+    if (cHead === cTail && kHead === kTail && fHead === fTail && mHead === mTail && cwHead === cwTail) break;
   }
 
   // O(touched) cleanup of queued flags on early contradiction exit
@@ -887,9 +938,11 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
       return;
     }
 
-    // If a cycle is already closed covering all LOOP cells, verify active constraints (Slitherlink, Mid-loop) and record.
+    // If a cycle is already closed covering all LOOP cells, verify active constraints (Slitherlink, Mid-loop, Castle Wall) and record.
     if (st.cycle) {
-      if ((!P.hasSlither || isSlitherSatisfied(P, e)) && (!P.hasMidloop || isMidloopSatisfied(P, e))) solutions.push(st);
+      if ((!P.hasSlither || isSlitherSatisfied(P, e))
+        && (!P.hasMidloop || isMidloopSatisfied(P, e))
+        && (!P.hasCastle || isCastleSatisfied(P, e))) solutions.push(st);
       return;
     }
 
@@ -922,6 +975,45 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
         } else if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
       }
       if (slTies && slTies.length) bestEdge = slTies[(rng() * slTies.length) | 0];
+      if (bestEdge >= 0) {
+        const onFirst = rng ? rng() < 0.5 : true;
+        const v0 = onFirst ? E_ON : E_OFF;
+        const v1 = onFirst ? E_OFF : E_ON;
+        const a = cloneState(st);
+        a.e[bestEdge] = v0;
+        dfs(a, bestEdge, -1);
+        if (solutions.length >= limit || exceeded) return;
+        st.e[bestEdge] = v1;
+        dfs(st, bestEdge, -1);
+        return;
+      }
+    }
+
+    // If there are no undecided LOOP vertices yet on a Castle Wall board, branch on an edge of the tightest unsatisfied ray.
+    if (P.hasCastle) {
+      let bestEdge = -1, bestPri = -1;
+      const cwTies = rng ? [] : null;
+      for (let ci = 0; ci < P.castle.length; ci++) {
+        const cw = P.castle[ci];
+        if (!cw.dir || cw.n === 0) continue;
+        let on = 0, unk = 0, firstUnk = -1;
+        const es = cw.edges;
+        for (let j = 0; j < es.length; j++) {
+          const y = es[j];
+          if (e[y] === E_ON) on++;
+          else if (e[y] === E_UNKNOWN) { unk++; if (firstUnk < 0) firstUnk = y; }
+        }
+        const need = cw.n - on;
+        if (unk === 0 || need <= 0) continue;
+        const pri = need * 20 - unk;
+        if (cwTies) {
+          if (pri > bestPri) { bestPri = pri; cwTies.length = 0; }
+          if (pri === bestPri) {
+            for (let j = 0; j < es.length; j++) if (e[es[j]] === E_UNKNOWN) cwTies.push(es[j]);
+          }
+        } else if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
+      }
+      if (cwTies && cwTies.length) bestEdge = cwTies[(rng() * cwTies.length) | 0];
       if (bestEdge >= 0) {
         const onFirst = rng ? rng() < 0.5 : true;
         const v0 = onFirst ? E_ON : E_OFF;
@@ -1117,6 +1209,7 @@ export function isSolved(P, edges) {
 
   if (!isSlitherSatisfied(P, edges)) return false;
   if (!isMidloopSatisfied(P, edges)) return false;
+  if (!isCastleSatisfied(P, edges)) return false;
 
   return true;
 }
@@ -1138,13 +1231,14 @@ export function puzzleCluesToString(p) {
   for (const c of p.clues || []) parts.push(`${c.r}:${c.c}:${c.t}`);
   serializeSlither(p, parts);
   serializeMidloop(p, parts);
+  serializeCastle(p, parts);
   for (const gv of p.givens || []) parts.push(`${gv.r}:${gv.c}:${gv.dir}${gv.v}`);
   return parts.join(';');
 }
 
-/** Parse the CSV clues field into `{ clues, slither, midloop, fullBoard, givens, voids }`. */
+/** Parse the CSV clues field into `{ clues, slither, midloop, castle, fullBoard, givens, voids }`. */
 export function parseCluesField(s) {
-  const acc = { clues: [], slither: [], midloop: [], givens: [], voids: [], fullBoard: false };
+  const acc = { clues: [], slither: [], midloop: [], castle: [], givens: [], voids: [], fullBoard: false };
   if (!s) return acc;
   for (const tok of s.split(';')) {
     if (!tok) continue;
@@ -1164,6 +1258,8 @@ export function parseCluesField(s) {
       // handled by Slitherlink variant
     } else if (parseMidloopToken(r, c, tag, acc)) {
       // handled by Mid-loop variant
+    } else if (parseCastleToken(r, c, tag, acc)) {
+      // handled by Castle Wall variant
     } else {
       throw new Error(`bad clue "${tok}"`);
     }
@@ -1194,7 +1290,7 @@ export function parseCsv(text) {
     const parts = t.split(',');
     if (parts.length < 4) throw new Error(`malformed CSV row: "${t.slice(0, 60)}"`);
     const [name, rows, cols, cluesStr, solution, rules, tier, score] = parts;
-    const { clues, slither, midloop, fullBoard, givens, voids } = parseCluesField(cluesStr);
+    const { clues, slither, midloop, castle, fullBoard, givens, voids } = parseCluesField(cluesStr);
     const rec = {
       name,
       rows: +rows,
@@ -1207,6 +1303,7 @@ export function parseCsv(text) {
     };
     if (slither.length) rec.slither = slither;
     if (midloop.length) rec.midloop = midloop;
+    if (castle.length) rec.castle = castle;
     if (fullBoard) rec.fullBoard = true;
     if (givens.length) rec.givens = givens;
     if (voids.length) rec.voids = voids;
@@ -1257,13 +1354,14 @@ export function symmetryKey(p) {
     }
     const sPart = symmetrySlither(p, swap, flipR, flipC);
     const mPart = symmetryMidloop(p, swap, flipR, flipC);
-    const key = `${prefix}${R}x${C}|${items}${sPart}${mPart}${vPart}${gPart}`;
+    const cPart = symmetryCastle(p, swap, flipR, flipC);
+    const key = `${prefix}${R}x${C}|${items}${sPart}${mPart}${cPart}${vPart}${gPart}`;
     if (best === null || key < best) best = key;
   }
   return best;
 }
 
-/** Orientation-specific short stable hash of size + clues (+ slither / midloop / fullBoard / voids / givens), for localStorage save keys. */
+/** Orientation-specific short stable hash of size + clues (+ slither / midloop / castle / fullBoard / voids / givens), for localStorage save keys. */
 export function puzzleHash(p) {
   if (p.hashKey) return p.hashKey;
   const sorted = [...p.clues].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c));
@@ -1274,14 +1372,17 @@ export function puzzleHash(p) {
   const sortedM = p.midloop && p.midloop.length
     ? [...p.midloop].sort((a, b) => ((a.r * p.cols + a.c) * 3 + dirOrd(a.dir)) - ((b.r * p.cols + b.c) * 3 + dirOrd(b.dir)))
     : null;
+  const sortedC = p.castle && p.castle.length
+    ? [...p.castle].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
+    : null;
   const sortedV = p.voids && p.voids.length
     ? [...p.voids].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
     : null;
   const sortedG = p.givens && p.givens.length
     ? [...p.givens].sort((a, b) => ((a.r * p.cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * p.cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)))
     : null;
-  const body = (p.fullBoard || sortedS || sortedM || sortedV || sortedG)
-    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], midloop: sortedM || [], givens: sortedG || [] })
+  const body = (p.fullBoard || sortedS || sortedM || sortedC || sortedV || sortedG)
+    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], midloop: sortedM || [], castle: sortedC || [], givens: sortedG || [] })
     : cluesToString(sorted);
   const s = `${p.rows}x${p.cols}|${body}`;
   let h = 5381;

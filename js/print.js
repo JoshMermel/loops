@@ -87,7 +87,7 @@ export function boardSvg(P, sol = null) {
         for (const f of grp) {
           const r = (f / fc) | 0, c = f % fc;
           for (const u of [r * cols + c, r * cols + c + 1, (r + 1) * cols + c, (r + 1) * cols + c + 1]) {
-            if (P.isVoid[u]) interiorVoid[u] = 1;
+            if (P.isVoid[u] && !(P.hasCastle && P.castleAtCell[u] >= 0)) interiorVoid[u] = 1;
           }
         }
       }
@@ -157,6 +157,29 @@ export function boardSvg(P, sol = null) {
       g += `<circle class="midloop-halo" cx="${mx}" cy="${my}" r="0.20" fill="#fff"/>`;
       g += `<circle class="midloop-dot" cx="${mx}" cy="${my}" r="0.155" fill="${INK}"/>`;
       g += `<circle class="midloop-core" cx="${mx}" cy="${my}" r="0.07" fill="#fff"/>`;
+    }
+  }
+  // Castle Wall tiles (White=Inside, Black=Outside, Gray=Either) in crisp B&W print
+  if (P.hasCastle) {
+    for (const cw of P.castle) {
+      const fill = cw.wall === 'W' ? '#fff' : cw.wall === 'B' ? INK : '#c8c8c8';
+      const ink = cw.wall === 'B' ? '#fff' : INK;
+      g += `<rect class="castle-print" x="${cw.c - 0.43}" y="${cw.r - 0.43}" width="0.86" height="0.86" rx="0.12" fill="${fill}" stroke="${INK}" stroke-width="0.06"/>`;
+      if (cw.dir) {
+        const fs = cw.n >= 10 ? 0.34 : 0.40;
+        const attrs = `font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="${ink}"`;
+        if (cw.dir === 'R') {
+          g += `<text x="${cw.c}" y="${cw.r}" font-size="${fs}" ${attrs}>${cw.n}→</text>`;
+        } else if (cw.dir === 'L') {
+          g += `<text x="${cw.c}" y="${cw.r}" font-size="${fs}" ${attrs}>←${cw.n}</text>`;
+        } else if (cw.dir === 'U') {
+          g += `<text x="${cw.c}" y="${cw.r - 0.17}" font-size="0.32" ${attrs}>↑</text>`;
+          g += `<text x="${cw.c}" y="${cw.r + 0.16}" font-size="${fs * 0.94}" ${attrs}>${cw.n}</text>`;
+        } else {
+          g += `<text x="${cw.c}" y="${cw.r - 0.15}" font-size="${fs * 0.94}" ${attrs}>${cw.n}</text>`;
+          g += `<text x="${cw.c}" y="${cw.r + 0.18}" font-size="0.32" ${attrs}>↓</text>`;
+        }
+      }
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" class="print-board" viewBox="${-pad} ${-pad} ${w + 2 * pad} ${h + 2 * pad}">${g}</svg>`;

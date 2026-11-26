@@ -189,6 +189,29 @@ for (const ex of examples) {
       g += `<circle cx="${mx}" cy="${my}" r="${S * 0.165}" fill="#0d9488" stroke="#ffffff" stroke-width="2"/>`;
     }
   }
+  if (P.hasCastle) {
+    const tileSz = S - 4, half = tileSz / 2;
+    for (const cw of P.castle) {
+      const cx = vx(cw.c), cy = vy(cw.r);
+      const fill = cw.wall === 'W' ? '#ffffff' : cw.wall === 'B' ? '#1f2429' : '#9aa3ad';
+      const stroke = cw.wall === 'G' ? '#4b5563' : '#1f2429';
+      const ink = cw.wall === 'W' ? '#111111' : '#ffffff';
+      g += `<rect x="${cx - half}" y="${cy - half}" width="${tileSz}" height="${tileSz}" rx="5" fill="${fill}" stroke="${stroke}" stroke-width="2.2"/>`;
+      if (cw.dir) {
+        const fs = cw.n >= 10 ? S * 0.34 : S * 0.40;
+        const attrs = `font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="${ink}"`;
+        if (cw.dir === 'R') g += `<text x="${cx}" y="${cy}" font-size="${fs}" ${attrs}>${cw.n}→</text>`;
+        else if (cw.dir === 'L') g += `<text x="${cx}" y="${cy}" font-size="${fs}" ${attrs}>←${cw.n}</text>`;
+        else if (cw.dir === 'U') {
+          g += `<text x="${cx}" y="${cy - S * 0.17}" font-size="${S * 0.32}" ${attrs}>↑</text>`;
+          g += `<text x="${cx}" y="${cy + S * 0.16}" font-size="${fs * 0.94}" ${attrs}>${cw.n}</text>`;
+        } else {
+          g += `<text x="${cx}" y="${cy - S * 0.15}" font-size="${fs * 0.94}" ${attrs}>${cw.n}</text>`;
+          g += `<text x="${cx}" y="${cy + S * 0.18}" font-size="${S * 0.32}" ${attrs}>↓</text>`;
+        }
+      }
+    }
+  }
 
   // Existing edge X marks (given walls in bold dark ink)
   for (let x = 0; x < P.numEdges; x++) {

@@ -4,7 +4,7 @@
     {
       "name": "Start here",
       "icon": "🌱",
-      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, and Hamilton cycle."
+      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, Castle Wall, and Hamilton cycle."
     },
     {
       "name": "Masyu",
@@ -100,6 +100,11 @@
       }
     },
     {
+      "name": "Castle Wall",
+      "icon": "🏰",
+      "blurb": "Keep white walls inside the loop, black walls outside, and match every directional segment count."
+    },
+    {
       "name": "Hamilton cycle",
       "icon": "🔁",
       "blurb": "Visit every single dot on the grid — guided by given lines, given walls, or both."
@@ -132,6 +137,22 @@
         "Mid-loop + Hamilton cycle": {
           "icon": "🎯🔁",
           "blurb": "Teal midpoint dots on a Hamilton cycle that visits every single dot."
+        },
+        "Castle Wall + Masyu": {
+          "icon": "🏰⚪",
+          "blurb": "Castle Wall inside/outside blocks and arrows paired with Masyu circles."
+        },
+        "Castle Wall + Slitherlink": {
+          "icon": "🏰🔢",
+          "blurb": "Castle Wall blocks and arrows paired with numbered Slitherlink squares."
+        },
+        "Castle Wall + Mid-loop": {
+          "icon": "🏰🎯",
+          "blurb": "Castle Wall blocks and arrows paired with Mid-loop teal midpoint dots."
+        },
+        "Castle Wall + Hamilton cycle": {
+          "icon": "🏰🔁",
+          "blurb": "Castle Wall blocks and arrows on a loop that must visit every remaining dot."
         }
       }
     }
@@ -163,6 +184,15 @@
       "count": 100,
       "group": "Start here",
       "blurb": "Small Beginner Mid-loop warm-ups, easiest first."
+    },
+    {
+      "id": "intro-castle",
+      "name": "Castle Wall intro",
+      "label": "🏰 Castle Wall",
+      "file": "data/intro-castle.csv",
+      "count": 24,
+      "group": "Start here",
+      "blurb": "Small 6×6 and 7×7 Beginner Castle Wall warm-ups, easiest first."
     },
     {
       "id": "intro-hamilton",
@@ -1065,12 +1095,70 @@
       "blurb": "Teal midpoint dots on a Hamilton cycle that visits every single dot."
     },
     {
+      "id": "castle-small",
+      "name": "Castle Wall Small",
+      "label": "🏰 Small (7×7)",
+      "file": "data/castle-small.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "blurb": "Compact 7×7 Castle Wall boards across all four difficulties."
+    },
+    {
+      "id": "castle-classic",
+      "name": "Castle Wall Classic",
+      "label": "🏰 Classic (10×10)",
+      "file": "data/castle-classic.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "blurb": "Classic 10×10 Castle Wall boards across all four difficulties."
+    },
+    {
+      "id": "hybrid-castle-masyu",
+      "name": "Castle Wall + Masyu",
+      "label": "🏰⚪ Classic (8×8)",
+      "file": "data/hybrid-castle-masyu.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Castle Wall + Masyu",
+      "blurb": "Castle Wall blocks and arrows paired with Masyu circles — every puzzle requires both."
+    },
+    {
+      "id": "hybrid-castle-slither",
+      "name": "Castle Wall + Slitherlink",
+      "label": "🏰🔢 Classic (8×8)",
+      "file": "data/hybrid-castle-slither.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Castle Wall + Slitherlink",
+      "blurb": "Castle Wall blocks and arrows paired with numbered Slitherlink squares — every puzzle requires both."
+    },
+    {
+      "id": "hybrid-castle-midloop",
+      "name": "Castle Wall + Mid-loop",
+      "label": "🏰🎯 Classic (8×8)",
+      "file": "data/hybrid-castle-midloop.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Castle Wall + Mid-loop",
+      "blurb": "Castle Wall blocks and arrows paired with Mid-loop teal dots — every puzzle requires both."
+    },
+    {
+      "id": "hybrid-castle-full",
+      "name": "Castle Wall + Hamilton cycle",
+      "label": "🏰🔁 Classic (8×8)",
+      "file": "data/hybrid-castle-full.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Castle Wall + Hamilton cycle",
+      "blurb": "Castle Wall blocks and arrows on a Hamilton cycle visiting every remaining dot."
+    },
+    {
       "id": "armory",
       "name": "Armory (How-to-solve examples)",
       "label": "Armory",
       "group": "Hidden",
       "file": "data/armory.csv",
-      "count": 49,
+      "count": 53,
       "hidden": true
     }
   ]

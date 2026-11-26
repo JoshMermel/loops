@@ -19,7 +19,7 @@ const manifest = {
     {
       name: 'Start here',
       icon: '🌱',
-      blurb: 'Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, and Hamilton cycle.',
+      blurb: 'Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, Castle Wall, and Hamilton cycle.',
     },
     {
       name: 'Masyu',
@@ -115,6 +115,11 @@ const manifest = {
       },
     },
     {
+      name: 'Castle Wall',
+      icon: '🏰',
+      blurb: 'Keep white walls inside the loop, black walls outside, and match every directional segment count.',
+    },
+    {
       name: 'Hamilton cycle',
       icon: '🔁',
       blurb: 'Visit every single dot on the grid — guided by given lines, given walls, or both.',
@@ -148,6 +153,22 @@ const manifest = {
           icon: '🎯🔁',
           blurb: 'Teal midpoint dots on a Hamilton cycle that visits every single dot.',
         },
+        'Castle Wall + Masyu': {
+          icon: '🏰⚪',
+          blurb: 'Castle Wall inside/outside blocks and arrows paired with Masyu circles.',
+        },
+        'Castle Wall + Slitherlink': {
+          icon: '🏰🔢',
+          blurb: 'Castle Wall blocks and arrows paired with numbered Slitherlink squares.',
+        },
+        'Castle Wall + Mid-loop': {
+          icon: '🏰🎯',
+          blurb: 'Castle Wall blocks and arrows paired with Mid-loop teal midpoint dots.',
+        },
+        'Castle Wall + Hamilton cycle': {
+          icon: '🏰🔁',
+          blurb: 'Castle Wall blocks and arrows on a loop that must visit every remaining dot.',
+        },
       },
     },
   ],
@@ -169,6 +190,11 @@ const recipes = [
     id: 'intro-midloop', name: 'Mid-loop intro', label: '🎯 Mid-loop', group: 'Start here',
     glob: 'intro_midloop_6x6,intro_midloop_7x7', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
     blurb: 'Small Beginner Mid-loop warm-ups, easiest first.',
+  },
+  {
+    id: 'intro-castle', name: 'Castle Wall intro', label: '🏰 Castle Wall', group: 'Start here',
+    glob: 'intro_castle_6x6,intro_castle_7x7', limit: 24, onlyTier: 'Beginner', balanceGroups: true,
+    blurb: 'Small 6×6 and 7×7 Beginner Castle Wall warm-ups, easiest first.',
   },
   {
     id: 'intro-hamilton', name: 'Hamilton cycle intro', label: '🔁 Hamilton cycle', group: 'Start here',
@@ -595,6 +621,40 @@ const recipes = [
     id: 'hybrid-midloop-full', name: 'Mid-loop + Hamilton cycle', label: '🎯🔁 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Hamilton cycle',
     glob: 'hybrid_midloop_full_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots on a Hamilton cycle that visits every single dot.',
+  },
+
+  // ---- Castle Wall (token books for manual review)
+  {
+    id: 'castle-small', name: 'Castle Wall Small', label: '🏰 Small (7×7)', group: 'Castle Wall',
+    glob: 'castle_7x7', tiers: '4,8,8,4',
+    blurb: 'Compact 7×7 Castle Wall boards across all four difficulties.',
+  },
+  {
+    id: 'castle-classic', name: 'Castle Wall Classic', label: '🏰 Classic (10×10)', group: 'Castle Wall',
+    glob: 'castle_10x10', tiers: '4,8,8,4',
+    blurb: 'Classic 10×10 Castle Wall boards across all four difficulties.',
+  },
+
+  // ---- Castle Wall Hybrids (token books for manual review)
+  {
+    id: 'hybrid-castle-masyu', name: 'Castle Wall + Masyu', label: '🏰⚪ Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Masyu',
+    glob: 'hybrid_castle_masyu_8x8', tiers: '4,8,8,4',
+    blurb: 'Castle Wall blocks and arrows paired with Masyu circles — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-castle-slither', name: 'Castle Wall + Slitherlink', label: '🏰🔢 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Slitherlink',
+    glob: 'hybrid_castle_slither_8x8', tiers: '4,8,8,4',
+    blurb: 'Castle Wall blocks and arrows paired with numbered Slitherlink squares — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-castle-midloop', name: 'Castle Wall + Mid-loop', label: '🏰🎯 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Mid-loop',
+    glob: 'hybrid_castle_midloop_8x8', tiers: '4,8,8,4',
+    blurb: 'Castle Wall blocks and arrows paired with Mid-loop teal dots — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-castle-full', name: 'Castle Wall + Hamilton cycle', label: '🏰🔁 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Hamilton cycle',
+    glob: 'hybrid_castle_full_8x8', tiers: '4,8,8,4',
+    blurb: 'Castle Wall blocks and arrows on a Hamilton cycle visiting every remaining dot.',
   },
 ];
 

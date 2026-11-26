@@ -106,6 +106,18 @@ if (process.argv.includes('--worker')) {
         if (givenWalls.has(mk)) return fail('midloop edge dot on a given wall');
       }
     }
+    const seenCW = new Set();
+    for (const cw of raw.castle || []) {
+      if (cw.r < 0 || cw.c < 0 || cw.r >= raw.rows || cw.c >= raw.cols) return fail('castle wall tile outside the board');
+      if (cw.wall !== 'W' && cw.wall !== 'B' && cw.wall !== 'G') return fail(`bad castle wall color "${cw.wall}"`);
+      if (cw.dir && cw.dir !== 'U' && cw.dir !== 'R' && cw.dir !== 'D' && cw.dir !== 'L') return fail(`bad castle dir "${cw.dir}"`);
+      if (cw.dir && (!Number.isInteger(cw.n) || cw.n < 0)) return fail(`bad castle count "${cw.n}"`);
+      const idx = cw.r * raw.cols + cw.c;
+      if (seenCW.has(idx)) return fail('duplicate castle wall tile on one cell');
+      if (seenV.has(idx)) return fail('castle wall tile collides with plain void');
+      if (seen.has(idx)) return fail('castle wall tile collides with circle clue');
+      seenCW.add(idx);
+    }
 
     let P;
     try { P = compile(raw); } catch (e) { return fail(`does not compile: ${e.message}`); }
@@ -150,6 +162,7 @@ if (process.argv.includes('--worker')) {
         clues: raw.clues,
         ...(raw.slither && raw.slither.length ? { slither: raw.slither } : {}),
         ...(raw.midloop && raw.midloop.length ? { midloop: raw.midloop } : {}),
+        ...(raw.castle && raw.castle.length ? { castle: raw.castle } : {}),
         ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
         fullBoard: false,
@@ -159,13 +172,15 @@ if (process.argv.includes('--worker')) {
       if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
     }
 
-    // Verify mutual necessity across any 2-way or 3-way clue-family hybrid (Masyu / Slitherlink / Mid-loop):
+    // Verify mutual necessity across any 2-way or 3-way clue-family hybrid (Masyu / Slitherlink / Mid-loop / Castle Wall):
     // dropping any one active clue family (while keeping all others + fullBoard/voids/givens) must leave >= 2 solutions.
+    // When dropping Castle Wall clues, keep their blocked tile cells as plain voids so the board geometry stays intact.
     if (!entry.hidden) {
       const families = [];
       if (P.clueCells.length > 0) families.push({ key: 'clues', label: 'Masyu circles', seed: 23456 });
       if (P.hasSlither) families.push({ key: 'slither', label: 'Slitherlink numbers', seed: 34567 });
       if (P.hasMidloop) families.push({ key: 'midloop', label: 'Mid-loop dots', seed: 45678 });
+      if (P.hasCastle) families.push({ key: 'castle', label: 'Castle Wall clues', seed: 56789 });
       if (families.length >= 2) {
         const fullOpts = {
           name: raw.name,
@@ -174,12 +189,17 @@ if (process.argv.includes('--worker')) {
           clues: raw.clues,
           ...(raw.slither && raw.slither.length ? { slither: raw.slither } : {}),
           ...(raw.midloop && raw.midloop.length ? { midloop: raw.midloop } : {}),
+          ...(raw.castle && raw.castle.length ? { castle: raw.castle } : {}),
           ...(P.fullBoard ? { fullBoard: true } : {}),
           ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
           ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
         };
         for (const fam of families) {
-          const withoutFam = compile({ ...fullOpts, [fam.key]: [] });
+          const dropOpts = { ...fullOpts, [fam.key]: [] };
+          if (fam.key === 'castle') {
+            dropOpts.voids = [...(raw.voids || []), ...raw.castle.map(({ r, c }) => ({ r, c }))];
+          }
+          const withoutFam = compile(dropOpts);
           const alt = proveNonUnique(withoutFam, fam.seed + from + k);
           if (alt.exceeded && alt.count < 2) return fail(`hybrid ${fam.label} necessity not proved: hit node cap`);
           if (alt.count < 2) return fail(`${fam.label} are redundant on hybrid (uniquely solvable without them)`);

@@ -33,11 +33,20 @@ Try these 24-puzzle tasting books and decide for each one whether to **grow to 5
 - [ ] `hybrid-midloop-slither-swiss` — **🧀 Swiss cheese (10×10)** (Mid-loop + Slitherlink with interior cutout holes)
 - [ ] `hybrid-midloop-slither-sym` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric Mid-loop + Slitherlink)
 
+### Castle Wall (Steps 1–4 token books — review before growing to full size & adding gimmicks)
+- [ ] `intro-castle` — **🏰 Castle Wall intro (6×6 & 7×7)** (24 Beginner warm-ups)
+- [ ] `castle-small` — **🏰 Small (7×7)** (24 pure Castle Wall puzzles across all 4 tiers)
+- [ ] `castle-classic` — **🏰 Classic (10×10)** (24 pure Castle Wall puzzles across all 4 tiers)
+- [ ] `hybrid-castle-masyu` — **🏰⚪ Castle Wall + Masyu (8×8)** (24 necessity-verified hybrid puzzles)
+- [ ] `hybrid-castle-slither` — **🏰🔢 Castle Wall + Slitherlink (8×8)** (24 necessity-verified hybrid puzzles)
+- [ ] `hybrid-castle-midloop` — **🏰🎯 Castle Wall + Mid-loop (8×8)** (24 necessity-verified hybrid puzzles)
+- [ ] `hybrid-castle-full` — **🏰🔁 Castle Wall + Hamilton cycle (8×8)** (24 necessity-verified hybrid puzzles)
+
 ## Variants & future twists
 
+- [ ] **Castle Wall follow-up (Steps 5–6 after playtesting token books):** grow chosen pure & hybrid Castle Wall books to full size (e.g. 500 + 12×12 / 100-puzzle intro) and add Castle Wall Bonus gimmicks (e.g. Symmetry, All-gray, Unnumbered walls, Skyscraper).
 - [ ] **New single-loop families in `js/variants/`:**
-  - **Corral / Bag:** dual-square sightline numbers (strictly Inside the loop), standalone + hybrids with Masyu, Mid-loop, Hamilton cycle (and visually distinct badges if paired with Slitherlink).
-  - **Castle Wall:** blocked void-cell arrow clues (Inside / Outside / Unknown) counting parallel loop segments along the row/column, standalone + hybrids.
+  - **Corral / Bag:** dual-square sightline numbers (strictly Inside the loop), standalone + hybrids with Masyu, Mid-loop, Castle Wall, Hamilton cycle (and visually distinct badges if paired with Slitherlink).
   - **Balance Loop / Yajilin / Simple Loop** (lower priority).
 - [ ] **More pure Slitherlink gimmicks:**
   - Digit-restricted boards: No 3s (`0/1/2`), Even only (`0/2`), Odd only (`1/3`).

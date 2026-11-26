@@ -623,6 +623,7 @@ export class Board {
     (info.clueState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`c${k}`); });
     (info.slitherState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`s${k}`); });
     (info.midloopState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`m${k}`); });
+    (info.castleState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`w${k}`); });
     if (info.badFaces) for (const f of info.badFaces) wanted.add(`f${f}`);
     if (info.earlyLoops) for (const x of info.earlyLoops) wanted.add(`l${x}`);
     if (info.trappedCells) for (const i of info.trappedCells) wanted.add(`t${i}`);
@@ -858,6 +859,34 @@ export class Board {
         const my = md.dir === 'V' ? vy(md.r) + S / 2 : vy(md.r);
         const st = mStates[k] === 'bad' && show.has(`m${k}`) ? ' bad' : '';
         g += `<circle class="midloop-dot${st}" cx="${mx}" cy="${my}" r="${rMid}"/>`;
+      }
+    }
+
+    // Castle Wall blocked clue tiles (White=Inside, Black=Outside, Gray=Either, with directional segment count)
+    if (P.hasCastle) {
+      const cwStates = info.castleState || [];
+      const tileSz = S - 4;
+      const half = tileSz / 2;
+      for (let k = 0; k < P.castle.length; k++) {
+        const cw = P.castle[k];
+        const cx = vx(cw.c), cy = vy(cw.r);
+        const st = cwStates[k] === 'bad' && show.has(`w${k}`) ? ' bad' : '';
+        g += `<rect class="castle-tile-${cw.wall}${st}" x="${cx - half}" y="${cy - half}" width="${tileSz}" height="${tileSz}" rx="5"/>`;
+        if (cw.dir) {
+          const tc = `castle-text-${cw.wall}${st}`;
+          const fs = cw.n >= 10 ? S * 0.34 : S * 0.40;
+          if (cw.dir === 'R') {
+            g += `<text class="${tc}" x="${cx}" y="${cy}" font-size="${fs}">${cw.n}→</text>`;
+          } else if (cw.dir === 'L') {
+            g += `<text class="${tc}" x="${cx}" y="${cy}" font-size="${fs}">←${cw.n}</text>`;
+          } else if (cw.dir === 'U') {
+            g += `<text class="${tc}" x="${cx}" y="${cy - S * 0.17}" font-size="${S * 0.32}">↑</text>`;
+            g += `<text class="${tc}" x="${cx}" y="${cy + S * 0.16}" font-size="${fs * 0.94}">${cw.n}</text>`;
+          } else {
+            g += `<text class="${tc}" x="${cx}" y="${cy - S * 0.15}" font-size="${fs * 0.94}">${cw.n}</text>`;
+            g += `<text class="${tc}" x="${cx}" y="${cy + S * 0.18}" font-size="${S * 0.32}">↓</text>`;
+          }
+        }
       }
     }
 

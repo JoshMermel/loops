@@ -8,6 +8,7 @@
 import { NONE, WHITE, BLACK } from './logic.js';
 import { autoXSlither } from './variants/slitherlink.js';
 import { autoXMidloop, isMidloopSatisfied } from './variants/midloop.js';
+import { autoXCastle, isCastleSatisfied } from './variants/castlewall.js';
 
 export const FACE_BLANK = 0, FACE_IN = 1, FACE_OUT = 2;
 
@@ -183,8 +184,9 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     return out;
   };
 
-  // Slitherlink bookkeeping (only needs one pass since `add` never turns an edge ON)
+  // Slitherlink & Castle Wall bookkeeping (only needs one pass since `add` never turns an edge ON)
   if (P.hasSlither) autoXSlither(P, w, add);
+  if (P.hasCastle) autoXCastle(P, w, add);
 
   const reqCell = new Uint8Array(N);
   for (let i = 0; i < N; i++) if (clue[i] !== NONE) reqCell[i] = 1;
@@ -254,7 +256,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
 
         const w1 = walk(eA);
         if (w1.closed) {
-          const impossible = P.clueCells.length > 0 || P.hasMidloop || anyDegGt0 || cycleViolatesSlither(w1.edges);
+          const impossible = P.clueCells.length > 0 || P.hasMidloop || P.hasCastle || anyDegGt0 || cycleViolatesSlither(w1.edges);
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
           }
@@ -268,6 +270,12 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           if (!impossible && anyDegGt0) impossible = true;
           if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
           if (!impossible && P.hasMidloop) impossible = cycleViolatesMidloopAt(t, w1.edges.concat(w2.edges));
+          if (!impossible && P.hasCastle) {
+            const cyc = new Uint8Array(numEdges);
+            for (const x of w1.edges) cyc[x] = 1;
+            for (const x of w2.edges) cyc[x] = 1;
+            impossible = !isCastleSatisfied(P, cyc);
+          }
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
             for (const x of w2.edges) if (add(x)) changed = true;
@@ -425,6 +433,15 @@ export function autoShadeCompute(P, m) {
     for (let f = 0; f < F; f++) {
       if (faceExt && faceExt[f]) continue;
       if (m.faces[f] && !(m.autoF && m.autoF[f])) mark(f, m.faces[f]);
+    }
+  }
+
+  // Seed 1b: Castle Wall White (Inside) and Black (Outside) blocks anchor their void hole parity automatically
+  if (P.hasCastleWalls) {
+    for (let k = 0; k < P.castle.length; k++) {
+      const cw = P.castle[k];
+      if (cw.wall === 'G' || cw.isExterior || cw.face < 0) continue;
+      mark(cw.face, cw.wall === 'W' ? FACE_IN : FACE_OUT);
     }
   }
 

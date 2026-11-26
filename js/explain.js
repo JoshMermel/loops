@@ -9,6 +9,7 @@ import { replayImagine } from './imagine.js';
 import { faceCoords } from './faceparity.js';
 import { describeSlitherChainStep, explainSlitherStep } from './variants/slitherlink.js';
 import { describeMidloopChainStep, explainMidloopStep, midDotLoc } from './variants/midloop.js';
+import { describeCastleChainStep, explainCastleStep } from './variants/castlewall.js';
 
 export const cellName = (P, i) => `${colName(i % P.cols)}${((i / P.cols) | 0) + 1}`;
 export const edgeName = (P, x) => {
@@ -82,6 +83,8 @@ function describeChainStep(P, s) {
   if (slText) return slText;
   const mlText = describeMidloopChainStep(P, s, { cellName, edgeName });
   if (mlText) return mlText;
+  const cwText = describeCastleChainStep(P, s, { cellName });
+  if (cwText) return cwText;
   const { rule, info, sets } = s;
   const c = info && info.cell !== undefined ? cellName(P, info.cell) : '';
   switch (rule) {
@@ -117,6 +120,9 @@ function describeChainStep(P, s) {
       }
       if (info.midIdx !== undefined && info.midIdx >= 0 && P.midloop && P.midloop[info.midIdx]) {
         return `${edgeName(P, info.edge)} cannot close the loop early before the Mid-loop dot at ${midDotLoc(P, P.midloop[info.midIdx], { cellName, edgeName })} is satisfied`;
+      }
+      if (info.castleIdx !== undefined && info.castleIdx >= 0 && P.castle && P.castle[info.castleIdx]) {
+        return `${edgeName(P, info.edge)} cannot close the loop early before the Castle Wall clue at ${cellName(P, P.castle[info.castleIdx].cell)} is satisfied`;
       }
       return `${edgeName(P, info.edge)} cannot close the loop early`;
     case 'threeWhites':
@@ -201,6 +207,25 @@ function describeContradiction(P, broke, finalState) {
         area: [],
       };
     }
+    case 'castleBroken': {
+      const cw = P.castle && P.castle[broke.castleIdx];
+      const cn = cw ? cellName(P, cw.cell) : '';
+      return {
+        text: broke.over
+          ? `the Castle Wall clue at ${cn} ends up with too many segments along its ray`
+          : `the Castle Wall clue at ${cn} cannot reach ${cw ? cw.n : ''} segment${cw && cw.n === 1 ? '' : 's'} along its ray`,
+        cells: cw ? [cw.cell] : [],
+        area: [],
+      };
+    }
+    case 'castleParity': {
+      const cw = P.castle && P.castle[broke.castleIdx];
+      return {
+        text: `a white/black Castle Wall inside-outside constraint is violated`,
+        cells: cw ? [cw.cell] : [],
+        area: [],
+      };
+    }
     case 'earlyClose': {
       if (broke.face !== undefined) {
         return { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [], face: broke.face };
@@ -211,6 +236,14 @@ function describeContradiction(P, broke, finalState) {
         return {
           text: `the loop closes early before the Mid-loop dot at ${loc} is satisfied`,
           cells: m.dir === 'C' ? [m.cell] : [m.a, m.b],
+          area: [],
+        };
+      }
+      if (broke.castleIdx !== undefined && broke.castleIdx >= 0 && P.castle && P.castle[broke.castleIdx]) {
+        const cw = P.castle[broke.castleIdx];
+        return {
+          text: `the loop closes early before the Castle Wall clue at ${cellName(P, cw.cell)} is satisfied`,
+          cells: [cw.cell],
           area: [],
         };
       }
@@ -397,6 +430,10 @@ export function explainStep(P, step, st = null) {
         if (m.dir === 'C') { roles.clue.push(m.cell); nudgeRoles.clue.push(m.cell); }
         else { roles.clue.push(m.a, m.b); nudgeRoles.clue.push(m.a, m.b); }
         text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the Mid-loop dot at ${loc} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
+      } else if (info.castleIdx !== undefined && info.castleIdx >= 0 && P.castle && P.castle[info.castleIdx]) {
+        const cw = P.castle[info.castleIdx];
+        roles.clue.push(cw.cell); nudgeRoles.clue.push(cw.cell);
+        text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the Castle Wall clue at ${cellName(P, cw.cell)} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
       } else {
         text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path while other loop cells lie outside it, so ${edgeName(P, info.edge)} cannot connect them.`;
       }
@@ -587,6 +624,8 @@ export function explainStep(P, step, st = null) {
             return `flipping diagonally across white circle ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
           case 'midDiag':
             return `flipping diagonally across Mid-loop dot ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
+          case 'castleWall':
+            return `the ${s.reason.wall === 'W' ? 'white (inside)' : 'black (outside)'} wall at ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
           case 'blackDiag':
             return `by the 3-to-1 corner rule at black circle ${cellName(P, s.reason.cell)}, ${dst} is ${col}`;
           case 'blackLeg':
@@ -847,6 +886,16 @@ export function explainStep(P, step, st = null) {
       if (mlExp) {
         nudge = mlExp.nudge;
         text = mlExp.text;
+        for (const x of [...targets.segOn, ...targets.segOff]) {
+          const [a, b] = edgeCells(P, x);
+          if (!nudgeRoles.focus.length && !nudgeRoles.clue.length) nudgeRoles.focus.push(a, b);
+        }
+        break;
+      }
+      const cwExp = explainCastleStep(P, { rule, info, targets }, { cellName, describeMarks, roles, nudgeRoles });
+      if (cwExp) {
+        nudge = cwExp.nudge;
+        text = cwExp.text;
         for (const x of [...targets.segOn, ...targets.segOff]) {
           const [a, b] = edgeCells(P, x);
           if (!nudgeRoles.focus.length && !nudgeRoles.clue.length) nudgeRoles.focus.push(a, b);

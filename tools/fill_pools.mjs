@@ -715,6 +715,48 @@ if (!isMainThread) {
       buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
       budgetSec: 60, perPuzzleMs: 12000,
     },
+
+    // ---- Castle Wall token pools (24-puzzle tasting books: pure + 4 hybrids)
+    {
+      group: 'castle-token', pool: 'intro_castle_6x6', cols: 6, rows: 6, style: 'castle',
+      buckets: { Beginner: { need: 15 } },
+      budgetSec: 60, perPuzzleMs: 10000,
+    },
+    {
+      group: 'castle-token', pool: 'intro_castle_7x7', cols: 7, rows: 7, style: 'castle',
+      buckets: { Beginner: { need: 15 } },
+      budgetSec: 60, perPuzzleMs: 10000,
+    },
+    {
+      group: 'castle-token', pool: 'castle_7x7', cols: 7, rows: 7, style: 'castle',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'castle-token', pool: 'castle_10x10', cols: 10, rows: 10, style: 'castle',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'castle-token', pool: 'hybrid_castle_masyu_8x8', cols: 8, rows: 8, style: 'castle-masyu',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'castle-token', pool: 'hybrid_castle_slither_8x8', cols: 8, rows: 8, style: 'castle-slither',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'castle-token', pool: 'hybrid_castle_midloop_8x8', cols: 8, rows: 8, style: 'castle-midloop',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'castle-token', pool: 'hybrid_castle_full_8x8', cols: 8, rows: 8, style: 'castle-full',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
   ];
 
   const knownGroups = new Set(JOBS.map((j) => j.group));
