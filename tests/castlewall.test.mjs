@@ -733,3 +733,133 @@ test('Castle Wall border tiles auto-shade Outside cleanly, render on Board, unwi
   assert.equal(mm.faces[0 * 3 + 1], FACE_OUT, 'on-board face next to border Castle Wall must auto-shade Outside');
   assert.equal(mm.faces[0 * 3 + 2], FACE_OUT, 'on-board face next to border Castle Wall must auto-shade Outside');
 });
+
+test('Castle Wall live error highlights catch closed-loop, deg-blocked, ray-bound, ray-diff, and wall-parity violations with zero false positives', () => {
+  // 1. Single closed loop leaving a White tile outside, trapping a Black tile inside, and missing an arrow count (NO X's placed!)
+  const pLoop = compile({
+    name: 'cw_err_loop',
+    rows: 5,
+    cols: 5,
+    clues: [],
+    castle: [
+      { r: 1, c: 1, wall: 'B', dir: '', n: -1 },       // trapped inside 2x2 loop (0,0)-(0,2)-(2,2)-(2,0)
+      { r: 3, c: 3, wall: 'W', dir: '', n: -1 },       // left outside that loop
+      { r: 4, c: 0, wall: 'B', dir: 'R', n: 2 },       // count 0 != 2 on completed single closed loop
+      { r: 0, c: 4, wall: 'B', dir: 'L', n: 2 },       // count 2 == 2 (satisfied!)
+    ],
+  });
+  const mLoop = { edges: new Uint8Array(pLoop.numEdges) };
+  // 2x2 closed loop around (1,1): (0,0)-(0,1)-(0,2)-(1,2)-(2,2)-(2,1)-(2,0)-(1,0)-(0,0)
+  for (const [r, c, d] of [[0, 0, 1], [0, 1, 1], [0, 2, 2], [1, 2, 2], [2, 2, 3], [2, 1, 3], [2, 0, 0], [1, 0, 0]]) {
+    mLoop.edges[pLoop.ed[(r * 5 + c) * 4 + d]] = 1;
+  }
+  const stLoop = castleStates(pLoop, mLoop);
+  assert.equal(stLoop[0], 'bad', 'Black tile trapped inside closed loop must flag bad');
+  assert.equal(stLoop[1], 'bad', 'White tile left outside completed single closed loop must flag bad');
+  assert.equal(stLoop[2], 'bad', 'under-filled arrow on completed single closed loop must flag bad');
+  assert.equal(stLoop[3], '', 'satisfied arrow on completed single closed loop must stay clean');
+
+  // Even with another stray open segment elsewhere, the Black tile trapped inside the closed cycle still flags bad
+  mLoop.edges[pLoop.ed[(4 * 5 + 1) * 4 + 1]] = 1;
+  const stCycle = castleStates(pLoop, mLoop);
+  assert.equal(stCycle[0], 'bad', 'Black tile trapped inside a closed cycle must flag bad even when other segments exist');
+
+  // 2. White tile with BOTH a valid border LINE and a wrong border X (previously silenced by compBad[EXT]!)
+  const pDual = compile({
+    name: 'cw_err_dual',
+    rows: 5,
+    cols: 5,
+    clues: [],
+    castle: [
+      { r: 1, c: 1, wall: 'W', dir: '', n: -1 },
+      { r: 3, c: 3, wall: 'W', dir: '', n: -1 },
+    ],
+  });
+  const mDual = { edges: new Uint8Array(pDual.numEdges) };
+  mDual.edges[pDual.ed[(0 * 5 + 0) * 4 + 1]] = 1; // valid top border LINE on (1,1)
+  mDual.edges[pDual.ed[(0 * 5 + 1) * 4 + 1]] = 2; // wrong top border X on (1,1)
+  const stDual = castleStates(pDual, mDual);
+  assert.equal(stDual[0], 'bad', 'White tile with 1 valid border line and 1 wrong border X must still flag bad');
+  assert.equal(stDual[1], '', 'unrelated innocent White tile must stay clean');
+
+  // 2b. Multi-edge interior parity contradiction (valid 2-step path on top + invalid 2-step path on bottom -> sink-BFS catches it!)
+  const pSink = compile({
+    name: 'cw_err_sink',
+    rows: 6,
+    cols: 5,
+    clues: [],
+    castle: [
+      { r: 2, c: 2, wall: 'W', dir: '', n: -1 },
+      { r: 2, c: 0, wall: 'B', dir: '', n: -1 },
+    ],
+  });
+  const mSink = { edges: new Uint8Array(pSink.numEdges) };
+  // Top path from EXT -> face(0,1) -> White hole (2,2): LINE then X => IN (valid)
+  mSink.edges[pSink.ed[(0 * 5 + 1) * 4 + 1]] = 1;
+  mSink.edges[pSink.ed[(1 * 5 + 1) * 4 + 1]] = 2;
+  // Bottom path from EXT -> face(4,1) -> face(3,1) -> White hole (2,2): X, X, X => OUT (invalid!)
+  mSink.edges[pSink.ed[(5 * 5 + 1) * 4 + 1]] = 2;
+  mSink.edges[pSink.ed[(4 * 5 + 1) * 4 + 1]] = 2;
+  mSink.edges[pSink.ed[(3 * 5 + 1) * 4 + 1]] = 2;
+  assert.equal(castleStates(pSink, mSink)[0], 'bad', 'sink-BFS must catch interior White tile with valid top path + invalid bottom path');
+
+  // 3. Deg-2 blocked ray edges (Auto-X OFF) + local ray-bound impossibility + collinear ray-diff contradiction
+  const pRay = compile({
+    name: 'cw_err_ray',
+    rows: 4,
+    cols: 6,
+    clues: [],
+    castle: [
+      { r: 0, c: 1, wall: 'B', dir: 'R', n: 2 }, // ray edges: (0,2)-(0,3), (0,3)-(0,4), (0,4)-(0,5)
+    ],
+  });
+  const mRayDeg = { edges: new Uint8Array(pRay.numEdges) };
+  // Draw vertical segment (0,3)-(1,3) AND (0,4)-(1,4)? Even simpler: give (0,3) deg=2? On top border, (0,3)-(1,3) alone gives max1 on (0,2)-(0,3)-(0,4)!
+  // If we also X out (0,4)-(0,5), only 2 ray edges remain sharing (0,3) with vertical line -> maxTotal=1 < 2!
+  mRayDeg.edges[pRay.ed[(0 * 6 + 3) * 4 + 2]] = 1; // vertical down from (0,3)
+  mRayDeg.edges[pRay.ed[(0 * 6 + 4) * 4 + 1]] = 2; // X out (0,4)-(0,5)
+  assert.equal(castleStates(pRay, mRayDeg)[0], 'bad', 'ray-bound maxTotal < rem must immediately flag arrow bad');
+
+  // Collinear ray-diff: 3-> at (1,0) and 2-> at (1,4) -> gap diff = 1; drawing 2 edges in gap flags both!
+  const pDiff = compile({
+    name: 'cw_err_diff',
+    rows: 4,
+    cols: 8,
+    clues: [],
+    castle: [
+      { r: 1, c: 0, wall: 'B', dir: 'R', n: 3 },
+      { r: 1, c: 4, wall: 'G', dir: 'R', n: 2 },
+    ],
+  });
+  const mDiff = { edges: new Uint8Array(pDiff.numEdges) };
+  mDiff.edges[pDiff.ed[(1 * 8 + 1) * 4 + 1]] = 1;
+  mDiff.edges[pDiff.ed[(1 * 8 + 2) * 4 + 1]] = 1;
+  assert.deepEqual(castleStates(pDiff, mDiff), ['bad', 'bad'], 'collinear ray-diff over-fill must flag both arrows bad');
+
+  // 4. Board.render emits castle-bad-halo and .bad classes for violated Castle Wall tiles
+  const el = { innerHTML: '', addEventListener() {} };
+  const b = new Board(el, {});
+  b.setPuzzle(pDual);
+  b.render(mDual, { clueState: [], slitherState: [], midloopState: [], castleState: stDual });
+  assert.ok(el.innerHTML.includes('class="castle-bad-halo"'), 'Board must emit castle-bad-halo for violated Castle Wall tiles');
+  assert.ok(el.innerHTML.includes('class="castle-tile-W bad"'), 'Board must emit bad class on violated Castle Wall tile');
+
+  // 5. Zero-false-positive fuzz: valid partial subsets of real solved Castle Wall puzzles never flag any tile bad
+  const rng = makeRng(2026);
+  for (let s = 0; s < 12; s++) {
+    const pGen = generatePuzzle({ rows: 7, cols: 7, style: 'castle', seed: 900 + s, budgetMs: 6000 });
+    assert.ok(pGen);
+    const P = compile(pGen);
+    const sol = decodeSolution(P, P.solution);
+    const activeEdges = [];
+    for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0) activeEdges.push(x);
+    for (const frac of [0.25, 0.5, 0.75, 1.0]) {
+      const m = { edges: new Uint8Array(P.numEdges) };
+      for (const x of activeEdges) {
+        if (rng() < frac) m.edges[x] = sol.e[x] === E_ON ? 1 : 2;
+      }
+      const states = castleStates(P, m);
+      assert.ok(states.every((v) => v === ''), `false positive on valid partial state (seed=${900 + s}, frac=${frac}): ${states}`);
+    }
+  }
+});

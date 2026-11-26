@@ -199,23 +199,24 @@ svg [hidden] { display: none; }
 #help-modal .help-fig .castle-tile-W,
 #help-modal .help-fig .castle-tile-B,
 #help-modal .help-fig .castle-tile-G { stroke-width: 1.2; }
-:is(#board, .help-fig) .castle-tile-W.bad,
-:is(#board, .help-fig) .castle-tile-B.bad,
-:is(#board, .help-fig) .castle-tile-G.bad { stroke: var(--pearl-bad); stroke-width: 3; }
+#board .castle-bad-halo { fill: none; stroke: var(--color-error); stroke-width: 6; opacity: 0.34; pointer-events: none; }
+:is(#board, .help-fig) .castle-tile-W.bad { fill: #fde8e8; stroke: var(--pearl-bad); stroke-width: 3.2; }
+:is(#board, .help-fig) .castle-tile-B.bad { fill: #4a151b; stroke: var(--pearl-bad); stroke-width: 3.2; }
+:is(#board, .help-fig) .castle-tile-G.bad { fill: #e3c2c6; stroke: var(--pearl-bad); stroke-width: 3.2; }
 :is(#board, .help-fig) .castle-text-W { fill: #111111; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
 :is(#board, .help-fig) .castle-text-B { fill: #ffffff; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
 :is(#board, .help-fig) .castle-text-G { fill: #111111; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
-:is(#board, .help-fig) .castle-text-W.bad { fill: #c62828; }
-:is(#board, .help-fig) .castle-text-B.bad { fill: #ff6b6b; }
-:is(#board, .help-fig) .castle-text-G.bad { fill: #991b1b; }
+:is(#board, .help-fig) .castle-text-W.bad { fill: #b71c1c; }
+:is(#board, .help-fig) .castle-text-B.bad { fill: #ff9494; }
+:is(#board, .help-fig) .castle-text-G.bad { fill: #8c1212; }
 :root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-W { fill: #f0f3f7; stroke: #111111; }
 :root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-B { fill: #0d1117; stroke: #8d96a0; }
 :root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-G { fill: #4c5664; stroke: #9aa4b2; }
 :root[data-theme="dark"] :is(#board, .help-fig) .castle-text-G { fill: #ffffff; }
-:root[data-theme="dark"] :is(#board, .help-fig) .castle-text-G.bad { fill: #ffc2c2; }
-:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-W.bad,
-:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-B.bad,
-:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-G.bad { stroke: var(--pearl-bad); }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-text-G.bad { fill: #ffd6d6; }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-W.bad { fill: #fce4e4; stroke: var(--pearl-bad); }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-B.bad { fill: #3f1218; stroke: var(--pearl-bad); }
+:root[data-theme="dark"] :is(#board, .help-fig) .castle-tile-G.bad { fill: #693840; stroke: var(--pearl-bad); }
 #board .hint-castle-clue { fill: none; stroke: var(--primary-blue); stroke-width: 3.4; pointer-events: none; }
 #board .hint-castle-focus { fill: none; stroke: var(--hint-ink); stroke-width: 3.4; pointer-events: none; }
 #board .hint-castle-problem { fill: none; stroke: var(--hint-problem); stroke-width: 3.6; stroke-dasharray: 5 3; pointer-events: none; }

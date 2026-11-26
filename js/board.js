@@ -890,6 +890,9 @@ export class Board {
         const cw = P.castle[k];
         const cx = vx(cw.c), cy = vy(cw.r);
         const st = cwStates[k] === 'bad' && show.has(`w${k}`) ? ' bad' : '';
+        if (st) {
+          g += `<rect class="castle-bad-halo" x="${cx - half - 2}" y="${cy - half - 2}" width="${tileSz + 4}" height="${tileSz + 4}" rx="7"/>`;
+        }
         g += `<rect class="castle-tile-${cw.wall}${st}" x="${cx - half}" y="${cy - half}" width="${tileSz}" height="${tileSz}" rx="5"/>`;
         if (cw.dir) {
           const tc = `castle-text-${cw.wall}${st}`;

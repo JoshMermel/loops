@@ -713,25 +713,172 @@ export function autoXCastle(P, w, add) {
  */
 export function castleStates(P, marks) {
   if (!P.hasCastle) return [];
-  const { castle, rows, cols, edgeA, faceExterior, faceRep } = P;
+  const { castle, rows, cols, N, numEdges, edgeA, edgeB } = P;
   const e = marks.edges;
   const out = new Array(castle.length).fill('');
+
+  // 1. Vertex degrees & closed-cycle components from drawn segments (e[x] === 1)
+  const deg = new Uint8Array(N);
+  const vPar = new Int32Array(N);
+  for (let i = 0; i < N; i++) vPar[i] = i;
+  const vFind = (u) => { while (vPar[u] !== u) { vPar[u] = vPar[vPar[u]]; u = vPar[u]; } return u; };
+  let totalOn = 0;
+  for (let x = 0; x < numEdges; x++) {
+    if (e[x] !== 1) continue;
+    const a = edgeA[x], b = edgeB[x];
+    if (a < 0) continue;
+    totalOn++;
+    deg[a]++; deg[b]++;
+    const ra = vFind(a), rb = vFind(b);
+    if (ra !== rb) vPar[Math.max(ra, rb)] = Math.min(ra, rb);
+  }
+
+  const closedCompRoots = [];
+  let singleClosedLoop = false;
+  if (totalOn > 0) {
+    const compClosed = new Map();
+    const compCount = new Map();
+    for (let x = 0; x < numEdges; x++) {
+      if (e[x] !== 1) continue;
+      const a = edgeA[x], b = edgeB[x];
+      if (a < 0) continue;
+      const r = vFind(a);
+      compCount.set(r, (compCount.get(r) || 0) + 1);
+      if (!compClosed.has(r)) compClosed.set(r, true);
+      if (deg[a] !== 2 || deg[b] !== 2) compClosed.set(r, false);
+    }
+    for (const [r, isCl] of compClosed) {
+      if (isCl) {
+        closedCompRoots.push(r);
+        if (compCount.get(r) === totalOn) singleClosedLoop = true;
+      }
+    }
+  }
+
+  // Effective edge state: blank edges incident to a vertex with deg >= 2 cannot be turned ON
+  const effE = new Int8Array(numEdges);
+  for (let x = 0; x < numEdges; x++) {
+    const v = e[x];
+    if (v === 0 && edgeA[x] >= 0 && (deg[edgeA[x]] >= 2 || deg[edgeB[x]] >= 2)) effE[x] = E_OFF;
+    else effE[x] = v;
+  }
+  const effSt = { e: effE, cell: P.isVoid || new Uint8Array(N) };
+
+  // 2. Numbered arrow checks: direct count, deg-blocked availability, single-closed-loop exact match, and local ray bounds
   for (let k = 0; k < castle.length; k++) {
     const cw = castle[k];
     if (!cw.dir) continue;
-    let on = 0, unk = 0;
+    let on = 0, avail = 0;
     const es = cw.edges;
     for (let j = 0; j < es.length; j++) {
-      const v = e[es[j]];
+      const x = es[j];
+      const v = e[x];
       if (v === 1) on++;
-      else if (v === 0) unk++;
+      else if (v === 0 && effE[x] === 0) avail++;
     }
-    if (on > cw.n || on + unk < cw.n) out[k] = 'bad';
+    if (on > cw.n || on + avail < cw.n || (singleClosedLoop && on !== cw.n)) {
+      out[k] = 'bad';
+    } else if (propagateCastleRayBoundOne(P, effSt, k, null) < 0) {
+      out[k] = 'bad';
+    }
   }
-  // Also flag W/B tiles whose Inside/Outside parity is contradicted in non-conflicted components
+
+  // 2b. Collinear same-direction ray-diff pairs (gap count directly exceeded or starved)
+  const diffPairs = P._castleRayDiffPairs;
+  if (diffPairs && diffPairs.length) {
+    for (let p = 0; p < diffPairs.length; p++) {
+      const pr = diffPairs[p];
+      const es = pr.edges;
+      let on = 0, avail = 0;
+      for (let j = 0; j < es.length; j++) {
+        const x = es[j];
+        const v = e[x];
+        if (v === 1) on++;
+        else if (v === 0 && effE[x] === 0) avail++;
+      }
+      if (on > pr.diff || on + avail < pr.diff) {
+        out[pr.i] = 'bad';
+        out[pr.j] = 'bad';
+      }
+    }
+  }
+
+  // 3. Inside/Outside parity checks for White/Black tiles
   if (P.hasCastleWalls && P._cwEdgeX) {
     const { _cwEdgeX, _cwEdgeFA, _cwEdgeFB, _cwAnchorF, _cwAnchorWant, _cwAnchorK } = P;
     const F = (rows - 1) * (cols - 1), EXT = F, V = F + 1;
+
+    // 3a. Direct single-edge wall boundary violations (immune to unrelated parity conflicts)
+    const wallGroups = P._castleWallGroups;
+    if (wallGroups && wallGroups.length) {
+      for (let g = 0; g < wallGroups.length; g++) {
+        const gr = wallGroups[g];
+        const wantOn = gr.info.val === E_ON;
+        let broken = false;
+        for (let j = 0; j < gr.edges.length; j++) {
+          const ev = effE[gr.edges[j]];
+          if ((wantOn && ev === 2) || (!wantOn && ev === 1)) { broken = true; break; }
+        }
+        if (broken) {
+          for (const idx of gr.info.castleIdxs) out[idx] = 'bad';
+          for (const idx of gr.info.castleIdxs2) out[idx] = 'bad';
+        }
+      }
+    }
+
+    // 3b. Closed-loop Jordan-curve parity (catches White outside / Black inside even with no X's placed!)
+    if (closedCompRoots.length > 0) {
+      // Build dual adjacency over all active edges once for exact cycle-interior BFS
+      const adjOff = new Int32Array(V + 1);
+      for (let i = 0; i < _cwEdgeX.length; i++) {
+        adjOff[_cwEdgeFA[i] + 1]++;
+        adjOff[_cwEdgeFB[i] + 1]++;
+      }
+      for (let i = 0; i < V; i++) adjOff[i + 1] += adjOff[i];
+      const adjTo = new Int32Array(adjOff[V]);
+      const adjEx = new Int32Array(adjOff[V]);
+      const pos = adjOff.slice(0, V);
+      for (let i = 0; i < _cwEdgeX.length; i++) {
+        const a = _cwEdgeFA[i], b = _cwEdgeFB[i], x = _cwEdgeX[i];
+        adjTo[pos[a]] = b; adjEx[pos[a]++] = x;
+        adjTo[pos[b]] = a; adjEx[pos[b]++] = x;
+      }
+      const q = new Int32Array(V);
+      const vis = new Int8Array(V);
+      const checkCycle = (onlyRoot) => {
+        vis.fill(-1);
+        vis[EXT] = 0;
+        let qh = 0, qt = 0;
+        q[qt++] = EXT;
+        while (qh < qt) {
+          const u = q[qh++];
+          const pu = vis[u];
+          const s = adjOff[u], end = adjOff[u + 1];
+          for (let j = s; j < end; j++) {
+            const v = adjTo[j];
+            if (vis[v] >= 0) continue;
+            const x = adjEx[j];
+            const cross = e[x] === 1 && (onlyRoot < 0 || vFind(edgeA[x]) === onlyRoot) ? 1 : 0;
+            vis[v] = pu ^ cross;
+            q[qt++] = v;
+          }
+        }
+        for (let i = 0; i < _cwAnchorF.length; i++) {
+          const f = _cwAnchorF[i], want = _cwAnchorWant[i], k = _cwAnchorK[i];
+          if (vis[f] < 0) continue;
+          if (onlyRoot < 0) {
+            if (vis[f] !== want) out[k] = 'bad';
+          } else if (want === 0 && vis[f] === 1) {
+            // Black tile trapped strictly inside a closed drawn cycle
+            out[k] = 'bad';
+          }
+        }
+      };
+      if (singleClosedLoop) checkCycle(-1);
+      else for (const r of closedCompRoots) checkCycle(r);
+    }
+
+    // 3c. Parity DSU across drawn lines (1) and X's / deg-2-blocked edges (2)
     const par = new Int32Array(V);
     const diff = new Uint8Array(V);
     const compBad = new Uint8Array(V);
@@ -757,17 +904,27 @@ export function castleStates(P, marks) {
       if (rv === EXT) { par[ru] = rv; diff[ru] = pu ^ pv ^ xor; compBad[rv] = bad; }
       else { par[rv] = ru; diff[rv] = pu ^ pv ^ xor; compBad[ru] = bad; }
     };
+    const parMark = (x) => {
+      const v = e[x];
+      if (v === 1 || v === 2) return v;
+      if (v === 0 && edgeA[x] >= 0 && (deg[edgeA[x]] === 2 || deg[edgeB[x]] === 2)) return 2;
+      return 0;
+    };
     for (let i = 0; i < _cwEdgeX.length; i++) {
-      const ev = e[_cwEdgeX[i]];
+      const ev = parMark(_cwEdgeX[i]);
       if (ev !== 1 && ev !== 2) continue;
       link(_cwEdgeFA[i], _cwEdgeFB[i], ev === 1 ? 1 : 0);
     }
     const extRoot = find(EXT);
     const compWall = new Map(); // root -> { eff, idxs, bad }
+    const skippedBad = [];
     for (let i = 0; i < _cwAnchorF.length; i++) {
       const f = _cwAnchorF[i], want = _cwAnchorWant[i], k = _cwAnchorK[i];
       const r = find(f);
-      if (compBad[r]) continue; // skip components with an unrelated edge-cycle mistake
+      if (compBad[r]) {
+        if (out[k] !== 'bad' && f !== EXT) skippedBad.push(i);
+        continue;
+      }
       if (r === extRoot) {
         if ((diff[f] ^ diff[EXT]) !== want) out[k] = 'bad';
       } else {
@@ -782,6 +939,62 @@ export function castleStates(P, marks) {
     }
     for (const rec of compWall.values()) {
       if (rec.bad) for (const idx of rec.idxs) out[idx] = 'bad';
+    }
+
+    // 3d. Sink-BFS fallback for tiles in a conflicted component: pin EXT = OUT (bit 1) and never expand
+    // through `f_k` itself, so a tile with BOTH a valid path and an invalid path from EXT still flags bad,
+    // while innocent tiles next to an unrelated edge-cycle conflict remain unflagged.
+    if (skippedBad.length > 0) {
+      const mOff = new Int32Array(V + 1);
+      for (let i = 0; i < _cwEdgeX.length; i++) {
+        const ev = parMark(_cwEdgeX[i]);
+        if (ev !== 1 && ev !== 2) continue;
+        mOff[_cwEdgeFA[i] + 1]++;
+        mOff[_cwEdgeFB[i] + 1]++;
+      }
+      for (let i = 0; i < V; i++) mOff[i + 1] += mOff[i];
+      const mTo = new Int32Array(mOff[V]);
+      const mXor = new Uint8Array(mOff[V]);
+      const pos = mOff.slice(0, V);
+      for (let i = 0; i < _cwEdgeX.length; i++) {
+        const ev = parMark(_cwEdgeX[i]);
+        if (ev !== 1 && ev !== 2) continue;
+        const a = _cwEdgeFA[i], b = _cwEdgeFB[i], xr = ev === 1 ? 1 : 0;
+        mTo[pos[a]] = b; mXor[pos[a]++] = xr;
+        mTo[pos[b]] = a; mXor[pos[b]++] = xr;
+      }
+      const mask = new Uint8Array(V);
+      const qU = new Int32Array(V * 2);
+      const qB = new Uint8Array(V * 2);
+      for (let si = 0; si < skippedBad.length; si++) {
+        const ai = skippedBad[si];
+        const fk = _cwAnchorF[ai], want = _cwAnchorWant[ai], k = _cwAnchorK[ai];
+        if (out[k] === 'bad') continue;
+        mask.fill(0);
+        mask[EXT] = 1; // bit 0 = OUT (0), bit 1 = IN (1)
+        let qh = 0, qt = 0;
+        qU[qt] = EXT; qB[qt++] = 1;
+        while (qh < qt) {
+          const u = qU[qh], bit = qB[qh++];
+          const s = mOff[u], end = mOff[u + 1];
+          for (let j = s; j < end; j++) {
+            const v = mTo[j];
+            if (v === EXT || v === fk) continue;
+            const nb = mXor[j] ? (bit === 1 ? 2 : 1) : bit;
+            if (mask[v] & nb) continue;
+            mask[v] |= nb;
+            qU[qt] = v; qB[qt++] = nb;
+          }
+        }
+        const s = mOff[fk], end = mOff[fk + 1];
+        for (let j = s; j < end; j++) {
+          const u = mTo[j];
+          const mu = mask[u];
+          if (mu !== 1 && mu !== 2) continue;
+          const parU = mu === 2 ? 1 : 0;
+          if ((parU ^ mXor[j]) !== want) { out[k] = 'bad'; break; }
+        }
+      }
     }
   }
   return out;
@@ -1100,7 +1313,8 @@ function propagateCastleRayBoundOne(P, st, k, setEdge) {
     else if (v === E_UNKNOWN) rbUnks[nUnk++] = x;
   }
   const rem = cw.n - on;
-  if (nUnk <= 1 || rem <= 0 || rem >= nUnk) return 0;
+  if (nUnk <= 1 || rem < 0 || rem > nUnk) return 0;
+  if (setEdge && (rem === 0 || rem === nUnk)) return 0;
 
   const p0 = (cw.d + 1) & 3, p1 = (cw.d + 3) & 3;
   let ng = 0;
