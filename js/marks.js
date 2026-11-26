@@ -488,9 +488,11 @@ export function autoShadeCompute(P, m) {
     stepNbr(r, c + 1, 2 * (base + 1) + 1, col);
   }
 
+  const faceExtShade = P.faceExtShade || null;
   const color = new Uint8Array(F);
   for (let f = 0; f < F; f++) {
-    if (mask[f] === FACE_IN || mask[f] === FACE_OUT) color[f] = mask[f];
+    if (faceExtShade && faceExtShade[f]) color[f] = FACE_OUT;
+    else if (mask[f] === FACE_IN || mask[f] === FACE_OUT) color[f] = mask[f];
   }
   return { color };
 }
@@ -505,9 +507,10 @@ export function reconcileAutoShade(P, cur, enabled = true) {
   if (!cur.autoF) cur.autoF = new Uint8Array(F);
   const now = enabled ? autoShadeCompute(P, cur) : null;
   const faceExt = P.hasVoids ? P.faceExterior : null;
+  const faceExtShade = P.faceExtShade || null;
 
   for (let f = 0; f < F; f++) {
-    if (faceExt && faceExt[f]) { cur.faces[f] = 0; cur.autoF[f] = 0; continue; }
+    if (faceExt && faceExt[f] && !(faceExtShade && faceExtShade[f])) { cur.faces[f] = 0; cur.autoF[f] = 0; continue; }
     const col = now ? now.color[f] : 0;
     if (cur.faces[f] !== 0 && cur.autoF[f]) {
       if (!col) { cur.faces[f] = 0; cur.autoF[f] = 0; }
@@ -651,6 +654,9 @@ export function facesFromSolvedLoop(P, edges) {
       if (g < 0 || out[g]) continue;
       seed(g, edges[x] === 1 ? flipColor(col) : col);
     }
+  }
+  if (P.faceExtShade) {
+    for (let f = 0; f < F; f++) if (P.faceExtShade[f]) out[f] = FACE_OUT;
   }
   return out;
 }

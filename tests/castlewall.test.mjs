@@ -4,11 +4,14 @@ import {
   compile, solve, propagate, isSolved, encodeSolution, decodeSolution,
   toCsvRow, parseCsv, symmetryKey, puzzleHash, initialState, E_ON, E_OFF,
 } from '../js/logic.js';
-import { interiorPlainVoids } from '../js/board.js';
+import { Board, interiorPlainVoids } from '../js/board.js';
 import { rate, nextSteps, detectSymmetries } from '../js/rating.js';
 import { explainStep } from '../js/explain.js';
 import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
-import { autoXForced, autoShadeCompute, shadeConflicts, FACE_IN, FACE_OUT } from '../js/marks.js';
+import {
+  autoXForced, autoShadeCompute, reconcileAutoShade, applyAutoShade,
+  facesFromSolvedLoop, shadeConflicts, FACE_BLANK, FACE_IN, FACE_OUT,
+} from '../js/marks.js';
 import { castleStates, earlyLoopEdges } from '../js/clues.js';
 import { findCastleRayBound, castleContradiction } from '../js/variants/castlewall.js';
 import { rotatePuzzleCW } from '../js/rotate.js';
@@ -651,4 +654,82 @@ test('Castle Wall regression coverage: Auto-X closed corridor, castleRayBound mo
   const iv = interiorPlainVoids(pMixV);
   assert.equal(iv[1 * 5 + 2], 1, 'interior plain void next to border Castle Wall must be marked interior');
   assert.equal(iv[0 * 5 + 2], 0, 'Castle Wall tile must never be marked as a plain interior void');
+});
+
+test('Castle Wall border tiles auto-shade Outside cleanly, render on Board, unwind when toggled off, and skip plain cutouts', () => {
+  // Pure Castle Wall with a left-edge Black tile (1,0), an interior Black tile (1,2), and an interior White tile (3,2)
+  const P = compile({
+    name: 'cw_edge_shade',
+    rows: 5,
+    cols: 5,
+    clues: [],
+    castle: [
+      { r: 1, c: 0, wall: 'B', dir: 'D', n: 0 },
+      { r: 1, c: 2, wall: 'B', dir: 'D', n: 0 },
+      { r: 3, c: 2, wall: 'W', dir: '', n: -1 },
+    ],
+  });
+  const fc = P.cols - 1;
+  const f = (r, c) => r * fc + c;
+  const m = {
+    edges: new Uint8Array(P.numEdges),
+    autoE: new Uint8Array(P.numEdges),
+    faces: new Uint8Array((P.rows - 1) * fc),
+    autoF: new Uint8Array((P.rows - 1) * fc),
+  };
+
+  reconcileAutoShade(P, m, true);
+  // Both faces touching the left-edge Black tile (1,0) must auto-shade Outside
+  assert.equal(m.faces[f(0, 0)], FACE_OUT, 'top face adjacent to left-edge Black tile must auto-shade Outside');
+  assert.equal(m.faces[f(1, 0)], FACE_OUT, 'bottom face adjacent to left-edge Black tile must auto-shade Outside');
+  assert.equal(m.autoF[f(0, 0)], 1);
+  assert.equal(m.autoF[f(1, 0)], 1);
+  // Interior Black & White tiles continue to auto-shade Outside / Inside as before
+  assert.equal(m.faces[f(0, 1)], FACE_OUT);
+  assert.equal(m.faces[f(2, 1)], FACE_IN);
+
+  // Board.render actually emits <rect class="face-out auto" ...> for the edge tile's adjacent faces
+  const el = { innerHTML: '', addEventListener() {} };
+  const b = new Board(el, {});
+  b.setPuzzle(P);
+  b.render(m, { clueState: [], slitherState: [], midloopState: [], castleState: [] });
+  assert.ok(el.innerHTML.includes('<rect class="face-out auto" x="24" y="24" width="44" height="44"/>'), 'Board must render face (0,0) auto-shade for edge Castle Wall tile');
+  assert.ok(el.innerHTML.includes('<rect class="face-out auto" x="24" y="68" width="44" height="44"/>'), 'Board must render face (1,0) auto-shade for edge Castle Wall tile');
+
+  // Toggling Auto-Shade OFF clears both edge and interior auto-shaded faces back to blank
+  applyAutoShade(P, m, false);
+  assert.equal(m.faces[f(0, 0)], FACE_BLANK);
+  assert.equal(m.faces[f(1, 0)], FACE_BLANK);
+  assert.equal(m.faces[f(0, 1)], FACE_BLANK);
+  assert.equal(m.faces[f(2, 1)], FACE_BLANK);
+
+  // facesFromSolvedLoop also paints border Castle Wall adjacent faces Outside (and rotates cleanly)
+  const solvedFaces = facesFromSolvedLoop(P, new Uint8Array(P.numEdges));
+  assert.equal(solvedFaces[f(0, 0)], FACE_OUT);
+  assert.equal(solvedFaces[f(1, 0)], FACE_OUT);
+  const rotP = rotatePuzzleCW(P);
+  // (1,0) in 5x5 rotates 90° CW to (0,3); its adjacent dual faces are (0,2) and (0,3)
+  assert.equal(rotP.faceExtShade[0 * 4 + 2], 1);
+  assert.equal(rotP.faceExtShade[0 * 4 + 3], 1);
+
+  // Mixed plain exterior void at (0,0) + border Castle Wall at (0,2):
+  // face (0,0) touches plain void -> stays blank; faces (0,1) and (0,2) lie inside board -> auto-shade Outside
+  const pMixed = compile({
+    name: 'cw_edge_mixed_void',
+    rows: 4,
+    cols: 4,
+    clues: [],
+    voids: [{ r: 0, c: 0 }],
+    castle: [{ r: 0, c: 2, wall: 'B', dir: 'D', n: 0 }],
+  });
+  const mm = {
+    edges: new Uint8Array(pMixed.numEdges),
+    autoE: new Uint8Array(pMixed.numEdges),
+    faces: new Uint8Array(9),
+    autoF: new Uint8Array(9),
+  };
+  reconcileAutoShade(pMixed, mm, true);
+  assert.equal(mm.faces[0 * 3 + 0], FACE_BLANK, 'plain exterior cutout face must remain unshaded');
+  assert.equal(mm.faces[0 * 3 + 1], FACE_OUT, 'on-board face next to border Castle Wall must auto-shade Outside');
+  assert.equal(mm.faces[0 * 3 + 2], FACE_OUT, 'on-board face next to border Castle Wall must auto-shade Outside');
 });

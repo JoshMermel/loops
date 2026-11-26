@@ -676,11 +676,12 @@ export class Board {
     // Dual-face Inside / Outside shading (under grid lines and hint overlays; interior holes render as one unified polygon)
     const fr = P.rows - 1, fc = P.cols - 1;
     const faceExt = P.hasVoids ? P.faceExterior : null;
+    const faceExtShade = P.faceExtShade || null;
     const faceHoleId = P.hasVoids ? P.faceHoleId : null;
     if (marks.faces && fr > 0 && fc > 0) {
       const doneHoles = faceHoleId ? new Set() : null;
       for (let f = 0; f < fr * fc; f++) {
-        if (faceExt && faceExt[f]) continue;
+        if (faceExt && faceExt[f] && !(faceExtShade && faceExtShade[f])) continue;
         const v = marks.faces[f];
         if (!v) continue;
         const hid = faceHoleId ? faceHoleId[f] : -1;

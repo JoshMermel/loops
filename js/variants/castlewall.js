@@ -272,6 +272,19 @@ export function compileCastle(P, raw) {
       _castleWallGroups = [];
     }
   }
+  let faceExtShade = null;
+  if (hasCastle && faceExterior && fr > 0 && fc > 0) {
+    const F = fr * fc;
+    const isPlain = (u) => isVoid[u] && castleAtCell[u] < 0;
+    for (let f = 0; f < F; f++) {
+      if (!faceExterior[f]) continue;
+      const r = (f / fc) | 0, c = f % fc;
+      if (isPlain(r * cols + c) || isPlain(r * cols + c + 1)
+        || isPlain((r + 1) * cols + c) || isPlain((r + 1) * cols + c + 1)) continue;
+      if (!faceExtShade) faceExtShade = new Uint8Array(F);
+      faceExtShade[f] = 1;
+    }
+  }
   P._ecwOff = _ecwOff;
   P._ecwData = _ecwData;
   P._cwEdgeX = _cwEdgeX;
@@ -286,6 +299,7 @@ export function compileCastle(P, raw) {
   P.castleByCol = castleByCol;
   P.hasCastleWalls = hasCastleWalls;
   P.castleImpossible = castleImpossible;
+  P.faceExtShade = faceExtShade;
   // Ensure every Castle Wall cell is marked void (caller marks before void topology; double-check here)
   for (let k = 0; k < castle.length; k++) {
     if (!isVoid[castle[k].cell]) throw new Error(`Castle Wall tile at ${castle[k].r},${castle[k].c} missing from voids`);
