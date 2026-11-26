@@ -1551,7 +1551,10 @@ $('csv-file').addEventListener('change', async (e) => {
 });
 
 // ---- Print booklet modal
-const endBookletPrint = () => document.body.classList.remove('printing-booklet');
+const endBookletPrint = () => {
+  document.body.classList.remove('printing-booklet');
+  $('print-root')?.replaceChildren();
+};
 window.addEventListener('afterprint', endBookletPrint);
 matchMedia('print').addEventListener?.('change', (e) => { if (!e.matches) endBookletPrint(); });
 const printSolution = (P) => {

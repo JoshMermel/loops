@@ -377,7 +377,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const ecOff = P._ecOff, ecData = P._ecData;
   const hasSlither = Boolean(P.hasSlither);
   const slitherNum = P.slitherNum;
-  const edgeFaces = P.edgeFaces;
+  const efOff = P._efOff, efData = P._efData;
   const hasMidloop = Boolean(P.hasMidloop);
   if (hasMidloop) ensureMidScratch(P.midloop.length);
   const qMid = scratchMidQ, inMidQ = scratchInMidQ;
@@ -435,19 +435,6 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       for (let j = 0; j < rl2.length; j++) pushMid(rl2[j]);
     }
   };
-  const pushVertexFaces = (v) => {
-    const r = (v / pCols) | 0, c = v % pCols;
-    if (r > 0) {
-      const base = (r - 1) * fcMax;
-      if (c > 0) pushFace(base + c - 1);
-      if (c < fcMax) pushFace(base + c);
-    }
-    if (r < frMax) {
-      const base = r * fcMax;
-      if (c > 0) pushFace(base + c - 1);
-      if (c < fcMax) pushFace(base + c);
-    }
-  };
   const wakeEdge = (x) => {
     const a = edgeA[x];
     if (a < 0) return;
@@ -457,8 +444,8 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     const end = ecOff[x + 1];
     for (let k = ecOff[x]; k < end; k++) pushClue(ecData[k]);
     if (hasSlither) {
-      pushVertexFaces(a);
-      pushVertexFaces(b);
+      const fEnd = efOff[x + 1];
+      for (let k = efOff[x]; k < fEnd; k++) pushFace(efData[k]);
     }
     if (hasMidloop) pushEdgeMid(x, a);
   };
@@ -848,19 +835,19 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
     // Prefer open ends (on === 1) with fewest choices, then circles with on === 0, then any LOOP cell.
     let bi = -1, bestKey = -1;
     const ties = rng ? [] : null;
-    const hasSl = P.hasSlither, sn = P.slitherNum, ef = P.edgeFaces;
+    const isSlV = P.hasSlither ? P.isSlitherVertex : null;
     const hasMid = P.hasMidloop, midAtCell = P.midloopAtCell;
     for (let i = 0; i < N; i++) {
       if (cell[i] !== LOOP) continue;
       const i4 = i * 4;
-      let on = 0, unk = 0, touchSl = 0;
+      let on = 0, unk = 0;
       const x0 = ed[i4], x1 = ed[i4 + 1], x2 = ed[i4 + 2], x3 = ed[i4 + 3];
-      if (x0 >= 0) { const v = e[x0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x0 * 2] >= 0 && sn[ef[x0 * 2]] > 0) || (ef[x0 * 2 + 1] >= 0 && sn[ef[x0 * 2 + 1]] > 0))) touchSl = 1; } }
-      if (x1 >= 0) { const v = e[x1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x1 * 2] >= 0 && sn[ef[x1 * 2]] > 0) || (ef[x1 * 2 + 1] >= 0 && sn[ef[x1 * 2 + 1]] > 0))) touchSl = 1; } }
-      if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x2 * 2] >= 0 && sn[ef[x2 * 2]] > 0) || (ef[x2 * 2 + 1] >= 0 && sn[ef[x2 * 2 + 1]] > 0))) touchSl = 1; } }
-      if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) { unk++; if (hasSl && ((ef[x3 * 2] >= 0 && sn[ef[x3 * 2]] > 0) || (ef[x3 * 2 + 1] >= 0 && sn[ef[x3 * 2 + 1]] > 0))) touchSl = 1; } }
+      if (x0 >= 0) { const v = e[x0]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x1 >= 0) { const v = e[x1]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x2 >= 0) { const v = e[x2]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
+      if (x3 >= 0) { const v = e[x3]; if (v === E_ON) on++; else if (v === E_UNKNOWN) unk++; }
       if (unk === 0) continue;
-      const isClue = (clue[i] !== NONE || touchSl || (hasMid && midAtCell[i] >= 0)) ? 1 : 0;
+      const isClue = (clue[i] !== NONE || (isSlV && isSlV[i]) || (hasMid && midAtCell[i] >= 0)) ? 1 : 0;
       const key = on * 100 + isClue * 10 + (4 - unk);
       if (ties) {
         if (key > bestKey) { bestKey = key; ties.length = 0; }

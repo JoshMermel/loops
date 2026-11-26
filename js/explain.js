@@ -112,6 +112,9 @@ function describeChainStep(P, s) {
       return segs.length ? `${c} must use ${joinList(segs)}` : `${c} is forced to extend`;
     }
     case 'noEarlyClose':
+      if (info.slitherFace !== undefined && info.slitherFace >= 0) {
+        return `${edgeName(P, info.edge)} cannot close the loop early before the ${P.slitherNum[info.slitherFace]} square ${faceName(P, info.slitherFace)} is satisfied`;
+      }
       if (info.midIdx !== undefined && info.midIdx >= 0 && P.midloop && P.midloop[info.midIdx]) {
         return `${edgeName(P, info.edge)} cannot close the loop early before the Mid-loop dot at ${midDotLoc(P, P.midloop[info.midIdx], { cellName, edgeName })} is satisfied`;
       }
@@ -546,10 +549,17 @@ export function explainStep(P, step, st = null) {
       nudgeRoles.focus.push(a, b);
       nudgeRoles.clue.push(...(info.clues || []));
       const isSl = rule === 'faceSlither';
+      const clueCells = info.clues || [];
+      const hasMidClues = P.hasMidloop && clueCells.some((c) => P.midloopAtCell[c] >= 0);
+      const hasCircleClues = clueCells.some((c) => P.clue[c] !== 0);
       nudge = isSl
         ? `Look at ${edgeName(P, info.edge)} — use Inside/Outside shading around the numbered squares to compare the two sides.`
-        : info.clues && info.clues.length
-          ? `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`
+        : clueCells.length
+          ? (hasMidClues && !hasCircleClues
+            ? `Look at ${edgeName(P, info.edge)} and the highlighted Mid-loop ${clueCells.length === 1 ? 'dot' : 'dots'} — use diagonal Inside/Outside shading to compare the squares on either side.`
+            : hasMidClues
+              ? `Look at ${edgeName(P, info.edge)} and the highlighted clues — use Inside/Outside shading to compare the squares on either side.`
+              : `Look at ${edgeName(P, info.edge)} and the highlighted circles — use circle Inside/Outside shading to compare the squares on either side.`)
           : `Look at ${edgeName(P, info.edge)} — use relative Inside/Outside shading to compare the squares on either side.`;
       faces = { in: info.facesIn || [], out: info.facesOut || [], clue: info.slitherFaces || [], focus: [], anchored: !!info.anchored };
       const label = (par) => (info.anchored ? (par === 1 ? 'Inside' : 'Outside') : (par === 1 ? 'Side A' : 'Side B'));
@@ -563,6 +573,8 @@ export function explainStep(P, step, st = null) {
             return `crossing ✕ at ${edgeName(P, s.reason.edge)} keeps ${dst} ${col}`;
           case 'whiteDiag':
             return `flipping diagonally across white circle ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
+          case 'midDiag':
+            return `flipping diagonally across Mid-loop dot ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
           case 'blackDiag':
             return `by the 3-to-1 corner rule at black circle ${cellName(P, s.reason.cell)}, ${dst} is ${col}`;
           case 'blackLeg':
@@ -597,7 +609,9 @@ export function explainStep(P, step, st = null) {
       const sideStr = info.val === E_ON
         ? `puts opposite sides (${label(info.parA)} and ${label(info.parB)}) across ${edgeName(P, info.edge)}, so draw ${edgeName(P, info.edge)}`
         : `puts ${label(info.parA)} on both sides of ${edgeName(P, info.edge)}, so cross out ${edgeName(P, info.edge)}`;
-      const heading = isSl || !(info.clues && info.clues.length) ? 'Inside/outside shading' : 'Circle shading';
+      const heading = isSl || !clueCells.length
+        ? 'Inside/outside shading'
+        : (hasMidClues && !hasCircleClues ? 'Mid-loop shading' : hasMidClues ? 'Clue shading' : 'Circle shading');
       text = chainDesc
         ? `${heading}: ${chainDesc}. That ${sideStr}.`
         : `${heading} ${sideStr}.`;

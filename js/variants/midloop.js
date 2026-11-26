@@ -12,6 +12,7 @@
 
 const E_UNKNOWN = 0, E_ON = 1, E_OFF = 2;
 const LOOP = 2, OFF = 1;
+const WHITE = 1, BLACK = 2;
 
 /** Axis directions: axis 0 = vertical (dNeg=0 U, dPos=2 D), axis 1 = horizontal (dNeg=3 L, dPos=1 R). */
 const AXIS_NEG = [0, 3];
@@ -184,7 +185,8 @@ function hasPerpOnAt(ed, e, u, p0, p1) {
  * must NOT already have BOTH perpendicular edges ON (would force degree 3),
  * and must have at least one perpendicular edge available (on-board, not OFF, neighbor not OFF).
  */
-function canTurnAt(ed, nb, e, cell, u, p0, p1) {
+function canTurnAt(ed, nb, e, cell, clue, u, p0, p1) {
+  if (clue && clue[u] === WHITE) return false;
   const u4 = u * 4;
   const x0 = ed[u4 + p0], x1 = ed[u4 + p1];
   const on0 = x0 >= 0 && e[x0] === E_ON;
@@ -204,6 +206,7 @@ function scanMidloopAxis(P, st, m, axis, negE, posE, negC, posC, stopAtFirst = f
   const { ed, nb, midloopAtCell, midloopAtEdge } = P;
   const e = st.e;
   const cell = st.cell;
+  const clue = P.clueCells && P.clueCells.length ? (st.clue || P.clue) : null;
   const dNeg = AXIS_NEG[axis], dPos = AXIS_POS[axis];
   const p0 = AXIS_PERP0[axis], p1 = AXIS_PERP1[axis];
   const isC = m.dir === 'C';
@@ -222,13 +225,16 @@ function scanMidloopAxis(P, st, m, axis, negE, posE, negC, posC, stopAtFirst = f
   let validCount = 0;
   let minK = 0;
 
-  // Test k = 0 for edge dots before tracing step 1
+  // Test k = 0 for edge dots before tracing step 1 (a Black circle cannot turn after a length-1 run)
   if (kMin === 0) {
+    const blackBlocked = clue && (clue[curN] === BLACK || clue[curP] === BLACK);
     const nextN = ed[curN * 4 + dNeg];
     const nextP = ed[curP * 4 + dPos];
     const forcedN = nextN >= 0 && (e[nextN] === E_ON || (midloopAtEdge && midloopAtEdge[nextN] >= 0));
     const forcedP = nextP >= 0 && (e[nextP] === E_ON || (midloopAtEdge && midloopAtEdge[nextP] >= 0));
-    if (!forcedN && !forcedP && canTurnAt(ed, nb, e, cell, curN, p0, p1) && canTurnAt(ed, nb, e, cell, curP, p0, p1)) {
+    if (!blackBlocked && !forcedN && !forcedP
+      && canTurnAt(ed, nb, e, cell, clue, curN, p0, p1)
+      && canTurnAt(ed, nb, e, cell, clue, curP, p0, p1)) {
       if (stopAtFirst) return 1;
       validCount = 1;
       minK = 0;
@@ -236,8 +242,11 @@ function scanMidloopAxis(P, st, m, axis, negE, posE, negC, posC, stopAtFirst = f
   }
 
   for (let j = 1; ; j++) {
-    // Extending to step j makes curN and curP strict interior vertices of the straight run
-    if ((!isC || j > 1) && (hasPerpOnAt(ed, e, curN, p0, p1) || hasPerpOnAt(ed, e, curP, p0, p1))) break;
+    // Extending to step j makes curN and curP strict interior vertices of the straight run (no perp ON, no Black circle)
+    if ((!isC || j > 1) && (
+      hasPerpOnAt(ed, e, curN, p0, p1) || hasPerpOnAt(ed, e, curP, p0, p1)
+      || (clue && (clue[curN] === BLACK || clue[curP] === BLACK))
+    )) break;
     const ne = ed[curN * 4 + dNeg];
     const pe = ed[curP * 4 + dPos];
     if (ne < 0 || pe < 0) break;
@@ -256,7 +265,9 @@ function scanMidloopAxis(P, st, m, axis, negE, posE, negC, posC, stopAtFirst = f
     const nextP = ed[curP * 4 + dPos];
     const forcedN = nextN >= 0 && (e[nextN] === E_ON || (midloopAtEdge && midloopAtEdge[nextN] >= 0));
     const forcedP = nextP >= 0 && (e[nextP] === E_ON || (midloopAtEdge && midloopAtEdge[nextP] >= 0));
-    if (!forcedN && !forcedP && canTurnAt(ed, nb, e, cell, curN, p0, p1) && canTurnAt(ed, nb, e, cell, curP, p0, p1)) {
+    if (!forcedN && !forcedP
+      && canTurnAt(ed, nb, e, cell, clue, curN, p0, p1)
+      && canTurnAt(ed, nb, e, cell, clue, curP, p0, p1)) {
       if (stopAtFirst) return 1;
       if (validCount === 0) minK = j;
       validCount++;
@@ -444,17 +455,19 @@ function drawnSideLen(ed, nb, e, start, dir) {
   return len;
 }
 
-/** Measure immediate straight stop distance (first OFF/border/perp-ON/dot) from `start` along `dir`. */
+/** Measure immediate straight stop distance (first OFF/border/perp-ON/Black/dot) from `start` along `dir`. */
 function sideBlockedDist(P, st, start, dir, axis, checkStartPerp) {
   const { ed, nb, midloopAtCell, midloopAtEdge } = P;
   const e = st.e, cell = st.cell;
+  const clue = P.clueCells && P.clueCells.length ? (st.clue || P.clue) : null;
   const p0 = AXIS_PERP0[axis], p1 = AXIS_PERP1[axis];
   let cur = start;
   for (let d = 0; ; d++) {
-    if ((d > 0 || checkStartPerp) && hasPerpOnAt(ed, e, cur, p0, p1)) return d;
+    if ((d > 0 || checkStartPerp) && (hasPerpOnAt(ed, e, cur, p0, p1) || (clue && clue[cur] === BLACK))) return d;
     const x = ed[cur * 4 + dir];
     if (x < 0 || e[x] === E_OFF) return d;
-    if (midloopAtEdge && midloopAtEdge[x] >= 0) return d;
+    // A collinear edge dot at edge d+1 prevents stopping at distance d (would merge runs), so max stop is d-1
+    if (midloopAtEdge && midloopAtEdge[x] >= 0) return d > 0 ? d - 1 : 0;
     const nxt = nb[cur * 4 + dir];
     if (cell && cell[nxt] === OFF) return d;
     if (midloopAtCell && midloopAtCell[nxt] >= 0) return d;
@@ -494,15 +507,20 @@ function checkMidVertexAxis(P, st, k) {
   const m = P.midloop[k];
   if (m.dir !== 'C') return null;
   const i = m.cell;
+  const { ed } = P;
+  const e = st.e;
+  const i4 = i * 4;
+  // Early exit when all 4 incident edges are already decided
+  const eu = ed[i4], er = ed[i4 + 1], edn = ed[i4 + 2], el = ed[i4 + 3];
+  if ((eu < 0 || e[eu] !== E_UNKNOWN) && (er < 0 || e[er] !== E_UNKNOWN)
+    && (edn < 0 || e[edn] !== E_UNKNOWN) && (el < 0 || e[el] !== E_UNKNOWN)) return null;
   const vOk = localAxisOk(P, st, i, 0);
   const hOk = localAxisOk(P, st, i, 1);
   if (vOk === hOk) return null;
   const axis = vOk ? 0 : 1;
-  const { ed } = P;
-  const e = st.e;
   const sets = [];
-  const e0 = ed[i * 4 + AXIS_NEG[axis]], e1 = ed[i * 4 + AXIS_POS[axis]];
-  const p0 = ed[i * 4 + AXIS_PERP0[axis]], p1 = ed[i * 4 + AXIS_PERP1[axis]];
+  const e0 = ed[i4 + AXIS_NEG[axis]], e1 = ed[i4 + AXIS_POS[axis]];
+  const p0 = ed[i4 + AXIS_PERP0[axis]], p1 = ed[i4 + AXIS_PERP1[axis]];
   if (e[e0] === E_UNKNOWN) sets.push(['e', e0, E_ON]);
   if (e[e1] === E_UNKNOWN) sets.push(['e', e1, E_ON]);
   if (p0 >= 0 && e[p0] === E_UNKNOWN) sets.push(['e', p0, E_OFF]);
@@ -548,15 +566,39 @@ function checkMidSymCap(P, st, k) {
   const { ed, nb } = P;
   const e = st.e;
   const dNeg = AXIS_NEG[axis], dPos = AXIS_POS[axis];
-  const lenN = drawnSideLen(ed, nb, e, m.a, dNeg);
-  const lenP = drawnSideLen(ed, nb, e, m.b, dPos);
+  let lenN = 0, endN = m.a;
+  while (true) {
+    const x = ed[endN * 4 + dNeg];
+    if (x < 0 || e[x] !== E_ON) break;
+    lenN++;
+    endN = nb[endN * 4 + dNeg];
+  }
+  let lenP = 0, endP = m.b;
+  while (true) {
+    const x = ed[endP * 4 + dPos];
+    if (x < 0 || e[x] !== E_ON) break;
+    lenP++;
+    endP = nb[endP * 4 + dPos];
+  }
+  const minDrawn = lenN < lenP ? lenN : lenP;
+  const kMin = m.dir === 'C' ? 1 : 0;
+  if (minDrawn < kMin) return null;
+  // Early exit: if both caps at minDrawn are already non-unknown, check only whether a tighter block exists below minDrawn
+  if (lenN === lenP) {
+    const cN = ed[endN * 4 + dNeg];
+    const cP = ed[endP * 4 + dPos];
+    if ((cN < 0 || e[cN] !== E_UNKNOWN) && (cP < 0 || e[cP] !== E_UNKNOWN)) return null;
+  }
   const blkN = sideBlockedDist(P, st, m.a, dNeg, axis, m.dir !== 'C');
   const blkP = sideBlockedDist(P, st, m.b, dPos, axis, m.dir !== 'C');
   const maxSym = blkN < blkP ? blkN : blkP;
-  const minDrawn = lenN < lenP ? lenN : lenP;
-  if (minDrawn < maxSym || maxSym < (m.dir === 'C' ? 1 : 0)) return null;
+  if (minDrawn < maxSym || maxSym < kMin) return null;
   let curN = m.a, curP = m.b;
-  for (let s = 0; s < maxSym; s++) { curN = nb[curN * 4 + dNeg]; curP = nb[curP * 4 + dPos]; }
+  if (maxSym === lenN && maxSym === lenP) {
+    curN = endN; curP = endP;
+  } else {
+    for (let s = 0; s < maxSym; s++) { curN = nb[curN * 4 + dNeg]; curP = nb[curP * 4 + dPos]; }
+  }
   const capN = ed[curN * 4 + dNeg];
   const capP = ed[curP * 4 + dPos];
   const sets = [];
@@ -609,40 +651,91 @@ function findMidSymCap(P, st) {
   return out;
 }
 
+/** Single-dot evaluator for Rule 5 (`midLengthForce`). Returns `{ sets, info }` or null. */
+function checkMidLengthForce(P, st, k) {
+  const m = P.midloop[k];
+  const axis = knownAxisOf(P, st, m);
+  if (axis < 0) return null;
+  const { ed, nb } = P;
+  const e = st.e;
+  const dNeg = AXIS_NEG[axis], dPos = AXIS_POS[axis];
+  // Early exit on already-completed dots (equal drawn arms capped OFF/border on both ends)
+  let lenN = 0, endN = m.a;
+  while (true) {
+    const x = ed[endN * 4 + dNeg];
+    if (x < 0 || e[x] !== E_ON) break;
+    lenN++;
+    endN = nb[endN * 4 + dNeg];
+  }
+  let lenP = 0, endP = m.b;
+  while (true) {
+    const x = ed[endP * 4 + dPos];
+    if (x < 0 || e[x] !== E_ON) break;
+    lenP++;
+    endP = nb[endP * 4 + dPos];
+  }
+  if (lenN === lenP && lenN >= (m.dir === 'C' ? 1 : 0)) {
+    const cN = ed[endN * 4 + dNeg], cP = ed[endP * 4 + dPos];
+    if ((cN < 0 || e[cN] === E_OFF) && (cP < 0 || e[cP] === E_OFF)) return null;
+  }
+  ensureRayScratch(P.rows > P.cols ? P.rows : P.cols);
+  const packed = scanMidloopAxis(P, st, m, axis, mlNegE, mlPosE, mlNegC, mlPosC, false);
+  if (packed === 0) return null;
+  const validCount = packed >>> 16;
+  const minK = packed & 0xffff;
+  const sets = [];
+  for (let j = 1; j <= minK; j++) {
+    if (e[mlNegE[j]] === E_UNKNOWN) sets.push(['e', mlNegE[j], E_ON]);
+    if (e[mlPosE[j]] === E_UNKNOWN) sets.push(['e', mlPosE[j], E_ON]);
+  }
+  if (validCount === 1) {
+    const capN = ed[mlNegC[minK] * 4 + dNeg];
+    const capP = ed[mlPosC[minK] * 4 + dPos];
+    if (capN >= 0 && e[capN] === E_UNKNOWN) sets.push(['e', capN, E_OFF]);
+    if (capP >= 0 && e[capP] === E_UNKNOWN) sets.push(['e', capP, E_OFF]);
+  }
+  return sets.length ? { sets, info: { midIdx: k, cell: m.a, cell2: m.b, axis, minK, exact: validCount === 1 } } : null;
+}
+
 /**
  * Rule 5 (Medium, weight 11): Mid-loop exact-length / gap deduction — along a known axis,
  * eliminating impossible stop lengths forces a larger minimum extension or a unique cap.
  */
 function findMidLengthForce(P, st) {
   if (!P.hasMidloop) return [];
-  const { ed } = P;
-  const e = st.e;
-  ensureRayScratch(P.rows > P.cols ? P.rows : P.cols);
   const out = [];
   for (let k = 0; k < P.midloop.length; k++) {
-    const m = P.midloop[k];
-    const axis = knownAxisOf(P, st, m);
-    if (axis < 0) continue;
-    const packed = scanMidloopAxis(P, st, m, axis, mlNegE, mlPosE, mlNegC, mlPosC, false);
-    if (packed === 0) continue;
-    const validCount = packed >>> 16;
-    const minK = packed & 0xffff;
-    const sets = [];
-    for (let j = 1; j <= minK; j++) {
-      if (e[mlNegE[j]] === E_UNKNOWN) sets.push(['e', mlNegE[j], E_ON]);
-      if (e[mlPosE[j]] === E_UNKNOWN) sets.push(['e', mlPosE[j], E_ON]);
-    }
-    if (validCount === 1) {
-      const capN = ed[mlNegC[minK] * 4 + AXIS_NEG[axis]];
-      const capP = ed[mlPosC[minK] * 4 + AXIS_POS[axis]];
-      if (capN >= 0 && e[capN] === E_UNKNOWN) sets.push(['e', capN, E_OFF]);
-      if (capP >= 0 && e[capP] === E_UNKNOWN) sets.push(['e', capP, E_OFF]);
-    }
-    if (sets.length) {
-      out.push({ sets, info: { midIdx: k, cell: m.a, cell2: m.b, axis, minK, exact: validCount === 1 } });
-    }
+    const h = checkMidLengthForce(P, st, k);
+    if (h) out.push(h);
   }
   return out;
+}
+
+/** Single-dot evaluator for Rule 6 (`midVertexParity`). Returns `{ sets, info }` or null. */
+function checkMidVertexParity(P, st, k) {
+  const m = P.midloop[k];
+  if (m.dir !== 'C' || knownAxisOf(P, st, m) >= 0) return null;
+  ensureRayScratch(P.rows > P.cols ? P.rows : P.cols);
+  const pV = scanMidloopAxis(P, st, m, 0, mlNegE, mlPosE, mlNegC, mlPosC, false);
+  const pH = scanMidloopAxis(P, st, m, 1, mlNegE2, mlPosE2, mlNegC2, mlPosC2, false);
+  if ((pV === 0) === (pH === 0)) return null;
+  const axis = pV !== 0 ? 0 : 1;
+  const packed = pV !== 0 ? pV : pH;
+  const negE = pV !== 0 ? mlNegE : mlNegE2;
+  const posE = pV !== 0 ? mlPosE : mlPosE2;
+  const { ed } = P;
+  const e = st.e;
+  const i = m.cell;
+  const sets = [];
+  const p0 = ed[i * 4 + AXIS_PERP0[axis]], p1 = ed[i * 4 + AXIS_PERP1[axis]];
+  if (p0 >= 0 && e[p0] === E_UNKNOWN) sets.push(['e', p0, E_OFF]);
+  if (p1 >= 0 && e[p1] === E_UNKNOWN) sets.push(['e', p1, E_OFF]);
+  const minK = packed & 0xffff;
+  for (let j = 1; j <= minK; j++) {
+    if (e[negE[j]] === E_UNKNOWN) sets.push(['e', negE[j], E_ON]);
+    if (e[posE[j]] === E_UNKNOWN) sets.push(['e', posE[j], E_ON]);
+  }
+  return sets.length ? { sets, info: { midIdx: k, cell: i, axis } } : null;
 }
 
 /**
@@ -651,33 +744,32 @@ function findMidLengthForce(P, st) {
  */
 function findMidVertexParity(P, st) {
   if (!P.hasMidloop) return [];
-  const { ed } = P;
-  const e = st.e;
-  ensureRayScratch(P.rows > P.cols ? P.rows : P.cols);
   const out = [];
   for (let k = 0; k < P.midloop.length; k++) {
-    const m = P.midloop[k];
-    if (m.dir !== 'C' || knownAxisOf(P, st, m) >= 0) continue;
-    const pV = scanMidloopAxis(P, st, m, 0, mlNegE, mlPosE, mlNegC, mlPosC, false);
-    const pH = scanMidloopAxis(P, st, m, 1, mlNegE2, mlPosE2, mlNegC2, mlPosC2, false);
-    if ((pV === 0) === (pH === 0)) continue;
-    const axis = pV !== 0 ? 0 : 1;
-    const packed = pV !== 0 ? pV : pH;
-    const negE = pV !== 0 ? mlNegE : mlNegE2;
-    const posE = pV !== 0 ? mlPosE : mlPosE2;
-    const i = m.cell;
-    const sets = [];
-    const p0 = ed[i * 4 + AXIS_PERP0[axis]], p1 = ed[i * 4 + AXIS_PERP1[axis]];
-    if (p0 >= 0 && e[p0] === E_UNKNOWN) sets.push(['e', p0, E_OFF]);
-    if (p1 >= 0 && e[p1] === E_UNKNOWN) sets.push(['e', p1, E_OFF]);
-    const minK = packed & 0xffff;
-    for (let j = 1; j <= minK; j++) {
-      if (e[negE[j]] === E_UNKNOWN) sets.push(['e', negE[j], E_ON]);
-      if (e[posE[j]] === E_UNKNOWN) sets.push(['e', posE[j], E_ON]);
-    }
-    if (sets.length) out.push({ sets, info: { midIdx: k, cell: i, axis } });
+    const h = checkMidVertexParity(P, st, k);
+    if (h) out.push(h);
   }
   return out;
+}
+
+/**
+ * Lookahead medium-step helper for `js/imagine.js` (parallels `whiteBothStraight` at step 7):
+ * keeps `runHypothesis` in sync with `propagateMidloopDot` so Mid-loop lookaheads don't fall through to `tryEdge`.
+ */
+export function findMediumMidloopStep(P, st, tryEmit, scopeMids = null) {
+  if (!P.hasMidloop) return null;
+  const len = scopeMids ? scopeMids.length : P.midloop.length;
+  for (let i = 0; i < len; i++) {
+    const k = scopeMids ? scopeMids[i] : i;
+    const h = checkMidLengthForce(P, st, k);
+    if (h) { const em = tryEmit('midLengthForce', h.sets, h.info); if (em) return em; }
+  }
+  for (let i = 0; i < len; i++) {
+    const k = scopeMids ? scopeMids[i] : i;
+    const h = checkMidVertexParity(P, st, k);
+    if (h) { const em = tryEmit('midVertexParity', h.sets, h.info); if (em) return em; }
+  }
+  return null;
 }
 
 /**

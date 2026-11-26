@@ -83,10 +83,11 @@ export function compileSlither(P, raw) {
   }
 
   const slither = [];
-  let slitherNum = null, slitherAt = null;
+  let slitherNum = null, slitherAt = null, isSlitherVertex = null, efOff = null, efData = null;
   if (hasRaw) {
     slitherNum = new Int8Array(F).fill(-1);
     slitherAt = new Int16Array(F).fill(-1);
+    isSlitherVertex = new Uint8Array(P.N);
     rawSlither.forEach((sc, k) => {
       const { r, c, n } = sc;
       if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || c < 0 || r >= fr || c >= fc) {
@@ -102,7 +103,47 @@ export function compileSlither(P, raw) {
       slitherAt[f] = k;
       slitherNum[f] = n;
       slither.push({ r, c, n, f });
+      if (n > 0) {
+        const tl = r * cols + c;
+        isSlitherVertex[tl] = 1;
+        isSlitherVertex[tl + 1] = 1;
+        isSlitherVertex[tl + cols] = 1;
+        isSlitherVertex[tl + cols + 1] = 1;
+      }
     });
+
+    // Precompute deduplicated CSR edge -> numbered-face wakeup list for propagate()
+    const edgeLists = Array.from({ length: numEdges }, () => []);
+    const addWake = (x, f) => {
+      if (x < 0 || edgeA[x] < 0) return;
+      const list = edgeLists[x];
+      for (let i = 0; i < list.length; i++) if (list[i] === f) return;
+      list.push(f);
+    };
+    const ed = P.ed;
+    for (let si = 0; si < slither.length; si++) {
+      const { r, c, n, f } = slither[si];
+      const f4 = f * 4;
+      for (let d = 0; d < 4; d++) addWake(faceEdges[f4 + d], f);
+      if (n === 1 || n === 3) {
+        for (let ci = 0; ci < 4; ci++) {
+          const sp = CORNER_SPEC[ci];
+          const v = (r + sp[0]) * cols + (c + sp[1]);
+          addWake(ed[v * 4 + sp[6]], f);
+          addWake(ed[v * 4 + sp[7]], f);
+        }
+      }
+    }
+    efOff = new Int32Array(numEdges + 1);
+    let total = 0;
+    for (let x = 0; x < numEdges; x++) { efOff[x] = total; total += edgeLists[x].length; }
+    efOff[numEdges] = total;
+    efData = new Int32Array(total);
+    for (let x = 0; x < numEdges; x++) {
+      const list = edgeLists[x];
+      const off = efOff[x];
+      for (let i = 0; i < list.length; i++) efData[off + i] = list[i];
+    }
   }
 
   P.numFaces = F;
@@ -112,6 +153,9 @@ export function compileSlither(P, raw) {
   P.hasSlither = slither.length > 0;
   P.slitherNum = slitherNum;
   P.slitherAt = slitherAt;
+  P.isSlitherVertex = isSlitherVertex;
+  P._efOff = efOff;
+  P._efData = efData;
 }
 
 /** Append CSV tokens `r:c:S0`..`r:c:S3` to `parts`. */
@@ -240,7 +284,6 @@ export function propagateSlitherFace(P, st, f, setEdge) {
             }
             if (otherOut >= 0 && e[otherOut] === E_UNKNOWN) setEdge(otherOut, E_OFF);
           } else if (onA && onB) {
-            // Both outside exits ON -> corner has degree 2 -> both inner edges OFF -> at most 2 edges left for 3!
             return false;
           }
         }

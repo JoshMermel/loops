@@ -104,7 +104,7 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
     const pv = diff[v];
     if (ru === rv) {
       if ((pu ^ pv) !== xor) { conflict = true; return false; }
-      if (buildGraph && (reason.kind === 'edgeOn' || reason.kind === 'edgeOff' || reason.kind === 'whiteDiag')) {
+      if (buildGraph && (reason.kind === 'edgeOn' || reason.kind === 'edgeOff' || reason.kind === 'whiteDiag' || reason.kind === 'midDiag')) {
         const key = u < v ? u * V + v : v * V + u;
         if (!edgeSeen.has(key)) {
           edgeSeen.add(key);
@@ -180,6 +180,22 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
       const sw = canonFace(wr < fr && wc > 0 ? wr * fc + (wc - 1) : EXT);
       const se = canonFace(wr < fr && wc < fc ? wr * fc + wc : EXT);
       const reason = buildGraph ? { kind: 'whiteDiag', cell } : null;
+      link(nw, se, 1, reason);
+      link(ne, sw, 1, reason);
+    }
+  }
+
+  if (useCircles && P.hasMidloop) {
+    // 2b. Vertex Mid-loop dots ('C') always go straight through, so both diagonal corner pairs have opposite parity
+    for (let k = 0; k < P.midloop.length; k++) {
+      const md = P.midloop[k];
+      if (md.dir !== 'C') continue;
+      const cell = md.cell, mr = md.r, mc = md.c;
+      const nw = canonFace(mr > 0 && mc > 0 ? (mr - 1) * fc + (mc - 1) : EXT);
+      const ne = canonFace(mr > 0 && mc < fc ? (mr - 1) * fc + mc : EXT);
+      const sw = canonFace(mr < fr && mc > 0 ? mr * fc + (mc - 1) : EXT);
+      const se = canonFace(mr < fr && mc < fc ? mr * fc + mc : EXT);
+      const reason = buildGraph ? { kind: 'midDiag', cell, midIdx: k } : null;
       link(nw, se, 1, reason);
       link(ne, sw, 1, reason);
     }

@@ -14,7 +14,7 @@ import {
 } from './variants/slitherlink.js';
 import {
   firstUnsatisfiedMidloop, isMidloopEdge, firstUnsatisfiedMidloopOnClose,
-  findEasyMidloopStep, midloopContradiction,
+  findEasyMidloopStep, findMediumMidloopStep, midloopContradiction,
 } from './variants/midloop.js';
 
 const isFrontierEdge = (P, st, x) => (
@@ -812,6 +812,12 @@ function findEasyStep(P, st, forbid, scope = null) {
     }
   }
 
+  // 7b. Mid-loop medium rules (keeps runHypothesis in sync with propagateMidloopDot, paralleling whiteBothStraight)
+  if (P.hasMidloop) {
+    const emitted = findMediumMidloopStep(P, st, tryEmit, scope ? scope.mids : null);
+    if (emitted) return emitted;
+  }
+
   // 8. noEarlyClose (skip when no E_ON / LOOP cell has been added in this hypothesis)
   if (scope && !scope.hasOn) return null;
   let loopCount = -1;
@@ -872,7 +878,9 @@ function findEasyStep(P, st, forbid, scope = null) {
  * Tracks the dirty causal cone of cells within orthogonal radius 2 of touched cells so
  * `findEasyStep` and `easyContradiction` stay O(local cone) instead of O(N) per step.
  */
-function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkArea = false, forbid = null, scoped = true, grayCell = -1 } = {}) {
+function runHypothesis(P, baseState, edge, val, {
+  maxSteps = MAX_STEPS, checkArea = false, forbid = null, scoped = true, grayCell = -1,
+} = {}) {
   const st = cloneState(baseState);
   if (grayCell >= 0) st.clue[grayCell] = val;
   else st.e[edge] = val;
@@ -1039,9 +1047,11 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
  * Prune a successful hypothesis chain by ablation: forbid derived steps from back to front;
  * if the contradiction still occurs without a step, drop it.
  */
-function pruneChain(P, baseState, edge, val, rawSteps, area, costCap, grayCell = -1) {
+function pruneChain(P, baseState, edge, val, rawSteps, area, costCap, grayCell = -1, rawBroke = null) {
   const isFrontier = grayCell >= 0 || isFrontierEdge(P, baseState, edge);
   if (minImagineCost(0, area, isFrontier) >= costCap) return null;
+  // Early reject: earlyClose/twoLoops contradictions cannot qualify as imagineLocal (cost <= MEDIUM_MAX)
+  if (costCap <= MEDIUM_MAX && rawBroke && (rawBroke.kind === 'earlyClose' || rawBroke.kind === 'twoLoops')) return null;
   const forbid = new Set();
   const kept = [];
   for (let k = rawSteps.length - 1; k >= 0; k--) {
@@ -1116,6 +1126,30 @@ function candidateEdges(P, st, frontierOnly = false) {
       }
     }
   }
+  if (P.hasMidloop) {
+    // Include step-1 and step-2 vertices along each Mid-loop dot's ray(s) so ray-distance-2 hypotheses are tested
+    for (let mi = 0; mi < P.midloop.length; mi++) {
+      const m = P.midloop[mi];
+      if (m.dir === 'C') {
+        const i4 = m.cell * 4;
+        for (let d = 0; d < 4; d++) {
+          const n1 = nb[i4 + d];
+          if (n1 >= 0) {
+            near[n1] = 1;
+            const n2 = nb[n1 * 4 + d];
+            if (n2 >= 0) near[n2] = 1;
+          }
+        }
+      } else {
+        const dNeg = m.axis === 0 ? 0 : 3;
+        const dPos = m.axis === 0 ? 2 : 1;
+        let n1 = nb[m.a * 4 + dNeg];
+        if (n1 >= 0) { near[n1] = 1; const n2 = nb[n1 * 4 + dNeg]; if (n2 >= 0) near[n2] = 1; }
+        n1 = nb[m.b * 4 + dPos];
+        if (n1 >= 0) { near[n1] = 1; const n2 = nb[n1 * 4 + dPos]; if (n2 >= 0) near[n2] = 1; }
+      }
+    }
+  }
   const secondary = [];
   for (let x = 0; x < numEdges; x++) {
     if (e[x] !== E_UNKNOWN) continue;
@@ -1134,12 +1168,11 @@ function candidateEdges(P, st, frontierOnly = false) {
  *   - Because oddOpenEnds and chokepointCheck are monotone, `fullContradiction` on the propagated
  *     fixed point is also an exact pre-filter for area contradictions.
  * Optional `costCap`: skip candidates that cannot beat `costCap` (strictly `< costCap`).
+ * Optional `stepCache`: reuses frontier pass across `costCap` escalations within the same `nextSteps` call.
  */
-export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) {
+export function bestImagine(P, st, { costCap = Infinity, without = null, stepCache = null } = {}) {
   const frontierOnly = costCap <= 84;
-  const edges = candidateEdges(P, st, frontierOnly);
   const unresolvedGrays = st.hasGray ? P.grays.filter((i) => st.clue[i] === GRAY) : [];
-  if (!edges.length && !unresolvedGrays.length) return null;
   if (propCellBuf.length < P.N) propCellBuf = new Int8Array(P.N);
   if (propEdgeBuf.length < P.numEdges) propEdgeBuf = new Int8Array(P.numEdges);
   if (st.hasGray && propClueBuf.length < P.N) propClueBuf = new Uint8Array(P.N);
@@ -1151,67 +1184,97 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
     cycle: false,
   };
 
-  // Check once whether `st` is already a propagate() fixed point (including UNKNOWN->LOOP endpoints)
-  // so trial calls can safely use O(local) seedEdge
-  stProp.cell.set(st.cell);
-  stProp.e.set(st.e);
-  if (st.hasGray) stProp.clue.set(st.clue);
-  stProp.cycle = st.cycle;
-  let baseFixed = !st.hasGray && propagate(P, stProp) && lastPropChanges === 0;
-  if (baseFixed) {
-    for (let i = 0; i < P.N; i++) {
-      if (stProp.cell[i] !== st.cell[i]) { baseFixed = false; break; }
+  let ic = stepCache && stepCache.imagine ? stepCache.imagine : null;
+  if (!ic) {
+    // Check once whether `st` is already a propagate() fixed point (including UNKNOWN->LOOP endpoints)
+    // so trial calls can safely use O(local) seedEdge
+    stProp.cell.set(st.cell);
+    stProp.e.set(st.e);
+    if (st.hasGray) stProp.clue.set(st.clue);
+    stProp.cycle = st.cycle;
+    let baseFixed = !st.hasGray && propagate(P, stProp) && lastPropChanges === 0;
+    if (baseFixed) {
+      for (let i = 0; i < P.N; i++) {
+        if (stProp.cell[i] !== st.cell[i]) { baseFixed = false; break; }
+      }
     }
+    ic = {
+      baseFixed,
+      edges: [],
+      edgeSeen: new Set(),
+      changed: [],
+      easyHits: [],
+      easyHitSet: new Set(),
+      noAreaSet: new Set(),
+      graysDone: false,
+      allDone: false,
+    };
+    if (stepCache) stepCache.imagine = ic;
   }
 
-  const needMask = edges.length * 2;
-  if (scratchChangedMask.length < needMask) scratchChangedMask = new Uint8Array(needMask);
-  const changedMask = scratchChangedMask;
+  const baseFixed = ic.baseFixed;
+  const wantEdges = ic.allDone ? ic.edges : candidateEdges(P, st, frontierOnly);
+  if (!wantEdges.length && !unresolvedGrays.length) return null;
 
-  const easyHits = [];
-  const easyHitSet = new Set();
-
-  for (let ei = 0; ei < edges.length; ei++) {
-    const x = edges[ei];
-    const isFront = isFrontierEdge(P, st, x);
-    for (let vi = 0; vi < 2; vi++) {
-      const val = vi === 0 ? E_ON : E_OFF;
-      stProp.cell.set(st.cell);
-      stProp.e.set(st.e);
-      if (st.hasGray) stProp.clue.set(st.clue);
-      stProp.cycle = st.cycle;
-      stProp.e[x] = val;
-      if (!propagate(P, stProp, baseFixed ? x : -1, -1)) {
-        changedMask[ei * 2 + vi] = 1;
-        const r = runHypothesis(P, st, x, val, { maxSteps: MAX_STEPS, checkArea: false });
-        if (r.broke) {
-          easyHits.push({ edge: x, grayCell: -1, hyp: val, rawSteps: r.steps, area: false, isFront });
-          easyHitSet.add((x << 2) | val);
+  const evalEdgeBatch = (list) => {
+    for (let ei = 0; ei < list.length; ei++) {
+      const x = list[ei];
+      if (ic.edgeSeen.has(x)) continue;
+      ic.edgeSeen.add(x);
+      const slot = ic.edges.length;
+      ic.edges.push(x);
+      const isFront = isFrontierEdge(P, st, x);
+      for (let vi = 0; vi < 2; vi++) {
+        const val = vi === 0 ? E_ON : E_OFF;
+        stProp.cell.set(st.cell);
+        stProp.e.set(st.e);
+        if (st.hasGray) stProp.clue.set(st.clue);
+        stProp.cycle = st.cycle;
+        stProp.e[x] = val;
+        if (!propagate(P, stProp, baseFixed ? x : -1, -1)) {
+          ic.changed[slot * 2 + vi] = 1;
+          const r = runHypothesis(P, st, x, val, { maxSteps: MAX_STEPS, checkArea: false });
+          if (r.broke) {
+            ic.easyHits.push({ edge: x, grayCell: -1, hyp: val, rawSteps: r.steps, rawBroke: r.broke, area: false, isFront });
+            ic.easyHitSet.add((x << 2) | val);
+          } else if (r.steps.length === 0) {
+            // Zero easy steps fired -> loop 2 cannot produce a >=1-step area hit either
+            ic.noAreaSet.add((x << 2) | val);
+          }
+        } else {
+          ic.changed[slot * 2 + vi] = lastPropChanges > 0 ? 1 : 0;
         }
-      } else {
-        changedMask[ei * 2 + vi] = lastPropChanges > 0 ? 1 : 0;
+      }
+    }
+  };
+
+  if (!ic.allDone) {
+    evalEdgeBatch(wantEdges);
+    if (!frontierOnly) ic.allDone = true;
+  }
+
+  if (!ic.graysDone) {
+    ic.graysDone = true;
+    // Also test imagining each unresolved gray pearl as WHITE or BLACK (natural human technique for Gray Masyu!)
+    for (let gi = 0; gi < unresolvedGrays.length; gi++) {
+      const gc = unresolvedGrays[gi];
+      for (const hypColor of [WHITE, BLACK]) {
+        stProp.cell.set(st.cell);
+        stProp.e.set(st.e);
+        stProp.clue.set(st.clue);
+        stProp.cycle = st.cycle;
+        stProp.clue[gc] = hypColor;
+        if (!propagate(P, stProp)) {
+          const r = runHypothesis(P, st, -1, hypColor, { maxSteps: MAX_STEPS, checkArea: false, grayCell: gc });
+          if (r.broke) {
+            ic.easyHits.push({ edge: -1, grayCell: gc, hyp: hypColor, rawSteps: r.steps, rawBroke: r.broke, area: false, isFront: true });
+          }
+        }
       }
     }
   }
 
-  // Also test imagining each unresolved gray pearl as WHITE or BLACK (natural human technique for Gray Masyu!)
-  for (let gi = 0; gi < unresolvedGrays.length; gi++) {
-    const gc = unresolvedGrays[gi];
-    for (const hypColor of [WHITE, BLACK]) {
-      stProp.cell.set(st.cell);
-      stProp.e.set(st.e);
-      stProp.clue.set(st.clue);
-      stProp.cycle = st.cycle;
-      stProp.clue[gc] = hypColor;
-      if (!propagate(P, stProp)) {
-        const r = runHypothesis(P, st, -1, hypColor, { maxSteps: MAX_STEPS, checkArea: false, grayCell: gc });
-        if (r.broke) {
-          easyHits.push({ edge: -1, grayCell: gc, hyp: hypColor, rawSteps: r.steps, area: false, isFront: true });
-        }
-      }
-    }
-  }
-
+  const easyHits = frontierOnly ? ic.easyHits.filter((c) => c.isFront) : ic.easyHits;
   // Prune easy hits FIRST (frontier candidates first, then shortest raw chain):
   // if an easy hit already achieves cost <= AREA_MIN_COST, we skip the O(edges) Tarjan/parity area scan!
   easyHits.sort((a, b) => (b.isFront ? 1 : 0) - (a.isFront ? 1 : 0) || a.rawSteps.length - b.rawSteps.length);
@@ -1222,7 +1285,7 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
       if (accepted >= limit) break;
       const cap = best ? best.cost : costCap;
       const gc = c.grayCell ?? -1;
-      const pr = pruneChain(P, st, c.edge, c.hyp, c.rawSteps, c.area, cap, gc);
+      const pr = pruneChain(P, st, c.edge, c.hyp, c.rawSteps, c.area, cap, gc, c.rawBroke);
       if (!pr || pr.cost >= costCap) continue;
       if (without && without.includes(pr.rule)) continue;
       accepted++;
@@ -1254,13 +1317,15 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
   const effectiveCap = best ? Math.min(costCap, best.cost) : costCap;
   if (easyChecked < MAX_CAND && effectiveCap > AREA_MIN_COST) {
     const areaHits = [];
+    const edges = ic.edges;
     for (let ei = 0; ei < edges.length; ei++) {
       const x = edges[ei];
       for (let vi = 0; vi < 2; vi++) {
         const val = vi === 0 ? E_ON : E_OFF;
-        if (easyHitSet.has((x << 2) | val)) continue;
+        const key = (x << 2) | val;
+        if (ic.easyHitSet.has(key) || ic.noAreaSet.has(key)) continue;
         // If propagate made 0 edge/OFF deductions beyond `x = val`, findEasyStep fires 0 steps -> cannot be an area hit
-        if (baseFixed && !changedMask[ei * 2 + vi]) continue;
+        if (baseFixed && !ic.changed[ei * 2 + vi]) continue;
         stProp.cell.set(st.cell);
         stProp.e.set(st.e);
         if (st.hasGray) stProp.clue.set(st.clue);
@@ -1271,7 +1336,9 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
         if (!propagate(P, stProp, baseFixed ? x : -1, -1) || fullContradiction(P, stProp, true)) {
           const r = runHypothesis(P, st, x, val, { maxSteps: AREA_STEPS, checkArea: true });
           if (r.broke) {
-            areaHits.push({ edge: x, grayCell: -1, hyp: val, rawSteps: r.steps, area: r.area });
+            areaHits.push({ edge: x, grayCell: -1, hyp: val, rawSteps: r.steps, rawBroke: r.broke, area: r.area });
+          } else {
+            ic.noAreaSet.add(key);
           }
         }
       }
@@ -1287,7 +1354,7 @@ export function bestImagine(P, st, { costCap = Infinity, without = null } = {}) 
         if (!propagate(P, stProp) || fullContradiction(P, stProp, true)) {
           const r = runHypothesis(P, st, -1, hypColor, { maxSteps: AREA_STEPS, checkArea: true, grayCell: gc });
           if (r.broke && r.area) {
-            areaHits.push({ edge: -1, grayCell: gc, hyp: hypColor, rawSteps: r.steps, area: true });
+            areaHits.push({ edge: -1, grayCell: gc, hyp: hypColor, rawSteps: r.steps, rawBroke: r.broke, area: true });
           }
         }
       }

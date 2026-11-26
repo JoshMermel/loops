@@ -987,9 +987,17 @@ function symEdgeMapFor(P, layout) {
   return em;
 }
 
+/** True if a symmetric Hamiltonian cycle on a void-free `rows x cols` grid is mathematically impossible. */
+function isImpossibleSymFull(rows, cols, layout) {
+  if (layout === 'transpose' && rows >= 4) return true;
+  if (layout === 'mirror' && (cols & 1) && rows >= 4) return true;
+  return false;
+}
+
 /** Sample a random symmetric Hamiltonian cycle on `emptyFull` for 'rot180', 'mirror', or 'transpose'. */
 function sampleSymmetricFullLoop(emptyFull, layout, rand, maxNodes = 4000) {
   if (layout === 'transpose' && emptyFull.rows !== emptyFull.cols) return null;
+  if (!emptyFull.hasVoids && isImpossibleSymFull(emptyFull.rows, emptyFull.cols, layout)) return null;
   const em = symEdgeMapFor(emptyFull, layout);
   const { N, numEdges, ed, edgeA } = emptyFull;
   let nodes = 0;
@@ -1031,8 +1039,9 @@ function sampleSymmetricFullLoop(emptyFull, layout, rand, maxNodes = 4000) {
     if (x < 0) return isSolved(emptyFull, st.e) ? st.e : null;
     const tx = em[x];
     const vals = rand() < 0.5 ? [E_ON, E_OFF] : [E_OFF, E_ON];
-    for (const v of vals) {
-      const s2 = cloneState(st);
+    for (let vi = 0; vi < 2; vi++) {
+      const v = vals[vi];
+      const s2 = vi === 0 ? cloneState(st) : st;
       s2.e[x] = v;
       if (!propagate(emptyFull, s2, x)) continue;
       if (tx >= 0 && tx !== x) {
@@ -1068,6 +1077,10 @@ function sampleSymmetricFullLoop(emptyFull, layout, rand, maxNodes = 4000) {
     return null;
   };
   const st0 = initialState(emptyFull);
+  // For rot180 on even x odd without voids, the single self-symmetric center edge cannot lie on a simple symmetric cycle
+  if (layout === 'rot180' && !emptyFull.hasVoids && (((emptyFull.rows & 1) ^ (emptyFull.cols & 1)) === 1)) {
+    for (let e = 0; e < numEdges; e++) if (edgeA[e] >= 0 && em[e] === e) st0.e[e] = E_OFF;
+  }
   if (!propagate(emptyFull, st0)) return null;
   return dfs(st0);
 }
@@ -1088,6 +1101,7 @@ function generateFullBoardPuzzle({
   if (!hasExplicitVoids && ((rows * cols) & 1)) return null;
   const isSwiss = style === 'full-swiss' || hasExplicitVoids;
   const symLayout = (!isSwiss && style !== 'full-masyu' && (layout === 'rot180' || layout === 'mirror')) ? layout : null;
+  if (symLayout && isImpossibleSymFull(rows, cols, symLayout)) return null;
   const N = rows * cols;
   const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
   const solvedByPropagate = (P) => {
@@ -1767,6 +1781,7 @@ function generateSlitherPuzzle({
   const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
   if ((isFull || isAll3) && !hasExplicitVoids && ((rows * cols) & 1)) return null;
   if (symLayout === 'transpose' && rows !== cols) return null;
+  if ((isFull || isAll3) && symLayout && !isSwiss && isImpossibleSymFull(rows, cols, symLayout)) return null;
   const N = rows * cols;
   const fr = rows - 1, fc = cols - 1;
   const pruneNodeCap = N >= 225 ? 8000 : N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
@@ -2116,6 +2131,7 @@ function generateMidloopPuzzle({
   const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
   if (layout && layout !== 'none' && !symLayout) return null;
   if (symLayout === 'transpose' && rows !== cols) return null;
+  if (isFull && symLayout && !isSwiss && isImpossibleSymFull(rows, cols, symLayout)) return null;
   if (isFull && !isSwiss && ((rows * cols) & 1)) return null;
   const N = rows * cols;
   const fr = rows - 1, fc = cols - 1;

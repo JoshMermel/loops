@@ -693,18 +693,26 @@ function findDeadEnd(P, st) {
 
 function findForcedExits(P, st) {
   const out = [];
-  for (let i = 0; i < P.N; i++) {
-    if (st.cell[i] !== LOOP) continue;
-    let on = 0;
-    const open = [];
+  const { N, ed, nb } = P;
+  const { cell, e } = st;
+  for (let i = 0; i < N; i++) {
+    if (cell[i] !== LOOP) continue;
+    const i4 = i * 4;
+    let on = 0, uCnt = 0, u0 = -1, u1 = -1;
     for (let d = 0; d < 4; d++) {
-      const x = P.ed[i * 4 + d];
+      const x = ed[i4 + d];
       if (x < 0) continue;
-      if (st.e[x] === E_ON) on++;
-      else if (st.e[x] === E_UNKNOWN && st.cell[P.nb[i * 4 + d]] !== OFF) open.push(x);
+      const ev = e[x];
+      if (ev === E_ON) on++;
+      else if (ev === E_UNKNOWN && cell[nb[i4 + d]] !== OFF) {
+        if (uCnt === 0) u0 = x;
+        else if (uCnt === 1) u1 = x;
+        uCnt++;
+      }
     }
-    if (open.length > 0 && on + open.length === 2) {
-      out.push({ sets: open.map((x) => ['e', x, E_ON]), info: { cell: i, edges: open } });
+    if (uCnt > 0 && on + uCnt === 2) {
+      if (uCnt === 1) out.push({ sets: [['e', u0, E_ON]], info: { cell: i, edges: [u0] } });
+      else out.push({ sets: [['e', u0, E_ON], ['e', u1, E_ON]], info: { cell: i, edges: [u0, u1] } });
     }
   }
   return out;
@@ -2410,19 +2418,19 @@ export function nextSteps(P, st, bookkeeping = null, without = null) {
   if (!runFreeBookkeeping(P, st, bookkeeping)) return null;
   const noImagine = !!without
     && without.includes('imagineLocal') && without.includes('imagineTrace') && without.includes('imagineChain');
+  const stepCache = {};
   const imagineAllowed = (f) => !!f && !(without && without.includes(f.rule));
   let found;
   let foundCap = 0;
   const imagined = (costCap = Infinity) => {
     if (noImagine) return null;
     if (found === undefined || (found === null && costCap > foundCap)) {
-      found = bestImagine(P, st, { costCap, without });
+      found = bestImagine(P, st, { costCap, without, stepCache });
       foundCap = costCap;
     }
     return imagineAllowed(found) ? found : null;
   };
 
-  const stepCache = {};
   for (const rule of HUMAN_ORDER) {
     if (without && without.includes(rule.id)) continue;
     if (!ruleApplies(rule, P, st)) continue;
