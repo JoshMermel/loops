@@ -147,7 +147,7 @@ function edgeBetween(P, a, b) {
   return -1;
 }
 
-const AUTO_GRACE_MS = 320;
+const AUTO_GRACE_MS = 180;
 const autoGrace = makeAutoGrace({ delayMs: AUTO_GRACE_MS });
 
 const reconcileAuto = (P, m) => {

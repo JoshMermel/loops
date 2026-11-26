@@ -57,7 +57,6 @@ test('makeAutoGrace defers auto-marks for double-tap, skips flush on same target
   let nextId = 1;
   const timers = new Map();
   const ag = makeAutoGrace({
-    delayMs: 320,
     setTimer: (fn, ms) => { const id = nextId++; timers.set(id, { fn, ms }); return id; },
     clearTimer: (id) => { timers.delete(id); },
   });
@@ -86,7 +85,7 @@ test('makeAutoGrace defers auto-marks for double-tap, skips flush on same target
   // Single tap left undisturbed fires when timer expires
   ag.schedule('f:2', () => { fired++; });
   const [{ fn, ms }] = [...timers.values()];
-  assert.equal(ms, 320);
+  assert.equal(ms, 180);
   fn();
   assert.equal(fired, 2);
   assert.equal(ag.isPending(), false);

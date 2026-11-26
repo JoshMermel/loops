@@ -23,7 +23,7 @@ export function makeGrace() {
  * stays pending as a missed timer so `flush(exceptKey)` or `flushIfMissed()` runs it safely later.
  */
 export function makeAutoGrace({
-  delayMs = 320,
+  delayMs = 180,
   setTimer = (fn, ms) => setTimeout(fn, ms),
   clearTimer = (id) => clearTimeout(id),
 } = {}) {
