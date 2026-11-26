@@ -69,7 +69,35 @@ const manifest = {
     {
       name: 'Slitherlink',
       icon: '🔢',
-      blurb: 'Each numbered square tells how many of its four sides belong to the single closed loop.',
+      blurb: 'Classic Slitherlink by size & difficulty, plus Swiss cheese, Skyscraper, Symmetry, and All 3s.',
+      subs: {
+        Classic: {
+          icon: '📚',
+          blurb: 'Standard Slitherlink boards by size (counted in numbered squares), from 7×7 up to tall 10×16.',
+          subs: {
+            '7×7': {
+              icon: '7️⃣',
+              blurb: 'Compact 7×7-square boards across all four difficulties.',
+            },
+            '10×10': {
+              icon: '🔟',
+              blurb: 'Classic 10×10-square boards across all four difficulties.',
+            },
+            '12×12': {
+              icon: '🔷',
+              blurb: 'Big 12×12-square boards across all four difficulties.',
+            },
+            '10×16': {
+              icon: '📏',
+              blurb: 'Tall magazine-page 10×16-square boards across all four difficulties.',
+            },
+          },
+        },
+        Bonus: {
+          icon: '🎁',
+          blurb: 'Themed variations with the same Slitherlink rules.',
+        },
+      },
     },
     {
       name: 'Mid-loop',
@@ -124,12 +152,12 @@ const recipes = [
   },
   {
     id: 'intro-slither', name: 'Slitherlink intro', label: '🔢 Slitherlink', group: 'Start here',
-    glob: 'intro_slither_5x5,intro_slither_6x6', limit: 40, onlyTier: 'Beginner', balanceGroups: true,
+    glob: 'intro_slither_5x5,intro_slither_6x6', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
     blurb: 'Small Beginner Slitherlink warm-ups, easiest first.',
   },
   {
     id: 'intro-midloop', name: 'Mid-loop intro', label: '🎯 Mid-loop', group: 'Start here',
-    glob: 'intro_midloop_6x6,intro_midloop_7x7', limit: 24, onlyTier: 'Beginner', balanceGroups: true,
+    glob: 'intro_midloop_6x6,intro_midloop_7x7', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
     blurb: 'Small Beginner Mid-loop warm-ups, easiest first.',
   },
   {
@@ -356,49 +384,71 @@ const recipes = [
     blurb: 'Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more.',
   },
 
-  // ---- Slitherlink (full-size 500-puzzle books)
+  // ---- Slitherlink Classic (per-size/per-difficulty 500-puzzle books, like Masyu) + Bonus
+  ...([
+    ['7x7', '7×7', 'slither_8x8'],
+    ['10x10', '10×10', 'slither_11x11'],
+    ['12x12', '12×12', 'slither_13x13'],
+    ['10x16', '10×16', 'slither_11x17'],
+  ].flatMap(([slug, dimLabel, glob]) => [
+    {
+      id: `slither-${slug}-beginner`, name: `Slitherlink ${dimLabel} Beginner`, label: 'Beginner',
+      group: 'Slitherlink', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Beginner',
+      blurb: 'Warm-up Slitherlink boards using core number and corner rules.',
+    },
+    {
+      id: `slither-${slug}-medium`, name: `Slitherlink ${dimLabel} Medium`, label: 'Medium',
+      group: 'Slitherlink', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Medium',
+      blurb: 'Corner-2 couplings, 1-line-in patterns, basic shading, and 1-step lookahead.',
+    },
+    {
+      id: `slither-${slug}-hard`, name: `Slitherlink ${dimLabel} Hard`, label: 'Hard',
+      group: 'Slitherlink', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Hard',
+      blurb: 'Slitherlink shading, loop topology, and short single-thread lookahead.',
+    },
+    {
+      id: `slither-${slug}-expert`, name: `Slitherlink ${dimLabel} Expert`, label: 'Expert',
+      group: 'Slitherlink', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Expert',
+      blurb: 'Deep lookahead chains on pure Slitherlink grids.',
+    },
+  ])),
   {
-    id: 'slither-small', name: 'Slitherlink — Small', label: 'Small', group: 'Slitherlink',
-    glob: 'slither_8x8', tiers: '50,200,200,50',
-    blurb: 'Compact Slitherlink boards across all four difficulties.',
-  },
-  {
-    id: 'slither-classic', name: 'Slitherlink — Classic', label: 'Classic', group: 'Slitherlink',
-    glob: 'slither_11x11', tiers: '50,200,200,50',
-    blurb: 'Classic 10×10-square Slitherlink boards across all four difficulties.',
-  },
-  {
-    id: 'slither-swiss-10x10', name: 'Slitherlink — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Slitherlink',
+    id: 'slither-swiss-10x10', name: 'Slitherlink — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Slitherlink', sub: 'Bonus',
     glob: 'slither_swiss_10x10', tiers: '50,200,200,50',
     blurb: 'Slitherlink on boards punched with random interior holes — each hole is entirely Inside or Outside.',
   },
   {
-    id: 'slither-sky-6x18', name: 'Slitherlink — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Slitherlink',
+    id: 'slither-sky-6x18', name: 'Slitherlink — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Slitherlink', sub: 'Bonus',
     glob: 'slither_sky_6x18', tiers: '50,200,200,50',
     blurb: 'Tall, narrow Slitherlink towers where the loop weaves up and down.',
   },
   {
-    id: 'slither-sym-9x9', name: 'Slitherlink — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Slitherlink',
+    id: 'slither-sym-9x9', name: 'Slitherlink — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Slitherlink', sub: 'Bonus',
     glob: 'slither_sym_rot180_9x9,slither_sym_mirror_9x9,slither_sym_transpose_9x9',
     tiers: '50,200,200,50', balanceGroups: true, interleaveGroups: true, maxRun: 2,
     blurb: 'Mirror, diagonal, and 180° symmetric Slitherlink clues and loops.',
   },
   {
-    id: 'slither-all3-8x8', name: 'Slitherlink — All 3s', label: '3️⃣ All 3s (8×8)', group: 'Slitherlink',
+    id: 'slither-all3-8x8', name: 'Slitherlink — All 3s', label: '3️⃣ All 3s (8×8)', group: 'Slitherlink', sub: 'Bonus',
     glob: 'slither_all3_8x8', tiers: '50,200,200,50',
     blurb: 'Pure Slitherlink where every single numbered square is a 3.',
   },
 
-  // ---- Mid-loop (token books)
+  // ---- Mid-loop (full-size 500-puzzle books at 10/40/40/10)
   {
     id: 'midloop-small', name: 'Mid-loop — Small', label: 'Small (7×7)', group: 'Mid-loop',
-    glob: 'midloop_7x7', tiers: '4,8,8,4',
+    glob: 'midloop_7x7', tiers: '50,200,200,50',
     blurb: 'Compact 7×7 Mid-loop boards across all four difficulties.',
   },
   {
     id: 'midloop-classic', name: 'Mid-loop — Classic', label: 'Classic (10×10)', group: 'Mid-loop',
-    glob: 'midloop_10x10', tiers: '4,8,8,4',
+    glob: 'midloop_10x10', tiers: '50,200,200,50',
     blurb: 'Classic 10×10 Mid-loop boards across all four difficulties.',
+  },
+  {
+    id: 'midloop-large', name: 'Mid-loop — Large', label: 'Large (12×12)', group: 'Mid-loop',
+    glob: 'midloop_12x12', tiers: '50,200,200,50',
+    blurb: 'Big 12×12 Mid-loop boards across all four difficulties.',
   },
 
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)
@@ -424,23 +474,36 @@ const recipes = [
   },
   {
     id: 'hybrid-midloop-masyu', name: 'Mid-loop + Masyu', label: '🎯⚪ Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Masyu',
-    glob: 'hybrid_midloop_masyu_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_midloop_masyu_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots and Masyu circles share one single loop — every puzzle genuinely requires both.',
   },
   {
     id: 'hybrid-midloop-slither', name: 'Mid-loop + Slitherlink', label: '🎯🔢 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
-    glob: 'hybrid_midloop_slither_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_midloop_slither_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots and Slitherlink numbers share one single loop — every puzzle genuinely requires both.',
   },
   {
     id: 'hybrid-midloop-full', name: 'Mid-loop + Hamilton cycle', label: '🎯🔁 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Hamilton cycle',
-    glob: 'hybrid_midloop_full_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_midloop_full_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots on a Hamilton cycle that visits every single dot.',
   },
 ];
 
+const onlyArg = process.argv.find((a, i) => process.argv[i - 1] === '--only')
+  || (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7);
+const onlySet = onlyArg ? new Set(onlyArg.split(',').map((s) => s.trim()).filter(Boolean)) : null;
+
 const builtFiles = [];
+if (onlySet) {
+  for (const r of recipes) {
+    if (!onlySet.has(r.id) && fs.existsSync(path.join(root, 'data', `${r.id}.csv`))) {
+      builtFiles.push(`data/${r.id}.csv`);
+    }
+  }
+}
+
 for (const r of recipes) {
+  if (onlySet && !onlySet.has(r.id)) continue;
   const args = [
     buildScript,
     '--id', r.id,
@@ -470,9 +533,22 @@ for (const r of recipes) {
   builtFiles.push(`data/${r.id}.csv`);
 }
 
-// Re-order manifest.books so non-hidden books appear in recipe order, hidden at the end
+// Re-order manifest.books so non-hidden books appear in recipe order, hidden at the end,
+// and sync recipe metadata (name/label/group/sub/sub2/blurb) even for skipped untouched books.
 const finalManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const byId = new Map(finalManifest.books.map((b) => [b.id, b]));
+for (const r of recipes) {
+  const entry = byId.get(r.id);
+  if (!entry) continue;
+  entry.name = r.name;
+  entry.label = r.label;
+  entry.group = r.group;
+  entry.blurb = r.blurb;
+  if (r.sub) entry.sub = r.sub;
+  else delete entry.sub;
+  if (r.sub2) entry.sub2 = r.sub2;
+  else delete entry.sub2;
+}
 finalManifest.default = manifest.default;
 finalManifest.groups = manifest.groups;
 finalManifest.books = [

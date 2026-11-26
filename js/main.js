@@ -1408,7 +1408,7 @@ function renderOfflineStatus(status) {
   offlineActions.hidden = !status.enabled;
   offlineRefreshBtn.disabled = offlineBusy || navigator.onLine === false;
   if (!status.enabled) {
-    offlineDesc.textContent = `Save the app and ${count} (~11 MB) to play without internet`;
+    offlineDesc.textContent = `Save the app and ${count} (~15 MB) to play without internet`;
   } else if (status.total === 0) {
     offlineDesc.textContent = 'Ready offline';
   } else if (status.cached >= status.total) {

@@ -54,7 +54,35 @@
     {
       "name": "Slitherlink",
       "icon": "🔢",
-      "blurb": "Each numbered square tells how many of its four sides belong to the single closed loop."
+      "blurb": "Classic Slitherlink by size & difficulty, plus Swiss cheese, Skyscraper, Symmetry, and All 3s.",
+      "subs": {
+        "Classic": {
+          "icon": "📚",
+          "blurb": "Standard Slitherlink boards by size (counted in numbered squares), from 7×7 up to tall 10×16.",
+          "subs": {
+            "7×7": {
+              "icon": "7️⃣",
+              "blurb": "Compact 7×7-square boards across all four difficulties."
+            },
+            "10×10": {
+              "icon": "🔟",
+              "blurb": "Classic 10×10-square boards across all four difficulties."
+            },
+            "12×12": {
+              "icon": "🔷",
+              "blurb": "Big 12×12-square boards across all four difficulties."
+            },
+            "10×16": {
+              "icon": "📏",
+              "blurb": "Tall magazine-page 10×16-square boards across all four difficulties."
+            }
+          }
+        },
+        "Bonus": {
+          "icon": "🎁",
+          "blurb": "Themed variations with the same Slitherlink rules."
+        }
+      }
     },
     {
       "name": "Mid-loop",
@@ -113,7 +141,7 @@
       "name": "Slitherlink intro",
       "label": "🔢 Slitherlink",
       "file": "data/intro-slither.csv",
-      "count": 40,
+      "count": 100,
       "group": "Start here",
       "blurb": "Small Beginner Slitherlink warm-ups, easiest first."
     },
@@ -122,7 +150,7 @@
       "name": "Mid-loop intro",
       "label": "🎯 Mid-loop",
       "file": "data/intro-midloop.csv",
-      "count": 24,
+      "count": 100,
       "group": "Start here",
       "blurb": "Small Beginner Mid-loop warm-ups, easiest first."
     },
@@ -521,22 +549,180 @@
       "blurb": "Bold shapes & repeating wallpapers — lattice, pillars, hourglass, spiral, brickwork, herringbone, and more."
     },
     {
-      "id": "slither-small",
-      "name": "Slitherlink — Small",
-      "label": "Small",
-      "file": "data/slither-small.csv",
+      "id": "slither-7x7-beginner",
+      "name": "Slitherlink 7×7 Beginner",
+      "label": "Beginner",
+      "file": "data/slither-7x7-beginner.csv",
       "count": 500,
       "group": "Slitherlink",
-      "blurb": "Compact Slitherlink boards across all four difficulties."
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Warm-up Slitherlink boards using core number and corner rules."
     },
     {
-      "id": "slither-classic",
-      "name": "Slitherlink — Classic",
-      "label": "Classic",
-      "file": "data/slither-classic.csv",
+      "id": "slither-7x7-medium",
+      "name": "Slitherlink 7×7 Medium",
+      "label": "Medium",
+      "file": "data/slither-7x7-medium.csv",
       "count": 500,
       "group": "Slitherlink",
-      "blurb": "Classic 10×10-square Slitherlink boards across all four difficulties."
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Corner-2 couplings, 1-line-in patterns, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "slither-7x7-hard",
+      "name": "Slitherlink 7×7 Hard",
+      "label": "Hard",
+      "file": "data/slither-7x7-hard.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Slitherlink shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "slither-7x7-expert",
+      "name": "Slitherlink 7×7 Expert",
+      "label": "Expert",
+      "file": "data/slither-7x7-expert.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Deep lookahead chains on pure Slitherlink grids."
+    },
+    {
+      "id": "slither-10x10-beginner",
+      "name": "Slitherlink 10×10 Beginner",
+      "label": "Beginner",
+      "file": "data/slither-10x10-beginner.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Warm-up Slitherlink boards using core number and corner rules."
+    },
+    {
+      "id": "slither-10x10-medium",
+      "name": "Slitherlink 10×10 Medium",
+      "label": "Medium",
+      "file": "data/slither-10x10-medium.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Corner-2 couplings, 1-line-in patterns, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "slither-10x10-hard",
+      "name": "Slitherlink 10×10 Hard",
+      "label": "Hard",
+      "file": "data/slither-10x10-hard.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Slitherlink shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "slither-10x10-expert",
+      "name": "Slitherlink 10×10 Expert",
+      "label": "Expert",
+      "file": "data/slither-10x10-expert.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Deep lookahead chains on pure Slitherlink grids."
+    },
+    {
+      "id": "slither-12x12-beginner",
+      "name": "Slitherlink 12×12 Beginner",
+      "label": "Beginner",
+      "file": "data/slither-12x12-beginner.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Warm-up Slitherlink boards using core number and corner rules."
+    },
+    {
+      "id": "slither-12x12-medium",
+      "name": "Slitherlink 12×12 Medium",
+      "label": "Medium",
+      "file": "data/slither-12x12-medium.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Corner-2 couplings, 1-line-in patterns, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "slither-12x12-hard",
+      "name": "Slitherlink 12×12 Hard",
+      "label": "Hard",
+      "file": "data/slither-12x12-hard.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Slitherlink shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "slither-12x12-expert",
+      "name": "Slitherlink 12×12 Expert",
+      "label": "Expert",
+      "file": "data/slither-12x12-expert.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Deep lookahead chains on pure Slitherlink grids."
+    },
+    {
+      "id": "slither-10x16-beginner",
+      "name": "Slitherlink 10×16 Beginner",
+      "label": "Beginner",
+      "file": "data/slither-10x16-beginner.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Warm-up Slitherlink boards using core number and corner rules."
+    },
+    {
+      "id": "slither-10x16-medium",
+      "name": "Slitherlink 10×16 Medium",
+      "label": "Medium",
+      "file": "data/slither-10x16-medium.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Corner-2 couplings, 1-line-in patterns, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "slither-10x16-hard",
+      "name": "Slitherlink 10×16 Hard",
+      "label": "Hard",
+      "file": "data/slither-10x16-hard.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Slitherlink shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "slither-10x16-expert",
+      "name": "Slitherlink 10×16 Expert",
+      "label": "Expert",
+      "file": "data/slither-10x16-expert.csv",
+      "count": 500,
+      "group": "Slitherlink",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Deep lookahead chains on pure Slitherlink grids."
     },
     {
       "id": "slither-swiss-10x10",
@@ -545,7 +731,8 @@
       "file": "data/slither-swiss-10x10.csv",
       "count": 500,
       "group": "Slitherlink",
-      "blurb": "Slitherlink on boards punched with random interior holes — each hole is entirely Inside or Outside."
+      "blurb": "Slitherlink on boards punched with random interior holes — each hole is entirely Inside or Outside.",
+      "sub": "Bonus"
     },
     {
       "id": "slither-sky-6x18",
@@ -554,7 +741,8 @@
       "file": "data/slither-sky-6x18.csv",
       "count": 500,
       "group": "Slitherlink",
-      "blurb": "Tall, narrow Slitherlink towers where the loop weaves up and down."
+      "blurb": "Tall, narrow Slitherlink towers where the loop weaves up and down.",
+      "sub": "Bonus"
     },
     {
       "id": "slither-sym-9x9",
@@ -563,7 +751,8 @@
       "file": "data/slither-sym-9x9.csv",
       "count": 500,
       "group": "Slitherlink",
-      "blurb": "Mirror, diagonal, and 180° symmetric Slitherlink clues and loops."
+      "blurb": "Mirror, diagonal, and 180° symmetric Slitherlink clues and loops.",
+      "sub": "Bonus"
     },
     {
       "id": "slither-all3-8x8",
@@ -572,14 +761,15 @@
       "file": "data/slither-all3-8x8.csv",
       "count": 500,
       "group": "Slitherlink",
-      "blurb": "Pure Slitherlink where every single numbered square is a 3."
+      "blurb": "Pure Slitherlink where every single numbered square is a 3.",
+      "sub": "Bonus"
     },
     {
       "id": "midloop-small",
       "name": "Mid-loop — Small",
       "label": "Small (7×7)",
       "file": "data/midloop-small.csv",
-      "count": 24,
+      "count": 500,
       "group": "Mid-loop",
       "blurb": "Compact 7×7 Mid-loop boards across all four difficulties."
     },
@@ -588,9 +778,18 @@
       "name": "Mid-loop — Classic",
       "label": "Classic (10×10)",
       "file": "data/midloop-classic.csv",
-      "count": 24,
+      "count": 500,
       "group": "Mid-loop",
       "blurb": "Classic 10×10 Mid-loop boards across all four difficulties."
+    },
+    {
+      "id": "midloop-large",
+      "name": "Mid-loop — Large",
+      "label": "Large (12×12)",
+      "file": "data/midloop-large.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "blurb": "Big 12×12 Mid-loop boards across all four difficulties."
     },
     {
       "id": "full-masyu-8x8",
@@ -637,7 +836,7 @@
       "name": "Mid-loop + Masyu",
       "label": "🎯⚪ Classic (8×8)",
       "file": "data/hybrid-midloop-masyu.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Mid-loop + Masyu",
       "blurb": "Teal midpoint dots and Masyu circles share one single loop — every puzzle genuinely requires both."
@@ -647,7 +846,7 @@
       "name": "Mid-loop + Slitherlink",
       "label": "🎯🔢 Classic (8×8)",
       "file": "data/hybrid-midloop-slither.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Mid-loop + Slitherlink",
       "blurb": "Teal midpoint dots and Slitherlink numbers share one single loop — every puzzle genuinely requires both."
@@ -657,7 +856,7 @@
       "name": "Mid-loop + Hamilton cycle",
       "label": "🎯🔁 Classic (8×8)",
       "file": "data/hybrid-midloop-full.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Mid-loop + Hamilton cycle",
       "blurb": "Teal midpoint dots on a Hamilton cycle that visits every single dot."
