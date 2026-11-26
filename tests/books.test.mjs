@@ -50,6 +50,9 @@ test('following hints from an empty board solves shipped Beginner and Medium puz
     '16x16-beginner', '16x16-medium', '12x20-beginner', '12x20-medium',
     '16x24-beginner', '16x24-medium',
     'slither-small', 'hybrid-slither-masyu', 'hybrid-slither-full',
+    'full-swiss-10x10', 'full-sym-8x8',
+    'slither-swiss-10x10', 'slither-sky-6x18', 'slither-sym-9x9', 'slither-all3-8x8',
+    'hybrid-slither2-full',
     'bonus-gray', 'swiss-10x10',
   ];
   for (const id of bookIds) {

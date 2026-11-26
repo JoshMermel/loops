@@ -363,6 +363,24 @@
       "blurb": "Visit every dot guided by a mix of permanent segments and walls."
     },
     {
+      "id": "full-swiss-10x10",
+      "name": "Swiss cheese (10×10)",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/full-swiss-10x10.csv",
+      "count": 24,
+      "group": "Hamilton cycle",
+      "blurb": "Visit every remaining dot on a 10×10 grid punched with balanced interior holes."
+    },
+    {
+      "id": "full-sym-8x8",
+      "name": "Symmetry (8×8)",
+      "label": "🪞 Symmetry (8×8)",
+      "file": "data/full-sym-8x8.csv",
+      "count": 24,
+      "group": "Hamilton cycle",
+      "blurb": "Mirror and 180° symmetric given lines and walls on a full-board loop."
+    },
+    {
       "id": "swiss-10x10",
       "name": "Swiss cheese (10×10)",
       "label": "🧀 10×10",
@@ -481,6 +499,42 @@
       "blurb": "Classic 10×10-square Slitherlink boards across all four difficulties."
     },
     {
+      "id": "slither-swiss-10x10",
+      "name": "Slitherlink — Swiss cheese",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/slither-swiss-10x10.csv",
+      "count": 24,
+      "group": "Slitherlink",
+      "blurb": "Slitherlink on boards punched with random interior holes — each hole is entirely Inside or Outside."
+    },
+    {
+      "id": "slither-sky-6x18",
+      "name": "Slitherlink — Skyscraper",
+      "label": "🏙️ Skyscraper (6×18)",
+      "file": "data/slither-sky-6x18.csv",
+      "count": 24,
+      "group": "Slitherlink",
+      "blurb": "Tall, narrow Slitherlink towers where the loop weaves up and down."
+    },
+    {
+      "id": "slither-sym-9x9",
+      "name": "Slitherlink — Symmetry",
+      "label": "🪞 Symmetry (9×9)",
+      "file": "data/slither-sym-9x9.csv",
+      "count": 24,
+      "group": "Slitherlink",
+      "blurb": "Mirror, diagonal, and 180° symmetric Slitherlink clues and loops."
+    },
+    {
+      "id": "slither-all3-8x8",
+      "name": "Slitherlink — All 3s",
+      "label": "3️⃣ All 3s (8×8)",
+      "file": "data/slither-all3-8x8.csv",
+      "count": 24,
+      "group": "Slitherlink",
+      "blurb": "Pure Slitherlink where every single numbered square is a 3."
+    },
+    {
       "id": "full-masyu-8x8",
       "name": "Masyu + Hamilton cycle",
       "label": "⚪🔁 Masyu + Hamilton cycle",
@@ -506,6 +560,15 @@
       "count": 24,
       "group": "Hybrids",
       "blurb": "Slitherlink numbers on a Hamilton cycle that visits every single dot."
+    },
+    {
+      "id": "hybrid-slither2-full",
+      "name": "All 2s + Hamilton cycle",
+      "label": "2️⃣🔁 All 2s + Hamilton cycle",
+      "file": "data/hybrid-slither2-full.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "blurb": "Every clue is a 2 on a Hamilton cycle that visits every single dot."
     },
     {
       "id": "armory",

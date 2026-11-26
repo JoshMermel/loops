@@ -243,6 +243,16 @@ const recipes = [
     glob: 'full_mixed_8x8', tiers: '50,200,200,50', tierBands: '0:255,220:300,265:500,450:1200',
     blurb: 'Visit every dot guided by a mix of permanent segments and walls.',
   },
+  {
+    id: 'full-swiss-10x10', name: 'Swiss cheese (10×10)', label: '🧀 Swiss cheese (10×10)', group: 'Hamilton cycle',
+    glob: 'full_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Visit every remaining dot on a 10×10 grid punched with balanced interior holes.',
+  },
+  {
+    id: 'full-sym-8x8', name: 'Symmetry (8×8)', label: '🪞 Symmetry (8×8)', group: 'Hamilton cycle',
+    glob: 'full_sym_rot180_8x8,full_sym_mirror_8x8', tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror and 180° symmetric given lines and walls on a full-board loop.',
+  },
 
   // ---- Swiss cheese (top-level section: 10x10, 12x12, 16x16, 12x20 — 500 core + Expert+ tail)
   {
@@ -321,6 +331,27 @@ const recipes = [
     glob: 'slither_11x11', tiers: '4,8,8,4',
     blurb: 'Classic 10×10-square Slitherlink boards across all four difficulties.',
   },
+  {
+    id: 'slither-swiss-10x10', name: 'Slitherlink — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Slitherlink',
+    glob: 'slither_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Slitherlink on boards punched with random interior holes — each hole is entirely Inside or Outside.',
+  },
+  {
+    id: 'slither-sky-6x18', name: 'Slitherlink — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Slitherlink',
+    glob: 'slither_sky_6x18', tiers: '4,8,8,4',
+    blurb: 'Tall, narrow Slitherlink towers where the loop weaves up and down.',
+  },
+  {
+    id: 'slither-sym-9x9', name: 'Slitherlink — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Slitherlink',
+    glob: 'slither_sym_rot180_9x9,slither_sym_mirror_9x9,slither_sym_transpose_9x9',
+    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror, diagonal, and 180° symmetric Slitherlink clues and loops.',
+  },
+  {
+    id: 'slither-all3-8x8', name: 'Slitherlink — All 3s', label: '3️⃣ All 3s (8×8)', group: 'Slitherlink',
+    glob: 'slither_all3_8x8', tiers: '4,8,8,4',
+    blurb: 'Pure Slitherlink where every single numbered square is a 3.',
+  },
 
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)
   {
@@ -337,6 +368,11 @@ const recipes = [
     id: 'hybrid-slither-full', name: 'Slitherlink + Hamilton cycle', label: '🔢🔁 Slitherlink + Hamilton cycle', group: 'Hybrids',
     glob: 'hybrid_slither_full_8x8', tiers: '4,8,8,4',
     blurb: 'Slitherlink numbers on a Hamilton cycle that visits every single dot.',
+  },
+  {
+    id: 'hybrid-slither2-full', name: 'All 2s + Hamilton cycle', label: '2️⃣🔁 All 2s + Hamilton cycle', group: 'Hybrids',
+    glob: 'hybrid_slither2_full_6x6', tiers: '4,8,8,4',
+    blurb: 'Every clue is a 2 on a Hamilton cycle that visits every single dot.',
   },
 ];
 

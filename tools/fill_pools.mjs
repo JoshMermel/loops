@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | intro-extra | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -454,6 +454,58 @@ if (!isMainThread) {
     },
     {
       group: 'slither', pool: 'hybrid_slither_full_8x8', cols: 8, rows: 8, style: 'slither-full',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+
+    // ---- Token variant pools for Hamilton cycle, Slitherlink, and Hybrids (24-puzzle playtest books)
+    {
+      group: 'variants-token', pool: 'full_swiss_10x10', cols: 10, rows: 10, style: 'full-swiss',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 12000,
+    },
+    {
+      group: 'variants-token', pool: 'full_sym_rot180_8x8', cols: 8, rows: 8, style: 'full-mixed', layout: 'rot180',
+      buckets: { Beginner: { need: 4 }, Medium: { need: 6 }, Hard: { need: 6 }, Expert: { need: 4 } },
+      budgetSec: 90, perPuzzleMs: 10000,
+    },
+    {
+      group: 'variants-token', pool: 'full_sym_mirror_8x8', cols: 8, rows: 8, style: 'full-mixed', layout: 'mirror',
+      buckets: { Beginner: { need: 4 }, Medium: { need: 6 }, Hard: { need: 6 }, Expert: { need: 4 } },
+      budgetSec: 90, perPuzzleMs: 10000,
+    },
+    {
+      group: 'variants-token', pool: 'slither_swiss_10x10', cols: 10, rows: 10, style: 'slither-swiss',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'variants-token', pool: 'slither_sky_6x18', cols: 6, rows: 18, style: 'slither',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 150, perPuzzleMs: 18000,
+    },
+    {
+      group: 'variants-token', pool: 'slither_sym_rot180_9x9', cols: 9, rows: 9, style: 'slither', layout: 'rot180',
+      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'variants-token', pool: 'slither_sym_mirror_9x9', cols: 9, rows: 9, style: 'slither', layout: 'mirror',
+      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'variants-token', pool: 'slither_sym_transpose_9x9', cols: 9, rows: 9, style: 'slither', layout: 'transpose',
+      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'variants-token', pool: 'slither_all3_8x8', cols: 8, rows: 8, style: 'slither-all3',
+      buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
+      budgetSec: 120, perPuzzleMs: 12000,
+    },
+    {
+      group: 'variants-token', pool: 'hybrid_slither2_full_6x6', cols: 6, rows: 6, style: 'slither-all2-full',
       buckets: { Beginner: { need: 6 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 6 } },
       budgetSec: 120, perPuzzleMs: 15000,
     },

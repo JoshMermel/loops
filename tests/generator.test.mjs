@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
-import { rate } from '../js/rating.js';
+import { rate, detectSymmetries } from '../js/rating.js';
 import { randomLoop, allowedClues, tightLoop, generatePuzzle, makeRng, maskPoints, quadrantStats } from '../js/generator.js';
 
 test('tightLoop returns cur.P.clue and cur.P.clueAt matching cur.clues even when final annealing steps reject', () => {
@@ -311,4 +311,53 @@ test('generatePuzzle matches independent rate(compile(p)) across gray, swiss-che
     assert.equal(r.tier, p.tier, `${cfg.style} cached tier mismatch`);
     assert.equal(r.rules, p.rules, `${cfg.style} cached rules mismatch`);
   }
+});
+
+test('generatePuzzle supports Hamilton swiss-cheese/symmetry and Slitherlink swiss-cheese/symmetry/all-3s/all-2s-full', () => {
+  const pFullSwiss = generatePuzzle({ rows: 8, cols: 8, style: 'full-swiss', seed: 501, budgetMs: 8000 });
+  assert.ok(pFullSwiss, 'failed to generate 8x8 full-swiss puzzle');
+  assert.equal(pFullSwiss.fullBoard, true);
+  assert.ok(pFullSwiss.voids && pFullSwiss.voids.length >= 2);
+  assert.ok(pFullSwiss.givens.length >= 2);
+  assert.equal(solve(pFullSwiss, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pFullSwiss)).score, pFullSwiss.score);
+
+  for (const layout of ['rot180', 'mirror']) {
+    const pFullSym = generatePuzzle({ rows: 6, cols: 6, style: 'full-mixed', layout, seed: 502, budgetMs: 8000 });
+    assert.ok(pFullSym, `failed to generate 6x6 full-mixed ${layout} puzzle`);
+    assert.equal(pFullSym.fullBoard, true);
+    assert.ok(detectSymmetries(pFullSym).length > 0, `full-mixed ${layout} must have detected symmetry`);
+    assert.equal(solve(pFullSym, { limit: 2, maxNodes: 50000 }).count, 1);
+    assert.equal(rate(compile(pFullSym)).score, pFullSym.score);
+  }
+
+  const pSlSwiss = generatePuzzle({ rows: 8, cols: 8, style: 'slither-swiss', seed: 503, budgetMs: 8000 });
+  assert.ok(pSlSwiss, 'failed to generate 8x8 slither-swiss puzzle');
+  assert.ok(pSlSwiss.voids && pSlSwiss.voids.length >= 1);
+  assert.ok(pSlSwiss.slither.length >= 4);
+  assert.equal(solve(pSlSwiss, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pSlSwiss)).score, pSlSwiss.score);
+
+  for (const layout of ['rot180', 'mirror', 'transpose']) {
+    const pSlSym = generatePuzzle({ rows: 7, cols: 7, style: 'slither', layout, seed: 504, budgetMs: 8000 });
+    assert.ok(pSlSym, `failed to generate 7x7 slither ${layout} puzzle`);
+    assert.ok(detectSymmetries(pSlSym).length > 0, `slither ${layout} must have detected symmetry`);
+    assert.equal(solve(pSlSym, { limit: 2, maxNodes: 50000 }).count, 1);
+    assert.equal(rate(compile(pSlSym)).score, pSlSym.score);
+  }
+
+  const pAll3 = generatePuzzle({ rows: 8, cols: 8, style: 'slither-all3', seed: 505, budgetMs: 8000 });
+  assert.ok(pAll3, 'failed to generate 8x8 slither-all3 puzzle');
+  assert.equal(Boolean(pAll3.fullBoard), false);
+  assert.ok(pAll3.slither.length >= 4 && pAll3.slither.every((s) => s.n === 3));
+  assert.equal(solve(pAll3, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pAll3)).score, pAll3.score);
+
+  const pAll2 = generatePuzzle({ rows: 6, cols: 6, style: 'slither-all2-full', seed: 506, budgetMs: 8000 });
+  assert.ok(pAll2, 'failed to generate 6x6 slither-all2-full puzzle');
+  assert.equal(pAll2.fullBoard, true);
+  assert.ok(pAll2.slither.length >= 4 && pAll2.slither.every((s) => s.n === 2));
+  assert.equal(solve(pAll2, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.ok(solve(compile({ name: 'nf2', rows: 6, cols: 6, clues: [], slither: pAll2.slither, fullBoard: false }), { limit: 2, maxNodes: 50000 }).count >= 2);
+  assert.equal(rate(compile(pAll2)).score, pAll2.score);
 });
