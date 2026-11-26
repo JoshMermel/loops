@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>How to solve Masyu</title>
-  <meta name="description" content="Every solving technique the Masyu Hint button knows, ordered from Beginner to Expert, with interactive examples.">
+  <title>How to Solve — Loop Puzzles</title>
+  <meta name="description" content="Every solving technique the Hint button knows across Masyu, Slitherlink, Mid-loop, Hamilton cycle, and Hybrids, with interactive examples.">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <script>
     (function () {
@@ -31,20 +31,31 @@
     .back { display: inline-block; margin-bottom: 12px; color: var(--accent); text-decoration: none; font-weight: 600; }
     .back:hover { text-decoration: underline; }
     h1 { margin: 0 0 8px; font-size: 1.9rem; }
-    h2 { margin: 36px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); font-size: 1.35rem; }
+    h2 { margin: 36px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); font-size: 1.38rem; }
     h3 { margin: 0 0 4px; font-size: 1.1rem; }
-    .variant-heading { margin: 26px 0 8px; font-size: 1.18rem; }
+    .sub-heading { margin: 26px 0 8px; font-size: 1.18rem; }
     p { margin: 0 0 12px; }
     ul { margin: 0 0 14px; padding-left: 22px; }
     li { margin: 4px 0; }
     code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
     .lead { color: var(--muted); font-size: 1.02rem; }
-    .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+    .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 22px; }
     .toc a {
       padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border);
       background: var(--card); color: var(--accent); text-decoration: none; font-size: 0.88rem; font-weight: 600;
     }
     .toc a:hover { border-color: var(--accent); }
+    .family-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px; margin: 12px 0 18px;
+    }
+    .family-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 14px; text-decoration: none; color: inherit; display: block;
+    }
+    .family-card:hover { border-color: var(--accent); }
+    .family-card b { display: block; margin-bottom: 4px; color: var(--accent); }
+    .family-card span { font-size: 0.88rem; color: var(--muted); }
     .rule-card {
       background: var(--card); border: 1px solid var(--border); border-radius: 10px;
       padding: 16px 18px; margin: 14px 0;
@@ -62,29 +73,41 @@
 </head>
 <body>
   <main>
-    <a class="back" href="../index.html">← Back to Masyu</a>
-    <h1>How to solve Masyu</h1>
-    <p class="lead">Every solving technique the Hint button knows, ordered from easiest to hardest. Click any diagram to open that exact puzzle in the app.</p>
+    <a class="back" href="../index.html">← Back to Puzzles</a>
+    <h1>How to Solve — Loop Puzzles</h1>
+    <p class="lead">Every solving technique the Hint button knows across <b>Masyu</b>, <b>Slitherlink</b>, <b>Mid-loop</b>, <b>Hamilton cycle</b>, and <b>Hybrids</b>. Click any diagram to open that exact puzzle in the app.</p>
     <nav class="toc" aria-label="Jump to section">
-      <a href="#rules">Rules</a>
+      <a href="#rules">Rules at a glance</a>
+      <a href="#loop-fundamentals">Loop fundamentals</a>
+      <a href="#puzzle-masyu">⚪ Masyu</a>
+      <a href="#variant-slitherlink">🔢 Slitherlink</a>
+      <a href="#variant-midloop">🎯 Mid-loop</a>
+      <a href="#variant-full">🔁 Hamilton cycle</a>
+      <a href="#variant-swiss">🧀 Modifiers &amp; Hybrids</a>
+    </nav>
+
+    <h2 id="rules">Rules at a glance</h2>
+    <p>Every puzzle shares one core goal: draw <b>one single closed loop</b> along the grid lines with no crossings or branches. Jump directly to any puzzle family:</p>
+    <div class="family-grid">
+      <a class="family-card" href="#puzzle-masyu"><b>⚪ Masyu</b><span>Go straight through white circles (turning beside them); turn 90° at black circles (going straight two steps out).</span></a>
+      <a class="family-card" href="#variant-slitherlink"><b>🔢 Slitherlink</b><span>Each number 0–3 inside a square tells how many of its four sides belong to the single closed loop.</span></a>
+      <a class="family-card" href="#variant-midloop"><b>🎯 Mid-loop</b><span>Pass straight through every teal dot at the exact midpoint of its straight segment (equal length on both sides).</span></a>
+      <a class="family-card" href="#variant-full"><b>🔁 Hamilton cycle</b><span>Visit every active intersection dot on the grid, guided by permanent given lines and ✕ walls.</span></a>
+      <a class="family-card" href="#variant-gray"><b>🔘 Gray circles</b><span>Masyu circles whose color (white or black) is hidden — deduce which each one is as you solve.</span></a>
+      <a class="family-card" href="#variant-swiss"><b>🧀 Swiss cheese &amp; Hybrids</b><span>Cutout holes (each entirely Inside or Outside) and two-ruleset hybrids that genuinely require both.</span></a>
+    </div>
+
+    <h2 id="loop-fundamentals">Loop fundamentals</h2>
+    <p>These universal techniques work identically on <b>every</b> puzzle family. A puzzle’s difficulty tier (Beginner, Medium, Hard, or Expert) comes from the hardest required rule across both loop fundamentals and puzzle-specific techniques.</p>
+    <nav class="toc" aria-label="Jump to fundamental tier">
       <a href="#bookkeeping">Bookkeeping</a>
       <a href="#beginner">Beginner</a>
       <a href="#medium">Medium</a>
       <a href="#hard">Hard</a>
       <a href="#expert">Expert</a>
-      <a href="#variant-rules">Variant rules</a>
     </nav>
 
-    <h2 id="rules">Rules of Masyu</h2>
-    <ul>
-      <li>Draw <b>one single closed loop</b> along the grid lines passing through every circle (white and black), with no crossings or branches.</li>
-      <li>Empty intersections may or may not be visited by the loop.</li>
-      <li><b>White circle (○):</b> the loop goes <b>straight through</b> it, and must <b>turn 90°</b> in at least one of the two adjacent cells along the loop.</li>
-      <li><b>Black circle (●):</b> the loop <b>turns 90°</b> at it, and must go <b>straight through</b> both adjacent cells along the loop (at least two segments straight in each exit direction).</li>
-      <li>Some books feature other loop puzzles or hybrids — see <a href="#variant-rules"><b>Variant rules</b></a> below (Slitherlink, Mid-loop, Hamilton cycle, Gray circles, and Swiss cheese).</li>
-    </ul>
-
-    <h2 id="bookkeeping">Bookkeeping</h2>
+    <h3 class="sub-heading" id="bookkeeping">Bookkeeping</h3>
     <p>5 core bookkeeping rules cost 1 each and run automatically before each hint step so the board stays tidy:</p>
     <ul>
       <li><code>edgesOffCellOff</code> (cost 1): A segment touching an off-loop cell is off.</li>
@@ -94,53 +117,8 @@
       <li><code>closedLoopRestOff</code> (cost 1): Once the single loop is closed, all remaining cells are off the loop.</li>
     </ul>
 
-    <h2 id="beginner">Beginner</h2>
-    <p>A puzzle is rated <b>Beginner</b> when its hardest required step is in this tier: basic circle rules, rows of three white circles, dead ends, forced exits, and not closing the loop early.</p>
-
-    <section class="rule-card" id="whiteStraight">
-      <h3><code>whiteStraight</code></h3>
-      <div class="rule-meta">Beginner, cost 2</div>
-      <p>A white circle blocked on one axis goes straight along the other.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=10"><img src="images/whiteStraight.svg" alt="whiteStraight hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-10 (5×5, the empty board). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The white circle at C1 cannot go vertically, so the loop must go straight horizontally through it."</blockquote>
-    </section>
-
-    <section class="rule-card" id="blackExtend">
-      <h3><code>blackExtend</code></h3>
-      <div class="rule-meta">Beginner, cost 2</div>
-      <p>A black circle continues straight two cells from an existing segment and turns away from the opposite side.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=11"><img src="images/blackExtend.svg" alt="blackExtend hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-11 (5×5, after 2 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The black circle at A3 leaves up, so it must go straight two cells up and cannot exit down."</blockquote>
-    </section>
-
-    <section class="rule-card" id="blackWall">
-      <h3><code>blackWall</code></h3>
-      <div class="rule-meta">Beginner, cost 2</div>
-      <p>A black circle blocked within two cells of a wall or cross must extend two cells the opposite way.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=12"><img src="images/blackWall.svg" alt="blackWall hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-12 (5×5, the empty board). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The black circle at E2 is too close to the up edge to go two straight cells up, so it must go two cells down."</blockquote>
-    </section>
-
-    <section class="rule-card" id="blackAdjacent">
-      <h3><code>blackAdjacent</code></h3>
-      <div class="rule-meta">Beginner, cost 3</div>
-      <p>Two touching black circles cannot connect, so each extends two cells away from the other.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=14"><img src="images/blackAdjacent.svg" alt="blackAdjacent hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-14 (8×8, after 7 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The touching black circles at D3 and D4 cannot connect (each must go straight through its neighbor), so D3 goes two cells up."</blockquote>
-    </section>
-
-    <section class="rule-card" id="whiteMustTurn">
-      <h3><code>whiteMustTurn</code></h3>
-      <div class="rule-meta">Beginner, cost 3</div>
-      <p>A white circle that goes straight at one end must turn at the other.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=15"><img src="images/whiteMustTurn.svg" alt="whiteMustTurn hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-15 (5×5, after 5 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The white circle at C2 goes straight through D2, so the loop must turn at B2 (cross out A2–B2)."</blockquote>
-    </section>
+    <h3 class="sub-heading" id="beginner">Beginner</h3>
+    <p>A puzzle is rated <b>Beginner</b> when its hardest required step is in this tier: direct local deductions — basic clue rules, dead ends, forced exits, and not closing the loop early.</p>
 
     <section class="rule-card" id="deadEnd">
       <h3><code>deadEnd</code></h3>
@@ -160,15 +138,6 @@
       <blockquote>Hint says: "A1 is on the loop and has only two exits left, so it must use A1–B1."</blockquote>
     </section>
 
-    <section class="rule-card" id="blackPerp">
-      <h3><code>blackPerp</code></h3>
-      <div class="rule-meta">Beginner, cost 5</div>
-      <p>A black circle cannot enter a neighbor that already has a perpendicular segment.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=17"><img src="images/blackPerp.svg" alt="blackPerp hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-17 (5×5, after 6 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The black circle at C3 cannot enter B3 (which already has a perpendicular segment), so it must go two cells right."</blockquote>
-    </section>
-
     <section class="rule-card" id="noEarlyClose">
       <h3><code>noEarlyClose</code></h3>
       <div class="rule-meta">Beginner, cost 6</div>
@@ -178,26 +147,8 @@
       <blockquote>Hint says: "A3 and B3 are the two ends of the same open path while other loop cells lie outside it, so A3–B3 cannot connect them."</blockquote>
     </section>
 
-    <section class="rule-card" id="threeWhites">
-      <h3><code>threeWhites</code></h3>
-      <div class="rule-meta">Beginner, cost 8</div>
-      <p>Three white circles in a row must all cross perpendicular to the row.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=16"><img src="images/threeWhites.svg" alt="threeWhites hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-16 (5×5, after 9 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "Three white circles in a row (D2, C2, and B2) cannot go along the row because the middle circle would fail to turn at either end; all three must cross vertically."</blockquote>
-    </section>
-
-    <h2 id="medium">Medium</h2>
-    <p>A puzzle is rated <b>Medium</b> when its hardest required step is in this tier: local multi-segment inferences, basic inside/outside shading, and 1-step local lookahead.</p>
-
-    <section class="rule-card" id="whiteBothStraight">
-      <h3><code>whiteBothStraight</code></h3>
-      <div class="rule-meta">Medium, cost 10</div>
-      <p>A white circle cannot use an axis where both neighbors already continue straight.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=24"><img src="images/whiteBothStraight.svg" alt="whiteBothStraight hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-24 (6×6, after 22 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "If the white circle at E4 went vertically, both ends would go straight without turning; so it must go straight horizontally."</blockquote>
-    </section>
+    <h3 class="sub-heading" id="medium">Medium</h3>
+    <p>A puzzle is rated <b>Medium</b> when its hardest required step is in this tier: multi-step local patterns, basic border-anchored Inside/Outside shading, and 1-step local lookahead.</p>
 
     <section class="rule-card" id="closingCell">
       <h3><code>closingCell</code></h3>
@@ -215,76 +166,6 @@
       <a class="rule-img" href="../index.html?book=armory&amp;puzzle=26"><img src="images/samePathExits.svg" alt="samePathExits hint example" loading="lazy"></a>
       <p class="caption">ARMORY-26 (8×8, after 11 earlier hints). Click the picture to open this puzzle in the app.</p>
       <blockquote>Hint says: "B2 is on the loop with three exits, and two of them (B1 and A2) lead to the ends of one path; using both would close the loop early, so it must take B2–C2."</blockquote>
-    </section>
-
-    <section class="rule-card" id="twoWhitesStraight">
-      <h3><code>twoWhitesStraight</code></h3>
-      <div class="rule-meta">Medium, cost 12</div>
-      <p>Two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=27"><img src="images/twoWhitesStraight.svg" alt="twoWhitesStraight hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-27 (8×8, after 23 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The touching white circles at E4 and F4 cannot join because C4–D4 already continues straight past E4; both must go vertically."</blockquote>
-    </section>
-
-    <section class="rule-card" id="whiteNoTurnAxis">
-      <h3><code>whiteNoTurnAxis</code></h3>
-      <div class="rule-meta">Medium, cost 14</div>
-      <p>A white circle cannot use an axis whose two neighbors are both unable to turn.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=29"><img src="images/whiteNoTurnAxis.svg" alt="whiteNoTurnAxis hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-29 (8×8, after 34 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The white circle at F3 must turn at one of its two ends, so it cannot go vertically (F2 is a white circle and F4 has both turns blocked); it must go horizontally."</blockquote>
-    </section>
-
-    <section class="rule-card" id="blackNoEarlyClose">
-      <h3><code>blackNoEarlyClose</code></h3>
-      <div class="rule-meta">Medium, cost 14</div>
-      <p>A black circle cannot extend two cells into the other end of its own path and close the loop early.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=30"><img src="images/blackNoEarlyClose.svg" alt="blackNoEarlyClose hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-30 (8×8, after 22 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "C3 and C1 are the two ends of one open path while other loop cells lie outside it, so the black circle at C3 cannot extend two cells up into C1; it must go two cells down."</blockquote>
-    </section>
-
-    <section class="rule-card" id="blackBlockedTarget">
-      <h3><code>blackBlockedTarget</code></h3>
-      <div class="rule-meta">Medium, cost 15</div>
-      <p>A black circle cannot extend toward a circle two cells away that cannot accept a straight segment.</p>
-      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
-    </section>
-
-    <section class="rule-card" id="blackTwoDiagWhites">
-      <h3><code>blackTwoDiagWhites</code></h3>
-      <div class="rule-meta">Medium, cost 15</div>
-      <p>A black circle flanked by two diagonally adjacent white circles cannot extend between them.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=31"><img src="images/blackTwoDiagWhites.svg" alt="blackTwoDiagWhites hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-31 (8×8, after 20 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The black circle at F3 cannot send a ray right between the two diagonal white circles at G4 and G2 (doing so would block whichever side its second leg takes); so it must go two cells left."</blockquote>
-    </section>
-
-    <section class="rule-card" id="blackWhiteNoTurn">
-      <h3><code>blackWhiteNoTurn</code></h3>
-      <div class="rule-meta">Medium, cost 16</div>
-      <p>A black circle cannot extend into a white circle two cells away whose far side cannot turn.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=32"><img src="images/blackWhiteNoTurn.svg" alt="blackWhiteNoTurn hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-32 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "The black circle at G3 cannot extend into the white circle at G5 because G6 already continues straight, leaving G5 unable to turn on either side; so G3 must go two cells up."</blockquote>
-    </section>
-
-    <section class="rule-card" id="whiteCornerPinch">
-      <h3><code>whiteCornerPinch</code></h3>
-      <div class="rule-meta">Medium, cost 17</div>
-      <p>A two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=33"><img src="images/whiteCornerPinch.svg" alt="whiteCornerPinch hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-33 (8×8, after 16 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "G6 has only two exits left, pointing to F6 and G5, which both already have a segment; passing through G6 would fill both neighbors and cut off the white circle at F5 on both axes, so cross out F6–G6 and G5–G6."</blockquote>
-    </section>
-
-    <section class="rule-card" id="whiteDeadEndPinch">
-      <h3><code>whiteDeadEndPinch</code></h3>
-      <div class="rule-meta">Medium, cost 17</div>
-      <p>A segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=34"><img src="images/whiteDeadEndPinch.svg" alt="whiteDeadEndPinch hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-34 (8×8, after 30 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "Drawing B2–C2 would fill both C2 and B2, turning B3 into a dead end and cutting off the white circle at C3 on both axes; so cross out B2–C2."</blockquote>
     </section>
 
     <section class="rule-card" id="faceShade">
@@ -314,8 +195,8 @@
       <blockquote>Hint says: "Imagine a segment at B3–B4: then the Mid-loop dot at B4–B5 must extend symmetrically vertically; and finally the Mid-loop dot at A5–A6 has no valid symmetric straight segment. So cross out B3–B4."</blockquote>
     </section>
 
-    <h2 id="hard">Hard</h2>
-    <p>A puzzle is rated <b>Hard</b> when its hardest required step is in this tier: circle-diagonal shading, global topology (pockets, chokepoints, paired ends), and short single-thread lookahead.</p>
+    <h3 class="sub-heading" id="hard">Hard</h3>
+    <p>A puzzle is rated <b>Hard</b> when its hardest required step is in this tier: clue-powered Inside/Outside shading, global loop topology (corridors, chokepoints, parity), symmetry, and short single-thread lookahead.</p>
 
     <section class="rule-card" id="corridorNoEarlyClose">
       <h3><code>corridorNoEarlyClose</code></h3>
@@ -329,7 +210,7 @@
     <section class="rule-card" id="faceCircle">
       <h3><code>faceCircle</code></h3>
       <div class="rule-meta">Hard, cost 38</div>
-      <p>Advanced inside/outside shading (white-circle diagonals, black 3-to-1 corners, or relative coloring) forces an edge.</p>
+      <p>Advanced inside/outside shading (white-circle or Mid-loop diagonals, black 3-to-1 corners, or relative coloring) forces an edge.</p>
       <a class="rule-img" href="../index.html?book=armory&amp;puzzle=40"><img src="images/faceCircle.svg" alt="faceCircle hint example" loading="lazy"></a>
       <p class="caption">ARMORY-40 (8×8, after 22 earlier hints). Click the picture to open this puzzle in the app.</p>
       <blockquote>Hint says: "Circle shading: crossing line C1–D1 makes C1–D2 Inside; crossing line H4–H5 makes G4–H5 Inside; crossing ✕ at G4–G5 keeps F4–G5 Inside; flipping diagonally across white circle F5 makes E5–F6 Outside (+3 more steps). That puts opposite sides (Inside and Outside) across C2–D2, so draw C2–D2."</blockquote>
@@ -405,8 +286,8 @@
       <blockquote>Hint says: "Because this puzzle has top-bottom mirror symmetry and a unique solution, the single loop must cross the mirror axis exactly twice (2 crossings already known), so cross out 4 edges."</blockquote>
     </section>
 
-    <h2 id="expert">Expert</h2>
-    <p>A puzzle is rated <b>Expert</b> when its hardest required step is in this tier: long or multi-front lookahead chains, full multi-rule trial and error, or beyond what Hint can explain.</p>
+    <h3 class="sub-heading" id="expert">Expert</h3>
+    <p>A puzzle is rated <b>Expert</b> when its hardest required step is in this tier: longer multi-front or area-parity lookahead chains and trial-and-contradiction deductions.</p>
 
     <section class="rule-card" id="imagineChain">
       <h3><code>imagineChain</code></h3>
@@ -426,17 +307,152 @@
       <blockquote>Hint says: "Imagine no segment at B6–C6 and follow the forced deductions (starting with: inside/outside shading forces draw B5–B6; then connecting the two open ends forces cross out A5–B5; then A5 must use A4–A5; then B5 must use B4–B5; reaching a contradiction after 5 steps). So draw B6–C6."</blockquote>
     </section>
 
-    <h2 id="variant-rules">Variant rules</h2>
-    <p>Extra rules and techniques used only in books with special rules:</p>
-    <nav class="toc" aria-label="Jump to variant">
-      <a href="#variant-gray">Gray circles</a>
-      <a href="#variant-full">Hamilton cycle</a>
-      <a href="#variant-swiss">Swiss cheese</a>
-      <a href="#variant-slitherlink">Slitherlink &amp; Hybrids</a>
-      <a href="#variant-midloop">Mid-loop &amp; Hybrids</a>
-    </nav>
+    <h2 id="puzzle-masyu">⚪ Masyu</h2>
+    <p><b>White circles (○):</b> pass straight through and turn 90° at least once at an adjacent intersection. <b>Black circles (●):</b> turn 90° at the circle and go straight for at least two segments in both exit directions.</p>
 
-    <h3 class="variant-heading" id="variant-gray">Gray circles</h3>
+    <section class="rule-card" id="whiteStraight">
+      <h3><code>whiteStraight</code></h3>
+      <div class="rule-meta">Beginner, cost 2</div>
+      <p>A white circle blocked on one axis goes straight along the other.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=10"><img src="images/whiteStraight.svg" alt="whiteStraight hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-10 (5×5, the empty board). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The white circle at C1 cannot go vertically, so the loop must go straight horizontally through it."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackExtend">
+      <h3><code>blackExtend</code></h3>
+      <div class="rule-meta">Beginner, cost 2</div>
+      <p>A black circle continues straight two cells from an existing segment and turns away from the opposite side.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=11"><img src="images/blackExtend.svg" alt="blackExtend hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-11 (5×5, after 2 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The black circle at A3 leaves up, so it must go straight two cells up and cannot exit down."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackWall">
+      <h3><code>blackWall</code></h3>
+      <div class="rule-meta">Beginner, cost 2</div>
+      <p>A black circle blocked within two cells of a wall or cross must extend two cells the opposite way.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=12"><img src="images/blackWall.svg" alt="blackWall hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-12 (5×5, the empty board). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The black circle at E2 is too close to the up edge to go two straight cells up, so it must go two cells down."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackAdjacent">
+      <h3><code>blackAdjacent</code></h3>
+      <div class="rule-meta">Beginner, cost 3</div>
+      <p>Two touching black circles cannot connect, so each extends two cells away from the other.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=14"><img src="images/blackAdjacent.svg" alt="blackAdjacent hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-14 (8×8, after 7 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The touching black circles at D3 and D4 cannot connect (each must go straight through its neighbor), so D3 goes two cells up."</blockquote>
+    </section>
+
+    <section class="rule-card" id="whiteMustTurn">
+      <h3><code>whiteMustTurn</code></h3>
+      <div class="rule-meta">Beginner, cost 3</div>
+      <p>A white circle that goes straight at one end must turn at the other.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=15"><img src="images/whiteMustTurn.svg" alt="whiteMustTurn hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-15 (5×5, after 5 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The white circle at C2 goes straight through D2, so the loop must turn at B2 (cross out A2–B2)."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackPerp">
+      <h3><code>blackPerp</code></h3>
+      <div class="rule-meta">Beginner, cost 5</div>
+      <p>A black circle cannot enter a neighbor that already has a perpendicular segment.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=17"><img src="images/blackPerp.svg" alt="blackPerp hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-17 (5×5, after 6 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The black circle at C3 cannot enter B3 (which already has a perpendicular segment), so it must go two cells right."</blockquote>
+    </section>
+
+    <section class="rule-card" id="threeWhites">
+      <h3><code>threeWhites</code></h3>
+      <div class="rule-meta">Beginner, cost 8</div>
+      <p>Three white circles in a row must all cross perpendicular to the row.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=16"><img src="images/threeWhites.svg" alt="threeWhites hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-16 (5×5, after 9 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "Three white circles in a row (D2, C2, and B2) cannot go along the row because the middle circle would fail to turn at either end; all three must cross vertically."</blockquote>
+    </section>
+
+    <section class="rule-card" id="whiteBothStraight">
+      <h3><code>whiteBothStraight</code></h3>
+      <div class="rule-meta">Medium, cost 10</div>
+      <p>A white circle cannot use an axis where both neighbors already continue straight.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=24"><img src="images/whiteBothStraight.svg" alt="whiteBothStraight hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-24 (6×6, after 22 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "If the white circle at E4 went vertically, both ends would go straight without turning; so it must go straight horizontally."</blockquote>
+    </section>
+
+    <section class="rule-card" id="twoWhitesStraight">
+      <h3><code>twoWhitesStraight</code></h3>
+      <div class="rule-meta">Medium, cost 12</div>
+      <p>Two touching white circles with a straight segment entering one cannot connect, so both cross perpendicular.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=27"><img src="images/twoWhitesStraight.svg" alt="twoWhitesStraight hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-27 (8×8, after 23 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The touching white circles at E4 and F4 cannot join because C4–D4 already continues straight past E4; both must go vertically."</blockquote>
+    </section>
+
+    <section class="rule-card" id="whiteNoTurnAxis">
+      <h3><code>whiteNoTurnAxis</code></h3>
+      <div class="rule-meta">Medium, cost 14</div>
+      <p>A white circle cannot use an axis whose two neighbors are both unable to turn.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=29"><img src="images/whiteNoTurnAxis.svg" alt="whiteNoTurnAxis hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-29 (8×8, after 34 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The white circle at F3 must turn at one of its two ends, so it cannot go vertically (F2 is a white circle and F4 has both turns blocked); it must go horizontally."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackNoEarlyClose">
+      <h3><code>blackNoEarlyClose</code></h3>
+      <div class="rule-meta">Medium, cost 14</div>
+      <p>A black circle cannot extend two cells into the other end of its own path and close the loop early.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=30"><img src="images/blackNoEarlyClose.svg" alt="blackNoEarlyClose hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-30 (8×8, after 22 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "C3 and C1 are the two ends of one open path while other loop cells lie outside it, so the black circle at C3 cannot extend two cells up into C1; it must go two cells down."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackBlockedTarget">
+      <h3><code>blackBlockedTarget</code></h3>
+      <div class="rule-meta">Medium, cost 15</div>
+      <p>A black circle cannot extend toward a circle two cells away that cannot accept a straight segment.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="blackTwoDiagWhites">
+      <h3><code>blackTwoDiagWhites</code></h3>
+      <div class="rule-meta">Medium, cost 15</div>
+      <p>A black circle flanked by two diagonally adjacent white circles cannot extend between them.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=31"><img src="images/blackTwoDiagWhites.svg" alt="blackTwoDiagWhites hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-31 (8×8, after 20 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The black circle at F3 cannot send a ray right between the two diagonal white circles at G4 and G2 (doing so would block whichever side its second leg takes); so it must go two cells left."</blockquote>
+    </section>
+
+    <section class="rule-card" id="blackWhiteNoTurn">
+      <h3><code>blackWhiteNoTurn</code></h3>
+      <div class="rule-meta">Medium, cost 16</div>
+      <p>A black circle cannot extend into a white circle two cells away whose far side cannot turn.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=32"><img src="images/blackWhiteNoTurn.svg" alt="blackWhiteNoTurn hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-32 (8×8, after 13 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "The black circle at G3 cannot extend into the white circle at G5 because G6 already continues straight, leaving G5 unable to turn on either side; so G3 must go two cells up."</blockquote>
+    </section>
+
+    <section class="rule-card" id="whiteCornerPinch">
+      <h3><code>whiteCornerPinch</code></h3>
+      <div class="rule-meta">Medium, cost 17</div>
+      <p>A two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=33"><img src="images/whiteCornerPinch.svg" alt="whiteCornerPinch hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-33 (8×8, after 16 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "G6 has only two exits left, pointing to F6 and G5, which both already have a segment; passing through G6 would fill both neighbors and cut off the white circle at F5 on both axes, so cross out F6–G6 and G5–G6."</blockquote>
+    </section>
+
+    <section class="rule-card" id="whiteDeadEndPinch">
+      <h3><code>whiteDeadEndPinch</code></h3>
+      <div class="rule-meta">Medium, cost 17</div>
+      <p>A segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=34"><img src="images/whiteDeadEndPinch.svg" alt="whiteDeadEndPinch hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-34 (8×8, after 30 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "Drawing B2–C2 would fill both C2 and B2, turning B3 into a dead end and cutting off the white circle at C3 on both axes; so cross out B2–C2."</blockquote>
+    </section>
+
+    <h3 class="sub-heading" id="variant-gray">Gray circles</h3>
     <p>Each gray circle is secretly either a <b>white</b> or a <b>black</b> circle — figuring out which is part of the puzzle. Tap a gray circle in the app to label it as an optional note.</p>
 
     <ul>
@@ -470,32 +486,8 @@
       <blockquote>Hint says: "If the gray circle at F4 were white, it could not make a required 90° turn on either axis; so it must be a black circle."</blockquote>
     </section>
 
-    <h3 class="variant-heading" id="variant-full">Hamilton cycle</h3>
-    <p>The loop must visit <b>every</b> intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens. Also combines with Masyu, Slitherlink, or Mid-loop in <b>Hybrids</b> books.</p>
-
-    <section class="rule-card" id="checkerPocket">
-      <h3><code>checkerPocket</code></h3>
-      <div class="rule-meta">Medium, cost 18</div>
-      <p>Checkerboard light/dark dot counts in a small full-board pocket force its exit segments.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=36"><img src="images/checkerPocket.svg" alt="checkerPocket hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-36 (8×8, after 10 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 2 more segment ends and dark dots need 4 (difference 2), which forces draw D4–D5 and B6–C6; cross out B5–C5 and D6–D7."</blockquote>
-    </section>
-
-    <section class="rule-card" id="checkerParity">
-      <h3><code>checkerParity</code></h3>
-      <div class="rule-meta">Hard, cost 36</div>
-      <p>Checkerboard light/dark dot counts in a full-board region force its exit segments.</p>
-      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=39"><img src="images/checkerParity.svg" alt="checkerParity hint example" loading="lazy"></a>
-      <p class="caption">ARMORY-39 (6×7, after 12 earlier hints). Click the picture to open this puzzle in the app.</p>
-      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 8 more segment ends and dark dots need 7 (difference 1), which forces draw A4–A5; cross out B4–B5."</blockquote>
-    </section>
-
-    <h3 class="variant-heading" id="variant-swiss">Swiss cheese</h3>
-    <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All core Masyu techniques — especially border rules, <code>chokepoint</code>, <code>faceShade</code>, and <code>faceCircle</code> — work naturally around and across interior holes.</p>
-
-    <h3 class="variant-heading" id="variant-slitherlink">Slitherlink &amp; Hybrids</h3>
-    <p>Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrids</b> books, numbered squares share the same single loop with Masyu circles, Mid-loop dots, or a Hamilton cycle.</p>
+    <h2 id="variant-slitherlink">🔢 Slitherlink</h2>
+    <p>Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides).</p>
 
     <section class="rule-card" id="slitherZero">
       <h3><code>slitherZero</code></h3>
@@ -587,8 +579,8 @@
       <blockquote>Hint says: "Inside/outside shading: even/odd parity around the 2 square B17–C18 makes A17–B18 Inside. That puts opposite sides (Outside and Inside) across A17–A18, so draw A17–A18."</blockquote>
     </section>
 
-    <h3 class="variant-heading" id="variant-midloop">Mid-loop &amp; Hybrids</h3>
-    <p>Every teal dot sits either on an intersection (even straight run: 2, 4, …) or on a segment midpoint (odd straight run: 1, 3, …). The single closed loop must pass <b>straight through</b> every teal dot with <b>equal straight lengths</b> on both sides up to the 90° turns at each end. Combines cleanly with Masyu, Slitherlink, and Hamilton cycle in <b>Hybrids</b> books.</p>
+    <h2 id="variant-midloop">🎯 Mid-loop</h2>
+    <p>Every teal dot sits either on an intersection (even straight run: 2, 4, …) or on a segment midpoint (odd straight run: 1, 3, …). The single closed loop must pass <b>straight through</b> every teal dot with <b>equal straight lengths</b> on both sides up to the 90° turns at each end. Because intersection dots always go straight through, diagonal Inside/Outside shading (<a href="#faceCircle"><code>faceCircle</code></a>) also applies to them.</p>
 
     <section class="rule-card" id="midEdgeDot">
       <h3><code>midEdgeDot</code></h3>
@@ -644,6 +636,32 @@
       <blockquote>Hint says: "The Mid-loop dot at C6 has no valid symmetric straight length horizontally, so it must run vertically: draw C5–C6 and C6–C7; cross out C6–D6 and B6–C6."</blockquote>
     </section>
 
+    <h2 id="variant-full">🔁 Hamilton cycle</h2>
+    <p>The loop must visit <b>every</b> active intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.</p>
+
+    <section class="rule-card" id="checkerPocket">
+      <h3><code>checkerPocket</code></h3>
+      <div class="rule-meta">Medium, cost 18</div>
+      <p>Checkerboard light/dark dot counts in a small full-board pocket force its exit segments.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=36"><img src="images/checkerPocket.svg" alt="checkerPocket hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-36 (8×8, after 10 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 2 more segment ends and dark dots need 4 (difference 2), which forces draw D4–D5 and B6–C6; cross out B5–C5 and D6–D7."</blockquote>
+    </section>
+
+    <section class="rule-card" id="checkerParity">
+      <h3><code>checkerParity</code></h3>
+      <div class="rule-meta">Hard, cost 36</div>
+      <p>Checkerboard light/dark dot counts in a full-board region force its exit segments.</p>
+      <a class="rule-img" href="../index.html?book=armory&amp;puzzle=39"><img src="images/checkerParity.svg" alt="checkerParity hint example" loading="lazy"></a>
+      <p class="caption">ARMORY-39 (6×7, after 12 earlier hints). Click the picture to open this puzzle in the app.</p>
+      <blockquote>Hint says: "Checkerboard parity on the highlighted full-board region: light dots need 8 more segment ends and dark dots need 7 (difference 1), which forces draw A4–A5; cross out B4–B5."</blockquote>
+    </section>
+
+    <h2 id="variant-rules">Board modifiers &amp; Hybrids</h2>
+    <h3 class="sub-heading" id="variant-swiss">🧀 Swiss cheese</h3>
+    <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All loop techniques — especially border rules, <a href="#chokepoint"><code>chokepoint</code></a>, <a href="#faceShade"><code>faceShade</code></a>, <a href="#faceCircle"><code>faceCircle</code></a>, and <a href="#faceSlither"><code>faceSlither</code></a> — work naturally around and across interior holes.</p>
+    <h3 class="sub-heading" id="hybrids">🔀 Hybrids</h3>
+    <p>In <b>Hybrids</b> books, two clue families (Masyu + Hamilton cycle, Slitherlink + Masyu, Slitherlink + Hamilton cycle, Mid-loop + Masyu, Mid-loop + Slitherlink, or Mid-loop + Hamilton cycle) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading and Mid-loop ray constraints automatically combine across clue families.</p>
   </main>
 </body>
 </html>
