@@ -128,6 +128,7 @@ if (process.argv.includes('--worker')) {
       for (const cw of P.castle) {
         if (cw.wall === 'W' && cw.isExterior) return fail('white castle wall tile on exterior/border');
         if (cw.wall === 'B' && !cw.dir && cw.isExterior) return fail('meaningless unnumbered exterior black castle wall tile');
+        if (cw.wall === 'G' && cw.isExterior) return fail('meaningless exterior gray castle wall tile');
         if (cw.dir && (cw.edges.length === 0 || cw.n > cw.edges.length)) return fail(`invalid castle arrow ray count ${cw.n}/${cw.edges.length}`);
       }
     }

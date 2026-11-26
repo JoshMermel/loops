@@ -305,6 +305,8 @@ let scratchCwQ = new Int16Array(0);
 let scratchInCwQ = new Uint8Array(0);
 let scratchCwDirty = new Uint8Array(0);
 let scratchCwDirtyList = new Int16Array(0);
+let scratchCwRunDirty = new Uint8Array(0);
+let scratchCwRunList = new Int16Array(0);
 let scratchCwCap = 0;
 let scratchQCap = 0;
 
@@ -326,6 +328,8 @@ function ensureCwScratch(K) {
     scratchInCwQ = new Uint8Array(K);
     scratchCwDirty = new Uint8Array(K);
     scratchCwDirtyList = new Int16Array(K);
+    scratchCwRunDirty = new Uint8Array(K);
+    scratchCwRunList = new Int16Array(K);
   }
   if (scratchCwCap <= K) {
     let cap = 32;
@@ -788,9 +792,19 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
         if (!propagateCastleParity(P, st, setEdgeOk)) { ok = false; break; }
       }
       if (cwDirtyLen > 0) {
-        const okMed = propagateCastleMedium(P, st, setEdgeOk, cwDirty);
-        for (let i = 0; i < cwDirtyLen; i++) cwDirty[cwDirtyList[i]] = 0;
+        // Snapshot dirty rays into a separate run buffer BEFORE calling propagateCastleMedium so any
+        // new edges set inside propagateCastleMedium cleanly mark cwDirty for the next pass!
+        const runLen = cwDirtyLen;
+        const cwRunDirty = scratchCwRunDirty, cwRunList = scratchCwRunList;
+        for (let i = 0; i < runLen; i++) {
+          const ci = cwDirtyList[i];
+          cwDirty[ci] = 0;
+          cwRunDirty[ci] = 1;
+          cwRunList[i] = ci;
+        }
         cwDirtyLen = 0;
+        const okMed = propagateCastleMedium(P, st, setEdgeOk, cwRunDirty);
+        for (let i = 0; i < runLen; i++) cwRunDirty[cwRunList[i]] = 0;
         if (!okMed) { ok = false; break; }
       }
       if (changes > before) continue;

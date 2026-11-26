@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  compile, solve, isSolved, encodeSolution, decodeSolution,
+  compile, solve, propagate, isSolved, encodeSolution, decodeSolution,
   toCsvRow, parseCsv, symmetryKey, puzzleHash, initialState, E_ON, E_OFF,
 } from '../js/logic.js';
+import { interiorPlainVoids } from '../js/board.js';
 import { rate, nextSteps, detectSymmetries } from '../js/rating.js';
 import { explainStep } from '../js/explain.js';
 import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
@@ -611,4 +612,43 @@ test('Castle Wall regression coverage: Auto-X closed corridor, castleRayBound mo
   stDO.e[pDiffOv.ed[(1 * 8 + 2) * 4 + 1]] = E_ON;
   const cDO = castleContradiction(pDiffOv, stDO);
   assert.ok(cDO && cDO.kind === 'castleBroken' && cDO.castleIdx === 0 && cDO.over === true, 'castleContradiction must catch ray-diff gap > diff');
+
+  // 8. Round 3 regressions:
+  //    (a) oddCount === 0 parity contradiction (rem=3 with three even length-2 coupled runs -> impossible!)
+  const pOdd0 = compile({ name: 'cw_odd0', rows: 5, cols: 10, clues: [], castle: [{ r: 2, c: 0, wall: 'G', dir: 'R', n: 3 }] });
+  const stOdd0 = initialState(pOdd0);
+  // 3 disjoint length-2 runs: (2,1)-(2,2)-(2,3), (2,4)-(2,5)-(2,6), (2,7)-(2,8)-(2,9)
+  stOdd0.e[pOdd0.ed[(2 * 10 + 3) * 4 + 1]] = E_OFF;
+  stOdd0.e[pOdd0.ed[(2 * 10 + 6) * 4 + 1]] = E_OFF;
+  for (const col of [2, 5, 8]) {
+    stOdd0.e[pOdd0.ed[(2 * 10 + col) * 4 + 0]] = E_OFF;
+    stOdd0.e[pOdd0.ed[(2 * 10 + col) * 4 + 2]] = E_OFF;
+  }
+  assert.ok(castleContradiction(pOdd0, stOdd0)?.kind === 'castleBroken', 'oddCount=0 odd rem must trigger castleContradiction');
+  assert.equal(propagate(pOdd0, initialState(pOdd0), -1, -1), true);
+  assert.equal(propagate(pOdd0, stOdd0), false, 'oddCount=0 odd rem must fail propagate()');
+
+  //    (b) cwDirty double-buffer: propagate() reaches fixed point in 1 call when rayBound re-dirties itself
+  const pDb = compile({ name: 'cw_db', rows: 5, cols: 12, clues: [], castle: [{ r: 2, c: 0, wall: 'G', dir: 'R', n: 4 }] });
+  const stDb = initialState(pDb);
+  for (const col of [2, 3]) {
+    stDb.e[pDb.ed[(2 * 12 + col) * 4 + 0]] = E_OFF;
+    stDb.e[pDb.ed[(2 * 12 + col) * 4 + 2]] = E_OFF;
+  }
+  stDb.e[pDb.ed[(2 * 12 + 4) * 4 + 0]] = E_OFF;
+  for (const col of [6, 8, 10]) stDb.e[pDb.ed[(2 * 12 + col) * 4 + 0]] = E_ON;
+  stDb.e[pDb.ed[(2 * 12 + 10) * 4 + 2]] = E_OFF;
+  const hypE = pDb.ed[(2 * 12 + 4) * 4 + 2];
+  stDb.e[hypE] = E_OFF;
+  assert.equal(propagate(pDb, stDb, hypE), false, 'double-buffered cwDirty must catch self-re-dirtied rayBound contradiction in one propagate() call');
+
+  //    (c) interiorPlainVoids handles border Castle Wall adjacent to interior plain Swiss-cheese void
+  const pMixV = compile({
+    name: 'cw_mixv', rows: 5, cols: 5, clues: [],
+    voids: [{ r: 1, c: 2 }],
+    castle: [{ r: 0, c: 2, wall: 'B', dir: 'D', n: 0 }],
+  });
+  const iv = interiorPlainVoids(pMixV);
+  assert.equal(iv[1 * 5 + 2], 1, 'interior plain void next to border Castle Wall must be marked interior');
+  assert.equal(iv[0 * 5 + 2], 0, 'Castle Wall tile must never be marked as a plain interior void');
 });

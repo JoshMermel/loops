@@ -1,7 +1,7 @@
 // Printable Masyu booklets: fixed black-and-white SVG laid out by cell size to fit both A4 and Letter.
 // Every page header links back to the site. Everything except buildPrintRoot is pure (tested in tests/print.test.mjs).
 import { E_ON } from './logic.js';
-import { tilesOutlinePath } from './board.js';
+import { tilesOutlinePath, interiorPlainVoids } from './board.js';
 
 const INK = '#111', GRID = '#8c8c8c';
 export const MAX_PRINT = 500;
@@ -83,20 +83,9 @@ export function boardSvg(P, sol = null) {
       const isPlainVoid = (u) => P.isVoid[u] && !(P.hasCastle && P.castleAtCell[u] >= 0);
       const outline = tilesOutlinePath(rows, cols, (r, c) => !isPlainVoid(r * cols + c), -0.5, -0.5, 1, 1, 0.14);
       g += `<path class="shape-outline" fill="#fff" fill-rule="evenodd" stroke="#999" stroke-width="0.04" d="${outline}"/>`;
-      if (P.holeList && P.holeList.length) {
-        const fc = cols - 1;
-        const interiorVoid = new Uint8Array(P.N);
-        for (const grp of P.holeList) {
-          for (const f of grp) {
-            const r = (f / fc) | 0, c = f % fc;
-            for (const u of [r * cols + c, r * cols + c + 1, (r + 1) * cols + c, (r + 1) * cols + c + 1]) {
-              if (isPlainVoid(u)) interiorVoid[u] = 1;
-            }
-          }
-        }
-        const holePath = tilesOutlinePath(rows, cols, (r, c) => interiorVoid[r * cols + c], -0.5, -0.5, 1, 1, 0.14);
-        if (holePath) g += `<path class="void-hole-print" fill="#e2e2e2" stroke="#777" stroke-width="0.04" d="${holePath}"/>`;
-      }
+      const interiorVoid = interiorPlainVoids(P);
+      const holePath = tilesOutlinePath(rows, cols, (r, c) => interiorVoid[r * cols + c], -0.5, -0.5, 1, 1, 0.14);
+      if (holePath) g += `<path class="void-hole-print" fill="#e2e2e2" stroke="#777" stroke-width="0.04" d="${holePath}"/>`;
     }
     for (let x = 0; x < P.numEdges; x++) {
       if (P.edgeA[x] < 0) continue;

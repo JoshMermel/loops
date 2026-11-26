@@ -582,6 +582,10 @@ export function explainStep(P, step, st = null) {
       const [a, b] = edgeCells(P, info.edge);
       roles.focus.push(a, b);
       nudgeRoles.focus.push(a, b);
+      if (info.clues && info.clues.length) {
+        roles.clue.push(...info.clues);
+        nudgeRoles.clue.push(...info.clues);
+      }
       nudge = `Look at ${edgeName(P, info.edge)} — use Inside/Outside shading to compare the two squares on either side of it.`;
       faces = { in: info.facesIn || [], out: info.facesOut || [], anchored: true };
       const sideName = (par) => (par === 1 ? 'Inside' : 'Outside');

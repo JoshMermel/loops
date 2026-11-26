@@ -138,6 +138,40 @@ export function tilesOutlinePath(rows, cols, hasTile, ox, oy, cw, ch, radius = 0
   return parts.join('');
 }
 
+/**
+ * Return a `Uint8Array(P.N)` marking every interior plain void (plain Swiss-cheese void not
+ * 4-connected to the outer grid border). Matches the exact interior holes of `tilesOutlinePath(!isPlainVoid)`.
+ */
+export function interiorPlainVoids(P) {
+  const { rows, cols, N, isVoid } = P;
+  const out = new Uint8Array(N);
+  if (!P.voids || !P.voids.length) return out;
+  const isPlain = new Uint8Array(N);
+  for (let u = 0; u < N; u++) {
+    if (isVoid[u] && !(P.hasCastle && P.castleAtCell[u] >= 0)) isPlain[u] = 1;
+  }
+  const ext = new Uint8Array(N);
+  const q = new Int32Array(N);
+  let qh = 0, qt = 0;
+  const push = (u) => {
+    if (!isPlain[u] || ext[u]) return;
+    ext[u] = 1;
+    q[qt++] = u;
+  };
+  for (let c = 0; c < cols; c++) { push(c); push((rows - 1) * cols + c); }
+  for (let r = 0; r < rows; r++) { push(r * cols); push(r * cols + cols - 1); }
+  while (qh < qt) {
+    const u = q[qh++];
+    const r = (u / cols) | 0, c = u - r * cols;
+    if (r > 0) push(u - cols);
+    if (r + 1 < rows) push(u + cols);
+    if (c > 0) push(u - 1);
+    if (c + 1 < cols) push(u + 1);
+  }
+  for (let u = 0; u < N; u++) if (isPlain[u] && !ext[u]) out[u] = 1;
+  return out;
+}
+
 /** Return cached SVG paths for a shaped puzzle's board silhouette, void cutouts, and unified interior holes. */
 function getShapePaths(P) {
   if (!P.hasVoids) return null;
@@ -151,20 +185,10 @@ function getShapePaths(P) {
   const boardPath = hasPlainVoids
     ? tilesOutlinePath(rows, cols, (r, c) => !isPlainVoid(r * cols + c), ox, oy, S, S, 8)
     : '';
-  // Separate interior plain-void cutouts (excluding Castle Wall tiles) for crisp inner framing
-  const interiorVoid = new Uint8Array(P.N);
-  if (hasPlainVoids && holeList && holeList.length) {
-    for (const grp of holeList) {
-      for (const f of grp) {
-        const r = (f / fc) | 0, c = f % fc;
-        for (const u of [r * cols + c, r * cols + c + 1, (r + 1) * cols + c, (r + 1) * cols + c + 1]) {
-          if (isPlainVoid(u)) interiorVoid[u] = 1;
-        }
-      }
-    }
-  }
+  // Interior plain-void cutouts (exact 4-connected interior holes matching boardPath) for crisp inner framing
+  const interiorVoid = hasPlainVoids ? interiorPlainVoids(P) : null;
   // Exact un-shifted inner cutout path (matches the hole in boardPath) for subtle hatch overlay
-  const voidHatchPath = hasPlainVoids
+  const voidHatchPath = interiorVoid
     ? tilesOutlinePath(rows, cols, (r, c) => interiorVoid[r * cols + c], ox, oy, S, S, 6)
     : '';
   const holePaths = (holeList || []).map((grp) => {

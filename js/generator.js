@@ -2615,17 +2615,22 @@ function generateCastlePuzzle({
   const isWithin = (r) => (allowUnsolved && !r.solved) || (r.solved && TIERS.indexOf(r.tier) <= effectiveMaxTier);
   const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
   const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
-  const minClues = isMasyu ? (N >= 81 ? 4 : 3) : 0;
-  const minSlither = isSlither ? (N >= 81 ? 5 : 4) : 0;
-  const minMid = isMidloop ? (N >= 81 ? 5 : 4) : 0;
+  const minClues = isMasyu ? (N >= 64 ? 4 : 3) : 0;
+  const minSlither = isSlither ? (N >= 64 ? 5 : 4) : 0;
+  const minMid = isMidloop ? (N >= 64 ? 5 : 4) : 0;
   const minCastle = isHybrid || isFull
-    ? Math.max(3, Math.floor(N * 0.06))
+    ? (N >= 64 ? Math.max(4, Math.floor(N * 0.06)) : 3)
     : Math.max(4, Math.floor(N * 0.10));
+  const reqQuadFill = (!isFull && rows >= 10 && cols >= 10) ? 0.30 : (!isFull && rows >= 8 && cols >= 8) ? 0.24 : 0;
+  const reqQuadItems = rows >= 10 && cols >= 10 ? 2 : (rows >= 7 && cols >= 7 ? 1 : 0);
 
   const sampleCastlePositions = () => {
     const targetK = isHybrid || isFull
       ? Math.max(5, Math.min(Math.floor(N * 0.20), Math.round(N * (0.11 + 0.05 * rand()))))
       : Math.max(6, Math.min(Math.floor(N * 0.28), Math.round(N * (0.17 + 0.06 * rand()))));
+    const maxBorder = Math.max(1, Math.floor(targetK * 0.28));
+    let nBorder = 0;
+    const isBorderCell = (r, c) => r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
     const grid = new Uint8Array(N);
     const pts = [];
     const cand = [];
@@ -2634,6 +2639,8 @@ function generateCastlePuzzle({
 
     const canPlace = (r, c) => {
       if (grid[r * cols + c]) return false;
+      const onB = isBorderCell(r, c);
+      if (onB && nBorder >= maxBorder) return false;
       // Avoid 2x2 solid clumps of blocked tiles and avoid sealing off corners
       let orth = 0;
       for (let d = 0; d < 4; d++) {
@@ -2658,11 +2665,14 @@ function generateCastlePuzzle({
       const lights = cand.filter(([r, c]) => ((r + c) & 1) === 0);
       const darks = cand.filter(([r, c]) => ((r + c) & 1) === 1);
       const needPairs = Math.max(2, targetK >> 1);
-      // Adjust parity if rows*cols is odd
       if ((N & 1) === 1) {
-        // Need 1 extra light tile (since (0,0) is light)
         for (const [r, c] of lights) {
-          if (canPlace(r, c)) { grid[r * cols + c] = 1; pts.push({ r, c }); break; }
+          if (canPlace(r, c)) {
+            grid[r * cols + c] = 1;
+            if (isBorderCell(r, c)) nBorder++;
+            pts.push({ r, c });
+            break;
+          }
         }
       }
       let li = 0, di = 0;
@@ -2671,17 +2681,29 @@ function generateCastlePuzzle({
         if (li >= lights.length) break;
         const [lr, lc] = lights[li++];
         grid[lr * cols + lc] = 1;
+        const lb = isBorderCell(lr, lc);
+        if (lb) nBorder++;
         let placedD = false;
         while (di < darks.length) {
           const [dr, dc] = darks[di++];
-          if (canPlace(dr, dc)) { grid[dr * cols + dc] = 1; pts.push({ r: lr, c: lc }, { r: dr, c: dc }); placedD = true; break; }
+          if (canPlace(dr, dc)) {
+            grid[dr * cols + dc] = 1;
+            if (isBorderCell(dr, dc)) nBorder++;
+            pts.push({ r: lr, c: lc }, { r: dr, c: dc });
+            placedD = true;
+            break;
+          }
         }
-        if (!placedD) { grid[lr * cols + lc] = 0; break; }
+        if (!placedD) { grid[lr * cols + lc] = 0; if (lb) nBorder--; break; }
       }
     } else {
       for (const [r, c] of cand) {
         if (pts.length >= targetK) break;
-        if (canPlace(r, c)) { grid[r * cols + c] = 1; pts.push({ r, c }); }
+        if (canPlace(r, c)) {
+          grid[r * cols + c] = 1;
+          if (isBorderCell(r, c)) nBorder++;
+          pts.push({ r, c });
+        }
       }
     }
     return pts;
@@ -2703,11 +2725,37 @@ function generateCastlePuzzle({
       edges = sample.solutions[0].e;
     } else {
       const res = randomShapedLoop(empty, rand, {
-        targetFill: 0.48 + 0.16 * rand(),
-        steps: Math.max(180, fr * fc * 26),
+        targetFill: 0.54 + 0.16 * rand(),
+        steps: Math.max(200, fr * fc * 28),
       });
-      if (!res.valid || res.loopCells < Math.max(10, Math.floor(empty.activeCount * 0.46))) continue;
+      if (!res.valid || res.loopCells < Math.max(12, Math.floor(N * 0.48))) continue;
       edges = res.edges;
+      // Check border reach and quadrant loop balance so boards never have empty sides or dead corners
+      const used = new Uint8Array(N);
+      for (let x = 0; x < empty.numEdges; x++) {
+        if (empty.edgeA[x] >= 0 && edges[x] === E_ON) { used[empty.edgeA[x]] = 1; used[empty.edgeB[x]] = 1; }
+      }
+      let topHit = 0, botHit = 0, leftHit = 0, rightHit = 0;
+      for (let c = 0; c < cols; c++) { if (used[c]) topHit = 1; if (used[(rows - 1) * cols + c]) botHit = 1; }
+      for (let r = 0; r < rows; r++) { if (used[r * cols]) leftHit = 1; if (used[r * cols + cols - 1]) rightHit = 1; }
+      const emptyBorders = 4 - (topHit + botHit + leftHit + rightHit);
+      if (emptyBorders > (N <= 36 ? 1 : 0)) continue;
+      if (reqQuadFill > 0) {
+        const mr = rows >> 1, mc = cols >> 1;
+        const qAct = [0, 0, 0, 0], qUse = [0, 0, 0, 0];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const u = r * cols + c;
+            if (empty.isVoid[u]) continue;
+            const qi = (r >= mr ? 2 : 0) + (c >= mc ? 1 : 0);
+            qAct[qi]++;
+            if (used[u]) qUse[qi]++;
+          }
+        }
+        let minQF = 1;
+        for (let qi = 0; qi < 4; qi++) if (qAct[qi] > 0) minQF = Math.min(minQF, qUse[qi] / qAct[qi]);
+        if (minQF < reqQuadFill) continue;
+      }
     }
 
     // Build initial Castle Wall tiles (all exact W/B wall colors + best informative arrow direction)
@@ -2890,9 +2938,9 @@ function generateCastlePuzzle({
         const cw = cwState[i];
         if (!cw.active) continue;
         if (!isFull) acts.push({ kind: 'dropCw', i });
-        if (cw.wall !== 'G' && cw.dir) {
+        if (cw.wall !== 'G' && cw.dir && !cw.isExt) {
           if (rand() < 0.45) acts.push({ kind: 'grayCw', i });
-          if (!cw.isExt && rand() < 0.35) acts.push({ kind: 'bareCw', i });
+          if (rand() < 0.35) acts.push({ kind: 'bareCw', i });
         }
       }
       for (let i = 0; i < cluesInit.length; i++) if (clAct[i]) acts.push({ kind: 'dropCl', i });
@@ -2913,22 +2961,23 @@ function generateCastlePuzzle({
         const cw = cwState[a.i];
         if (!cw.active || nCw <= minCastle) return false;
         if (cw.dir && nNumAct <= minNumFloor) return false;
-        if (!isHybrid) {
-          if (cw.wall === 'W' && nWAct <= 1) return false;
-          if (cw.wall === 'B' && nBAct <= 1) return false;
-        } else if (cw.wall !== 'G' && (nWAct + nBAct - 1) < Math.max(2, Math.ceil((nCw - 1) * 0.5))) {
+        if (cw.wall === 'W' && nWAct <= 1) return false;
+        if (cw.wall === 'B' && nBAct <= 1) return false;
+        // Prevent Gray-cap drift when dropping a non-Gray tile
+        if (cw.wall !== 'G' && nGAct > Math.max(1, Math.floor((nCw - 1) * 0.35))) return false;
+        if (isHybrid && cw.wall !== 'G' && (nWAct + nBAct - 1) < Math.max(2, Math.ceil((nCw - 1) * 0.5))) {
           return false;
         }
         return true;
       }
       if (a.kind === 'grayCw') {
         const cw = cwState[a.i];
-        if (!cw.active || cw.wall === 'G' || !cw.dir) return false;
+        // Never relax exterior/border tiles to Gray (they are geometrically forced outside anyway!)
+        if (!cw.active || cw.wall === 'G' || cw.isExt || !cw.dir) return false;
         if (nGAct >= Math.max(1, Math.floor(nCw * 0.35))) return false;
-        if (!isHybrid && !isFull) {
-          if (cw.wall === 'W' && nWAct <= 1) return false;
-          if (cw.wall === 'B' && nBAct <= 1) return false;
-        } else if ((nWAct + nBAct - 1) < Math.max(2, Math.ceil(nCw * 0.5))) {
+        if (cw.wall === 'W' && nWAct <= 1) return false;
+        if (cw.wall === 'B' && nBAct <= 1) return false;
+        if ((isHybrid || isFull) && (nWAct + nBAct - 1) < Math.max(2, Math.ceil(nCw * 0.5))) {
           return false;
         }
         return true;
@@ -3089,22 +3138,43 @@ function generateCastlePuzzle({
     const fin = extract();
     if (fin.castle.length < minCastle) continue;
     const nNum = fin.castle.filter((c) => c.dir).length;
+    const nZero = fin.castle.filter((c) => c.dir && c.n === 0).length;
     const nW = fin.castle.filter((c) => c.wall === 'W').length;
     const nB = fin.castle.filter((c) => c.wall === 'B').length;
     if (nNum < minNumFloor) continue;
-    if (!isHybrid && !isFull && (nW < 1 || nB < 1)) continue;
+    if (nZero > Math.max(2, Math.floor(nNum * 0.30))) continue;
+    if (nW < 1 || nB < 1) continue;
     if ((isHybrid || isFull) && (nW + nB) < Math.max(2, Math.ceil(fin.castle.length * 0.5))) continue;
     if (isMasyu) {
       const mcW = fin.clues.filter((c) => c.t === 'W').length;
       const mcB = fin.clues.filter((c) => c.t === 'B').length;
       if (fin.clues.length < minClues || mcW < 1 || mcB < 1) continue;
+      const ratio = fin.castle.length / fin.clues.length;
+      if (ratio < 0.45 || ratio > 2.2) continue;
     }
-    if (isSlither && (fin.slither.length < minSlither || new Set(fin.slither.map((s) => s.n)).size < 2)) continue;
-    if (isMidloop && fin.midloop.length < minMid) continue;
+    if (isSlither) {
+      if (fin.slither.length < minSlither || new Set(fin.slither.map((s) => s.n)).size < 2) continue;
+      const ratio = fin.castle.length / fin.slither.length;
+      if (ratio < 0.45 || ratio > 2.2) continue;
+    }
+    if (isMidloop) {
+      if (fin.midloop.length < minMid) continue;
+      const ratio = fin.castle.length / fin.midloop.length;
+      if (ratio < 0.45 || ratio > 2.2) continue;
+    }
+    if (reqQuadItems > 0) {
+      const mr = rows >> 1, mc = cols >> 1;
+      const qCnt = [0, 0, 0, 0];
+      for (const cw of fin.castle) qCnt[(cw.r >= mr ? 2 : 0) + (cw.c >= mc ? 1 : 0)]++;
+      for (const cl of fin.clues) qCnt[(cl.r >= mr ? 2 : 0) + (cl.c >= mc ? 1 : 0)]++;
+      for (const sc of fin.slither) qCnt[(sc.r >= mr ? 2 : 0) + (sc.c >= mc ? 1 : 0)]++;
+      for (const md of fin.midloop) qCnt[(md.r >= mr ? 2 : 0) + (md.c >= mc ? 1 : 0)]++;
+      if (Math.min(...qCnt) < reqQuadItems) continue;
+    }
 
     const P = compileC(fin.castle, fin.clues, fin.slither, fin.midloop);
-    // Guard against unnumbered exterior Black or unnumbered Gray tiles (could occur if stripping adjacent tiles opened a hole to exterior)
-    if (P.castle.some((cw) => !cw.dir && (cw.wall === 'G' || (cw.wall === 'B' && cw.isExterior)))) continue;
+    // Guard against unnumbered exterior Black, exterior Gray, or unnumbered Gray tiles
+    if (P.castle.some((cw) => (cw.wall === 'G' && (!cw.dir || cw.isExterior)) || (cw.wall === 'B' && !cw.dir && cw.isExterior))) continue;
 
     const rated = cachedRated || rate(P);
     if (wantUnsolved) {

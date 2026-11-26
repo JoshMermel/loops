@@ -218,7 +218,7 @@ export function compileCastle(P, raw) {
 
       const afList = [], awList = [], akList = [];
       const known = new Map();
-      known.set(EXT, { par: 0, idx: -1 });
+      known.set(EXT, { par: 0, idx: -1, idxs: [] });
       for (let k = 0; k < castle.length; k++) {
         const cw = castle[k];
         if (cw.wall === 'G') continue;
@@ -227,8 +227,10 @@ export function compileCastle(P, raw) {
         afList.push(f);
         awList.push(want);
         akList.push(k);
-        if (!cw.isExterior && cw.face >= 0 && !known.has(f)) {
-          known.set(f, { par: want, idx: k });
+        if (!cw.isExterior && cw.face >= 0) {
+          const rec = known.get(f);
+          if (!rec) known.set(f, { par: want, idx: k, idxs: [k] });
+          else rec.idxs.push(k);
         }
       }
       _cwAnchorF = Int32Array.from(afList);
@@ -242,12 +244,22 @@ export function compileCastle(P, raw) {
         const ka = known.get(a), kb = known.get(b);
         if (!ka || !kb || (ka.idx < 0 && kb.idx < 0)) continue;
         const val = (ka.par !== kb.par) ? E_ON : E_OFF;
-        const i1 = ka.idx >= 0 ? ka.idx : kb.idx;
-        const i2 = ka.idx >= 0 && kb.idx >= 0 ? kb.idx : -1;
+        const k1 = ka.idx >= 0 ? ka : kb;
+        const k2 = ka.idx >= 0 && kb.idx >= 0 ? kb : null;
+        const i1 = k1.idx, i2 = k2 ? k2.idx : -1;
         const key = i2 >= 0 ? (i1 < i2 ? `${i1}:${i2}` : `${i2}:${i1}`) : `${i1}:EXT`;
         let rec = grouped.get(key);
         if (!rec) {
-          rec = { edges: [], info: { castleIdx: i1, castleIdx2: i2, val } };
+          rec = {
+            edges: [],
+            info: {
+              castleIdx: i1,
+              castleIdx2: i2,
+              castleIdxs: k1.idxs.slice(),
+              castleIdxs2: k2 ? k2.idxs.slice() : [],
+              val,
+            },
+          };
           grouped.set(key, rec);
         }
         rec.edges.push(_cwEdgeX[i]);
@@ -973,7 +985,9 @@ function evalCastleRayBoundOne(P, st, k) {
     }
   }
 
-  if (rem < minTotal || rem > maxTotal) return { contradiction: true };
+  if (rem < minTotal || rem > maxTotal || (oddCount === 0 && ((rem - minTotal) & 1) === 1)) {
+    return { contradiction: true };
+  }
 
   const sets = [];
   let reason = null;
@@ -1128,7 +1142,7 @@ function propagateCastleRayBoundOne(P, st, k, setEdge) {
   }
 
   if (rem < minTotal) return -1;
-  if (rem > maxTotal) return -2;
+  if (rem > maxTotal || (oddCount === 0 && ((rem - minTotal) & 1) === 1)) return -2;
   if (!setEdge) return 0;
 
   if (rem === minTotal) {
@@ -1388,26 +1402,37 @@ export function explainCastleStep(P, step, helpers) {
         nudge: `Count the remaining segments ${dirWord} from the ${arrow} clue at ${cn}.`,
         text: info.mode === 'fill'
           ? `The ${arrow} clue at ${cn} needs every remaining open segment ${dirWord} from it to reach ${info.n} — ${marks}.`
-          : `The ${arrow} clue at ${cn} already has all ${info.n} segment${info.n === 1 ? '' : 's'} ${dirWord} from it, so the rest of its ray is off — ${marks}.`,
+          : `The ${arrow} clue at ${cn} already has ${info.n === 1 ? 'its 1 segment' : `all ${info.n} segments`} ${dirWord} from it, so the rest of its ray is off — ${marks}.`,
       };
     case 'castleWallEdge': {
       const cw2 = info.castleIdx2 >= 0 && P.castle ? P.castle[info.castleIdx2] : null;
-      if (cw) { roles.clue.push(cw.cell); nudgeRoles.clue.push(cw.cell); }
-      if (cw2) { roles.clue.push(cw2.cell); nudgeRoles.clue.push(cw2.cell); }
+      const list1 = info.castleIdxs && info.castleIdxs.length ? info.castleIdxs : (cw ? [info.castleIdx] : []);
+      const list2 = info.castleIdxs2 && info.castleIdxs2.length ? info.castleIdxs2 : (cw2 ? [info.castleIdx2] : []);
+      for (const idx of list1) {
+        const cObj = P.castle[idx];
+        if (cObj) { roles.clue.push(cObj.cell); nudgeRoles.clue.push(cObj.cell); }
+      }
+      for (const idx of list2) {
+        const cObj = P.castle[idx];
+        if (cObj) { roles.clue.push(cObj.cell); nudgeRoles.clue.push(cObj.cell); }
+      }
+      const namesOf = (list) => list.map((idx) => cellName(P, P.castle[idx].cell)).join('/');
+      const n1 = list1.length ? namesOf(list1) : cn;
+      const n2 = list2.length ? namesOf(list2) : (cw2 ? cellName(P, cw2.cell) : '');
       const colorWord = (w) => (w === 'W' ? 'white (inside)' : 'black (outside)');
       if (!cw2) {
         return {
-          nudge: `Look between the ${colorWord(cw.wall)} wall at ${cn} and the outer edge of the board.`,
+          nudge: `Look between the ${colorWord(cw.wall)} wall at ${n1} and the outer edge of the board.`,
           text: cw.wall === 'W'
-            ? `The white wall at ${cn} must lie inside the loop while the board edge is outside, so the loop must pass between them — ${marks}.`
-            : `Both the black wall at ${cn} and the board edge lie outside the loop, so no loop segment can separate them — ${marks}.`,
+            ? `The white wall${list1.length > 1 ? 's' : ''} at ${n1} must lie inside the loop while the board edge is outside, so the loop must pass between them — ${marks}.`
+            : `Both the black wall${list1.length > 1 ? 's' : ''} at ${n1} and the board edge lie outside the loop, so no loop segment can separate them — ${marks}.`,
         };
       }
       return {
-        nudge: `Look between the ${colorWord(cw.wall)} wall at ${cn} and the ${colorWord(cw2.wall)} wall at ${cellName(P, cw2.cell)}.`,
+        nudge: `Look between the ${colorWord(cw.wall)} wall at ${n1} and the ${colorWord(cw2.wall)} wall at ${n2}.`,
         text: info.val === E_ON
-          ? `The ${colorWord(cw.wall)} wall at ${cn} and the ${colorWord(cw2.wall)} wall at ${cellName(P, cw2.cell)} lie on opposite sides of the loop, so the loop must separate them — ${marks}.`
-          : `Both walls at ${cn} and ${cellName(P, cw2.cell)} lie on the same side of the loop, so no loop segment can separate them — ${marks}.`,
+          ? `The ${colorWord(cw.wall)} wall at ${n1} and the ${colorWord(cw2.wall)} wall at ${n2} lie on opposite sides of the loop, so the loop must separate them — ${marks}.`
+          : `Both walls at ${n1} and ${n2} lie on the same side of the loop, so no loop segment can separate them — ${marks}.`,
       };
     }
     case 'castleRayDiff': {
@@ -1429,7 +1454,7 @@ export function explainCastleStep(P, step, helpers) {
         : info.reason === 'runRequired'
           ? `the remaining edges outside a forced straight corridor cannot reach the ${info.rem} needed segment${info.rem === 1 ? '' : 's'}`
           : info.reason === 'turnCap'
-            ? `forced turns along the ray already account for all ${info.rem} remaining segment${info.rem === 1 ? '' : 's'}`
+            ? `forced turns along the ray already account for ${info.rem === 1 ? 'the 1 remaining segment' : `all ${info.rem} remaining segments`}`
             : info.reason === 'turnNeed'
               ? `turn limits along the ray leave zero spare capacity to reach ${info.rem} remaining segment${info.rem === 1 ? '' : 's'}`
               : `even/odd corridor parity along the ray pins the only odd-length segment`;
