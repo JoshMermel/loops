@@ -106,6 +106,14 @@ if (process.argv.includes('--worker')) {
       }
     }
 
+    const proveNonUnique = (altP, baseSeed) => {
+      let alt = solve(altP, { limit: 2, maxNodes: 50000 });
+      for (let t = 0; t < 5 && alt.count < 2 && alt.exceeded; t++) {
+        alt = solve(altP, { limit: 2, maxNodes: 100000, rng: makeRng(baseSeed + t * 997) });
+      }
+      return alt;
+    };
+
     // Verify full-board necessity: dropping `fullBoard` must leave >= 2 valid solutions
     if (P.fullBoard && !entry.hidden) {
       const noFull = compile({
@@ -118,10 +126,7 @@ if (process.argv.includes('--worker')) {
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
         fullBoard: false,
       });
-      let alt = solve(noFull, { limit: 2, maxNodes: 50000 });
-      if (alt.count < 2 && alt.exceeded) {
-        alt = solve(noFull, { limit: 2, maxNodes: 500000, rng: makeRng(12345 + from + k) });
-      }
+      const alt = proveNonUnique(noFull, 12345 + from + k);
       if (alt.exceeded && alt.count < 2) return fail('fullBoard necessity not proved: hit node cap');
       if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
     }
@@ -138,14 +143,12 @@ if (process.argv.includes('--worker')) {
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
       };
       const onlySlither = compile({ ...baseOpts, clues: [], slither: raw.slither });
-      let altS = solve(onlySlither, { limit: 2, maxNodes: 50000 });
-      if (altS.count < 2 && altS.exceeded) altS = solve(onlySlither, { limit: 2, maxNodes: 500000, rng: makeRng(23456 + from + k) });
+      const altS = proveNonUnique(onlySlither, 23456 + from + k);
       if (altS.exceeded && altS.count < 2) return fail('hybrid circle necessity not proved: hit node cap');
       if (altS.count < 2) return fail('Masyu circles are redundant on hybrid (uniquely solvable from Slitherlink alone)');
 
       const onlyMasyu = compile({ ...baseOpts, clues: raw.clues, slither: [] });
-      let altM = solve(onlyMasyu, { limit: 2, maxNodes: 50000 });
-      if (altM.count < 2 && altM.exceeded) altM = solve(onlyMasyu, { limit: 2, maxNodes: 500000, rng: makeRng(34567 + from + k) });
+      const altM = proveNonUnique(onlyMasyu, 34567 + from + k);
       if (altM.exceeded && altM.count < 2) return fail('hybrid Slitherlink necessity not proved: hit node cap');
       if (altM.count < 2) return fail('Slitherlink numbers are redundant on hybrid (uniquely solvable from Masyu alone)');
     }

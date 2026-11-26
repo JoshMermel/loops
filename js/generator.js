@@ -1747,8 +1747,13 @@ function generateSlitherPuzzle({
     const P0 = compileS(cluesInit, slitherInit);
     let baseTight = solvedByPropagate(P0);
     if (!baseTight) {
+      if (beginnerOnly && !solvedByRules(P0, BEGINNER_UPTO).solved) continue;
       const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
       if (ex.exceeded || ex.count !== 1) continue;
+      if (mediumOnly && !solvedByRules(P0, MEDIUM_UPTO).solved) {
+        const r0 = rate(P0);
+        if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+      }
     }
 
     // Track active items via O(1) Uint8Array mask (always extracts canonically sorted clues & slither!)

@@ -64,7 +64,21 @@
     {
       "name": "Hybrids",
       "icon": "🔀",
-      "blurb": "Two loop puzzle rules combined on one board — every puzzle genuinely needs both."
+      "blurb": "Two loop puzzle rules combined on one board — every puzzle genuinely needs both.",
+      "subs": {
+        "Masyu + Hamilton cycle": {
+          "icon": "⚪🔁",
+          "blurb": "Masyu circles on a loop that must visit every dot on the grid."
+        },
+        "Slitherlink + Masyu": {
+          "icon": "🔢⚪",
+          "blurb": "Numbered squares and Masyu circles sharing one single closed loop."
+        },
+        "Slitherlink + Hamilton cycle": {
+          "icon": "🔢🔁",
+          "blurb": "Slitherlink numbers on a Hamilton cycle that visits every single dot."
+        }
+      }
     }
   ],
   "books": [
@@ -367,7 +381,7 @@
       "name": "Swiss cheese (10×10)",
       "label": "🧀 Swiss cheese (10×10)",
       "file": "data/full-swiss-10x10.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hamilton cycle",
       "blurb": "Visit every remaining dot on a 10×10 grid punched with balanced interior holes."
     },
@@ -376,7 +390,7 @@
       "name": "Symmetry (8×8)",
       "label": "🪞 Symmetry (8×8)",
       "file": "data/full-sym-8x8.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hamilton cycle",
       "blurb": "Mirror and 180° symmetric given lines and walls on a full-board loop."
     },
@@ -485,7 +499,7 @@
       "name": "Slitherlink — Small",
       "label": "Small",
       "file": "data/slither-small.csv",
-      "count": 24,
+      "count": 500,
       "group": "Slitherlink",
       "blurb": "Compact Slitherlink boards across all four difficulties."
     },
@@ -494,7 +508,7 @@
       "name": "Slitherlink — Classic",
       "label": "Classic",
       "file": "data/slither-classic.csv",
-      "count": 24,
+      "count": 500,
       "group": "Slitherlink",
       "blurb": "Classic 10×10-square Slitherlink boards across all four difficulties."
     },
@@ -503,7 +517,7 @@
       "name": "Slitherlink — Swiss cheese",
       "label": "🧀 Swiss cheese (10×10)",
       "file": "data/slither-swiss-10x10.csv",
-      "count": 24,
+      "count": 500,
       "group": "Slitherlink",
       "blurb": "Slitherlink on boards punched with random interior holes — each hole is entirely Inside or Outside."
     },
@@ -512,7 +526,7 @@
       "name": "Slitherlink — Skyscraper",
       "label": "🏙️ Skyscraper (6×18)",
       "file": "data/slither-sky-6x18.csv",
-      "count": 24,
+      "count": 500,
       "group": "Slitherlink",
       "blurb": "Tall, narrow Slitherlink towers where the loop weaves up and down."
     },
@@ -521,7 +535,7 @@
       "name": "Slitherlink — Symmetry",
       "label": "🪞 Symmetry (9×9)",
       "file": "data/slither-sym-9x9.csv",
-      "count": 24,
+      "count": 500,
       "group": "Slitherlink",
       "blurb": "Mirror, diagonal, and 180° symmetric Slitherlink clues and loops."
     },
@@ -530,45 +544,49 @@
       "name": "Slitherlink — All 3s",
       "label": "3️⃣ All 3s (8×8)",
       "file": "data/slither-all3-8x8.csv",
-      "count": 24,
+      "count": 500,
       "group": "Slitherlink",
       "blurb": "Pure Slitherlink where every single numbered square is a 3."
     },
     {
       "id": "full-masyu-8x8",
       "name": "Masyu + Hamilton cycle",
-      "label": "⚪🔁 Masyu + Hamilton cycle",
+      "label": "⚪🔁 Classic (8×8)",
       "file": "data/full-masyu-8x8.csv",
       "count": 500,
       "group": "Hybrids",
-      "blurb": "Sparse Masyu circles where visiting every dot is required to find the unique loop."
+      "blurb": "Sparse Masyu circles where visiting every dot is required to find the unique loop.",
+      "sub": "Masyu + Hamilton cycle"
     },
     {
       "id": "hybrid-slither-masyu",
       "name": "Slitherlink + Masyu",
-      "label": "🔢⚪ Slitherlink + Masyu",
+      "label": "🔢⚪ Classic (8×8)",
       "file": "data/hybrid-slither-masyu.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
-      "blurb": "Numbered squares and Masyu circles share one single loop — every puzzle genuinely requires both."
+      "blurb": "Numbered squares and Masyu circles share one single loop — every puzzle genuinely requires both.",
+      "sub": "Slitherlink + Masyu"
     },
     {
       "id": "hybrid-slither-full",
       "name": "Slitherlink + Hamilton cycle",
-      "label": "🔢🔁 Slitherlink + Hamilton cycle",
+      "label": "🔢🔁 Classic (8×8)",
       "file": "data/hybrid-slither-full.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
-      "blurb": "Slitherlink numbers on a Hamilton cycle that visits every single dot."
+      "blurb": "Slitherlink numbers on a Hamilton cycle that visits every single dot.",
+      "sub": "Slitherlink + Hamilton cycle"
     },
     {
       "id": "hybrid-slither2-full",
       "name": "All 2s + Hamilton cycle",
-      "label": "2️⃣🔁 All 2s + Hamilton cycle",
+      "label": "2️⃣🔁 All 2s (6×7)",
       "file": "data/hybrid-slither2-full.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
-      "blurb": "Every clue is a 2 on a Hamilton cycle that visits every single dot."
+      "blurb": "Every clue is a 2 on a Hamilton cycle that visits every single dot.",
+      "sub": "Slitherlink + Hamilton cycle"
     },
     {
       "id": "armory",
