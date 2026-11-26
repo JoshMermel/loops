@@ -1766,33 +1766,40 @@ function generateShapedPuzzle({
 
 /**
  * Generate one verified, rated Slitherlink or Slitherlink-hybrid puzzle:
- *   - 'slither'           pure Slitherlink (numbered dual faces only; supports `layout`: 'rot180'|'mirror'|'transpose')
- *   - 'slither-swiss'     Slitherlink on a Swiss cheese cutout board
- *   - 'slither-all3'      pure Slitherlink where every numbered square is a 3
- *   - 'slither-all2-full' Slitherlink + Hamilton cycle where every numbered square is a 2 (verified full-board necessity)
- *   - 'slither-masyu'     Slitherlink + Masyu hybrid (verified mutual necessity: neither clue set alone is unique)
- *   - 'slither-full'      Slitherlink + Full board / Hamiltonian cycle (verified full-board necessity)
+ *   - 'slither'            pure Slitherlink (numbered dual faces only; supports `layout`: 'rot180'|'mirror'|'transpose')
+ *   - 'slither-swiss'      Slitherlink on a Swiss cheese cutout board
+ *   - 'slither-all3'       pure Slitherlink where every numbered square is a 3
+ *   - 'slither-all2-full'  Slitherlink + Hamilton cycle where every numbered square is a 2 (verified full-board necessity)
+ *   - 'slither-all3-full'  Slitherlink + Hamilton cycle where every numbered square is a 3 (verified full-board necessity)
+ *   - 'slither-masyu'      Slitherlink + Masyu hybrid (verified mutual necessity: neither clue set alone is unique)
+ *   - 'slither-all2-masyu' All-2s Slitherlink + Masyu hybrid (verified mutual necessity)
+ *   - 'slither-all3-masyu' All-3s Slitherlink + Masyu hybrid (verified mutual necessity)
+ *   - 'slither-gray'       Slitherlink + All-gray Masyu circles hybrid (verified mutual necessity)
+ *   - 'slither-masyu-swiss' Slitherlink + Masyu on a Swiss cheese cutout board (verified mutual necessity)
+ *   - 'slither-full'       Slitherlink + Full board / Hamiltonian cycle (verified full-board necessity)
+ *   - 'slither-full-swiss' Slitherlink + Hamilton cycle on a balanced Swiss cheese board (verified full-board necessity)
  */
 function generateSlitherPuzzle({
   rows, cols, style, layout = 'none', voids = null, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier,
   wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
 }) {
-  const isAll3 = style === 'slither-all3';
-  const isAll2Full = style === 'slither-all2-full';
-  const isSingleDigit = isAll3 || isAll2Full;
-  const isFull = style === 'slither-full' || isAll2Full;
-  const isHybrid = style === 'slither-masyu';
+  const isAll3 = style === 'slither-all3' || style === 'slither-all3-masyu' || style === 'slither-all3-full';
+  const isAll2 = style === 'slither-all2-full' || style === 'slither-all2-masyu';
+  const isSingleDigit = isAll3 || isAll2;
+  const isFull = style === 'slither-full' || style === 'slither-full-swiss' || style === 'slither-all2-full' || style === 'slither-all3-full';
+  const isGray = style === 'slither-gray';
+  const isHybrid = style === 'slither-masyu' || style === 'slither-all2-masyu' || style === 'slither-all3-masyu' || isGray || style === 'slither-masyu-swiss';
   const hasExplicitVoids = Boolean(voids && voids.length > 0);
-  const isSwiss = style === 'slither-swiss' || hasExplicitVoids;
+  const isSwiss = style === 'slither-swiss' || style === 'slither-masyu-swiss' || style === 'slither-full-swiss' || hasExplicitVoids;
   const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
-  if ((isFull || isAll3) && !hasExplicitVoids && ((rows * cols) & 1)) return null;
+  if ((isFull || style === 'slither-all3') && !isSwiss && ((rows * cols) & 1)) return null;
   if (symLayout === 'transpose' && rows !== cols) return null;
-  if ((isFull || isAll3) && symLayout && !isSwiss && isImpossibleSymFull(rows, cols, symLayout)) return null;
+  if ((isFull || style === 'slither-all3') && symLayout && !isSwiss && isImpossibleSymFull(rows, cols, symLayout)) return null;
   const N = rows * cols;
   const fr = rows - 1, fc = cols - 1;
   const pruneNodeCap = N >= 225 ? 8000 : N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
   const baseEmpty = !isSwiss ? compile({ name: 'esl', rows, cols, clues: [], fullBoard: isFull }) : null;
-  const hamEmpty = (isAll3 && !isSwiss) ? compile({ name: 'eham', rows, cols, clues: [], fullBoard: true }) : null;
+  const hamEmpty = (style === 'slither-all3' && !isSwiss) ? compile({ name: 'eham', rows, cols, clues: [], fullBoard: true }) : null;
 
   const solvedByPropagate = (P) => {
     const st = initialState(P);
@@ -1818,7 +1825,7 @@ function generateSlitherPuzzle({
 
   while (Date.now() < deadline) {
     const useVoids = isSwiss
-      ? ((voids && voids.length) ? voids : swissCheeseVoids(rows, cols, rand))
+      ? ((voids && voids.length) ? voids : swissCheeseVoids(rows, cols, rand, { balanced: isFull }))
       : [];
     if (isSwiss && !useVoids.length) continue;
     const empty = isSwiss
@@ -1836,8 +1843,8 @@ function generateSlitherPuzzle({
     });
 
     let edges;
-    if (isFull || isAll3) {
-      const sampleGrid = isAll3
+    if (isFull || style === 'slither-all3') {
+      const sampleGrid = style === 'slither-all3'
         ? (hamEmpty || compile({ name: 'eham', rows, cols, clues: [], voids: useVoids, fullBoard: true }))
         : empty;
       if (symLayout) {
@@ -1867,7 +1874,7 @@ function generateSlitherPuzzle({
       edges = res.edges;
     } else {
       const res = randomLoop(rows, cols, rand, {
-        targetFill: 0.44 + 0.14 * rand(),
+        targetFill: (isAll3 ? 0.56 : 0.44) + 0.14 * rand(),
         steps: Math.max(160, fr * fc * 24),
       });
       if (res.loopCells < minLoopCells || res.emptyBorders > 0) continue;
@@ -1877,12 +1884,14 @@ function generateSlitherPuzzle({
 
     let slitherInit = allowedSlither(rows, cols, edges, empty);
     if (isAll3) slitherInit = slitherInit.filter((s) => s.n === 3);
-    else if (isAll2Full) slitherInit = slitherInit.filter((s) => s.n === 2);
+    else if (isAll2) slitherInit = slitherInit.filter((s) => s.n === 2);
 
     let cluesInit = [];
     if (isHybrid) {
       const { whites, blacks } = allowedClues(rows, cols, edges, empty);
-      cluesInit = whites.concat(blacks);
+      cluesInit = isGray
+        ? whites.concat(blacks).map(({ r, c }) => ({ r, c, t: 'G' }))
+        : whites.concat(blacks);
       if (cluesInit.length < Math.max(4, minClues)) continue;
     }
     if (slitherInit.length < Math.max(4, minSlither)) continue;
@@ -2066,9 +2075,13 @@ function generateSlitherPuzzle({
     }
 
     if (isHybrid) {
-      const nW = fin.clues.filter((c) => c.t === 'W').length;
-      const nB = fin.clues.filter((c) => c.t === 'B').length;
-      if (fin.clues.length < minClues || (rows >= 5 && cols >= 5 && (nW < 1 || nB < 1))) continue;
+      if (isGray) {
+        if (fin.clues.length < minClues) continue;
+      } else {
+        const nW = fin.clues.filter((c) => c.t === 'W').length;
+        const nB = fin.clues.filter((c) => c.t === 'B').length;
+        if (fin.clues.length < minClues || (rows >= 5 && cols >= 5 && (nW < 1 || nB < 1))) continue;
+      }
     }
     if (reqQuadItems > 0) {
       const midR = rows >> 1, midC = cols >> 1;
@@ -2136,12 +2149,13 @@ function generateMidloopPuzzle({
 }) {
   const isFull = style === 'midloop-full';
   const isMasyu = style === 'midloop-masyu';
-  const isSlither = style === 'midloop-slither';
+  const isSlither = style === 'midloop-slither' || style === 'midloop-slither-swiss' || style === 'midloop-slither2';
+  const isSlitherAll2 = style === 'midloop-slither2';
   const isEvenOnly = style === 'midloop-even';
   const isOddOnly = style === 'midloop-odd';
   const isLongOnly = style === 'midloop-long';
   const hasExplicitVoids = Boolean(voids && voids.length > 0);
-  const isSwiss = style === 'midloop-swiss' || hasExplicitVoids;
+  const isSwiss = style === 'midloop-swiss' || style === 'midloop-slither-swiss' || hasExplicitVoids;
   const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
   const regionLayout = (!isSwiss && (layout === 'interior' || layout === 'frame')) ? layout : null;
   if (layout && layout !== 'none' && !symLayout && !regionLayout) return null;
@@ -2313,6 +2327,7 @@ function generateMidloopPuzzle({
       cluesInit.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
     } else if (isSlither) {
       slitherInit = allowedSlither(rows, cols, edges, empty);
+      if (isSlitherAll2) slitherInit = slitherInit.filter((s) => s.n === 2);
       if (slitherInit.length < Math.max(4, minSlither)) continue;
       slitherInit.sort((a, b) => (a.r * fc + a.c) - (b.r * fc + b.c));
     }
@@ -2515,7 +2530,7 @@ function generateMidloopPuzzle({
       if (fin.clues.length < minClues || (rows >= 5 && cols >= 5 && (nW < 1 || nB < 1))) continue;
     }
     if (isSlither) {
-      if (fin.slither.length < minSlither || new Set(fin.slither.map((s) => s.n)).size < 2) continue;
+      if (fin.slither.length < minSlither || (!isSlitherAll2 && new Set(fin.slither.map((s) => s.n)).size < 2)) continue;
     }
     if (reqQuadItems > 0) {
       const midR = rows >> 1, midC = cols >> 1;
@@ -2628,13 +2643,13 @@ export function generatePuzzle({
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
     });
   }
-  if (style === 'slither' || style === 'slither-swiss' || style === 'slither-all3' || style === 'slither-all2-full' || style === 'slither-masyu' || style === 'slither-full') {
+  if (style === 'slither' || style === 'slither-swiss' || style === 'slither-all3' || style === 'slither-all2-full' || style === 'slither-all3-full' || style === 'slither-masyu' || style === 'slither-all2-masyu' || style === 'slither-all3-masyu' || style === 'slither-gray' || style === 'slither-masyu-swiss' || style === 'slither-full' || style === 'slither-full-swiss') {
     return generateSlitherPuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
     });
   }
-  if (style === 'midloop' || style === 'midloop-swiss' || style === 'midloop-even' || style === 'midloop-odd' || style === 'midloop-long' || style === 'midloop-masyu' || style === 'midloop-slither' || style === 'midloop-full') {
+  if (style === 'midloop' || style === 'midloop-swiss' || style === 'midloop-even' || style === 'midloop-odd' || style === 'midloop-long' || style === 'midloop-masyu' || style === 'midloop-slither' || style === 'midloop-slither-swiss' || style === 'midloop-slither2' || style === 'midloop-full') {
     return generateMidloopPuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,

@@ -633,6 +633,88 @@ if (!isMainThread) {
       buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
       budgetSec: 90, perPuzzleMs: 12000,
     },
+
+    // ---- Slitherlink Hybrid gimmick token pools (24-puzzle tasting books at 4 B / 8 M / 8 H / 4 E)
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither2_masyu_8x8', cols: 8, rows: 8, style: 'slither-all2-masyu',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither3_masyu_8x8', cols: 8, rows: 8, style: 'slither-all3-masyu',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_gray_8x8', cols: 8, rows: 8, style: 'slither-gray',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_swiss_10x10', cols: 10, rows: 10, style: 'slither-masyu-swiss',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_sym_rot180_9x9', cols: 9, rows: 9, style: 'slither-masyu', layout: 'rot180',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_sym_mirror_9x9', cols: 9, rows: 9, style: 'slither-masyu', layout: 'mirror',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_sym_transpose_9x9', cols: 9, rows: 9, style: 'slither-masyu', layout: 'transpose',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither3_full_8x8', cols: 8, rows: 8, style: 'slither-all3-full',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_full_swiss_10x10', cols: 10, rows: 10, style: 'slither-full-swiss',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_full_sym_rot180_8x8', cols: 8, rows: 8, style: 'slither-full', layout: 'rot180',
+      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_slither_full_sym_mirror_8x8', cols: 8, rows: 8, style: 'slither-full', layout: 'mirror',
+      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither2_8x8', cols: 8, rows: 8, style: 'midloop-slither2',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 15000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_swiss_10x10', cols: 10, rows: 10, style: 'midloop-slither-swiss',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_sym_rot180_9x9', cols: 9, rows: 9, style: 'midloop-slither', layout: 'rot180',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_sym_mirror_9x9', cols: 9, rows: 9, style: 'midloop-slither', layout: 'mirror',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_sym_transpose_9x9', cols: 9, rows: 9, style: 'midloop-slither', layout: 'transpose',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
   ];
 
   const knownGroups = new Set(JOBS.map((j) => j.group));

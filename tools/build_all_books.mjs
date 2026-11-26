@@ -514,6 +514,32 @@ const recipes = [
     blurb: 'Numbered squares and Masyu circles share one single loop — every puzzle genuinely requires both.',
   },
   {
+    id: 'hybrid-slither2-masyu', name: 'All 2s + Masyu', label: '2️⃣⚪ All 2s (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
+    glob: 'hybrid_slither2_masyu_8x8', tiers: '4,8,8,4',
+    blurb: 'Every numbered square is a 2, paired with Masyu circles — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-slither3-masyu', name: 'All 3s + Masyu', label: '3️⃣⚪ All 3s (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
+    glob: 'hybrid_slither3_masyu_8x8', tiers: '4,8,8,4',
+    blurb: 'Every numbered square is a 3, paired with Masyu circles — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-slither-gray', name: 'Slitherlink + Gray dots', label: '🔢🔘 Gray dots (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
+    glob: 'hybrid_slither_gray_8x8', tiers: '4,8,8,4',
+    blurb: 'Slitherlink numbers paired with mystery gray circles — deduce white vs. black as you go.',
+  },
+  {
+    id: 'hybrid-slither-masyu-swiss', name: 'Slitherlink + Masyu — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
+    glob: 'hybrid_slither_masyu_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Slitherlink numbers and Masyu circles on boards punched with random interior holes.',
+  },
+  {
+    id: 'hybrid-slither-masyu-sym', name: 'Slitherlink + Masyu — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
+    glob: 'hybrid_slither_masyu_sym_rot180_9x9,hybrid_slither_masyu_sym_mirror_9x9,hybrid_slither_masyu_sym_transpose_9x9',
+    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror, diagonal, and 180° symmetric Slitherlink + Masyu clues and loops.',
+  },
+  {
     id: 'hybrid-slither-full', name: 'Slitherlink + Hamilton cycle', label: '🔢🔁 Classic (8×8)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
     glob: 'hybrid_slither_full_8x8', tiers: '50,200,200,50',
     blurb: 'Slitherlink numbers on a Hamilton cycle that visits every single dot.',
@@ -524,6 +550,22 @@ const recipes = [
     blurb: 'Every clue is a 2 on a Hamilton cycle that visits every single dot.',
   },
   {
+    id: 'hybrid-slither3-full', name: 'All 3s + Hamilton cycle', label: '3️⃣🔁 All 3s (8×8)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
+    glob: 'hybrid_slither3_full_8x8', tiers: '4,8,8,4',
+    blurb: 'Every numbered square is a 3 on a Hamilton cycle — verified to require visiting every dot.',
+  },
+  {
+    id: 'hybrid-slither-full-swiss', name: 'Slitherlink + Hamilton — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
+    glob: 'hybrid_slither_full_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Slitherlink numbers on a Hamilton cycle across boards punched with balanced interior holes.',
+  },
+  {
+    id: 'hybrid-slither-full-sym', name: 'Slitherlink + Hamilton — Symmetry', label: '🪞 Symmetry (8×8)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
+    glob: 'hybrid_slither_full_sym_rot180_8x8,hybrid_slither_full_sym_mirror_8x8',
+    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror and 180° symmetric Slitherlink numbers on a full-board Hamilton cycle.',
+  },
+  {
     id: 'hybrid-midloop-masyu', name: 'Mid-loop + Masyu', label: '🎯⚪ Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Masyu',
     glob: 'hybrid_midloop_masyu_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots and Masyu circles share one single loop — every puzzle genuinely requires both.',
@@ -532,6 +574,22 @@ const recipes = [
     id: 'hybrid-midloop-slither', name: 'Mid-loop + Slitherlink', label: '🎯🔢 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
     glob: 'hybrid_midloop_slither_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots and Slitherlink numbers share one single loop — every puzzle genuinely requires both.',
+  },
+  {
+    id: 'hybrid-midloop-slither2', name: 'Mid-loop + All 2s', label: '🎯2️⃣ All 2s (8×8)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
+    glob: 'hybrid_midloop_slither2_8x8', tiers: '4,8,8,4',
+    blurb: 'Teal midpoint dots paired with all-2s Slitherlink squares — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-midloop-slither-swiss', name: 'Mid-loop + Slitherlink — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
+    glob: 'hybrid_midloop_slither_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Teal midpoint dots and Slitherlink numbers on boards punched with random interior holes.',
+  },
+  {
+    id: 'hybrid-midloop-slither-sym', name: 'Mid-loop + Slitherlink — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
+    glob: 'hybrid_midloop_slither_sym_rot180_9x9,hybrid_midloop_slither_sym_mirror_9x9,hybrid_midloop_slither_sym_transpose_9x9',
+    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror, diagonal, and 180° symmetric Mid-loop + Slitherlink clues and loops.',
   },
   {
     id: 'hybrid-midloop-full', name: 'Mid-loop + Hamilton cycle', label: '🎯🔁 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Hamilton cycle',

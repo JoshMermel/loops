@@ -31,9 +31,12 @@ if (!Number.isFinite(count) || count < 1 || !Number.isFinite(seed) || !Number.is
 const VALID_STYLES = new Set([
   'balanced', 'white', 'black', 'sparse', 'gray-mixed', 'gray-all',
   'full-masyu', 'full-lines', 'full-walls', 'full-mixed', 'full-swiss',
-  'shaped', 'swiss-cheese', 'slither', 'slither-swiss', 'slither-all3', 'slither-all2-full', 'slither-masyu', 'slither-full',
+  'shaped', 'swiss-cheese',
+  'slither', 'slither-swiss', 'slither-all3', 'slither-all2-full', 'slither-all3-full',
+  'slither-masyu', 'slither-all2-masyu', 'slither-all3-masyu', 'slither-gray', 'slither-masyu-swiss',
+  'slither-full', 'slither-full-swiss',
   'midloop', 'midloop-swiss', 'midloop-even', 'midloop-odd', 'midloop-long',
-  'midloop-masyu', 'midloop-slither', 'midloop-full',
+  'midloop-masyu', 'midloop-slither', 'midloop-slither-swiss', 'midloop-slither2', 'midloop-full',
 ]);
 const style = arg('style', 'balanced');
 if (!VALID_STYLES.has(style)) {

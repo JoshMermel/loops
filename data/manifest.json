@@ -905,6 +905,56 @@
       "sub": "Slitherlink + Masyu"
     },
     {
+      "id": "hybrid-slither2-masyu",
+      "name": "All 2s + Masyu",
+      "label": "2️⃣⚪ All 2s (8×8)",
+      "file": "data/hybrid-slither2-masyu.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Masyu",
+      "blurb": "Every numbered square is a 2, paired with Masyu circles — every puzzle requires both."
+    },
+    {
+      "id": "hybrid-slither3-masyu",
+      "name": "All 3s + Masyu",
+      "label": "3️⃣⚪ All 3s (8×8)",
+      "file": "data/hybrid-slither3-masyu.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Masyu",
+      "blurb": "Every numbered square is a 3, paired with Masyu circles — every puzzle requires both."
+    },
+    {
+      "id": "hybrid-slither-gray",
+      "name": "Slitherlink + Gray dots",
+      "label": "🔢🔘 Gray dots (8×8)",
+      "file": "data/hybrid-slither-gray.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Masyu",
+      "blurb": "Slitherlink numbers paired with mystery gray circles — deduce white vs. black as you go."
+    },
+    {
+      "id": "hybrid-slither-masyu-swiss",
+      "name": "Slitherlink + Masyu — Swiss cheese",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/hybrid-slither-masyu-swiss.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Masyu",
+      "blurb": "Slitherlink numbers and Masyu circles on boards punched with random interior holes."
+    },
+    {
+      "id": "hybrid-slither-masyu-sym",
+      "name": "Slitherlink + Masyu — Symmetry",
+      "label": "🪞 Symmetry (9×9)",
+      "file": "data/hybrid-slither-masyu-sym.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Masyu",
+      "blurb": "Mirror, diagonal, and 180° symmetric Slitherlink + Masyu clues and loops."
+    },
+    {
       "id": "hybrid-slither-full",
       "name": "Slitherlink + Hamilton cycle",
       "label": "🔢🔁 Classic (8×8)",
@@ -925,6 +975,36 @@
       "sub": "Slitherlink + Hamilton cycle"
     },
     {
+      "id": "hybrid-slither3-full",
+      "name": "All 3s + Hamilton cycle",
+      "label": "3️⃣🔁 All 3s (8×8)",
+      "file": "data/hybrid-slither3-full.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Hamilton cycle",
+      "blurb": "Every numbered square is a 3 on a Hamilton cycle — verified to require visiting every dot."
+    },
+    {
+      "id": "hybrid-slither-full-swiss",
+      "name": "Slitherlink + Hamilton — Swiss cheese",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/hybrid-slither-full-swiss.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Hamilton cycle",
+      "blurb": "Slitherlink numbers on a Hamilton cycle across boards punched with balanced interior holes."
+    },
+    {
+      "id": "hybrid-slither-full-sym",
+      "name": "Slitherlink + Hamilton — Symmetry",
+      "label": "🪞 Symmetry (8×8)",
+      "file": "data/hybrid-slither-full-sym.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Slitherlink + Hamilton cycle",
+      "blurb": "Mirror and 180° symmetric Slitherlink numbers on a full-board Hamilton cycle."
+    },
+    {
       "id": "hybrid-midloop-masyu",
       "name": "Mid-loop + Masyu",
       "label": "🎯⚪ Classic (8×8)",
@@ -943,6 +1023,36 @@
       "group": "Hybrids",
       "sub": "Mid-loop + Slitherlink",
       "blurb": "Teal midpoint dots and Slitherlink numbers share one single loop — every puzzle genuinely requires both."
+    },
+    {
+      "id": "hybrid-midloop-slither2",
+      "name": "Mid-loop + All 2s",
+      "label": "🎯2️⃣ All 2s (8×8)",
+      "file": "data/hybrid-midloop-slither2.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Mid-loop + Slitherlink",
+      "blurb": "Teal midpoint dots paired with all-2s Slitherlink squares — every puzzle requires both."
+    },
+    {
+      "id": "hybrid-midloop-slither-swiss",
+      "name": "Mid-loop + Slitherlink — Swiss cheese",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/hybrid-midloop-slither-swiss.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Mid-loop + Slitherlink",
+      "blurb": "Teal midpoint dots and Slitherlink numbers on boards punched with random interior holes."
+    },
+    {
+      "id": "hybrid-midloop-slither-sym",
+      "name": "Mid-loop + Slitherlink — Symmetry",
+      "label": "🪞 Symmetry (9×9)",
+      "file": "data/hybrid-midloop-slither-sym.csv",
+      "count": 24,
+      "group": "Hybrids",
+      "sub": "Mid-loop + Slitherlink",
+      "blurb": "Mirror, diagonal, and 180° symmetric Mid-loop + Slitherlink clues and loops."
     },
     {
       "id": "hybrid-midloop-full",

@@ -2,45 +2,72 @@
 
 Open follow-ups and future ideas for Masyu (see [README.md](README.md) for architecture and shipped features).
 
+## Gimmick token books to playtest & evaluate
+
+Try these 24-puzzle tasting books and decide for each one whether to **grow to 500**, **keep small**, or **delete**:
+
+### Mid-loop → Bonus
+- [ ] `midloop-even-7x7` — **✚ All even (7×7)** (intersection dots only; every clued run has even length `2, 4, 6…`)
+- [ ] `midloop-odd-9x9` — **➖ All odd (9×9)** (segment-midpoint dots only; every clued run has odd length `1, 3, 5…`)
+- [ ] `midloop-swiss-10x10` — **🧀 Swiss cheese (10×10)** (interior cutout holes slicing straight corridors)
+- [ ] `midloop-sky-6x18` — **🏙️ Skyscraper (6×18)** (tall narrow towers with short horizontal caps & sweeping vertical runs)
+- [ ] `midloop-sym-9x9` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric dots & loops)
+- [ ] `midloop-long-8x8` — **📏 Long runs (8×8)** (no length-1 stubs; every clued run length ≥ 2, odd dots ≥ 3)
+- [ ] `midloop-interior-8x8` — **◻️ Interior only (8×8)** (no dots touching the outer border ring)
+- [ ] `midloop-frame-8x8` — **🖼️ Hollow frame (8×8)** (dots only in the outer 2-cell ring around a blank 4×4 center)
+
+### Hybrids → Slitherlink + Masyu
+- [ ] `hybrid-slither2-masyu` — **2️⃣⚪ All 2s (8×8)** (all-2s Slitherlink paired with Masyu circles)
+- [ ] `hybrid-slither3-masyu` — **3️⃣⚪ All 3s (8×8)** (all-3s Slitherlink paired with Masyu circles)
+- [ ] `hybrid-slither-gray` — **🔢🔘 Gray dots (8×8)** (Slitherlink numbers paired with all-gray Masyu circles)
+- [ ] `hybrid-slither-masyu-swiss` — **🧀 Swiss cheese (10×10)** (Slitherlink + Masyu with interior cutout holes)
+- [ ] `hybrid-slither-masyu-sym` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric Slitherlink + Masyu)
+
+### Hybrids → Slitherlink + Hamilton cycle
+- [ ] `hybrid-slither3-full` — **3️⃣🔁 All 3s (8×8)** (all-3s Slitherlink on a Hamilton cycle, full-board necessity verified)
+- [ ] `hybrid-slither-full-swiss` — **🧀 Swiss cheese (10×10)** (Slitherlink + Hamilton cycle on balanced cutout boards)
+- [ ] `hybrid-slither-full-sym` — **🪞 Symmetry (8×8)** (180° and mirror symmetric Slitherlink + Hamilton cycle)
+
+### Hybrids → Mid-loop + Slitherlink
+- [ ] `hybrid-midloop-slither2` — **🎯2️⃣ All 2s (8×8)** (teal midpoint dots paired with all-2s Slitherlink)
+- [ ] `hybrid-midloop-slither-swiss` — **🧀 Swiss cheese (10×10)** (Mid-loop + Slitherlink with interior cutout holes)
+- [ ] `hybrid-midloop-slither-sym` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric Mid-loop + Slitherlink)
+
 ## Variants & future twists
 
 - [ ] **New single-loop families in `js/variants/`:**
-  - **Mid-loop follow-ups:** grow prototype Mid-loop & Mid-loop Hybrid books to 500 once playtested, add Mid-loop variants (Swiss cheese, Symmetry, Skyscraper), and add Mid-loop armory illustrations to `docs/how_to_solve.html`.
-  - **Corral / Bag:** dual-square sightline numbers (strictly Inside the loop), standalone + hybrids with Masyu, Hamilton cycle (and visually distinct badges if paired with Slitherlink).
+  - **Corral / Bag:** dual-square sightline numbers (strictly Inside the loop), standalone + hybrids with Masyu, Mid-loop, Hamilton cycle (and visually distinct badges if paired with Slitherlink).
   - **Castle Wall:** blocked void-cell arrow clues (Inside / Outside / Unknown) counting parallel loop segments along the row/column, standalone + hybrids.
   - **Balance Loop / Yajilin / Simple Loop** (lower priority).
-- [ ] **More Hybrid gimmicks** (inside our `Hybrids` subcategories):
-  - *Masyu + Hamilton cycle:* All white, All black, Gray dots, Swiss cheese, Symmetry.
-  - *Slitherlink + Masyu:* All 2s + Masyu, All 3s + Masyu, Gray dots + Slitherlink, Swiss cheese, Symmetry.
-  - *Slitherlink + Hamilton cycle:* Swiss cheese, Symmetry, All 3s + Hamilton cycle (test uniqueness feasibility).
 - [ ] **More pure Slitherlink gimmicks:**
   - Digit-restricted boards: No 3s (`0/1/2`), Even only (`0/2`), Odd only (`1/3`).
   - Geometric clue masks (Slitherlink `Patterns`), plus larger sizes (`13×13`, `15×15`).
+- [ ] **More Hybrid gimmicks** (inside our remaining `Hybrids` subcategories):
+  - *Masyu + Hamilton cycle:* All white, All black, Gray dots, Swiss cheese, Symmetry.
+  - *Mid-loop + Masyu / Mid-loop + Hamilton cycle:* Gray dots, Swiss cheese, Symmetry, All even / All odd.
 - [ ] **New circle types:**
   - **Strict / double-turn whites & numbered blacks:** e.g. marked white circles that must turn on *both* sides, and/or numbered black circles whose straight legs have a required length.
   - **Anti-Masyu (inverted pearls):** inverted rules (white turns and immediately turns on ≥1 side; black goes straight and stays straight on both sides), standalone or mixed with standard circles.
 - [ ] **Cylinder / Torus / Möbius strip / Klein bottle:** wrap-around edge topologies (including twisted/non-orientable identifications where Inside/Outside shading generalizes or disables). Inspired by Jason Davies's [Planarity](https://www.jasondavies.com/planarity/) — inspect closely during implementation and credit the author for inspiration.
-- [ ] **Hexagonal or triangular Masyu (maybe):** generalized non-square lattice topology (`K = 3` / `K = 6` in `js/logic.js`) with a dedicated renderer and drag handler.
+- [ ] **Hexagonal or triangular grids (maybe):** generalized non-square lattice topology (`K = 3` / `K = 6` in `js/logic.js`) with a dedicated renderer and drag handler.
 
 ## Rules, books & generator
 
-- [ ] **Consider promoting other Bonus books to top-level sections:** review whether any remaining Bonus themes (e.g., All white / All black, Black & White Cookie, Skyscraper, Symmetry, Patterns) merit their own top-level section with multiple sizes or variations.
+- [ ] **Add Mid-loop armory illustrations:** curate Mid-loop examples in `data/armory.csv` and render them into `docs/how_to_solve.html` (matching Masyu and Slitherlink rule diagrams).
 - [ ] **Cross-family hybrid inferences (rules that only exist when two puzzle types meet):** audit Medium/Hard hybrid puzzles (`Slitherlink + Masyu`, `Mid-loop + Masyu`, `Mid-loop + Slitherlink`, `+ Hamilton cycle`) to see which recurring `imagineLocal`/`imagineTrace` steps deserve cheap named cross-rules — e.g.:
   - *Mid-loop + Masyu:* a White circle at distance `k` from a Mid-loop dot cannot be a turn endpoint (eliminating half-length `k`), or a Black circle adjacent to a Mid-loop dot forcing symmetric straight legs.
   - *Slitherlink + Masyu:* a Black/White circle on a corner of a `3` or `1` square forcing its entry/exit legs directly.
   - *Mid-loop + Slitherlink:* a Mid-loop dot along a `3`/`2`/`1` square restricting which symmetric lengths keep the square's edge count legal.
-- [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (remaining ideas:
-  - diagonally adjacent black and white circles near a wall,
-  - two white circles diagonally adjacent forcing a corridor,
-  - paired open ends with 4 or 6 ends (`pairedEnds`),
-  - uniqueness-assuming shortcuts (`uniqueRoute`) if desired for Hint only).
+- [ ] **Rescore older Masyu books (optional housekeeping):** ~0.5–2% of puzzles in pre-Mid-loop Masyu Hard/Expert/Swiss books have minor `rules`/`score` drift (`0` tier changes) from earlier engine updates; run `tools/rescore.mjs` if we want `--all --rate` 100% zero-diff across legacy books too.
+- [ ] **Consider promoting other Bonus books to top-level sections:** review whether any remaining Bonus themes (e.g., All white / All black, Black & White Cookie, Skyscraper, Symmetry, Patterns) merit their own top-level section with multiple sizes or variations.
+- [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring patterns currently handled by `imagine` that deserve their own cheaper named rule (e.g., diagonally adjacent black & white circles near a wall, two diagonally adjacent white circles forcing a corridor, `pairedEnds` with 4/6 ends, or hint-only `uniqueRoute`).
 - [ ] **Explore even larger boards or custom packs:** e.g. `20×20` / `20×36` mega boards using `tools/fill_pools.mjs` / `tools/overnight.mjs`.
-- [ ] **More themed Bonus ideas to explore:**
-  - **Symmetric layout (asymmetric colors):** 180° symmetric clue *positions* with free circle colors and asymmetric loops.
-  - **Diagonal stripes / X-pattern / Border-only frame on larger boards.**
+- [ ] **More themed Masyu Bonus ideas:** 180° symmetric clue *positions* with free circle colors and asymmetric loops; diagonal stripes / X-pattern / border-only frame on larger boards.
 
 ## UI, polish & housekeeping
 
+- [ ] **Daily / Random puzzle picker:** one-click "Daily" or "Surprise me" picker by puzzle family and difficulty.
+- [ ] **Custom puzzle builder / shareable URL links:** draw or paste a custom board and share it via URL hash.
 - [ ] **Cross-machine completion sync / login (maybe):** optionally allow signing in to share puzzle completion status across devices (see Star Battle for reference).
 - [ ] **Phone / touch testing** of edge-tap vs cell-drag hit margins (`EDGE_MARGIN` in `js/board.js`).
 - [ ] **Playwright PNG screenshots** (`tools/capture_how_to_images.py`) once Playwright is installed, to compare against the pure-Node SVG illustrations.
