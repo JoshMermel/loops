@@ -287,6 +287,24 @@ test('generatePuzzle supports midloop, midloop-masyu, midloop-slither, and midlo
   assert.ok(detectSymmetries(pSym).some((s) => s.id === 'rot180'), 'rot180 midloop should preserve 180° symmetry');
   const pBeg = generatePuzzle({ rows: 8, cols: 8, style: 'midloop', targetTier: 'Beginner', seed: 606, budgetMs: 8000 });
   assert.ok(pBeg && pBeg.tier === 'Beginner', 'failed to generate Beginner 8x8 midloop');
+
+  // Pure Mid-loop gimmicks: all-even, all-odd, swiss, long runs, interior-only, hollow frame
+  const pEven = generatePuzzle({ rows: 7, cols: 7, style: 'midloop-even', seed: 607, budgetMs: 8000 });
+  assert.ok(pEven && pEven.midloop.every((m) => m.dir === 'C'), 'midloop-even must only place intersection dots');
+  const pOdd = generatePuzzle({ rows: 8, cols: 8, style: 'midloop-odd', seed: 608, budgetMs: 8000 });
+  assert.ok(pOdd && pOdd.midloop.every((m) => m.dir !== 'C'), 'midloop-odd must only place edge dots');
+  const pSwiss = generatePuzzle({ rows: 10, cols: 10, style: 'midloop-swiss', seed: 609, budgetMs: 8000 });
+  assert.ok(pSwiss && pSwiss.voids.length > 0 && pSwiss.midloop.length >= 4, 'midloop-swiss must place voids & dots');
+  const pLong = generatePuzzle({ rows: 8, cols: 8, style: 'midloop-long', seed: 610, budgetMs: 8000 });
+  assert.ok(pLong && pLong.midloop.length >= 4, 'midloop-long should generate cleanly');
+  const pInt = generatePuzzle({ rows: 8, cols: 8, style: 'midloop', layout: 'interior', seed: 611, budgetMs: 8000 });
+  assert.ok(pInt && pInt.midloop.every((m) => m.r > 0 && m.c > 0 && m.r < 7 && m.c < 7), 'interior midloop must avoid border');
+  const pFrm = generatePuzzle({ rows: 8, cols: 8, style: 'midloop', layout: 'frame', seed: 612, budgetMs: 8000 });
+  assert.ok(pFrm && pFrm.midloop.every((m) => {
+    const rr = m.dir === 'V' ? m.r + 0.5 : m.r;
+    const cc = m.dir === 'H' ? m.c + 0.5 : m.c;
+    return rr < 2 || rr > 5 || cc < 2 || cc > 5;
+  }), 'frame midloop must leave 4x4 center blank');
 });
 
 test('Mid-loop validation, 1-step rectangular rotation, answer-key print SVG, and noEarlyClose explanation', () => {

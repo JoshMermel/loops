@@ -87,7 +87,17 @@
     {
       "name": "Mid-loop",
       "icon": "🎯",
-      "blurb": "Pass straight through every teal dot at the exact midpoint of its straight loop segment."
+      "blurb": "Pass straight through every teal dot at the exact midpoint of its straight loop segment — Classic sizes plus Bonus gimmicks.",
+      "subs": {
+        "Classic": {
+          "icon": "📚",
+          "blurb": "Standard Mid-loop boards across three sizes."
+        },
+        "Bonus": {
+          "icon": "🎁",
+          "blurb": "Themed variations with the same Mid-loop rules."
+        }
+      }
     },
     {
       "name": "Hamilton cycle",
@@ -771,7 +781,8 @@
       "file": "data/midloop-small.csv",
       "count": 500,
       "group": "Mid-loop",
-      "blurb": "Compact 7×7 Mid-loop boards across all four difficulties."
+      "blurb": "Compact 7×7 Mid-loop boards across all four difficulties.",
+      "sub": "Classic"
     },
     {
       "id": "midloop-classic",
@@ -780,7 +791,8 @@
       "file": "data/midloop-classic.csv",
       "count": 500,
       "group": "Mid-loop",
-      "blurb": "Classic 10×10 Mid-loop boards across all four difficulties."
+      "blurb": "Classic 10×10 Mid-loop boards across all four difficulties.",
+      "sub": "Classic"
     },
     {
       "id": "midloop-large",
@@ -789,7 +801,88 @@
       "file": "data/midloop-large.csv",
       "count": 500,
       "group": "Mid-loop",
-      "blurb": "Big 12×12 Mid-loop boards across all four difficulties."
+      "blurb": "Big 12×12 Mid-loop boards across all four difficulties.",
+      "sub": "Classic"
+    },
+    {
+      "id": "midloop-even-7x7",
+      "name": "Mid-loop — All even",
+      "label": "✚ All even (7×7)",
+      "file": "data/midloop-even-7x7.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "Every dot sits on a grid intersection — every clued straight run has even length (2, 4, 6…)."
+    },
+    {
+      "id": "midloop-odd-9x9",
+      "name": "Mid-loop — All odd",
+      "label": "➖ All odd (9×9)",
+      "file": "data/midloop-odd-9x9.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "Every dot sits on a segment midpoint — every clued straight run has odd length (1, 3, 5…)."
+    },
+    {
+      "id": "midloop-swiss-10x10",
+      "name": "Mid-loop — Swiss cheese",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/midloop-swiss-10x10.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "Mid-loop on boards punched with random interior holes that slice straight corridors."
+    },
+    {
+      "id": "midloop-sky-6x18",
+      "name": "Mid-loop — Skyscraper",
+      "label": "🏙️ Skyscraper (6×18)",
+      "file": "data/midloop-sky-6x18.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "Tall, narrow Mid-loop towers with short horizontal caps and sweeping vertical runs."
+    },
+    {
+      "id": "midloop-sym-9x9",
+      "name": "Mid-loop — Symmetry",
+      "label": "🪞 Symmetry (9×9)",
+      "file": "data/midloop-sym-9x9.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "Mirror, diagonal, and 180° symmetric Mid-loop dots and loops."
+    },
+    {
+      "id": "midloop-long-8x8",
+      "name": "Mid-loop — Long runs",
+      "label": "📏 Long runs (8×8)",
+      "file": "data/midloop-long-8x8.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "No length-1 stubs — every teal dot sits on a straight run of length 2 or more (odd dots at least 3)."
+    },
+    {
+      "id": "midloop-interior-8x8",
+      "name": "Mid-loop — Interior only",
+      "label": "◻️ Interior only (8×8)",
+      "file": "data/midloop-interior-8x8.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "No dots touching the outer border ring — zero free border caps."
+    },
+    {
+      "id": "midloop-frame-8x8",
+      "name": "Mid-loop — Hollow frame",
+      "label": "🖼️ Hollow frame (8×8)",
+      "file": "data/midloop-frame-8x8.csv",
+      "count": 24,
+      "group": "Mid-loop",
+      "sub": "Bonus",
+      "blurb": "Dots only in the outer 2-cell frame around a completely blank 4×4 center."
     },
     {
       "id": "full-masyu-8x8",

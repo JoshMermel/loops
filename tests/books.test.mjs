@@ -73,6 +73,8 @@ test('following hints from an empty board solves shipped Beginner and Medium puz
     'slither-swiss-10x10', 'slither-sky-6x18', 'slither-sym-9x9', 'slither-all3-8x8',
     'hybrid-slither2-full',
     'midloop-small', 'midloop-classic', 'midloop-large',
+    'midloop-even-7x7', 'midloop-odd-9x9', 'midloop-swiss-10x10', 'midloop-sky-6x18',
+    'midloop-sym-9x9', 'midloop-long-8x8', 'midloop-interior-8x8', 'midloop-frame-8x8',
     'hybrid-midloop-masyu', 'hybrid-midloop-slither', 'hybrid-midloop-full',
     'bonus-gray', 'swiss-10x10',
   ];

@@ -581,6 +581,58 @@ if (!isMainThread) {
       buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
       budgetSec: 420, perPuzzleMs: 15000,
     },
+
+    // ---- Mid-loop Bonus gimmick token pools (24-puzzle tasting books at 4 B / 8 M / 8 H / 4 E)
+    {
+      group: 'midloop-bonus', pool: 'midloop_even_7x7', cols: 7, rows: 7, style: 'midloop-even',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_odd_9x9', cols: 9, rows: 9, style: 'midloop-odd',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_swiss_10x10', cols: 10, rows: 10, style: 'midloop-swiss',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 15000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_sky_6x18', cols: 6, rows: 18, style: 'midloop',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_sym_rot180_9x9', cols: 9, rows: 9, style: 'midloop', layout: 'rot180',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_sym_mirror_9x9', cols: 9, rows: 9, style: 'midloop', layout: 'mirror',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_sym_transpose_9x9', cols: 9, rows: 9, style: 'midloop', layout: 'transpose',
+      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
+      budgetSec: 60, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_long_8x8', cols: 8, rows: 8, style: 'midloop-long',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_interior_8x8', cols: 8, rows: 8, style: 'midloop', layout: 'interior',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
+    {
+      group: 'midloop-bonus', pool: 'midloop_frame_8x8', cols: 8, rows: 8, style: 'midloop', layout: 'frame',
+      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
+      budgetSec: 90, perPuzzleMs: 12000,
+    },
   ];
 
   const knownGroups = new Set(JOBS.map((j) => j.group));

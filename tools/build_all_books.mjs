@@ -102,7 +102,17 @@ const manifest = {
     {
       name: 'Mid-loop',
       icon: '🎯',
-      blurb: 'Pass straight through every teal dot at the exact midpoint of its straight loop segment.',
+      blurb: 'Pass straight through every teal dot at the exact midpoint of its straight loop segment — Classic sizes plus Bonus gimmicks.',
+      subs: {
+        Classic: {
+          icon: '📚',
+          blurb: 'Standard Mid-loop boards across three sizes.',
+        },
+        Bonus: {
+          icon: '🎁',
+          blurb: 'Themed variations with the same Mid-loop rules.',
+        },
+      },
     },
     {
       name: 'Hamilton cycle',
@@ -434,21 +444,62 @@ const recipes = [
     blurb: 'Pure Slitherlink where every single numbered square is a 3.',
   },
 
-  // ---- Mid-loop (full-size 500-puzzle books at 10/40/40/10)
+  // ---- Mid-loop Classic (full-size 500-puzzle books at 10/40/40/10) + Bonus gimmick token books (24 puzzles each)
   {
-    id: 'midloop-small', name: 'Mid-loop — Small', label: 'Small (7×7)', group: 'Mid-loop',
+    id: 'midloop-small', name: 'Mid-loop — Small', label: 'Small (7×7)', group: 'Mid-loop', sub: 'Classic',
     glob: 'midloop_7x7', tiers: '50,200,200,50',
     blurb: 'Compact 7×7 Mid-loop boards across all four difficulties.',
   },
   {
-    id: 'midloop-classic', name: 'Mid-loop — Classic', label: 'Classic (10×10)', group: 'Mid-loop',
+    id: 'midloop-classic', name: 'Mid-loop — Classic', label: 'Classic (10×10)', group: 'Mid-loop', sub: 'Classic',
     glob: 'midloop_10x10', tiers: '50,200,200,50',
     blurb: 'Classic 10×10 Mid-loop boards across all four difficulties.',
   },
   {
-    id: 'midloop-large', name: 'Mid-loop — Large', label: 'Large (12×12)', group: 'Mid-loop',
+    id: 'midloop-large', name: 'Mid-loop — Large', label: 'Large (12×12)', group: 'Mid-loop', sub: 'Classic',
     glob: 'midloop_12x12', tiers: '50,200,200,50',
     blurb: 'Big 12×12 Mid-loop boards across all four difficulties.',
+  },
+  {
+    id: 'midloop-even-7x7', name: 'Mid-loop — All even', label: '✚ All even (7×7)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_even_7x7', tiers: '4,8,8,4',
+    blurb: 'Every dot sits on a grid intersection — every clued straight run has even length (2, 4, 6…).',
+  },
+  {
+    id: 'midloop-odd-9x9', name: 'Mid-loop — All odd', label: '➖ All odd (9×9)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_odd_9x9', tiers: '4,8,8,4',
+    blurb: 'Every dot sits on a segment midpoint — every clued straight run has odd length (1, 3, 5…).',
+  },
+  {
+    id: 'midloop-swiss-10x10', name: 'Mid-loop — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Mid-loop on boards punched with random interior holes that slice straight corridors.',
+  },
+  {
+    id: 'midloop-sky-6x18', name: 'Mid-loop — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_sky_6x18', tiers: '4,8,8,4',
+    blurb: 'Tall, narrow Mid-loop towers with short horizontal caps and sweeping vertical runs.',
+  },
+  {
+    id: 'midloop-sym-9x9', name: 'Mid-loop — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_sym_rot180_9x9,midloop_sym_mirror_9x9,midloop_sym_transpose_9x9',
+    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror, diagonal, and 180° symmetric Mid-loop dots and loops.',
+  },
+  {
+    id: 'midloop-long-8x8', name: 'Mid-loop — Long runs', label: '📏 Long runs (8×8)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_long_8x8', tiers: '4,8,8,4',
+    blurb: 'No length-1 stubs — every teal dot sits on a straight run of length 2 or more (odd dots at least 3).',
+  },
+  {
+    id: 'midloop-interior-8x8', name: 'Mid-loop — Interior only', label: '◻️ Interior only (8×8)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_interior_8x8', tiers: '4,8,8,4',
+    blurb: 'No dots touching the outer border ring — zero free border caps.',
+  },
+  {
+    id: 'midloop-frame-8x8', name: 'Mid-loop — Hollow frame', label: '🖼️ Hollow frame (8×8)', group: 'Mid-loop', sub: 'Bonus',
+    glob: 'midloop_frame_8x8', tiers: '4,8,8,4',
+    blurb: 'Dots only in the outer 2-cell frame around a completely blank 4×4 center.',
   },
 
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)

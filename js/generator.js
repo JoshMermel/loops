@@ -266,7 +266,7 @@ export function allowedSlither(rows, cols, edges, grid = null) {
 }
 
 /** Find every exact geometric Mid-loop dot (vertex 'C' or edge 'H'/'V') on `edges`. */
-export function allowedMidloop(rows, cols, edges, grid = null) {
+export function allowedMidloop(rows, cols, edges, grid = null, includeLen = false) {
   const empty = grid || compile({ name: 'tmp', rows, cols, clues: [] });
   const { ed } = empty;
   const out = [];
@@ -282,8 +282,11 @@ export function allowedMidloop(rows, cols, edges, grid = null) {
         c++;
       }
       const len = c - start;
-      if ((len & 1) === 0) out.push({ r, c: start + (len >> 1), dir: 'C' });
-      else out.push({ r, c: start + (len >> 1), dir: 'H' });
+      const dot = (len & 1) === 0
+        ? { r, c: start + (len >> 1), dir: 'C' }
+        : { r, c: start + (len >> 1), dir: 'H' };
+      if (includeLen) dot.len = len;
+      out.push(dot);
     }
   }
   for (let c = 0; c < cols; c++) {
@@ -298,8 +301,11 @@ export function allowedMidloop(rows, cols, edges, grid = null) {
         r++;
       }
       const len = r - start;
-      if ((len & 1) === 0) out.push({ r: start + (len >> 1), c, dir: 'C' });
-      else out.push({ r: start + (len >> 1), c, dir: 'V' });
+      const dot = (len & 1) === 0
+        ? { r: start + (len >> 1), c, dir: 'C' }
+        : { r: start + (len >> 1), c, dir: 'V' };
+      if (includeLen) dot.len = len;
+      out.push(dot);
     }
   }
   const dirOrd = (d) => (d === 'C' ? 0 : d === 'H' ? 1 : 2);
@@ -2115,7 +2121,11 @@ function generateSlitherPuzzle({
 
 /**
  * Generate one verified, rated Mid-loop or Mid-loop hybrid puzzle:
- *   - 'midloop'         pure Mid-loop (teal midpoint dots only; supports `layout`: 'rot180'|'mirror'|'transpose')
+ *   - 'midloop'         pure Mid-loop (teal midpoint dots only; supports `layout`: 'rot180'|'mirror'|'transpose'|'interior'|'frame')
+ *   - 'midloop-swiss'   pure Mid-loop on a Swiss cheese cutout board
+ *   - 'midloop-even'    pure Mid-loop with intersection dots only (every clued run has even length 2, 4, 6...)
+ *   - 'midloop-odd'     pure Mid-loop with edge-midpoint dots only (every clued run has odd length 1, 3, 5...)
+ *   - 'midloop-long'    pure Mid-loop with no length-1 runs (every clued run has length >= 2; odd dots >= 3)
  *   - 'midloop-masyu'   Mid-loop + Masyu hybrid (verified mutual necessity)
  *   - 'midloop-slither' Mid-loop + Slitherlink hybrid (verified mutual necessity)
  *   - 'midloop-full'    Mid-loop + Hamilton cycle hybrid (verified full-board necessity)
@@ -2127,30 +2137,25 @@ function generateMidloopPuzzle({
   const isFull = style === 'midloop-full';
   const isMasyu = style === 'midloop-masyu';
   const isSlither = style === 'midloop-slither';
-  const isSwiss = Boolean(voids && voids.length > 0);
+  const isEvenOnly = style === 'midloop-even';
+  const isOddOnly = style === 'midloop-odd';
+  const isLongOnly = style === 'midloop-long';
+  const hasExplicitVoids = Boolean(voids && voids.length > 0);
+  const isSwiss = style === 'midloop-swiss' || hasExplicitVoids;
   const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
-  if (layout && layout !== 'none' && !symLayout) return null;
+  const regionLayout = (!isSwiss && (layout === 'interior' || layout === 'frame')) ? layout : null;
+  if (layout && layout !== 'none' && !symLayout && !regionLayout) return null;
   if (symLayout === 'transpose' && rows !== cols) return null;
   if (isFull && symLayout && !isSwiss && isImpossibleSymFull(rows, cols, symLayout)) return null;
   if (isFull && !isSwiss && ((rows * cols) & 1)) return null;
   const N = rows * cols;
   const fr = rows - 1, fc = cols - 1;
   const pruneNodeCap = N >= 225 ? 8000 : N >= 200 ? 10000 : N <= 64 ? 15000 : 25000;
-  const useVoids = isSwiss ? voids : [];
-  const empty = compile({
+  const baseEmpty = !isSwiss ? compile({
     name: 'eml', rows, cols, clues: [],
-    ...(useVoids.length ? { voids: useVoids } : {}),
     ...(isFull ? { fullBoard: true } : {}),
-  });
-  if (isFull && empty.activeLight !== empty.activeDark) return null;
-  const compileM = (clues, slither, midloop, extra = {}) => compile({
-    name, rows, cols, clues,
-    ...(slither.length ? { slither } : {}),
-    ...(midloop.length ? { midloop } : {}),
-    ...(useVoids.length ? { voids: useVoids } : {}),
-    ...(isFull ? { fullBoard: true } : {}),
-    ...extra,
-  });
+  }) : null;
+  if (isFull && !isSwiss && baseEmpty.activeLight !== baseEmpty.activeDark) return null;
 
   const solvedByPropagate = (P) => {
     const st = initialState(P);
@@ -2162,10 +2167,12 @@ function generateMidloopPuzzle({
   const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
   const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
   const reqQuadFill = (!isSwiss && rows >= 10 && cols >= 10) ? 0.35 : (!isSwiss && rows >= 8 && cols >= 8) ? 0.28 : 0;
-  const reqQuadItems = (!isSwiss && rows >= 10 && cols >= 10) ? Math.max(2, Math.floor((N / 4) * 0.08)) : 0;
+  const reqQuadItems = (!isSwiss && !regionLayout && rows >= 10 && cols >= 10) ? Math.max(2, Math.floor((N / 4) * 0.08)) : 0;
   const minClues = isMasyu ? (N >= 100 ? 5 : N >= 64 ? 4 : 3) : 0;
   const minSlither = isSlither ? (N >= 100 ? 7 : N >= 64 ? 5 : 4) : 0;
-  const minMid = (isMasyu || isSlither) ? (N >= 100 ? 6 : N >= 64 ? 5 : 4) : Math.max(4, Math.floor(N * 0.10));
+  const minMid = (isMasyu || isSlither) ? (N >= 100 ? 6 : N >= 64 ? 5 : 4)
+    : (isEvenOnly || isLongOnly || regionLayout) ? Math.max(4, Math.floor(N * 0.07))
+    : Math.max(4, Math.floor(N * 0.10));
 
   const dirCode = (d) => (d === 'C' ? 0 : d === 'H' ? 1 : 2);
   const midKey = (r, c, dir) => (r * cols + c) * 3 + dirCode(dir);
@@ -2196,6 +2203,26 @@ function generateMidloopPuzzle({
   };
 
   while (Date.now() < deadline) {
+    const useVoids = isSwiss
+      ? ((voids && voids.length) ? voids : swissCheeseVoids(rows, cols, rand))
+      : [];
+    if (isSwiss && !useVoids.length) continue;
+    const empty = isSwiss
+      ? compile({ name: 'eml', rows, cols, clues: [], voids: useVoids, ...(isFull ? { fullBoard: true } : {}) })
+      : baseEmpty;
+    if (isFull && empty.activeLight !== empty.activeDark) {
+      if (hasExplicitVoids) return null;
+      continue;
+    }
+    const compileM = (clues, slither, midloop, extra = {}) => compile({
+      name, rows, cols, clues,
+      ...(slither.length ? { slither } : {}),
+      ...(midloop.length ? { midloop } : {}),
+      ...(useVoids.length ? { voids: useVoids } : {}),
+      ...(isFull ? { fullBoard: true } : {}),
+      ...extra,
+    });
+
     let edges;
     if (isFull) {
       if (symLayout) {
@@ -2229,7 +2256,31 @@ function generateMidloopPuzzle({
       edges = res.edges;
     }
 
-    let midInit = allowedMidloop(rows, cols, edges, empty);
+    let midInit = allowedMidloop(rows, cols, edges, empty, isLongOnly);
+    if (isEvenOnly) {
+      midInit = midInit.filter((m) => m.dir === 'C');
+    } else if (isOddOnly) {
+      midInit = midInit.filter((m) => m.dir !== 'C');
+    } else if (isLongOnly) {
+      midInit = midInit.filter((m) => m.len >= 2).map(({ r, c, dir }) => ({ r, c, dir }));
+    }
+    if (regionLayout === 'interior') {
+      // No dot touching the outer border ring
+      midInit = midInit.filter((m) => {
+        if (m.dir === 'C') return m.r > 0 && m.r < rows - 1 && m.c > 0 && m.c < cols - 1;
+        if (m.dir === 'H') return m.r > 0 && m.r < rows - 1 && m.c > 0 && m.c < cols - 2;
+        return m.r > 0 && m.r < rows - 2 && m.c > 0 && m.c < cols - 1;
+      });
+    } else if (regionLayout === 'frame') {
+      // Dots only in the outer frame, leaving a blank hollow center box
+      const padR = rows >= 9 ? 3 : 2;
+      const padC = cols >= 9 ? 3 : 2;
+      midInit = midInit.filter((m) => {
+        const rr = m.dir === 'V' ? m.r + 0.5 : m.r;
+        const cc = m.dir === 'H' ? m.c + 0.5 : m.c;
+        return rr < padR || rr > rows - 1 - padR || cc < padC || cc > cols - 1 - padC;
+      });
+    }
     let cluesInit = [];
     let slitherInit = [];
     if (isMasyu) {
@@ -2448,11 +2499,15 @@ function generateMidloopPuzzle({
     if (Date.now() >= deadline) break;
     const fin = extractActive();
     if (fin.midloop.length < minMid) continue;
-    // Require a mix of vertex dots and edge dots on pure Mid-loop boards >= 6x6
-    if (style === 'midloop' && rows >= 6 && cols >= 6) {
+    // Require a mix of vertex dots and edge dots on pure Mid-loop boards >= 6x6 (except All-Even / All-Odd)
+    if ((style === 'midloop' || style === 'midloop-swiss' || isLongOnly) && rows >= 6 && cols >= 6) {
       const hasC = fin.midloop.some((m) => m.dir === 'C');
       const hasE = fin.midloop.some((m) => m.dir !== 'C');
       if (!hasC || !hasE) continue;
+    } else if (isOddOnly && rows >= 6 && cols >= 6) {
+      const hasH = fin.midloop.some((m) => m.dir === 'H');
+      const hasV = fin.midloop.some((m) => m.dir === 'V');
+      if (!hasH || !hasV) continue;
     }
     if (isMasyu) {
       const nW = fin.clues.filter((c) => c.t === 'W').length;
@@ -2579,7 +2634,7 @@ export function generatePuzzle({
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
     });
   }
-  if (style === 'midloop' || style === 'midloop-masyu' || style === 'midloop-slither' || style === 'midloop-full') {
+  if (style === 'midloop' || style === 'midloop-swiss' || style === 'midloop-even' || style === 'midloop-odd' || style === 'midloop-long' || style === 'midloop-masyu' || style === 'midloop-slither' || style === 'midloop-full') {
     return generateMidloopPuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
