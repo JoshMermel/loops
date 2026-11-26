@@ -66,9 +66,10 @@ for (const p of candidates) {
     addCand(p);
   }
 }
-const familyQuota = { slither: 200, full: 120, voids: 80, gray: 120 };
+const familyQuota = { slither: 200, midloop: 150, full: 120, voids: 80, gray: 120 };
 for (const p of candidates) {
   if (p.slither && p.slither.length && familyQuota.slither > 0 && addCand(p)) familyQuota.slither--;
+  else if (p.midloop && p.midloop.length && familyQuota.midloop > 0 && addCand(p)) familyQuota.midloop--;
   else if (p.fullBoard && familyQuota.full > 0 && addCand(p)) familyQuota.full--;
   else if (p.voids && p.voids.length && familyQuota.voids > 0 && addCand(p)) familyQuota.voids--;
   else if (p.clues.some((c) => c.t === 'G') && familyQuota.gray > 0 && addCand(p)) familyQuota.gray--;
@@ -79,6 +80,7 @@ for (const p of candidates) {
 }
 const variantCount = (p) => (
   (p.slither && p.slither.length ? 1 : 0)
+  + (p.midloop && p.midloop.length ? 1 : 0)
   + (p.fullBoard ? 1 : 0)
   + (p.voids && p.voids.length ? 1 : 0)
   + (p.clues.some((c) => c.t === 'G') ? 1 : 0)

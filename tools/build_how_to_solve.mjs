@@ -54,6 +54,13 @@ const VARIANT_GROUPS = [
     htmlIntro: 'Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In <b>Hybrids</b> books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.',
     ruleIds: ['slitherZero', 'slitherCount', 'slitherCorner', 'slitherAdjacent3', 'slitherDiag3', 'slitherLineIn', 'slitherCorner2', 'slither1LineIn', 'slitherDiag32', 'faceSlither'],
   },
+  {
+    id: 'variant-midloop',
+    title: 'Mid-loop & Hybrids',
+    intro: 'Every teal dot sits either on an intersection (even straight run: 2, 4, …) or on a segment midpoint (odd straight run: 1, 3, …). The single closed loop must pass **straight through** every teal dot with **equal straight lengths** on both sides up to the 90° turns at each end. Combines cleanly with Masyu, Slitherlink, and Hamilton cycle in **Hybrids** books.',
+    htmlIntro: 'Every teal dot sits either on an intersection (even straight run: 2, 4, …) or on a segment midpoint (odd straight run: 1, 3, …). The single closed loop must pass <b>straight through</b> every teal dot with <b>equal straight lengths</b> on both sides up to the 90° turns at each end. Combines cleanly with Masyu, Slitherlink, and Hamilton cycle in <b>Hybrids</b> books.',
+    ruleIds: ['midEdgeDot', 'midVertexAxis', 'midSymExtend', 'midSymCap', 'midLengthForce', 'midVertexParity'],
+  },
 ];
 const VARIANT_RULE_IDS = new Set(VARIANT_GROUPS.flatMap((g) => g.ruleIds));
 const RULE_BY_ID = new Map(RULES.map((r) => [r.id, r]));
@@ -104,7 +111,7 @@ say(
   '- The loop must visit **every circle** (white and black). Empty intersections may or may not be visited.',
   '- **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.',
   '- **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each exit direction).',
-  '- Some books feature other loop puzzles or hybrids — see **[Variant rules](#variant-rules)** below (Slitherlink, Hamilton cycle, Gray circles, and Swiss cheese).',
+  '- Some books feature other loop puzzles or hybrids — see **[Variant rules](#variant-rules)** below (Slitherlink, Mid-loop, Hamilton cycle, Gray circles, and Swiss cheese).',
   '',
   '## How the examples work',
   '',

@@ -167,6 +167,13 @@ for (const ex of examples) {
       g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.22}" fill="#111111"/>`;
     }
   }
+  if (P.hasMidloop) {
+    for (const md of P.midloop) {
+      const mx = md.dir === 'H' ? vx(md.c) + S / 2 : vx(md.c);
+      const my = md.dir === 'V' ? vy(md.r) + S / 2 : vy(md.r);
+      g += `<circle cx="${mx}" cy="${my}" r="${S * 0.165}" fill="#0d9488" stroke="#ffffff" stroke-width="2"/>`;
+    }
+  }
 
   // Existing edge X marks (given walls in bold dark ink)
   for (let x = 0; x < P.numEdges; x++) {

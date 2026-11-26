@@ -1231,7 +1231,7 @@ function renderHelpModal() {
 
   const link = $('help-guide-link');
   if (link) {
-    const hash = hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
+    const hash = hasMidloop ? '#variant-midloop' : hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasVoids ? '#variant-swiss' : '';
     link.setAttribute('href', `docs/how_to_solve.html${hash}`);
   }
 }

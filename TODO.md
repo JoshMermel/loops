@@ -25,6 +25,10 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 ## Rules, books & generator
 
 - [ ] **Consider promoting other Bonus books to top-level sections:** review whether any remaining Bonus themes (e.g., All white / All black, Black & White Cookie, Skyscraper, Symmetry, Patterns) merit their own top-level section with multiple sizes or variations.
+- [ ] **Cross-family hybrid inferences (rules that only exist when two puzzle types meet):** audit Medium/Hard hybrid puzzles (`Slitherlink + Masyu`, `Mid-loop + Masyu`, `Mid-loop + Slitherlink`, `+ Hamilton cycle`) to see which recurring `imagineLocal`/`imagineTrace` steps deserve cheap named cross-rules — e.g.:
+  - *Mid-loop + Masyu:* a White circle at distance `k` from a Mid-loop dot cannot be a turn endpoint (eliminating half-length `k`), or a Black circle adjacent to a Mid-loop dot forcing symmetric straight legs.
+  - *Slitherlink + Masyu:* a Black/White circle on a corner of a `3` or `1` square forcing its entry/exit legs directly.
+  - *Mid-loop + Slitherlink:* a Mid-loop dot along a `3`/`2`/`1` square restricting which symmetric lengths keep the square's edge count legal.
 - [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring Masyu patterns currently handled by `imagine` that deserve their own cheaper named rule (remaining ideas:
   - diagonally adjacent black and white circles near a wall,
   - two white circles diagonally adjacent forcing a corridor,
