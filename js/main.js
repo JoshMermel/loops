@@ -1112,51 +1112,67 @@ function renderBookPicker(path = []) {
     return;
   }
 
-  // Walk the metadata tree along `path`
+  // Walk the metadata tree along `path`, transparently unwrapping any single-child-only wrapper levels
+  // (e.g. Castle Wall -> Classic -> {7×7, 10×10, 12×12, 10×16} while Classic is its only subcategory).
   const rootGroup = groups.find((g) => g.name === path[0]);
   if (!rootGroup) { show([]); return; }
-  let meta = rootGroup;
-  for (let d = 1; d < path.length; d++) meta = meta?.subs?.[path[d]] || {};
+  const inspectNode = (p) => {
+    const d = p.length;
+    let m = rootGroup;
+    for (let i = 1; i < d; i++) m = m?.subs?.[p[i]] || {};
+    const books = listed.filter((b) => {
+      const bp = bookPath(b);
+      if (bp.length < d) return false;
+      for (let i = 0; i < d; i++) if (bp[i] !== p[i]) return false;
+      return true;
+    });
+    const children = [];
+    for (const k of (m?.subs ? Object.keys(m.subs) : [])) {
+      if (books.some((b) => bookPath(b)[d] === k)) children.push(k);
+    }
+    for (const b of books) {
+      const k = bookPath(b)[d];
+      if (k && !children.includes(k)) children.push(k);
+    }
+    const direct = books.filter((b) => bookPath(b).length === d);
+    return { meta: m, books, children, direct };
+  };
 
-  const depth = path.length;
-  const inNode = listed.filter((b) => {
-    const bp = bookPath(b);
-    if (bp.length < depth) return false;
-    for (let i = 0; i < depth; i++) if (bp[i] !== path[i]) return false;
-    return true;
-  });
-
-  const childNames = [];
-  const metaSubKeys = meta?.subs ? Object.keys(meta.subs) : [];
-  for (const k of metaSubKeys) {
-    if (inNode.some((b) => bookPath(b)[depth] === k)) childNames.push(k);
+  const origNode = inspectNode(path);
+  const effPath = path.slice();
+  let node = origNode;
+  while (node.children.length === 1 && !node.direct.length) {
+    effPath.push(node.children[0]);
+    node = inspectNode(effPath);
   }
-  for (const b of inNode) {
-    const k = bookPath(b)[depth];
-    if (k && !childNames.includes(k)) childNames.push(k);
+  let backPath = path.slice(0, -1);
+  while (backPath.length >= 2) {
+    const parent = inspectNode(backPath.slice(0, -1));
+    if (parent.children.length === 1 && !parent.direct.length) backPath = backPath.slice(0, -1);
+    else break;
   }
-  const directBooks = inNode.filter((b) => bookPath(b).length === depth);
 
-  const title = depth === 1 ? path[0] : `${path[depth - 2]} · ${path[depth - 1]}`;
-  const backLabel = depth === 1 ? '← All books' : `← ${path[depth - 2]}`;
-  header(title, meta?.blurb, backLabel, () => show(path.slice(0, -1)));
+  const title = !backPath.length ? path[0] : `${backPath[backPath.length - 1]} · ${path[path.length - 1]}`;
+  const backLabel = !backPath.length ? '← All books' : `← ${backPath[backPath.length - 1]}`;
+  header(title, origNode.meta?.blurb, backLabel, () => show(backPath));
 
-  if (!childNames.length || (childNames.length === 1 && !directBooks.length)) {
-    bookList(inNode);
+  if (!node.children.length) {
+    bookList(node.books);
     return;
   }
 
+  const effDepth = effPath.length;
   const grid = el('div', 'bp-cards');
-  for (const name of childNames) {
-    const subBooks = inNode.filter((b) => bookPath(b)[depth] === name);
-    const info = meta?.subs?.[name] || {};
+  for (const name of node.children) {
+    const subBooks = node.books.filter((b) => bookPath(b)[effDepth] === name);
+    const info = node.meta?.subs?.[name] || {};
     const only = subBooks.length === 1 ? subBooks[0] : null;
-    grid.append(card(info.icon || meta?.icon || rootGroup.icon, name, info.blurb || (only && only.blurb),
+    grid.append(card(info.icon || node.meta?.icon || rootGroup.icon, name, info.blurb || (only && only.blurb),
       only ? countText(only).text : plural(subBooks.length, 'book'),
-      subBooks.some(isCurrent), () => (only ? pick(only) : show([...path, name]))));
+      subBooks.some(isCurrent), () => (only ? pick(only) : show([...effPath, name]))));
   }
   body.append(grid);
-  if (directBooks.length) bookList(directBooks);
+  if (node.direct.length) bookList(node.direct);
 }
 const bookModal = setupModal('book-modal', 'book-btn', () => renderBookPicker([]));
 
