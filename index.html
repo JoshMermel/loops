@@ -311,11 +311,13 @@
           </div>
           <div class="help-rule-card help-rule-card--wide" id="help-card-castle" hidden>
             <div class="help-rule-title">Castle Wall tiles (white / black / gray)</div>
-            <p class="help-rule-desc">The loop cannot enter blocked Castle Wall tiles. <b>White</b> tiles must sit strictly <b>inside</b> the loop, <b>black</b> tiles strictly <b>outside</b>, and <b>gray</b> tiles may be either. Each numbered arrow counts the <b>total length of parallel loop segments</b> in that direction all the way to the board edge (looking past other tiles).</p>
+            <p class="help-rule-desc">The loop cannot enter blocked Castle Wall tiles. <b>White</b> tiles must sit strictly <b>inside</b> the loop, <b>black</b> tiles strictly <b>outside</b>, and <b>gray</b> tiles may be either. Each numbered arrow counts the <b>total length of parallel loop segments</b> in that direction all the way to the board edge (looking past other tiles); <b>unnumbered</b> tiles just mark inside or outside.</p>
             <div class="help-diagrams">
               <figure class="help-fig">
                 <svg viewBox="0 0 112 88" aria-label="Valid Castle Wall white inside tile with arrow count">
                   <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="23" y="22" width="44" height="44"/>
+                  <rect class="face-in" x="67" y="44" width="22" height="22"/>
                   <path class="hr-grid" d="M23 22H89M67 44H89M23 66H89M23 22V66M67 22V66M89 22V66"/>
                   <path class="hr-line" d="M23 22H67V44H89V66H23Z"/>
                   <rect class="castle-tile-W" x="36" y="35" width="18" height="18" rx="3.5"/>
@@ -326,12 +328,42 @@
               <figure class="help-fig">
                 <svg viewBox="0 0 112 88" aria-label="Valid Castle Wall black outside tile with 0 arrow">
                   <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-out" x="23" y="22" width="44" height="44"/>
+                  <rect class="face-in" x="67" y="22" width="22" height="44"/>
                   <path class="hr-grid" d="M23 22H89M67 44H89M23 66H89M23 22V66M67 22V66M89 22V66"/>
                   <path class="hr-line" d="M67 22H89V66H67Z"/>
                   <rect class="castle-tile-B" x="36" y="35" width="18" height="18" rx="3.5"/>
                   <text class="castle-text-B" x="45" y="44" font-size="9.5">0→</text>
                 </svg>
                 <figcaption class="ok-text">✓ Black outside, 0 parallel</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid Castle Wall gray tiles sitting inside or outside the loop">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="12" y="11" width="44" height="44"/>
+                  <rect class="face-in" x="12" y="55" width="22" height="22"/>
+                  <rect class="face-out" x="56" y="33" width="44" height="44"/>
+                  <path class="hr-grid" d="M12 11H100M56 33H100M12 55H56M12 77H100M12 11V77M34 55V77M56 11V77M78 11V33M100 11V77"/>
+                  <path class="hr-line" d="M12 11H56V55H34V77H12Z"/>
+                  <rect class="castle-tile-G" x="25" y="24" width="18" height="18" rx="3.5"/>
+                  <text class="castle-text-G" x="34" y="30" font-size="8.5">1</text>
+                  <text class="castle-text-G" x="34" y="37.5" font-size="7.5">↓</text>
+                  <rect class="castle-tile-G" x="69" y="46" width="18" height="18" rx="3.5"/>
+                  <text class="castle-text-G" x="78" y="55" font-size="9.5">←1</text>
+                </svg>
+                <figcaption class="ok-text">✓ Gray: inside or outside</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid unnumbered Castle Wall white inside and black outside tiles">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="12" y="22" width="44" height="44"/>
+                  <rect class="face-out" x="56" y="22" width="44" height="44"/>
+                  <path class="hr-grid" d="M12 22H100M12 66H100M12 22V66M56 22V66M100 22V66"/>
+                  <path class="hr-line" d="M12 22H56V66H12Z"/>
+                  <rect class="castle-tile-W" x="25" y="35" width="18" height="18" rx="3.5"/>
+                  <rect class="castle-tile-B" x="69" y="35" width="18" height="18" rx="3.5"/>
+                </svg>
+                <figcaption class="ok-text">✓ Blank: inside/outside only</figcaption>
               </figure>
             </div>
           </div>
