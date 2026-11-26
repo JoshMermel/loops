@@ -6,45 +6,15 @@ Open follow-ups and future ideas for Masyu (see [README.md](README.md) for archi
 
 Try these 24-puzzle tasting books and decide for each one whether to **grow to 500**, **keep small**, or **delete**:
 
-### Mid-loop → Bonus
-- [ ] `midloop-even-7x7` — **✚ All even (7×7)** (intersection dots only; every clued run has even length `2, 4, 6…`)
-- [ ] `midloop-odd-9x9` — **➖ All odd (9×9)** (segment-midpoint dots only; every clued run has odd length `1, 3, 5…`)
-- [ ] `midloop-swiss-10x10` — **🧀 Swiss cheese (10×10)** (interior cutout holes slicing straight corridors)
-- [ ] `midloop-sky-6x18` — **🏙️ Skyscraper (6×18)** (tall narrow towers with short horizontal caps & sweeping vertical runs)
-- [ ] `midloop-sym-9x9` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric dots & loops)
-- [ ] `midloop-long-8x8` — **📏 Long runs (8×8)** (no length-1 stubs; every clued run length ≥ 2, odd dots ≥ 3)
-- [ ] `midloop-interior-8x8` — **◻️ Interior only (8×8)** (no dots touching the outer border ring)
-- [ ] `midloop-frame-8x8` — **🖼️ Hollow frame (8×8)** (dots only in the outer 2-cell ring around a blank 4×4 center)
-
-### Hybrids → Slitherlink + Masyu
-- [ ] `hybrid-slither2-masyu` — **2️⃣⚪ All 2s (8×8)** (all-2s Slitherlink paired with Masyu circles)
-- [ ] `hybrid-slither3-masyu` — **3️⃣⚪ All 3s (8×8)** (all-3s Slitherlink paired with Masyu circles)
-- [ ] `hybrid-slither-gray` — **🔢🔘 Gray dots (8×8)** (Slitherlink numbers paired with all-gray Masyu circles)
-- [ ] `hybrid-slither-masyu-swiss` — **🧀 Swiss cheese (10×10)** (Slitherlink + Masyu with interior cutout holes)
-- [ ] `hybrid-slither-masyu-sym` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric Slitherlink + Masyu)
-
-### Hybrids → Slitherlink + Hamilton cycle
-- [ ] `hybrid-slither3-full` — **3️⃣🔁 All 3s (8×8)** (all-3s Slitherlink on a Hamilton cycle, full-board necessity verified)
-- [ ] `hybrid-slither-full-swiss` — **🧀 Swiss cheese (10×10)** (Slitherlink + Hamilton cycle on balanced cutout boards)
-- [ ] `hybrid-slither-full-sym` — **🪞 Symmetry (8×8)** (180° and mirror symmetric Slitherlink + Hamilton cycle)
-
-### Hybrids → Mid-loop + Slitherlink
-- [ ] `hybrid-midloop-slither2` — **🎯2️⃣ All 2s (8×8)** (teal midpoint dots paired with all-2s Slitherlink)
-- [ ] `hybrid-midloop-slither-swiss` — **🧀 Swiss cheese (10×10)** (Mid-loop + Slitherlink with interior cutout holes)
-- [ ] `hybrid-midloop-slither-sym` — **🪞 Symmetry (9×9)** (180°, mirror, and diagonal symmetric Mid-loop + Slitherlink)
-
-### Castle Wall (Steps 1–4 token books — review before growing to full size & adding gimmicks)
-- [ ] `intro-castle` — **🏰 Castle Wall intro (6×6 & 7×7)** (24 Beginner warm-ups)
-- [ ] `castle-small` — **🏰 Small (7×7)** (24 pure Castle Wall puzzles across all 4 tiers)
-- [ ] `castle-classic` — **🏰 Classic (10×10)** (24 pure Castle Wall puzzles across all 4 tiers)
-- [ ] `hybrid-castle-masyu` — **🏰⚪ Castle Wall + Masyu (8×8)** (24 necessity-verified hybrid puzzles)
-- [ ] `hybrid-castle-slither` — **🏰🔢 Castle Wall + Slitherlink (8×8)** (24 necessity-verified hybrid puzzles)
-- [ ] `hybrid-castle-midloop` — **🏰🎯 Castle Wall + Mid-loop (8×8)** (24 necessity-verified hybrid puzzles)
-- [ ] `hybrid-castle-full` — **🏰🔁 Castle Wall + Hamilton cycle (8×8)** (24 necessity-verified hybrid puzzles)
+### Hybrids → Gray dots + each pure family
+- [ ] `hybrid-gray-full` — **🔘🔁 Gray dots + Hamilton cycle (8×8)** (all-gray Masyu circles on a Hamilton cycle visiting every dot)
+- [ ] `hybrid-midloop-gray` — **🎯🔘 Mid-loop + Gray dots (8×8)** (teal midpoint dots paired with all-gray Masyu circles)
+- [ ] `hybrid-castle-gray` — **🏰🔘 Castle Wall + Gray dots (8×8)** (Castle Wall blocks & arrows paired with all-gray Masyu circles)
 
 ## Variants & future twists
 
-- [ ] **Castle Wall follow-up (Steps 5–6 after playtesting token books):** grow chosen pure & hybrid Castle Wall books to full size (e.g. 500 + 12×12 / 100-puzzle intro) and add Castle Wall Bonus gimmicks (e.g. Symmetry, All-gray, Unnumbered walls, Skyscraper).
+- [ ] **Castle Wall Bonus gimmicks (Step 6):** add Castle Wall Bonus tasting books (e.g. Symmetry, All-gray walls, Unnumbered walls, Skyscraper, Swiss cheese).
+- [ ] **Mid-loop Classic per-size × difficulty split (optional):** split pure `Mid-loop → Classic` (`7×7`, `10×10`, `12×12`) into separate Beginner/Medium/Hard/Expert books to match Masyu, Slitherlink, and Castle Wall.
 - [ ] **New single-loop families in `js/variants/`:**
   - **Corral / Bag:** dual-square sightline numbers (strictly Inside the loop), standalone + hybrids with Masyu, Mid-loop, Castle Wall, Hamilton cycle (and visually distinct badges if paired with Slitherlink).
   - **Balance Loop / Yajilin / Simple Loop** (lower priority).

@@ -118,6 +118,30 @@ const manifest = {
       name: 'Castle Wall',
       icon: '🏰',
       blurb: 'Keep white walls inside the loop, black walls outside, and match every directional segment count.',
+      subs: {
+        Classic: {
+          icon: '📚',
+          blurb: 'Standard Castle Wall boards by size, from 7×7 up to tall 10×16.',
+          subs: {
+            '7×7': {
+              icon: '7️⃣',
+              blurb: 'Compact 7×7 boards across all four difficulties.',
+            },
+            '10×10': {
+              icon: '🔟',
+              blurb: 'Classic 10×10 boards across all four difficulties.',
+            },
+            '12×12': {
+              icon: '🔷',
+              blurb: 'Big 12×12 boards across all four difficulties.',
+            },
+            '10×16': {
+              icon: '📏',
+              blurb: 'Tall magazine-page 10×16 boards across all four difficulties.',
+            },
+          },
+        },
+      },
     },
     {
       name: 'Hamilton cycle',
@@ -193,7 +217,7 @@ const recipes = [
   },
   {
     id: 'intro-castle', name: 'Castle Wall intro', label: '🏰 Castle Wall', group: 'Start here',
-    glob: 'intro_castle_6x6,intro_castle_7x7', limit: 24, onlyTier: 'Beginner', balanceGroups: true,
+    glob: 'intro_castle_6x6,intro_castle_7x7', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
     blurb: 'Small 6×6 and 7×7 Beginner Castle Wall warm-ups, easiest first.',
   },
   {
@@ -488,45 +512,59 @@ const recipes = [
   },
   {
     id: 'midloop-even-7x7', name: 'Mid-loop — All even', label: '✚ All even (7×7)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_even_7x7', tiers: '4,8,8,4',
+    glob: 'midloop_even_7x7', tiers: '50,200,200,50',
     blurb: 'Every dot sits on a grid intersection — every clued straight run has even length (2, 4, 6…).',
   },
   {
     id: 'midloop-odd-9x9', name: 'Mid-loop — All odd', label: '➖ All odd (9×9)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_odd_9x9', tiers: '4,8,8,4',
+    glob: 'midloop_odd_9x9', tiers: '50,200,200,50',
     blurb: 'Every dot sits on a segment midpoint — every clued straight run has odd length (1, 3, 5…).',
   },
   {
     id: 'midloop-swiss-10x10', name: 'Mid-loop — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_swiss_10x10', tiers: '4,8,8,4',
+    glob: 'midloop_swiss_10x10', tiers: '50,200,200,50',
     blurb: 'Mid-loop on boards punched with random interior holes that slice straight corridors.',
   },
   {
     id: 'midloop-sky-6x18', name: 'Mid-loop — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_sky_6x18', tiers: '4,8,8,4',
+    glob: 'midloop_sky_6x18', tiers: '50,200,200,50',
     blurb: 'Tall, narrow Mid-loop towers with short horizontal caps and sweeping vertical runs.',
   },
   {
     id: 'midloop-sym-9x9', name: 'Mid-loop — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Mid-loop', sub: 'Bonus',
     glob: 'midloop_sym_rot180_9x9,midloop_sym_mirror_9x9,midloop_sym_transpose_9x9',
-    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    tiers: '50,200,200,50', balanceGroups: true, interleaveGroups: true, maxRun: 2,
     blurb: 'Mirror, diagonal, and 180° symmetric Mid-loop dots and loops.',
   },
-  {
-    id: 'midloop-long-8x8', name: 'Mid-loop — Long runs', label: '📏 Long runs (8×8)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_long_8x8', tiers: '4,8,8,4',
-    blurb: 'No length-1 stubs — every teal dot sits on a straight run of length 2 or more (odd dots at least 3).',
-  },
-  {
-    id: 'midloop-interior-8x8', name: 'Mid-loop — Interior only', label: '◻️ Interior only (8×8)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_interior_8x8', tiers: '4,8,8,4',
-    blurb: 'No dots touching the outer border ring — zero free border caps.',
-  },
-  {
-    id: 'midloop-frame-8x8', name: 'Mid-loop — Hollow frame', label: '🖼️ Hollow frame (8×8)', group: 'Mid-loop', sub: 'Bonus',
-    glob: 'midloop_frame_8x8', tiers: '4,8,8,4',
-    blurb: 'Dots only in the outer 2-cell frame around a completely blank 4×4 center.',
-  },
+
+  // ---- Castle Wall Classic (per-size/per-difficulty 500-puzzle books, like Masyu & Slitherlink)
+  ...([
+    ['7x7', '7×7', 'castle_7x7'],
+    ['10x10', '10×10', 'castle_10x10'],
+    ['12x12', '12×12', 'castle_12x12'],
+    ['10x16', '10×16', 'castle_10x16'],
+  ].flatMap(([slug, dimLabel, glob]) => [
+    {
+      id: `castle-${slug}-beginner`, name: `Castle Wall ${dimLabel} Beginner`, label: 'Beginner',
+      group: 'Castle Wall', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Beginner',
+      blurb: 'Warm-up Castle Wall boards using core arrow counts and wall edges.',
+    },
+    {
+      id: `castle-${slug}-medium`, name: `Castle Wall ${dimLabel} Medium`, label: 'Medium',
+      group: 'Castle Wall', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Medium',
+      blurb: 'Ray differences, corridor bounds, basic shading, and 1-step lookahead.',
+    },
+    {
+      id: `castle-${slug}-hard`, name: `Castle Wall ${dimLabel} Hard`, label: 'Hard',
+      group: 'Castle Wall', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Hard',
+      blurb: 'Wall parity, loop topology, and short single-thread lookahead.',
+    },
+    {
+      id: `castle-${slug}-expert`, name: `Castle Wall ${dimLabel} Expert`, label: 'Expert',
+      group: 'Castle Wall', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Expert',
+      blurb: 'Deep lookahead chains on pure Castle Wall grids.',
+    },
+  ])),
 
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)
   {
@@ -535,35 +573,19 @@ const recipes = [
     blurb: 'Sparse Masyu circles where visiting every dot is required to find the unique loop.',
   },
   {
+    id: 'hybrid-gray-full', name: 'Gray dots + Hamilton cycle', label: '🔘🔁 Gray dots (8×8)', group: 'Hybrids', sub: 'Masyu + Hamilton cycle',
+    glob: 'hybrid_gray_full_8x8', tiers: '4,8,8,4',
+    blurb: 'Mystery gray circles on a Hamilton cycle visiting every dot — deduce white vs. black as you go.',
+  },
+  {
     id: 'hybrid-slither-masyu', name: 'Slitherlink + Masyu', label: '🔢⚪ Classic (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
     glob: 'hybrid_slither_masyu_8x8', tiers: '50,200,200,50',
     blurb: 'Numbered squares and Masyu circles share one single loop — every puzzle genuinely requires both.',
   },
   {
-    id: 'hybrid-slither2-masyu', name: 'All 2s + Masyu', label: '2️⃣⚪ All 2s (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
-    glob: 'hybrid_slither2_masyu_8x8', tiers: '4,8,8,4',
-    blurb: 'Every numbered square is a 2, paired with Masyu circles — every puzzle requires both.',
-  },
-  {
-    id: 'hybrid-slither3-masyu', name: 'All 3s + Masyu', label: '3️⃣⚪ All 3s (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
-    glob: 'hybrid_slither3_masyu_8x8', tiers: '4,8,8,4',
-    blurb: 'Every numbered square is a 3, paired with Masyu circles — every puzzle requires both.',
-  },
-  {
     id: 'hybrid-slither-gray', name: 'Slitherlink + Gray dots', label: '🔢🔘 Gray dots (8×8)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
-    glob: 'hybrid_slither_gray_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_slither_gray_8x8', tiers: '50,200,200,50',
     blurb: 'Slitherlink numbers paired with mystery gray circles — deduce white vs. black as you go.',
-  },
-  {
-    id: 'hybrid-slither-masyu-swiss', name: 'Slitherlink + Masyu — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
-    glob: 'hybrid_slither_masyu_swiss_10x10', tiers: '4,8,8,4',
-    blurb: 'Slitherlink numbers and Masyu circles on boards punched with random interior holes.',
-  },
-  {
-    id: 'hybrid-slither-masyu-sym', name: 'Slitherlink + Masyu — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Hybrids', sub: 'Slitherlink + Masyu',
-    glob: 'hybrid_slither_masyu_sym_rot180_9x9,hybrid_slither_masyu_sym_mirror_9x9,hybrid_slither_masyu_sym_transpose_9x9',
-    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
-    blurb: 'Mirror, diagonal, and 180° symmetric Slitherlink + Masyu clues and loops.',
   },
   {
     id: 'hybrid-slither-full', name: 'Slitherlink + Hamilton cycle', label: '🔢🔁 Classic (8×8)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
@@ -577,24 +599,18 @@ const recipes = [
   },
   {
     id: 'hybrid-slither3-full', name: 'All 3s + Hamilton cycle', label: '3️⃣🔁 All 3s (8×8)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
-    glob: 'hybrid_slither3_full_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_slither3_full_8x8', tiers: '50,200,200,50',
     blurb: 'Every numbered square is a 3 on a Hamilton cycle — verified to require visiting every dot.',
-  },
-  {
-    id: 'hybrid-slither-full-swiss', name: 'Slitherlink + Hamilton — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
-    glob: 'hybrid_slither_full_swiss_10x10', tiers: '4,8,8,4',
-    blurb: 'Slitherlink numbers on a Hamilton cycle across boards punched with balanced interior holes.',
-  },
-  {
-    id: 'hybrid-slither-full-sym', name: 'Slitherlink + Hamilton — Symmetry', label: '🪞 Symmetry (8×8)', group: 'Hybrids', sub: 'Slitherlink + Hamilton cycle',
-    glob: 'hybrid_slither_full_sym_rot180_8x8,hybrid_slither_full_sym_mirror_8x8',
-    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
-    blurb: 'Mirror and 180° symmetric Slitherlink numbers on a full-board Hamilton cycle.',
   },
   {
     id: 'hybrid-midloop-masyu', name: 'Mid-loop + Masyu', label: '🎯⚪ Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Masyu',
     glob: 'hybrid_midloop_masyu_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots and Masyu circles share one single loop — every puzzle genuinely requires both.',
+  },
+  {
+    id: 'hybrid-midloop-gray', name: 'Mid-loop + Gray dots', label: '🎯🔘 Gray dots (8×8)', group: 'Hybrids', sub: 'Mid-loop + Masyu',
+    glob: 'hybrid_midloop_gray_8x8', tiers: '4,8,8,4',
+    blurb: 'Teal midpoint dots paired with mystery gray circles — deduce white vs. black as you go.',
   },
   {
     id: 'hybrid-midloop-slither', name: 'Mid-loop + Slitherlink', label: '🎯🔢 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
@@ -603,57 +619,37 @@ const recipes = [
   },
   {
     id: 'hybrid-midloop-slither2', name: 'Mid-loop + All 2s', label: '🎯2️⃣ All 2s (8×8)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
-    glob: 'hybrid_midloop_slither2_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_midloop_slither2_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots paired with all-2s Slitherlink squares — every puzzle requires both.',
-  },
-  {
-    id: 'hybrid-midloop-slither-swiss', name: 'Mid-loop + Slitherlink — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
-    glob: 'hybrid_midloop_slither_swiss_10x10', tiers: '4,8,8,4',
-    blurb: 'Teal midpoint dots and Slitherlink numbers on boards punched with random interior holes.',
-  },
-  {
-    id: 'hybrid-midloop-slither-sym', name: 'Mid-loop + Slitherlink — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Hybrids', sub: 'Mid-loop + Slitherlink',
-    glob: 'hybrid_midloop_slither_sym_rot180_9x9,hybrid_midloop_slither_sym_mirror_9x9,hybrid_midloop_slither_sym_transpose_9x9',
-    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
-    blurb: 'Mirror, diagonal, and 180° symmetric Mid-loop + Slitherlink clues and loops.',
   },
   {
     id: 'hybrid-midloop-full', name: 'Mid-loop + Hamilton cycle', label: '🎯🔁 Classic (8×8)', group: 'Hybrids', sub: 'Mid-loop + Hamilton cycle',
     glob: 'hybrid_midloop_full_8x8', tiers: '50,200,200,50',
     blurb: 'Teal midpoint dots on a Hamilton cycle that visits every single dot.',
   },
-
-  // ---- Castle Wall (token books for manual review)
-  {
-    id: 'castle-small', name: 'Castle Wall Small', label: '🏰 Small (7×7)', group: 'Castle Wall',
-    glob: 'castle_7x7', tiers: '4,8,8,4',
-    blurb: 'Compact 7×7 Castle Wall boards across all four difficulties.',
-  },
-  {
-    id: 'castle-classic', name: 'Castle Wall Classic', label: '🏰 Classic (10×10)', group: 'Castle Wall',
-    glob: 'castle_10x10', tiers: '4,8,8,4',
-    blurb: 'Classic 10×10 Castle Wall boards across all four difficulties.',
-  },
-
-  // ---- Castle Wall Hybrids (token books for manual review)
   {
     id: 'hybrid-castle-masyu', name: 'Castle Wall + Masyu', label: '🏰⚪ Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Masyu',
-    glob: 'hybrid_castle_masyu_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_castle_masyu_8x8', tiers: '50,200,200,50',
     blurb: 'Castle Wall blocks and arrows paired with Masyu circles — every puzzle requires both.',
   },
   {
+    id: 'hybrid-castle-gray', name: 'Castle Wall + Gray dots', label: '🏰🔘 Gray dots (8×8)', group: 'Hybrids', sub: 'Castle Wall + Masyu',
+    glob: 'hybrid_castle_gray_8x8', tiers: '4,8,8,4',
+    blurb: 'Castle Wall blocks and arrows paired with mystery gray circles — deduce white vs. black as you go.',
+  },
+  {
     id: 'hybrid-castle-slither', name: 'Castle Wall + Slitherlink', label: '🏰🔢 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Slitherlink',
-    glob: 'hybrid_castle_slither_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_castle_slither_8x8', tiers: '50,200,200,50',
     blurb: 'Castle Wall blocks and arrows paired with numbered Slitherlink squares — every puzzle requires both.',
   },
   {
     id: 'hybrid-castle-midloop', name: 'Castle Wall + Mid-loop', label: '🏰🎯 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Mid-loop',
-    glob: 'hybrid_castle_midloop_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_castle_midloop_8x8', tiers: '50,200,200,50',
     blurb: 'Castle Wall blocks and arrows paired with Mid-loop teal dots — every puzzle requires both.',
   },
   {
     id: 'hybrid-castle-full', name: 'Castle Wall + Hamilton cycle', label: '🏰🔁 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Hamilton cycle',
-    glob: 'hybrid_castle_full_8x8', tiers: '4,8,8,4',
+    glob: 'hybrid_castle_full_8x8', tiers: '50,200,200,50',
     blurb: 'Castle Wall blocks and arrows on a Hamilton cycle visiting every remaining dot.',
   },
 ];

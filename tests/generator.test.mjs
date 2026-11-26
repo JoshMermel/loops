@@ -361,3 +361,32 @@ test('generatePuzzle supports Hamilton swiss-cheese/symmetry and Slitherlink swi
   assert.ok(solve(compile({ name: 'nf2', rows: 6, cols: 6, clues: [], slither: pAll2.slither, fullBoard: false }), { limit: 2, maxNodes: 50000 }).count >= 2);
   assert.equal(rate(compile(pAll2)).score, pAll2.score);
 });
+
+test('generatePuzzle supports full-gray, midloop-gray, and castle-gray all-gray hybrids with necessity checks', () => {
+  const pfg = generatePuzzle({ rows: 6, cols: 6, style: 'full-gray', seed: 601, budgetMs: 8000 });
+  assert.ok(pfg, 'failed to generate 6x6 full-gray puzzle');
+  assert.equal(pfg.fullBoard, true);
+  assert.ok(pfg.clues.length >= 4 && pfg.clues.every((c) => c.t === 'G'));
+  assert.equal(solve(pfg, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.ok(solve(compile({ name: 'fg_nf', rows: 6, cols: 6, clues: pfg.clues, fullBoard: false }), { limit: 2, maxNodes: 50000 }).count >= 2);
+  assert.equal(rate(compile(pfg)).score, pfg.score);
+
+  const pmg = generatePuzzle({ rows: 7, cols: 7, style: 'midloop-gray', seed: 602, budgetMs: 8000 });
+  assert.ok(pmg, 'failed to generate 7x7 midloop-gray puzzle');
+  assert.ok(pmg.clues.length >= 3 && pmg.clues.every((c) => c.t === 'G'));
+  assert.ok(pmg.midloop.length >= 4);
+  assert.equal(solve(pmg, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.ok(solve(compile({ name: 'mg_a', rows: 7, cols: 7, clues: [], midloop: pmg.midloop }), { limit: 2, maxNodes: 50000 }).count >= 2);
+  assert.ok(solve(compile({ name: 'mg_b', rows: 7, cols: 7, clues: pmg.clues }), { limit: 2, maxNodes: 50000 }).count >= 2);
+  assert.equal(rate(compile(pmg)).score, pmg.score);
+
+  const pcg = generatePuzzle({ rows: 7, cols: 7, style: 'castle-gray', seed: 603, budgetMs: 8000 });
+  assert.ok(pcg, 'failed to generate 7x7 castle-gray puzzle');
+  assert.ok(pcg.clues.length >= 3 && pcg.clues.every((c) => c.t === 'G'));
+  assert.ok(pcg.castle.length >= 3);
+  assert.equal(solve(pcg, { limit: 2, maxNodes: 50000 }).count, 1);
+  const plainVoids = pcg.castle.map(({ r, c }) => ({ r, c }));
+  assert.ok(solve(compile({ name: 'cg_a', rows: 7, cols: 7, clues: [], castle: pcg.castle }), { limit: 2, maxNodes: 50000 }).count >= 2);
+  assert.ok(solve(compile({ name: 'cg_b', rows: 7, cols: 7, clues: pcg.clues, voids: plainVoids }), { limit: 2, maxNodes: 50000 }).count >= 2);
+  assert.equal(rate(compile(pcg)).score, pcg.score);
+});

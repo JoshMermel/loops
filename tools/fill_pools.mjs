@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | slither-classic | midloop | midloop-bonus | slither-hybrid-token | castle-token | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | slither-classic | midloop | midloop-bonus | slither-hybrid-grow | gray-hybrid-token | castle-hybrids | castle-classic | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -582,180 +582,129 @@ if (!isMainThread) {
       budgetSec: 420, perPuzzleMs: 15000,
     },
 
-    // ---- Mid-loop Bonus gimmick token pools (24-puzzle tasting books at 4 B / 8 M / 8 H / 4 E)
+    // ---- Mid-loop Bonus pools (500-puzzle books at 50 B / 200 M / 200 H / 50 E)
     {
       group: 'midloop-bonus', pool: 'midloop_even_7x7', cols: 7, rows: 7, style: 'midloop-even',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 12000,
     },
     {
       group: 'midloop-bonus', pool: 'midloop_odd_9x9', cols: 9, rows: 9, style: 'midloop-odd',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
     {
       group: 'midloop-bonus', pool: 'midloop_swiss_10x10', cols: 10, rows: 10, style: 'midloop-swiss',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 15000,
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
     {
       group: 'midloop-bonus', pool: 'midloop_sky_6x18', cols: 6, rows: 18, style: 'midloop',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 480, perPuzzleMs: 18000,
     },
     {
       group: 'midloop-bonus', pool: 'midloop_sym_rot180_9x9', cols: 9, rows: 9, style: 'midloop', layout: 'rot180',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
+      buckets: { Beginner: { need: 18 }, Medium: { need: 68 }, Hard: { need: 68 }, Expert: { need: 18 } },
+      budgetSec: 240, perPuzzleMs: 15000,
     },
     {
       group: 'midloop-bonus', pool: 'midloop_sym_mirror_9x9', cols: 9, rows: 9, style: 'midloop', layout: 'mirror',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
+      buckets: { Beginner: { need: 18 }, Medium: { need: 68 }, Hard: { need: 68 }, Expert: { need: 18 } },
+      budgetSec: 240, perPuzzleMs: 15000,
     },
     {
       group: 'midloop-bonus', pool: 'midloop_sym_transpose_9x9', cols: 9, rows: 9, style: 'midloop', layout: 'transpose',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'midloop-bonus', pool: 'midloop_long_8x8', cols: 8, rows: 8, style: 'midloop-long',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
-    },
-    {
-      group: 'midloop-bonus', pool: 'midloop_interior_8x8', cols: 8, rows: 8, style: 'midloop', layout: 'interior',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
-    {
-      group: 'midloop-bonus', pool: 'midloop_frame_8x8', cols: 8, rows: 8, style: 'midloop', layout: 'frame',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      buckets: { Beginner: { need: 18 }, Medium: { need: 68 }, Hard: { need: 68 }, Expert: { need: 18 } },
+      budgetSec: 240, perPuzzleMs: 15000,
     },
 
-    // ---- Slitherlink Hybrid gimmick token pools (24-puzzle tasting books at 4 B / 8 M / 8 H / 4 E)
+    // ---- Slitherlink Hybrid gimmick pools (grown to 500-puzzle books at 50 B / 200 M / 200 H / 50 E)
     {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither2_masyu_8x8', cols: 8, rows: 8, style: 'slither-all2-masyu',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      group: 'slither-hybrid-grow', pool: 'hybrid_slither_gray_8x8', cols: 8, rows: 8, style: 'slither-gray',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 15000,
     },
     {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither3_masyu_8x8', cols: 8, rows: 8, style: 'slither-all3-masyu',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      group: 'slither-hybrid-grow', pool: 'hybrid_slither3_full_8x8', cols: 8, rows: 8, style: 'slither-all3-full',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 15000,
     },
     {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_gray_8x8', cols: 8, rows: 8, style: 'slither-gray',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_swiss_10x10', cols: 10, rows: 10, style: 'slither-masyu-swiss',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_sym_rot180_9x9', cols: 9, rows: 9, style: 'slither-masyu', layout: 'rot180',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_sym_mirror_9x9', cols: 9, rows: 9, style: 'slither-masyu', layout: 'mirror',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_masyu_sym_transpose_9x9', cols: 9, rows: 9, style: 'slither-masyu', layout: 'transpose',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither3_full_8x8', cols: 8, rows: 8, style: 'slither-all3-full',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_full_swiss_10x10', cols: 10, rows: 10, style: 'slither-full-swiss',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_full_sym_rot180_8x8', cols: 8, rows: 8, style: 'slither-full', layout: 'rot180',
-      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_slither_full_sym_mirror_8x8', cols: 8, rows: 8, style: 'slither-full', layout: 'mirror',
-      buckets: { Beginner: { need: 3 }, Medium: { need: 5 }, Hard: { need: 5 }, Expert: { need: 3 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither2_8x8', cols: 8, rows: 8, style: 'midloop-slither2',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 15000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_swiss_10x10', cols: 10, rows: 10, style: 'midloop-slither-swiss',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_sym_rot180_9x9', cols: 9, rows: 9, style: 'midloop-slither', layout: 'rot180',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_sym_mirror_9x9', cols: 9, rows: 9, style: 'midloop-slither', layout: 'mirror',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
-    },
-    {
-      group: 'slither-hybrid-token', pool: 'hybrid_midloop_slither_sym_transpose_9x9', cols: 9, rows: 9, style: 'midloop-slither', layout: 'transpose',
-      buckets: { Beginner: { need: 2 }, Medium: { need: 4 }, Hard: { need: 4 }, Expert: { need: 2 } },
-      budgetSec: 60, perPuzzleMs: 12000,
+      group: 'slither-hybrid-grow', pool: 'hybrid_midloop_slither2_8x8', cols: 8, rows: 8, style: 'midloop-slither2',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
 
-    // ---- Castle Wall token pools (24-puzzle tasting books: pure + 4 hybrids)
+    // ---- Gray dots + each pure family token pools (24-puzzle tasting books at 4 B / 8 M / 8 H / 4 E)
     {
-      group: 'castle-token', pool: 'intro_castle_6x6', cols: 6, rows: 6, style: 'castle',
-      buckets: { Beginner: { need: 15 } },
-      budgetSec: 60, perPuzzleMs: 10000,
-    },
-    {
-      group: 'castle-token', pool: 'intro_castle_7x7', cols: 7, rows: 7, style: 'castle',
-      buckets: { Beginner: { need: 15 } },
-      budgetSec: 60, perPuzzleMs: 10000,
-    },
-    {
-      group: 'castle-token', pool: 'castle_7x7', cols: 7, rows: 7, style: 'castle',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
-    },
-    {
-      group: 'castle-token', pool: 'castle_10x10', cols: 10, rows: 10, style: 'castle',
+      group: 'gray-hybrid-token', pool: 'hybrid_gray_full_8x8', cols: 8, rows: 8, style: 'full-gray',
       buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
       budgetSec: 120, perPuzzleMs: 15000,
     },
     {
-      group: 'castle-token', pool: 'hybrid_castle_masyu_8x8', cols: 8, rows: 8, style: 'castle-masyu',
+      group: 'gray-hybrid-token', pool: 'hybrid_midloop_gray_8x8', cols: 8, rows: 8, style: 'midloop-gray',
       buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      budgetSec: 120, perPuzzleMs: 15000,
     },
     {
-      group: 'castle-token', pool: 'hybrid_castle_slither_8x8', cols: 8, rows: 8, style: 'castle-slither',
+      group: 'gray-hybrid-token', pool: 'hybrid_castle_gray_8x8', cols: 8, rows: 8, style: 'castle-gray',
       buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      budgetSec: 120, perPuzzleMs: 15000,
+    },
+
+    // ---- Castle Wall Intro (100) + Hybrids (500 each at 50 B / 200 M / 200 H / 50 E)
+    {
+      group: 'castle-hybrids', pool: 'intro_castle_6x6', cols: 6, rows: 6, style: 'castle',
+      buckets: { Beginner: { need: 55 } },
+      budgetSec: 90, perPuzzleMs: 10000,
     },
     {
-      group: 'castle-token', pool: 'hybrid_castle_midloop_8x8', cols: 8, rows: 8, style: 'castle-midloop',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      group: 'castle-hybrids', pool: 'intro_castle_7x7', cols: 7, rows: 7, style: 'castle',
+      buckets: { Beginner: { need: 55 } },
+      budgetSec: 90, perPuzzleMs: 10000,
     },
     {
-      group: 'castle-token', pool: 'hybrid_castle_full_8x8', cols: 8, rows: 8, style: 'castle-full',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 90, perPuzzleMs: 12000,
+      group: 'castle-hybrids', pool: 'hybrid_castle_masyu_8x8', cols: 8, rows: 8, style: 'castle-masyu',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 15000,
+    },
+    {
+      group: 'castle-hybrids', pool: 'hybrid_castle_slither_8x8', cols: 8, rows: 8, style: 'castle-slither',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 15000,
+    },
+    {
+      group: 'castle-hybrids', pool: 'hybrid_castle_midloop_8x8', cols: 8, rows: 8, style: 'castle-midloop',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 15000,
+    },
+    {
+      group: 'castle-hybrids', pool: 'hybrid_castle_full_8x8', cols: 8, rows: 8, style: 'castle-full',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 360, perPuzzleMs: 15000,
+    },
+
+    // ---- Castle Wall Classic (per-size/per-difficulty 500-puzzle books, like Masyu & Slitherlink)
+    {
+      group: 'castle-classic', pool: 'castle_7x7', cols: 7, rows: 7, style: 'castle',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 420, perPuzzleMs: 12000,
+    },
+    {
+      group: 'castle-classic', pool: 'castle_10x10', cols: 10, rows: 10, style: 'castle',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 720, perPuzzleMs: 18000,
+    },
+    {
+      group: 'castle-classic', pool: 'castle_12x12', cols: 12, rows: 12, style: 'castle',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 1200, perPuzzleMs: 25000,
+    },
+    {
+      group: 'castle-classic', pool: 'castle_10x16', cols: 10, rows: 16, style: 'castle',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 1500, perPuzzleMs: 30000,
     },
   ];
 

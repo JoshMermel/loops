@@ -1094,6 +1094,7 @@ function sampleSymmetricFullLoop(emptyFull, layout, rand, maxNodes = 4000) {
 /**
  * Generate one verified, rated Full-board puzzle (`fullBoard: true`):
  *   - 'full-masyu': circles + full-board rule, verified to REQUIRE the full-board rule (non-unique without it).
+ *   - 'full-gray':  all-gray circles + full-board rule, verified to REQUIRE the full-board rule (non-unique without it).
  *   - 'full-lines': zero circles, permanent given loop segments only.
  *   - 'full-walls': zero circles, permanent given walls (X) only.
  *   - 'full-mixed': zero circles, mix of permanent given segments and given walls (supports `layout`: 'rot180'|'mirror').
@@ -1106,7 +1107,9 @@ function generateFullBoardPuzzle({
   const hasExplicitVoids = Boolean(voids && voids.length > 0);
   if (!hasExplicitVoids && ((rows * cols) & 1)) return null;
   const isSwiss = style === 'full-swiss' || hasExplicitVoids;
-  const symLayout = (!isSwiss && style !== 'full-masyu' && (layout === 'rot180' || layout === 'mirror')) ? layout : null;
+  const isGray = style === 'full-gray';
+  const isMasyu = style === 'full-masyu' || isGray;
+  const symLayout = (!isSwiss && !isMasyu && (layout === 'rot180' || layout === 'mirror')) ? layout : null;
   if (symLayout && isImpossibleSymFull(rows, cols, symLayout)) return null;
   const N = rows * cols;
   const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
@@ -1153,7 +1156,7 @@ function generateFullBoardPuzzle({
       edges = sample.solutions[0].e;
     }
 
-    if (style === 'full-masyu') {
+    if (isMasyu) {
       const compileFM = (clues, extra = {}) => compile({
         name, rows, cols, clues,
         ...(useVoids.length ? { voids: useVoids } : {}),
@@ -1161,7 +1164,11 @@ function generateFullBoardPuzzle({
         ...extra,
       });
       const { whites, blacks } = allowedClues(rows, cols, edges, emptyFull);
-      let current = shuffle(whites.concat(blacks), rand);
+      const whiteSet = isGray ? new Set(whites.map((c) => c.r * cols + c.c)) : null;
+      const rawClues = isGray
+        ? whites.concat(blacks).map(({ r, c }) => ({ r, c, t: 'G' }))
+        : whites.concat(blacks);
+      let current = shuffle(rawClues, rand);
       if (current.length < 4) continue;
       const Pfull = compileFM(current);
       let baseTight = solvedByPropagate(Pfull);
@@ -1226,7 +1233,11 @@ function generateFullBoardPuzzle({
       }
 
       if (Date.now() >= deadline) break;
-      if (!current.some((c) => c.t === 'W') || !current.some((c) => c.t === 'B')) continue;
+      if (isGray) {
+        if (current.length < 4 || !current.some((c) => whiteSet.has(c.r * cols + c.c)) || !current.some((c) => !whiteSet.has(c.r * cols + c.c))) continue;
+      } else if (!current.some((c) => c.t === 'W') || !current.some((c) => c.t === 'B')) {
+        continue;
+      }
       current = sortClues(current);
 
       const P = compileFM(current);
@@ -2140,6 +2151,7 @@ function generateSlitherPuzzle({
  *   - 'midloop-odd'     pure Mid-loop with edge-midpoint dots only (every clued run has odd length 1, 3, 5...)
  *   - 'midloop-long'    pure Mid-loop with no length-1 runs (every clued run has length >= 2; odd dots >= 3)
  *   - 'midloop-masyu'   Mid-loop + Masyu hybrid (verified mutual necessity)
+ *   - 'midloop-gray'    Mid-loop + All-gray Masyu circles hybrid (verified mutual necessity)
  *   - 'midloop-slither' Mid-loop + Slitherlink hybrid (verified mutual necessity)
  *   - 'midloop-full'    Mid-loop + Hamilton cycle hybrid (verified full-board necessity)
  */
@@ -2148,7 +2160,8 @@ function generateMidloopPuzzle({
   wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
 }) {
   const isFull = style === 'midloop-full';
-  const isMasyu = style === 'midloop-masyu';
+  const isGray = style === 'midloop-gray';
+  const isMasyu = style === 'midloop-masyu' || isGray;
   const isSlither = style === 'midloop-slither' || style === 'midloop-slither-swiss' || style === 'midloop-slither2';
   const isSlitherAll2 = style === 'midloop-slither2';
   const isEvenOnly = style === 'midloop-even';
@@ -2297,9 +2310,11 @@ function generateMidloopPuzzle({
     }
     let cluesInit = [];
     let slitherInit = [];
+    let whiteSet = null;
     if (isMasyu) {
       const { whites, blacks } = allowedClues(rows, cols, edges, empty);
-      const allC = whites.concat(blacks);
+      if (isGray) whiteSet = new Set(whites.map((c) => c.r * cols + c.c));
+      const allC = isGray ? whites.concat(blacks).map(({ r, c }) => ({ r, c, t: 'G' })) : whites.concat(blacks);
       const midCSet = new Set(midInit.filter((m) => m.dir === 'C').map((m) => m.r * cols + m.c));
       const dropMidC = new Set();
       if (!symLayout) {
@@ -2525,8 +2540,12 @@ function generateMidloopPuzzle({
       if (!hasH || !hasV) continue;
     }
     if (isMasyu) {
-      const nW = fin.clues.filter((c) => c.t === 'W').length;
-      const nB = fin.clues.filter((c) => c.t === 'B').length;
+      const nW = isGray
+        ? fin.clues.filter((c) => whiteSet.has(c.r * cols + c.c)).length
+        : fin.clues.filter((c) => c.t === 'W').length;
+      const nB = isGray
+        ? fin.clues.filter((c) => !whiteSet.has(c.r * cols + c.c)).length
+        : fin.clues.filter((c) => c.t === 'B').length;
       if (fin.clues.length < minClues || (rows >= 5 && cols >= 5 && (nW < 1 || nB < 1))) continue;
     }
     if (isSlither) {
@@ -2586,6 +2605,7 @@ function generateMidloopPuzzle({
  * Generate one verified, rated Castle Wall or Castle Wall hybrid puzzle:
  *   - 'castle'         pure Castle Wall (White=Inside, Black=Outside, Gray=Either + directional segment counts)
  *   - 'castle-masyu'   Castle Wall + Masyu hybrid (verified mutual necessity)
+ *   - 'castle-gray'    Castle Wall + All-gray Masyu circles hybrid (verified mutual necessity)
  *   - 'castle-slither' Castle Wall + Slitherlink hybrid (verified mutual necessity)
  *   - 'castle-midloop' Castle Wall + Mid-loop hybrid (verified mutual necessity)
  *   - 'castle-full'    Castle Wall + Hamilton cycle hybrid (verified full-board necessity)
@@ -2595,7 +2615,8 @@ function generateCastlePuzzle({
   wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
 }) {
   const isFull = style === 'castle-full';
-  const isMasyu = style === 'castle-masyu';
+  const isGray = style === 'castle-gray';
+  const isMasyu = style === 'castle-masyu' || isGray;
   const isSlither = style === 'castle-slither';
   const isMidloop = style === 'castle-midloop';
   const isHybrid = isMasyu || isSlither || isMidloop;
@@ -2625,9 +2646,11 @@ function generateCastlePuzzle({
   const reqQuadItems = rows >= 10 && cols >= 10 ? 2 : (rows >= 7 && cols >= 7 ? 1 : 0);
 
   const sampleCastlePositions = () => {
+    const baseFrac = beginnerOnly && !isHybrid && !isFull && N >= 100 ? (0.22 + 0.06 * rand()) : (0.17 + 0.06 * rand());
+    const maxFrac = beginnerOnly && !isHybrid && !isFull && N >= 100 ? 0.30 : 0.28;
     const targetK = isHybrid || isFull
       ? Math.max(5, Math.min(Math.floor(N * 0.20), Math.round(N * (0.11 + 0.05 * rand()))))
-      : Math.max(6, Math.min(Math.floor(N * 0.28), Math.round(N * (0.17 + 0.06 * rand()))));
+      : Math.max(6, Math.min(Math.floor(N * maxFrac), Math.round(N * baseFrac)));
     const maxBorder = Math.max(1, Math.floor(targetK * 0.28));
     let nBorder = 0;
     const isBorderCell = (r, c) => r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
@@ -2822,9 +2845,11 @@ function generateCastlePuzzle({
     if (castleInit.length < Math.max(4, minCastle)) continue;
 
     let cluesInit = [], slitherInit = [], midInit = [];
+    let clWhiteSet = null;
     if (isMasyu) {
       const { whites, blacks } = allowedClues(rows, cols, edges, empty);
-      cluesInit = whites.concat(blacks);
+      if (isGray) clWhiteSet = new Set(whites.map((c) => c.r * cols + c.c));
+      cluesInit = isGray ? whites.concat(blacks).map(({ r, c }) => ({ r, c, t: 'G' })) : whites.concat(blacks);
       if (cluesInit.length < Math.max(4, minClues)) continue;
       cluesInit.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
     } else if (isSlither) {
@@ -2916,8 +2941,9 @@ function generateCastlePuzzle({
     let nBAct = cwState.filter((c) => c.wall === 'B').length;
     let nGAct = cwState.filter((c) => c.wall === 'G').length;
     let nNumAct = cwState.filter((c) => c.dir).length;
-    let nClW = isMasyu ? cluesInit.filter((c) => c.t === 'W').length : 0;
-    let nClB = isMasyu ? cluesInit.filter((c) => c.t === 'B').length : 0;
+    const isClW = (cl) => (isGray ? clWhiteSet.has(cl.r * cols + cl.c) : cl.t === 'W');
+    let nClW = isMasyu ? cluesInit.filter(isClW).length : 0;
+    let nClB = isMasyu ? cluesInit.length - nClW : 0;
     const minNumFloor = Math.max(2, Math.floor(minCastle * 0.6));
 
     const extract = () => ({
@@ -2988,8 +3014,8 @@ function generateCastlePuzzle({
       }
       if (a.kind === 'dropCl') {
         if (!clAct[a.i] || nCl <= minClues) return false;
-        if (cluesInit[a.i].t === 'W' && nClW <= 1) return false;
-        if (cluesInit[a.i].t === 'B' && nClB <= 1) return false;
+        if (isClW(cluesInit[a.i]) && nClW <= 1) return false;
+        if (!isClW(cluesInit[a.i]) && nClB <= 1) return false;
         return true;
       }
       if (a.kind === 'dropSl') return slAct[a.i] && nSl > minSlither;
@@ -3027,10 +3053,11 @@ function generateCastlePuzzle({
       }
       if (a.kind === 'dropCl') {
         clAct[a.i] = 0; nCl--;
-        if (cluesInit[a.i].t === 'W') nClW--; else if (cluesInit[a.i].t === 'B') nClB--;
+        const wFlag = isClW(cluesInit[a.i]);
+        if (wFlag) nClW--; else nClB--;
         return () => {
           clAct[a.i] = 1; nCl++;
-          if (cluesInit[a.i].t === 'W') nClW++; else if (cluesInit[a.i].t === 'B') nClB++;
+          if (wFlag) nClW++; else nClB++;
         };
       }
       if (a.kind === 'dropSl') { slAct[a.i] = 0; nSl--; return () => { slAct[a.i] = 1; nSl++; }; }
@@ -3146,8 +3173,8 @@ function generateCastlePuzzle({
     if (nW < 1 || nB < 1) continue;
     if ((isHybrid || isFull) && (nW + nB) < Math.max(2, Math.ceil(fin.castle.length * 0.5))) continue;
     if (isMasyu) {
-      const mcW = fin.clues.filter((c) => c.t === 'W').length;
-      const mcB = fin.clues.filter((c) => c.t === 'B').length;
+      const mcW = fin.clues.filter(isClW).length;
+      const mcB = fin.clues.length - mcW;
       if (fin.clues.length < minClues || mcW < 1 || mcB < 1) continue;
       const ratio = fin.castle.length / fin.clues.length;
       if (ratio < 0.45 || ratio > 2.2) continue;
@@ -3278,7 +3305,7 @@ export function generatePuzzle({
   const effectiveMaxTier = targetTier && !wantUnsolved ? Math.min(maxTierIdx, TIERS.indexOf(targetTier)) : maxTierIdx;
   const beginnerOnly = stripMode === 'beginner' || (stripMode === null && effectiveMaxTier === 0);
   const mediumOnly = stripMode === 'medium' || (stripMode === null && effectiveMaxTier === 1);
-  if (style === 'full-masyu' || style === 'full-lines' || style === 'full-walls' || style === 'full-mixed' || style === 'full-swiss') {
+  if (style === 'full-masyu' || style === 'full-gray' || style === 'full-lines' || style === 'full-walls' || style === 'full-mixed' || style === 'full-swiss') {
     return generateFullBoardPuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
@@ -3290,13 +3317,13 @@ export function generatePuzzle({
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
     });
   }
-  if (style === 'midloop' || style === 'midloop-swiss' || style === 'midloop-even' || style === 'midloop-odd' || style === 'midloop-long' || style === 'midloop-masyu' || style === 'midloop-slither' || style === 'midloop-slither-swiss' || style === 'midloop-slither2' || style === 'midloop-full') {
+  if (style === 'midloop' || style === 'midloop-swiss' || style === 'midloop-even' || style === 'midloop-odd' || style === 'midloop-long' || style === 'midloop-masyu' || style === 'midloop-gray' || style === 'midloop-slither' || style === 'midloop-slither-swiss' || style === 'midloop-slither2' || style === 'midloop-full') {
     return generateMidloopPuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
     });
   }
-  if (style === 'castle' || style === 'castle-masyu' || style === 'castle-slither' || style === 'castle-midloop' || style === 'castle-full') {
+  if (style === 'castle' || style === 'castle-masyu' || style === 'castle-gray' || style === 'castle-slither' || style === 'castle-midloop' || style === 'castle-full') {
     return generateCastlePuzzle({
       rows, cols, style, layout, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
