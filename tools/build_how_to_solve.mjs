@@ -27,12 +27,14 @@ const imgFor = (ruleId) => {
 };
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// Partition rules into universal loop fundamentals vs. puzzle-family-specific rules
+// Partition rules into universal loop fundamentals vs. puzzle-family-specific & cross-family hybrid rules
 const isGrayRule = (r) => Boolean(r.grayOnly || r.id === 'grayFromShape');
-const isPuzzleSpecific = (r) => Boolean(r.circleOnly || isGrayRule(r) || r.slitherOnly || r.midloopOnly || r.fullBoardOnly);
+const isHybridRule = (r) => Boolean(r.hybridOnly);
+const isPuzzleSpecific = (r) => Boolean(r.circleOnly || isGrayRule(r) || r.slitherOnly || r.midloopOnly || r.fullBoardOnly || isHybridRule(r));
 const sortByLadder = (list) => list.slice().sort((a, b) => (
   TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.cost - b.cost
 ));
+const hybridRules = sortByLadder(RULES.filter((r) => isHybridRule(r) && !r.free));
 
 const UNIVERSAL_TIER_BLURBS = {
   Beginner: 'direct local deductions — basic clue rules, dead ends, forced exits, and not closing the loop early',
@@ -55,7 +57,7 @@ const PUZZLE_SECTIONS = [
     icon: '⚪',
     summaryMd: '**White circles (○):** pass straight through and turn 90° at least once at an adjacent intersection. **Black circles (●):** turn 90° at the circle and go straight for at least two segments in both exit directions.',
     summaryHtml: '<b>White circles (○):</b> pass straight through and turn 90° at least once at an adjacent intersection. <b>Black circles (●):</b> turn 90° at the circle and go straight for at least two segments in both exit directions.',
-    rules: sortByLadder(RULES.filter((r) => r.circleOnly && !r.free)),
+    rules: sortByLadder(RULES.filter((r) => r.circleOnly && !r.free && !isHybridRule(r))),
     subgroups: [
       {
         id: 'variant-gray',
@@ -73,7 +75,7 @@ const PUZZLE_SECTIONS = [
     icon: '🔢',
     summaryMd: 'Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides).',
     summaryHtml: 'Each number <b>0–3</b> sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides).',
-    rules: sortByLadder(RULES.filter((r) => r.slitherOnly && !r.free)),
+    rules: sortByLadder(RULES.filter((r) => r.slitherOnly && !r.free && !isHybridRule(r))),
     subgroups: [],
   },
   {
@@ -104,6 +106,7 @@ const covered = new Set([
     ...s.rules.map((r) => r.id),
     ...s.subgroups.flatMap((sg) => [...sg.freeRules.map((r) => r.id), ...sg.rules.map((r) => r.id)]),
   ]),
+  ...hybridRules.map((r) => r.id),
 ]);
 const missingRules = RULES.filter((r) => !covered.has(r.id)).map((r) => r.id);
 if (missingRules.length) {
@@ -205,9 +208,10 @@ say(
   '',
   '### Hybrids',
   '',
-  'In **Hybrids** books, two clue families (such as Masyu + Hamilton cycle, Slitherlink + Masyu, Slitherlink + Hamilton cycle, Mid-loop + Masyu, Mid-loop + Slitherlink, or Mid-loop + Hamilton cycle) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading and Mid-loop ray constraints automatically combine across clue families.',
+  'In **Hybrids** books, two clue families (such as Masyu + Hamilton cycle, Slitherlink + Masyu, Slitherlink + Hamilton cycle, Mid-loop + Masyu, Mid-loop + Slitherlink, or Mid-loop + Hamilton cycle) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading and Mid-loop ray constraints automatically combine across clue families, and the Hint button also knows these dedicated cross-family deductions:',
   '',
 );
+for (const r of hybridRules) emitRuleMd(r, '####');
 
 fs.writeFileSync(path.join(root, 'docs', 'how_to_solve.md'), out.join('\n').replace(/\n---\n$/, '\n'), 'utf8');
 
@@ -378,7 +382,8 @@ htmlParts.push(`
     <h3 class="sub-heading" id="variant-swiss">🧀 Swiss cheese</h3>
     <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All loop techniques — especially border rules, <a href="#chokepoint"><code>chokepoint</code></a>, <a href="#faceShade"><code>faceShade</code></a>, <a href="#faceCircle"><code>faceCircle</code></a>, and <a href="#faceSlither"><code>faceSlither</code></a> — work naturally around and across interior holes.</p>
     <h3 class="sub-heading" id="hybrids">🔀 Hybrids</h3>
-    <p>In <b>Hybrids</b> books, two clue families (Masyu + Hamilton cycle, Slitherlink + Masyu, Slitherlink + Hamilton cycle, Mid-loop + Masyu, Mid-loop + Slitherlink, or Mid-loop + Hamilton cycle) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading and Mid-loop ray constraints automatically combine across clue families.</p>
+    <p>In <b>Hybrids</b> books, two clue families (Masyu + Hamilton cycle, Slitherlink + Masyu, Slitherlink + Hamilton cycle, Mid-loop + Masyu, Mid-loop + Slitherlink, or Mid-loop + Hamilton cycle) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading and Mid-loop ray constraints automatically combine across clue families, and the Hint button also knows these dedicated cross-family deductions:</p>
+    ${hybridRules.map((r) => renderRuleCardHtml(r)).join('\n')}
   </main>
 </body>
 </html>

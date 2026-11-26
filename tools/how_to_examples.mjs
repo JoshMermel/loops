@@ -66,18 +66,6 @@ for (const p of candidates) {
     addCand(p);
   }
 }
-const familyQuota = { slither: 200, midloop: 150, full: 120, voids: 80, gray: 120 };
-for (const p of candidates) {
-  if (p.slither && p.slither.length && familyQuota.slither > 0 && addCand(p)) familyQuota.slither--;
-  else if (p.midloop && p.midloop.length && familyQuota.midloop > 0 && addCand(p)) familyQuota.midloop--;
-  else if (p.fullBoard && familyQuota.full > 0 && addCand(p)) familyQuota.full--;
-  else if (p.voids && p.voids.length && familyQuota.voids > 0 && addCand(p)) familyQuota.voids--;
-  else if (p.clues.some((c) => c.t === 'G') && familyQuota.gray > 0 && addCand(p)) familyQuota.gray--;
-}
-for (const p of candidates) {
-  if (prioritized.length >= 1200) break;
-  addCand(p);
-}
 const variantCount = (p) => (
   (p.slither && p.slither.length ? 1 : 0)
   + (p.midloop && p.midloop.length ? 1 : 0)
@@ -86,6 +74,33 @@ const variantCount = (p) => (
   + (p.clues.some((c) => c.t === 'G') ? 1 : 0)
   + (p.givens && p.givens.length ? 1 : 0)
 );
+const isHybridCand = (p) => (
+  (p.slither && p.slither.length ? 1 : 0)
+  + (p.midloop && p.midloop.length ? 1 : 0)
+  + (p.clues && p.clues.length ? 1 : 0)
+  + (p.fullBoard ? 1 : 0)
+) >= 2;
+const familyQuota = { slither: 200, midloop: 150, full: 120, voids: 80, gray: 120, hybridSlitherMasyu: 60, hybridSlitherFull: 60, hybridFullMasyu: 60, hybridMidloop: 60 };
+for (const p of candidates) {
+  if (isHybridCand(p)) {
+    const hasS = p.slither && p.slither.length > 0;
+    const hasM = p.midloop && p.midloop.length > 0;
+    const hasC = p.clues && p.clues.length > 0;
+    if (hasM && familyQuota.hybridMidloop > 0 && addCand(p)) { familyQuota.hybridMidloop--; continue; }
+    if (hasS && hasC && familyQuota.hybridSlitherMasyu > 0 && addCand(p)) { familyQuota.hybridSlitherMasyu--; continue; }
+    if (hasS && p.fullBoard && familyQuota.hybridSlitherFull > 0 && addCand(p)) { familyQuota.hybridSlitherFull--; continue; }
+    if (hasC && p.fullBoard && familyQuota.hybridFullMasyu > 0 && addCand(p)) { familyQuota.hybridFullMasyu--; continue; }
+  }
+  if (p.slither && p.slither.length && familyQuota.slither > 0 && addCand(p)) familyQuota.slither--;
+  else if (p.midloop && p.midloop.length && familyQuota.midloop > 0 && addCand(p)) familyQuota.midloop--;
+  else if (p.fullBoard && familyQuota.full > 0 && addCand(p)) familyQuota.full--;
+  else if (p.voids && p.voids.length && familyQuota.voids > 0 && addCand(p)) familyQuota.voids--;
+  else if (p.clues.some((c) => c.t === 'G') && familyQuota.gray > 0 && addCand(p)) familyQuota.gray--;
+}
+for (const p of candidates) {
+  if (prioritized.length >= 1400) break;
+  addCand(p);
+}
 
 // Sort prioritized: plain Masyu boards first, then single-variant boards, then hybrids, smallest-first within each band
 // so core Masyu rules never get crowded out by smaller Slitherlink/Hamilton/Gray examples.

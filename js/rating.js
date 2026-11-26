@@ -1022,6 +1022,39 @@ function findBlackWhiteNoTurn(P, st) {
 }
 
 /**
+ * Hybrid rule: when a must-visit dot (Hamilton cycle or Mid-loop vertex dot) sits immediately
+ * adjacent to a black Masyu circle and has one perpendicular side blocked, the straight edge
+ * continuing away from the black circle must be ON — otherwise the black circle could not enter
+ * the dot either, stranding it with at most one exit.
+ */
+function findBlackMustVisitReach(P, st) {
+  if (!P.fullBoard && !P.hasMidloop) return [];
+  const { ed, nb, fullBoard, midloopAtCell } = P;
+  const e = st.e;
+  const out = [];
+  for (const b of blacksOf(P, st)) {
+    for (let d = 0; d < 4; d++) {
+      const eTo = ed[b * 4 + d];
+      if (eTo < 0 || e[eTo] !== E_UNKNOWN) continue;
+      const j = nb[b * 4 + d];
+      if (st.cell[j] === OFF) continue;
+      const isMid = midloopAtCell && midloopAtCell[j] >= 0;
+      if (!fullBoard && !isMid) continue;
+      const eOpp = ed[j * 4 + d];
+      if (eOpp < 0 || e[eOpp] !== E_UNKNOWN) continue;
+      const p0 = ed[j * 4 + ((d + 1) & 3)], p1 = ed[j * 4 + ((d + 3) & 3)];
+      const n0 = nb[j * 4 + ((d + 1) & 3)], n1 = nb[j * 4 + ((d + 3) & 3)];
+      const p0Off = p0 < 0 || e[p0] === E_OFF || (n0 >= 0 && st.cell[n0] === OFF);
+      const p1Off = p1 < 0 || e[p1] === E_OFF || (n1 >= 0 && st.cell[n1] === OFF);
+      if (p0Off !== p1Off) {
+        out.push({ sets: [['e', eOpp, E_ON]], info: { b, j, eTo, edge: eOpp, kind: isMid ? 'midloop' : 'full' } });
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * A black circle at one end of an open path cannot extend two cells straight into the other end
  * of that same path while other loop cells lie outside (closing the loop early).
  */
@@ -2213,6 +2246,7 @@ export const RULES = [
   defRule({ id: 'blackBlockedTarget', tier: 'Medium', weight: 15, circleOnly: true, find: findBlackBlockedTarget, label: 'a black circle cannot extend toward a circle two cells away that cannot accept a straight segment' }),
   defRule({ id: 'blackTwoDiagWhites', tier: 'Medium', weight: 15, circleOnly: true, find: findBlackTwoDiagWhites, label: 'a black circle flanked by two diagonally adjacent white circles cannot extend between them' }),
   defRule({ id: 'blackWhiteNoTurn', tier: 'Medium', weight: 16, circleOnly: true, find: findBlackWhiteNoTurn, label: 'a black circle cannot extend into a white circle two cells away whose far side cannot turn' }),
+  defRule({ id: 'blackMustVisitReach', tier: 'Medium', weight: 13, hybridOnly: true, circleOnly: true, find: findBlackMustVisitReach, label: 'a must-visit dot next to a black circle with a blocked side must draw the straight segment away from the black circle, or the dot would be stranded' }),
   defRule({ id: 'whiteCornerPinch', tier: 'Medium', weight: 17, circleOnly: true, find: findWhiteCornerPinch, label: 'a two-exit corner diagonally next to a white circle cannot pinch both of its already-active neighbors' }),
   defRule({ id: 'whiteDeadEndPinch', tier: 'Medium', weight: 17, circleOnly: true, find: findWhiteDeadEndPinch, label: 'a segment completing two sides of a 2×2 square beside a white circle cannot pinch both of its axes' }),
   defRule({ id: 'faceShade', tier: 'Medium', weight: 18, find: findFaceShade, label: 'basic inside/outside shading (crossing lines and X marks from the border) puts known colors on both sides of an edge' }),
@@ -2256,12 +2290,20 @@ export const ruleLabel = (id) => (id === 'unsolved' ? 'none of the current rules
 
 const IMAGINE_AFTER = 20; // Beginner + local Medium + faceShade + boxStrand (<= 20) always run before searching imagined chains (min cost 22)
 
+const isHybridBoard = (P) => (
+  (P.hasSlither ? 1 : 0)
+  + (P.hasMidloop ? 1 : 0)
+  + (P.clueCells.length > 0 ? 1 : 0)
+  + (P.fullBoard ? 1 : 0)
+) >= 2;
+
 const ruleApplies = (rule, P, st) => (
   (!rule.slitherOnly || P.hasSlither)
   && (!rule.midloopOnly || P.hasMidloop)
   && (!rule.circleOnly || P.clueCells.length > 0)
   && (!rule.grayOnly || st.hasGray)
   && (!rule.fullBoardOnly || P.fullBoard)
+  && (!rule.hybridOnly || isHybridBoard(P))
 );
 
 /** Apply all non-costly rules below `upto` until fixed point, contradiction, or `maxSteps`. Mutates `st`. */

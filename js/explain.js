@@ -137,6 +137,8 @@ function describeChainStep(P, s) {
       return `the black circle at ${c} cannot extend between white circles ${cellName(P, info.whites[0])} and ${cellName(P, info.whites[1])}, so it goes two cells ${DIR_WORD[info.dir]}`;
     case 'blackWhiteNoTurn':
       return `the black circle at ${c} cannot extend into white circle ${cellName(P, info.target)} and goes two cells ${DIR_WORD[info.dir]}`;
+    case 'blackMustVisitReach':
+      return `the must-visit dot ${cellName(P, info.j)} beside black circle ${cellName(P, info.b)} must draw ${edgeName(P, info.edge)}`;
     case 'whiteCornerPinch':
       return `visiting ${c} would pinch white circle ${cellName(P, info.white)} on both axes`;
     case 'whiteDeadEndPinch':
@@ -489,6 +491,16 @@ export function explainStep(P, step, st = null) {
           ? `${farNm} already continues straight`
           : `${farNm} has both turns blocked`;
       text = `The black circle at ${cellName(P, info.cell)} cannot extend into the white circle at ${cellName(P, info.target)} because ${why}, leaving ${cellName(P, info.target)} unable to turn on either side; so ${cellName(P, info.cell)} must go two cells ${DIR_WORD[info.dir]}.`;
+      break;
+    }
+    case 'blackMustVisitReach': {
+      roles.clue.push(info.b);
+      roles.focus.push(info.j);
+      nudgeRoles.clue.push(info.b);
+      nudgeRoles.focus.push(info.j);
+      const subj = info.kind === 'midloop' ? `the Mid-loop dot at ${cellName(P, info.j)}` : cellName(P, info.j);
+      nudge = `Look at the black circle at ${cellName(P, info.b)} and ${info.kind === 'midloop' ? `the Mid-loop dot at ${cellName(P, info.j)}` : `its must-visit neighbor ${cellName(P, info.j)}`} — check what happens if ${edgeName(P, info.edge)} is crossed out.`;
+      text = `Because ${subj} must be visited and is already blocked on one perpendicular side, crossing out ${edgeName(P, info.edge)} would also block the black circle at ${cellName(P, info.b)} from entering through ${edgeName(P, info.eTo)} — stranding ${cellName(P, info.j)}. So draw ${edgeName(P, info.edge)}.`;
       break;
     }
     case 'whiteCornerPinch': {

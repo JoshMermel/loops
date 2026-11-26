@@ -1070,7 +1070,7 @@
       "label": "Armory",
       "group": "Hidden",
       "file": "data/armory.csv",
-      "count": 50,
+      "count": 49,
       "hidden": true
     }
   ]

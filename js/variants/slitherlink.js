@@ -518,7 +518,7 @@ export function applySlitherParity(P, st, ctx) {
 
 // ------------------------------------------------------------ Human-style solving rules
 
-const OFF = 1;
+const NONE = 0, WHITE = 1, OFF = 1;
 export const CORNER_SPEC = [
   // [dr, dc, fEdgeA, fEdgeB, oppA, oppB, outDirA, outDirB, adjA: [dr,dc,contDir,perpOutDir], adjB: [dr,dc,contDir,perpOutDir]]
   [0, 0, 0, 3, 1, 2, 0, 3, [0, 1, 1, 0], [1, 0, 2, 3]], // NW
@@ -833,6 +833,98 @@ export function findSlitherDiag32(P, st) {
   return out;
 }
 
+/**
+ * Hybrid rule: a straight-through clue (white Masyu circle or Mid-loop vertex dot) on a corner of
+ * a numbered Slitherlink square always uses exactly 1 of the square's two sides at that corner,
+ * forcing the square's two opposite sides (both ON for 3, both OFF for 1, sum=1 for 2).
+ */
+export function findSlitherStraightCorner(P, st) {
+  if (!P.hasSlither || (!P.clueCells.length && !P.hasMidloop)) return [];
+  const { cols, slither, faceEdges, midloopAtCell } = P;
+  const clue = st.clue || P.clue;
+  const e = st.e;
+  const out = [];
+  for (let k = 0; k < slither.length; k++) {
+    const sc = slither[k];
+    if (sc.n === 0) continue;
+    const f4 = sc.f * 4;
+    for (let ci = 0; ci < 4; ci++) {
+      const [dr, dc, fea, feb, oppA, oppB] = CORNER_SPEC[ci];
+      const v = (sc.r + dr) * cols + (sc.c + dc);
+      const isW = clue[v] === WHITE;
+      const isMid = !isW && midloopAtCell && midloopAtCell[v] >= 0;
+      if (!isW && !isMid) continue;
+      const ea = faceEdges[f4 + fea], eb = faceEdges[f4 + feb];
+      const eoA = faceEdges[f4 + oppA], eoB = faceEdges[f4 + oppB];
+      if (ea < 0 || eb < 0 || eoA < 0 || eoB < 0) continue;
+      if (e[ea] !== E_UNKNOWN || e[eb] !== E_UNKNOWN) continue;
+      const sets = [];
+      if (sc.n === 3) {
+        if (e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_ON]);
+        if (e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_ON]);
+      } else if (sc.n === 1) {
+        if (e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_OFF]);
+        if (e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_OFF]);
+      } else if (sc.n === 2) {
+        if (e[eoA] === E_ON && e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_OFF]);
+        else if (e[eoB] === E_ON && e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_OFF]);
+        else if (e[eoA] === E_OFF && e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_ON]);
+        else if (e[eoB] === E_OFF && e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_ON]);
+      }
+      if (sets.length) out.push({ sets, info: { face: sc.f, n: sc.n, cell: v, clueKind: isW ? 'white' : 'midloop' } });
+    }
+  }
+  return out;
+}
+
+/**
+ * Hybrid rule: a must-visit corner (Hamilton cycle dot, Masyu circle, or Mid-loop vertex dot) of a
+ * Slitherlink square needing 1 more segment (rem === 1), with both corner sides unknown and only 1
+ * available outside exit, must use that outside exit (ON if unknown) and 1 of its two corner sides —
+ * crossing out the square's two opposite sides.
+ */
+export function findSlitherMustVisitCorner(P, st) {
+  if (!P.hasSlither || (!P.fullBoard && !P.clueCells.length && !P.hasMidloop)) return [];
+  const { cols, slither, faceEdges, ed, fullBoard, midloopAtCell } = P;
+  const clue = st.clue || P.clue;
+  const e = st.e;
+  const out = [];
+  for (let k = 0; k < slither.length; k++) {
+    const sc = slither[k];
+    if (sc.n === 0) continue;
+    const f4 = sc.f * 4;
+    let onCnt = 0;
+    for (let s = 0; s < 4; s++) {
+      const fx = faceEdges[f4 + s];
+      if (fx >= 0 && e[fx] === E_ON) onCnt++;
+    }
+    if (sc.n - onCnt !== 1) continue;
+    for (let ci = 0; ci < 4; ci++) {
+      const [dr, dc, fea, feb, oppA, oppB, odA, odB] = CORNER_SPEC[ci];
+      const v = (sc.r + dr) * cols + (sc.c + dc);
+      const isClue = clue[v] !== NONE;
+      const isMid = midloopAtCell && midloopAtCell[v] >= 0;
+      if (!fullBoard && !isClue && !isMid) continue;
+      const ea = faceEdges[f4 + fea], eb = faceEdges[f4 + feb];
+      if (ea < 0 || eb < 0 || e[ea] !== E_UNKNOWN || e[eb] !== E_UNKNOWN) continue;
+      const blkA = isBlockedDir(P, st, v, odA);
+      const blkB = isBlockedDir(P, st, v, odB);
+      if (blkA === blkB) continue; // need exactly 1 open outside exit
+      const openOut = blkA ? ed[v * 4 + odB] : ed[v * 4 + odA];
+      const sets = [];
+      const eoA = faceEdges[f4 + oppA], eoB = faceEdges[f4 + oppB];
+      if (eoA >= 0 && e[eoA] === E_UNKNOWN) sets.push(['e', eoA, E_OFF]);
+      if (eoB >= 0 && e[eoB] === E_UNKNOWN) sets.push(['e', eoB, E_OFF]);
+      if (openOut >= 0 && e[openOut] === E_UNKNOWN) sets.push(['e', openOut, E_ON]);
+      if (sets.length) {
+        const kind = isClue ? 'circle' : isMid ? 'midloop' : 'full';
+        out.push({ sets, info: { face: sc.f, n: sc.n, cell: v, kind } });
+      }
+    }
+  }
+  return out;
+}
+
 export const SLITHER_RULES = [
   { id: 'slitherZero', tier: 'Beginner', weight: 2, find: findSlitherZero, label: 'a 0 square has no loop segments around it' },
   { id: 'slitherCount', tier: 'Beginner', weight: 2, find: findSlitherCount, label: 'a numbered square whose remaining edges match its count must fill or cross them out' },
@@ -841,7 +933,9 @@ export const SLITHER_RULES = [
   { id: 'slitherDiag3', tier: 'Beginner', weight: 6, find: findSlitherDiag3, label: 'two diagonally adjacent 3s force both outer corners on' },
   { id: 'slitherLineIn', tier: 'Beginner', weight: 6, find: findSlitherLineIn, label: 'a segment entering a corner of a square with one spare side (e.g. a 3, or a 2 with one X) forces its other open sides on and blocks the other exit' },
   { id: 'slitherCorner2', tier: 'Medium', weight: 10, find: findSlitherCorner2, label: 'a 2 at a blocked corner couples its two corner sides (both on or both off), forcing exits at its adjacent corners' },
+  { id: 'slitherStraightCorner', tier: 'Medium', weight: 11, hybridOnly: true, find: findSlitherStraightCorner, label: 'a white circle or Mid-loop dot on a corner of a Slitherlink square contributes exactly one of its two corner sides, forcing the opposite sides' },
   { id: 'slither1LineIn', tier: 'Medium', weight: 12, find: findSlither1LineIn, label: 'a segment forced into a corner of a 1 crosses out its two opposite sides' },
+  { id: 'slitherMustVisitCorner', tier: 'Medium', weight: 12, hybridOnly: true, find: findSlitherMustVisitCorner, label: 'a must-visit corner of a Slitherlink square needing one more segment with only one outside exit forces that exit on and crosses out the square’s opposite sides' },
   { id: 'slitherDiag32', tier: 'Medium', weight: 14, find: findSlitherDiag32, label: 'a diagonal chain of 2s between two 3s forces both outer corners on' },
 ];
 
@@ -868,6 +962,10 @@ export function describeSlitherChainStep(P, s, { faceName }) {
       return `the segment entering the ${info.n ?? 3} square ${fn} forces its remaining sides`;
     case 'slither1LineIn':
       return `the segment entering the 1 square ${fn} crosses out its opposite sides`;
+    case 'slitherStraightCorner':
+      return `the ${info.clueKind === 'white' ? 'white circle' : 'Mid-loop dot'} on the ${info.n} square ${fn} forces its opposite sides`;
+    case 'slitherMustVisitCorner':
+      return `the must-visit corner on the ${info.n} square ${fn} forces its outside exit and opposite sides`;
     case 'slitherDiag32':
       return `the diagonal 3–2–3 chain between ${fn} and ${faceName(P, info.face2)} forces both outer corners`;
     case 'faceSlither':
@@ -956,6 +1054,33 @@ export function explainSlitherStep(P, step, helpers) {
         nudge: `Look at the segment entering corner ${cellName(P, info.cell)} of the 1 square at ${fn}.`,
         text: `The segment at ${cellName(P, info.cell)} must continue along one of the 1 square's two adjacent sides at ${fn}, using up its single segment — so its two opposite sides are off: ${marks}.`,
       };
+    case 'slitherStraightCorner': {
+      const cn = cellName(P, info.cell);
+      const who = info.clueKind === 'white' ? 'white circle' : 'Mid-loop dot';
+      addFace(faces.focus, info.face);
+      roles.clue.push(info.cell);
+      nudgeRoles.clue.push(info.cell);
+      const detail = info.n === 3
+        ? `so both opposite sides of the 3 square must be drawn`
+        : info.n === 1
+          ? `using up the 1 square's single segment so both opposite sides are off`
+          : `so the 2 square's two opposite sides must also contribute exactly 1 segment`;
+      return {
+        nudge: `Look at the ${who} at corner ${cn} of the ${info.n} square at ${fn}.`,
+        text: `Because the loop passes straight through the ${who} at ${cn}, it uses exactly one of the ${info.n} square's two sides at ${cn} — ${detail}: ${marks}.`,
+      };
+    }
+    case 'slitherMustVisitCorner': {
+      const cn = cellName(P, info.cell);
+      const who = info.kind === 'circle' ? 'circle' : info.kind === 'midloop' ? 'Mid-loop dot' : 'dot';
+      addFace(faces.focus, info.face);
+      roles.focus.push(info.cell);
+      nudgeRoles.focus.push(info.cell);
+      return {
+        nudge: `Look at the must-visit ${who} at corner ${cn} of the ${info.n} square at ${fn} and check its outside exits.`,
+        text: `Corner ${cn} must be visited and has only one open exit outside the ${info.n} square at ${fn}, while the square can take at most one more segment — so ${cn} must use its outside exit and one side of the square, leaving no segments for the square's other open sides: ${marks}.`,
+      };
+    }
     case 'slitherDiag32':
       addFace(faces.focus, info.face);
       addFace(faces.focus, info.face2);

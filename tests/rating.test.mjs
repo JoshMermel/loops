@@ -1012,3 +1012,41 @@ test('findSlitherCorner2 handles blocked contDir via OFF cell symmetrically', ()
   assert.ok(fs.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === perpEdge && v === E_ON)),
     'expected blocked-via-OFF contDir to force perpendicular exit ON');
 });
+
+test('cross-family hybrid rules (slitherStraightCorner, slitherMustVisitCorner, blackMustVisitReach) fire cleanly', () => {
+  // 1. slitherStraightCorner: white circle on TL corner (1,1) of 3 square (1,1) forces S & E sides ON
+  const Psc3 = compile({ name: 'hsc3', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'W' }], slither: [{ r: 1, c: 1, n: 3 }] });
+  const rSC = RULES.find((r) => r.id === 'slitherStraightCorner');
+  const f3 = rSC.find(Psc3, initialState(Psc3));
+  const f4 = (1 * 3 + 1) * 4;
+  assert.ok(f3.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === Psc3.faceEdges[f4 + 1] && v === E_ON)
+    && f.sets.some(([k, x, v]) => k === 'e' && x === Psc3.faceEdges[f4 + 2] && v === E_ON)),
+    'white circle on corner of 3 square must force both opposite sides ON');
+
+  // 1b. slitherStraightCorner with Mid-loop vertex dot on corner of 1 square forces both opposite sides OFF
+  const Psc1 = compile({ name: 'hsc1', rows: 4, cols: 4, clues: [], midloop: [{ r: 1, c: 1, dir: 'C' }], slither: [{ r: 1, c: 1, n: 1 }] });
+  const f1 = rSC.find(Psc1, initialState(Psc1));
+  assert.ok(f1.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === Psc1.faceEdges[f4 + 1] && v === E_OFF)
+    && f.sets.some(([k, x, v]) => k === 'e' && x === Psc1.faceEdges[f4 + 2] && v === E_OFF)),
+    'Mid-loop vertex dot on corner of 1 square must force both opposite sides OFF');
+
+  // 2. slitherMustVisitCorner: Hamilton cycle corner (0,1) on top border of 1 square (0,1) has only 1 outside exit (L -> (0,0)),
+  // forcing L ON and both opposite sides (E and S of square (0,1)) OFF
+  const Pmv = compile({ name: 'hmv', rows: 4, cols: 4, clues: [], slither: [{ r: 0, c: 1, n: 1 }], fullBoard: true });
+  const rMV = RULES.find((r) => r.id === 'slitherMustVisitCorner');
+  const fmv = rMV.find(Pmv, initialState(Pmv));
+  const mvF4 = (0 * 3 + 1) * 4;
+  const outL = Pmv.ed[(0 * 4 + 1) * 4 + 3];
+  assert.ok(fmv.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === outL && v === E_ON)
+    && f.sets.some(([k, x, v]) => k === 'e' && x === Pmv.faceEdges[mvF4 + 1] && v === E_OFF)
+    && f.sets.some(([k, x, v]) => k === 'e' && x === Pmv.faceEdges[mvF4 + 2] && v === E_OFF)),
+    'must-visit border corner of 1 square must force its single outside exit ON and opposite sides OFF');
+
+  // 3. blackMustVisitReach: Black circle at (0,1) next to Hamilton cycle dot (0,2) on top border -> forces (0,2)-(0,3) ON
+  const Pbm = compile({ name: 'hbm', rows: 4, cols: 4, clues: [{ r: 0, c: 1, t: 'B' }], fullBoard: true });
+  const rBM = RULES.find((r) => r.id === 'blackMustVisitReach');
+  const fbm = rBM.find(Pbm, initialState(Pbm));
+  const farE = Pbm.ed[(0 * 4 + 2) * 4 + 1];
+  assert.ok(fbm.some((f) => f.sets.some(([k, x, v]) => k === 'e' && x === farE && v === E_ON)),
+    'must-visit border dot next to black circle must force far straight edge ON');
+});

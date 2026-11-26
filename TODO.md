@@ -53,12 +53,8 @@ Try these 24-puzzle tasting books and decide for each one whether to **grow to 5
 
 ## Rules, books & generator
 
-- [ ] **Add Mid-loop armory illustrations:** curate Mid-loop examples in `data/armory.csv` and render them into `docs/how_to_solve.html` (matching Masyu and Slitherlink rule diagrams).
-- [ ] **Cross-family hybrid inferences (rules that only exist when two puzzle types meet):** audit Medium/Hard hybrid puzzles (`Slitherlink + Masyu`, `Mid-loop + Masyu`, `Mid-loop + Slitherlink`, `+ Hamilton cycle`) to see which recurring `imagineLocal`/`imagineTrace` steps deserve cheap named cross-rules — e.g.:
-  - *Mid-loop + Masyu:* a White circle at distance `k` from a Mid-loop dot cannot be a turn endpoint (eliminating half-length `k`), or a Black circle adjacent to a Mid-loop dot forcing symmetric straight legs.
-  - *Slitherlink + Masyu:* a Black/White circle on a corner of a `3` or `1` square forcing its entry/exit legs directly.
-  - *Mid-loop + Slitherlink:* a Mid-loop dot along a `3`/`2`/`1` square restricting which symmetric lengths keep the square's edge count legal.
 - [ ] **Rescore older Masyu books (optional housekeeping):** ~0.5–2% of puzzles in pre-Mid-loop Masyu Hard/Expert/Swiss books have minor `rules`/`score` drift (`0` tier changes) from earlier engine updates; run `tools/rescore.mjs` if we want `--all --rate` 100% zero-diff across legacy books too.
+- [ ] **Additional cross-family hybrid inferences (if new patterns emerge from play):** `slitherStraightCorner`, `slitherMustVisitCorner`, and `blackMustVisitReach` are now shipped and illustrated; revisit if playtesting surfaces more recurring Medium/Hard hybrid `imagine` patterns.
 - [ ] **Consider promoting other Bonus books to top-level sections:** review whether any remaining Bonus themes (e.g., All white / All black, Black & White Cookie, Skyscraper, Symmetry, Patterns) merit their own top-level section with multiple sizes or variations.
 - [ ] **New human rules from play:** play generated Medium/Hard puzzles and note any recurring patterns currently handled by `imagine` that deserve their own cheaper named rule (e.g., diagonally adjacent black & white circles near a wall, two diagonally adjacent white circles forcing a corridor, `pairedEnds` with 4/6 ends, or hint-only `uniqueRoute`).
 - [ ] **Explore even larger boards or custom packs:** e.g. `20×20` / `20×36` mega boards using `tools/fill_pools.mjs` / `tools/overnight.mjs`.
