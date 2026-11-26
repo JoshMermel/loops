@@ -719,7 +719,16 @@ function renderCurrentHint() {
     if (activeFaces.problem && activeFaces.problem.length && !usedRoles.includes('problem')) usedRoles.push('problem');
   }
   const hasClueFaces = !!(activeFaces && activeFaces.clue && activeFaces.clue.length);
-  const clueLabel = hasClueFaces ? (roles.clue && roles.clue.length ? 'the clues' : 'the clue') : null;
+  const hasMidClue = Boolean(
+    state.P && state.P.hasMidloop
+    && (h.rule.startsWith('mid') || (roles.clue && roles.clue.some((i) => state.P.midloopAtCell[i] >= 0)))
+  );
+  const hasCircleClue = Boolean(roles.clue && state.P && roles.clue.some((i) => state.P.clue[i] !== 0));
+  const clueLabel = hasClueFaces
+    ? (roles.clue && roles.clue.length ? 'the clues' : 'the clue')
+    : hasMidClue
+      ? (hasCircleClue ? 'the clues' : 'the Mid-loop dot')
+      : null;
   const faceLabels = full && item.faces && (item.faces.in.length || item.faces.out.length)
     ? {
         hasIn: item.faces.in.length > 0,
@@ -1399,7 +1408,7 @@ function renderOfflineStatus(status) {
   offlineActions.hidden = !status.enabled;
   offlineRefreshBtn.disabled = offlineBusy || navigator.onLine === false;
   if (!status.enabled) {
-    offlineDesc.textContent = `Save the app and ${count} (~9 MB) to play without internet`;
+    offlineDesc.textContent = `Save the app and ${count} (~11 MB) to play without internet`;
   } else if (status.total === 0) {
     offlineDesc.textContent = 'Ready offline';
   } else if (status.cached >= status.total) {

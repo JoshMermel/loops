@@ -594,7 +594,7 @@ A gray circle that cannot make a valid white-circle turn on either axis must be 
 
 ### Hamilton cycle
 
-The loop must visit **every** intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens. Also combines with Masyu or Slitherlink in **Hybrids** books.
+The loop must visit **every** intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold **✕** walls are permanent givens. Also combines with Masyu, Slitherlink, or Mid-loop in **Hybrids** books.
 
 #### checkerPocket
 
@@ -630,7 +630,7 @@ Cutout holes cannot be entered. Every enclosed hole lies entirely **Inside** or 
 
 ### Slitherlink & Hybrids
 
-Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrids** books, numbered squares share the same single loop with Masyu circles or a Hamilton cycle.
+Each number **0–3** sits inside a grid square and tells how many of that square’s four sides belong to the single closed loop (blank squares can have any number of sides). In **Hybrids** books, numbered squares share the same single loop with Masyu circles, Mid-loop dots, or a Hamilton cycle.
 
 #### slitherZero
 

@@ -92,7 +92,9 @@ export function boardSvg(P, sol = null) {
 
   if (P.fullBoard) {
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      if (P.hasVoids && P.isVoid[r * cols + c]) continue;
+      const idx = r * cols + c;
+      if ((P.hasVoids && P.isVoid[idx]) || P.clue[idx]) continue;
+      if (P.hasMidloop && P.midloopAtCell[idx] >= 0) continue;
       g += `<circle class="full-dot" cx="${c}" cy="${r}" r="0.065" fill="#555"/>`;
     }
   }
@@ -137,9 +139,9 @@ export function boardSvg(P, sol = null) {
     for (const md of P.midloop) {
       const mx = md.dir === 'H' ? md.c + 0.5 : md.c;
       const my = md.dir === 'V' ? md.r + 0.5 : md.r;
-      g += `<circle class="midloop-halo" cx="${mx}" cy="${my}" r="0.17" fill="#fff"/>`;
-      g += `<circle class="midloop-dot" cx="${mx}" cy="${my}" r="0.15" fill="${INK}"/>`;
-      g += `<circle class="midloop-core" cx="${mx}" cy="${my}" r="0.055" fill="#fff"/>`;
+      g += `<circle class="midloop-halo" cx="${mx}" cy="${my}" r="0.20" fill="#fff"/>`;
+      g += `<circle class="midloop-dot" cx="${mx}" cy="${my}" r="0.155" fill="${INK}"/>`;
+      g += `<circle class="midloop-core" cx="${mx}" cy="${my}" r="0.07" fill="#fff"/>`;
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" class="print-board" viewBox="${-pad} ${-pad} ${w + 2 * pad} ${h + 2 * pad}">${g}</svg>`;

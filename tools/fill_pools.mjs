@@ -50,7 +50,22 @@ if (!isMainThread) {
       const tot = dB + dM + dH + dE + dP;
       if (tot === 0) return null;
       const maxTier = (dP > 0 || dE > 0) ? 'Expert' : dH > 0 ? 'Hard' : dM > 0 ? 'Medium' : 'Beginner';
-      if (dP > 0 && dB + dM + dH + dE === 0) return { targetTier: 'Expert+', maxTier: 'Expert', stripMode: 'deep', allowUnsolved: true };
+      const activeTiers = [];
+      if (dB > 0) activeTiers.push('Beginner');
+      if (dM > 0) activeTiers.push('Medium');
+      if (dH > 0) activeTiers.push('Hard');
+      if (dE > 0) activeTiers.push('Expert');
+      if (dP > 0) activeTiers.push('Expert+');
+      if (activeTiers.length === 1) {
+        const only = activeTiers[0];
+        if (only === 'Expert+') return { targetTier: 'Expert+', maxTier: 'Expert', stripMode: 'deep', allowUnsolved: true };
+        return {
+          targetTier: only,
+          maxTier: only,
+          stripMode: only === 'Beginner' ? 'beginner' : only === 'Medium' ? 'medium' : 'deep',
+          allowUnsolved: false,
+        };
+      }
       const r = rng() * tot;
       if (r < dB) return { targetTier: null, maxTier: 'Beginner', stripMode: 'beginner', allowUnsolved: false };
       if (r < dB + dM) return { targetTier: null, maxTier: dH + dE + dP === 0 ? 'Medium' : maxTier, stripMode: 'medium', allowUnsolved: false };
@@ -81,6 +96,9 @@ if (!isMainThread) {
           name: `${job.pool}_${seedStart}_${++seq}`,
         });
         if (!p) continue;
+        // Skip independent re-verification when the puzzle already falls outside needed buckets
+        const preB = bucketOf(p, job.buckets);
+        if (!preB || (deficits[preB] || 0) <= 0) continue;
         // Independent re-verification
         const r = verifyPuzzle(p);
         if (!r) continue;

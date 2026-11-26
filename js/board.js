@@ -747,6 +747,7 @@ export class Board {
     const dotCls = P.fullBoard ? 'grid-dot full-board' : 'grid-dot';
     for (let i = 0; i < P.N; i++) {
       if ((P.hasVoids && P.isVoid[i]) || P.clue[i] || deg[i] > 0) continue;
+      if (P.hasMidloop && P.midloopAtCell[i] >= 0) continue;
       g += `<circle class="${dotCls}" cx="${ix(i)}" cy="${iy(i)}" r="${dotR}"/>`;
     }
 
@@ -787,6 +788,22 @@ export class Board {
           ? ` style="stroke:${pc[colorOf.get(find(a)) % pc.length]}"`
           : '';
         g += `<line class="seg${isBadLoop ? ' bad' : ''}"${style} stroke-width="${S * 0.14}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      }
+    }
+
+    // Hint chain & ghost segments (drawn below pearls and Mid-loop dots so clues stay crisp)
+    if (hint) {
+      const targets = hint.targets || {};
+      for (const x of hint.chain || []) {
+        const [x1, y1, x2, y2] = segCoords(x);
+        g += `<line class="chain-seg" stroke-width="${S * 0.11}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      }
+      for (const x of targets.segOn || []) {
+        const [x1, y1, x2, y2] = segCoords(x);
+        const len = Math.hypot(x2 - x1, y2 - y1);
+        const inset = (P.hasMidloop && P.midloopAtEdge[x] >= 0) ? S * 0.12 : S * 0.24;
+        const k = inset / len;
+        g += `<line class="ghost-seg" stroke-width="${S * 0.14}" x1="${x1 + (x2 - x1) * k}" y1="${y1 + (y2 - y1) * k}" x2="${x2 - (x2 - x1) * k}" y2="${y2 - (y2 - y1) * k}"/>`;
       }
     }
 
@@ -860,21 +877,12 @@ export class Board {
     if (dManual) g += `<path class="edge-x-halo" d="${dManual}"/><path class="edge-x" d="${dManual}"/>`;
     if (dGiven) g += `<path class="wall-given-halo" d="${dGiven}"/><path class="wall-given" d="${dGiven}"/>`;
 
-    // Hint overlays
+    // Hint overlays (rings, ghost X, gray label ghosts, wrong marks)
     if (hint) {
       const roles = hint.roles || {};
       const targets = hint.targets || {};
       for (const i of roles.exit || []) g += `<circle class="hint-exit" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.30}"/>`;
       for (const i of roles.focus || []) g += `<circle class="hint-focus-ring" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.32}"/>`;
-      for (const x of hint.chain || []) {
-        const [x1, y1, x2, y2] = segCoords(x);
-        g += `<line class="chain-seg" stroke-width="${S * 0.11}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
-      }
-      for (const x of targets.segOn || []) {
-        const [x1, y1, x2, y2] = segCoords(x);
-        const len = Math.hypot(x2 - x1, y2 - y1), k = (S * 0.24) / len;
-        g += `<line class="ghost-seg" stroke-width="${S * 0.14}" x1="${x1 + (x2 - x1) * k}" y1="${y1 + (y2 - y1) * k}" x2="${x2 - (x2 - x1) * k}" y2="${y2 - (y2 - y1) * k}"/>`;
-      }
       for (const x of targets.segOff || []) {
         const [x1, y1, x2, y2] = segCoords(x);
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.11;
@@ -987,7 +995,8 @@ export class Board {
         if (this.hoverEdge >= 0 && !hoverAutoX && !hoverGiven) {
           const [a, b] = edgeCells(P, this.hoverEdge);
           const mx = (ix(a) + ix(b)) / 2, my = (iy(a) + iy(b)) / 2;
-          nodes.push(svgEl('circle', { class: 'edge-hover', cx: mx, cy: my, r: S * 0.16 }));
+          const hr = (P.hasMidloop && P.midloopAtEdge[this.hoverEdge] >= 0) ? S * 0.24 : S * 0.16;
+          nodes.push(svgEl('circle', { class: 'edge-hover', cx: mx, cy: my, r: hr }));
         } else if (this.hoverCell >= 0) {
           if (P.clue[this.hoverCell] === GRAY) {
             const k = P.grayAt ? P.grayAt[this.hoverCell] : -1;
@@ -1004,7 +1013,8 @@ export class Board {
                 : null;
               for (const i of [this.hoverCell, far]) {
                 const x = ix(i), y = iy(i);
-                const d = P.clue[i] ? S * 0.28 : S * 0.20;
+                const hasDot = Boolean(P.clue[i] || (P.hasMidloop && P.midloopAtCell[i] >= 0));
+                const d = hasDot ? S * 0.28 : S * 0.20;
                 const path = `M${x} ${y - d}L${x + d} ${y}L${x} ${y + d}L${x - d} ${y}Z`;
                 nodes.push(svgEl('path', { class: 'line-end-halo', d: path }));
                 const attrs = { class: 'line-end', d: path };

@@ -147,6 +147,7 @@ export function trappedFullCells(P, marks) {
   for (let i = 0; i < P.N; i++) {
     if (P.isVoid && P.isVoid[i]) continue;
     if (P.clue[i] !== NONE) continue;
+    if (P.hasMidloop && P.midloopAtCell[i] >= 0) continue;
     let avail = 0;
     for (let d = 0; d < 4; d++) {
       const x = P.ed[i * 4 + d];

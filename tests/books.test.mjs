@@ -41,6 +41,21 @@ test('manifest.json matches every shipped CSV file, count, and section hierarchy
       }
     }
   }
+
+  // Every CSV in data/ must be registered in manifest.json (no orphan files)
+  const diskCsvs = fs.readdirSync(path.join(root, 'data')).filter((f) => f.endsWith('.csv'));
+  for (const f of diskCsvs) {
+    assert.ok(files.has(`data/${f}`), `orphan CSV file data/${f} is not registered in manifest.json`);
+  }
+
+  // Every visible group & subcategory in manifest.groups must have at least one visible book
+  const visible = manifest.books.filter((b) => !b.hidden);
+  for (const g of manifest.groups) {
+    assert.ok(visible.some((b) => b.group === g.name), `empty manifest group "${g.name}"`);
+    for (const subName of Object.keys(g.subs || {})) {
+      assert.ok(visible.some((b) => b.group === g.name && b.sub === subName), `empty manifest sub "${g.name}/${subName}"`);
+    }
+  }
 });
 
 test('following hints from an empty board solves shipped Beginner and Medium puzzles across sizes and variants', () => {
@@ -116,5 +131,8 @@ test('docs/how_to_solve.md and docs/how_to_solve.html exist with all referenced 
   assert.deepEqual(htmlImgs, imgs, 'docs/how_to_solve.html and .md image lists should match');
   for (const rel of imgs) {
     assert.ok(fs.existsSync(path.join(root, 'docs', rel)), `missing doc image docs/${rel}`);
+  }
+  for (const anchor of ['variant-gray', 'variant-full', 'variant-swiss', 'variant-slitherlink', 'variant-midloop']) {
+    assert.ok(html.includes(`id="${anchor}"`), `missing #${anchor} anchor in docs/how_to_solve.html`);
   }
 });

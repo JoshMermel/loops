@@ -1,7 +1,7 @@
 // Shared CLI helpers for Masyu tooling scripts in tools/.
 import { fileURLToPath } from 'node:url';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
-import { rate, TIERS } from '../js/rating.js';
+import { rate, solvedByRules, FIRST_LOOKAHEAD, TIERS } from '../js/rating.js';
 
 /** Absolute path to repository root from any script directly inside `tools/`. */
 export const repoRoot = (metaUrl) => fileURLToPath(new URL('..', metaUrl));
@@ -42,8 +42,13 @@ export function verifyPuzzle(p, { maxNodes = 500000 } = {}) {
   });
   const dec = decodeSolution(fresh, p.solution);
   if (!isSolved(fresh, dec.e)) return null;
-  const exact = solve(fresh, { limit: 2, maxNodes });
-  if (exact.exceeded || exact.count !== 1) return null;
-  if (encodeSolution(fresh, exact.solutions[0]) !== p.solution) return null;
+  const byRules = solvedByRules(fresh, FIRST_LOOKAHEAD);
+  if (byRules.solved) {
+    if (encodeSolution(fresh, byRules.state) !== p.solution) return null;
+  } else {
+    const exact = solve(fresh, { limit: 2, maxNodes });
+    if (exact.exceeded || exact.count !== 1) return null;
+    if (encodeSolution(fresh, exact.solutions[0]) !== p.solution) return null;
+  }
   return rate(fresh);
 }

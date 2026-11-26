@@ -415,11 +415,25 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   };
   const frMax = P.rows - 1, fcMax = P.cols - 1, pCols = P.cols;
   const pushVertexMid = (v) => {
-    const r = (v / pCols) | 0, c = v % pCols;
+    const r = (v / pCols) | 0, c = v - r * pCols;
     const rl = midByRow[r];
     for (let j = 0; j < rl.length; j++) pushMid(rl[j]);
     const cl = midByCol[c];
     for (let j = 0; j < cl.length; j++) pushMid(cl[j]);
+  };
+  const pushEdgeMid = (x, a) => {
+    const r = (a / pCols) | 0, c = a - r * pCols;
+    const rl = midByRow[r];
+    for (let j = 0; j < rl.length; j++) pushMid(rl[j]);
+    const cl = midByCol[c];
+    for (let j = 0; j < cl.length; j++) pushMid(cl[j]);
+    if ((x & 1) === 0) {
+      const cl2 = midByCol[c + 1];
+      for (let j = 0; j < cl2.length; j++) pushMid(cl2[j]);
+    } else {
+      const rl2 = midByRow[r + 1];
+      for (let j = 0; j < rl2.length; j++) pushMid(rl2[j]);
+    }
   };
   const pushVertexFaces = (v) => {
     const r = (v / pCols) | 0, c = v % pCols;
@@ -446,10 +460,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       pushVertexFaces(a);
       pushVertexFaces(b);
     }
-    if (hasMidloop) {
-      pushVertexMid(a);
-      pushVertexMid(b);
-    }
+    if (hasMidloop) pushEdgeMid(x, a);
   };
 
   const setCell = (i, v) => {

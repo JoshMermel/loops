@@ -8,7 +8,7 @@ import { ruleLabel, oddOpenEnds, checkerImbalance, chokepointCheck } from './rat
 import { replayImagine } from './imagine.js';
 import { faceCoords } from './faceparity.js';
 import { describeSlitherChainStep, explainSlitherStep } from './variants/slitherlink.js';
-import { describeMidloopChainStep, explainMidloopStep } from './variants/midloop.js';
+import { describeMidloopChainStep, explainMidloopStep, midDotLoc } from './variants/midloop.js';
 
 export const cellName = (P, i) => `${colName(i % P.cols)}${((i / P.cols) | 0) + 1}`;
 export const edgeName = (P, x) => {
@@ -112,6 +112,9 @@ function describeChainStep(P, s) {
       return segs.length ? `${c} must use ${joinList(segs)}` : `${c} is forced to extend`;
     }
     case 'noEarlyClose':
+      if (info.midIdx !== undefined && info.midIdx >= 0 && P.midloop && P.midloop[info.midIdx]) {
+        return `${edgeName(P, info.edge)} cannot close the loop early before the Mid-loop dot at ${midDotLoc(P, P.midloop[info.midIdx], { cellName, edgeName })} is satisfied`;
+      }
       return `${edgeName(P, info.edge)} cannot close the loop early`;
     case 'threeWhites':
       return `the three white circles at ${joinList(info.cells.map((k) => cellName(P, k)))} must cross ${info.axis === 'v' ? 'vertically' : 'horizontally'}`;
@@ -193,10 +196,21 @@ function describeContradiction(P, broke, finalState) {
         area: [],
       };
     }
-    case 'earlyClose':
-      return broke.face !== undefined
-        ? { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [], face: broke.face }
-        : { text: `the loop closes early while ${cellName(P, broke.cell)} is still outside it`, cells: [broke.cell], area: [] };
+    case 'earlyClose': {
+      if (broke.face !== undefined) {
+        return { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [], face: broke.face };
+      }
+      if (broke.midIdx !== undefined && broke.midIdx >= 0 && P.midloop && P.midloop[broke.midIdx]) {
+        const m = P.midloop[broke.midIdx];
+        const loc = midDotLoc(P, m, { cellName, edgeName });
+        return {
+          text: `the loop closes early before the Mid-loop dot at ${loc} is satisfied`,
+          cells: m.dir === 'C' ? [m.cell] : [m.a, m.b],
+          area: [],
+        };
+      }
+      return { text: `the loop closes early while ${cellName(P, broke.cell)} is still outside it`, cells: [broke.cell], area: [] };
+    }
     case 'twoLoops':
       return { text: 'two separate closed loops form', cells: [], area: [] };
     case 'offLine':
@@ -372,6 +386,12 @@ export function explainStep(P, step, st = null) {
       if (info.slitherFace !== undefined && info.slitherFace >= 0) {
         faces = { in: [], out: [], clue: [info.slitherFace], focus: [] };
         text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the ${P.slitherNum[info.slitherFace]} square ${faceName(P, info.slitherFace)} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
+      } else if (info.midIdx !== undefined && info.midIdx >= 0 && P.midloop && P.midloop[info.midIdx]) {
+        const m = P.midloop[info.midIdx];
+        const loc = midDotLoc(P, m, { cellName, edgeName });
+        if (m.dir === 'C') { roles.clue.push(m.cell); nudgeRoles.clue.push(m.cell); }
+        else { roles.clue.push(m.a, m.b); nudgeRoles.clue.push(m.a, m.b); }
+        text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the Mid-loop dot at ${loc} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
       } else {
         text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path while other loop cells lie outside it, so ${edgeName(P, info.edge)} cannot connect them.`;
       }

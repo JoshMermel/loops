@@ -154,22 +154,28 @@ export function randomLoop(rows, cols, rng, { targetFill = null, steps = null } 
   return { edges, loopCells, faceCount, emptyBorders, minQuadFill };
 }
 
-/** Generate a random symmetric simple closed loop ('rot180' | 'mirror' | 'transpose') on the dual face grid. */
-function randomSymmetricLoop(rows, cols, rng, layout, { targetFill = null, steps = null } = {}) {
-  if (layout === 'transpose' && rows !== cols) return null;
-  const { fr, fc, F, inS, toEdges } = makeDualGrid(rows, cols);
-  if (fr <= 0 || fc <= 0) return null;
-  const emptyBoard = compile({ name: 'sym_sl', rows, cols, clues: [] });
-  const orbitOf = (r, c) => {
-    const pts = layout === 'rot180' ? [[r, c], [fr - 1 - r, fc - 1 - c]]
-      : layout === 'mirror' ? [[r, c], [r, fc - 1 - c]]
-      : [[r, c], [c, r]];
-    const seen = new Set(), out = [];
-    for (const [rr, cc] of pts) {
-      const k = rr * fc + cc;
-      if (!seen.has(k)) { seen.add(k); out.push([rr, cc]); }
+/** True if every pair of faces in `orb` has Chebyshev distance > 1 (non-overlapping 3x3 neighborhoods). */
+function orbitIsDisjoint(orb) {
+  for (let i = 0; i < orb.length; i++) {
+    const r0 = orb[i][0], c0 = orb[i][1];
+    for (let j = i + 1; j < orb.length; j++) {
+      if (Math.abs(r0 - orb[j][0]) <= 1 && Math.abs(c0 - orb[j][1]) <= 1) return false;
     }
-    return out;
+  }
+  return true;
+}
+
+/** Generate a random symmetric simple closed loop ('rot180' | 'mirror' | 'transpose') on the dual face grid. */
+function randomSymmetricLoop(rows, cols, rng, layout, { targetFill = null, steps = null, empty = null } = {}) {
+  if (layout !== 'rot180' && layout !== 'mirror' && layout !== 'transpose') return null;
+  if (layout === 'transpose' && rows !== cols) return null;
+  const { fr, fc, F, inS, canToggle, toEdges } = makeDualGrid(rows, cols);
+  if (fr <= 0 || fc <= 0) return null;
+  const emptyBoard = empty || compile({ name: 'sym_sl', rows, cols, clues: [] });
+  const orbitOf = (r, c) => {
+    const r2 = layout === 'rot180' ? fr - 1 - r : layout === 'mirror' ? r : c;
+    const c2 = layout === 'rot180' ? fc - 1 - c : layout === 'mirror' ? fc - 1 - c : r;
+    return (r2 === r && c2 === c) ? [[r, c]] : [[r, c], [r2, c2]];
   };
   let faceCount = 0;
   const cr = (fr / 2) | 0, cc = (fc / 2) | 0;
@@ -190,16 +196,23 @@ function randomSymmetricLoop(rows, cols, rng, layout, { targetFill = null, steps
   for (let s = 0; s < totalSteps; s++) {
     const r = (rng() * fr) | 0, c = (rng() * fc) | 0;
     const orb = orbitOf(r, c);
-    const v0 = inS[orb[0][0] * fc + orb[0][1]];
-    if (orb.some(([rr, ccc]) => inS[rr * fc + ccc] !== v0)) continue;
+    const v0 = inS[r * fc + c];
+    if (orb.length === 2 && inS[orb[1][0] * fc + orb[1][1]] !== v0) continue;
     if (v0 && faceCount - orb.length < 2) continue;
     const frac = faceCount / F;
     if (!v0 && frac > wantFrac + 0.14 && rng() < 0.72) continue;
     if (v0 && frac < wantFrac - 0.14 && rng() < 0.72) continue;
-    for (const [rr, ccc] of orb) inS[rr * fc + ccc] ^= 1;
+    // O(1) exact homotopy check whenever the orbit cells have disjoint 3x3 neighborhoods
+    if (orb.length === 1 || orbitIsDisjoint(orb)) {
+      if (!canToggle(r, c)) continue;
+      for (let k = 0; k < orb.length; k++) inS[orb[k][0] * fc + orb[k][1]] ^= 1;
+      faceCount += v0 ? -orb.length : orb.length;
+      continue;
+    }
+    for (let k = 0; k < orb.length; k++) inS[orb[k][0] * fc + orb[k][1]] ^= 1;
     const { edges, loopCells } = toEdges();
     if (loopCells < 4 || !isSolved(emptyBoard, edges)) {
-      for (const [rr, ccc] of orb) inS[rr * fc + ccc] ^= 1;
+      for (let k = 0; k < orb.length; k++) inS[orb[k][0] * fc + orb[k][1]] ^= 1;
       continue;
     }
     faceCount += v0 ? -orb.length : orb.length;
@@ -429,14 +442,18 @@ export function tightLoop(rows, cols, rng, {
 
   const orbitOf = (r, c) => {
     if (!symFaces) return [[r, c]];
-    const pts = symFaces === 'rot180' ? [[r, c], [fr - 1 - r, fc - 1 - c]]
-      : symFaces === 'mirror' ? [[r, c], [r, fc - 1 - c]]
-      : symFaces === 'transpose' ? [[r, c], [c, r]]
-      : [[r, c], [c, fr - 1 - r], [fr - 1 - r, fc - 1 - c], [fc - 1 - c, r]];
-    const seen = new Set(), out = [];
-    for (const [rr, cc] of pts) {
-      const k = rr * fc + cc;
-      if (!seen.has(k)) { seen.add(k); out.push([rr, cc]); }
+    if (symFaces !== 'rot90') {
+      const r2 = symFaces === 'rot180' ? fr - 1 - r : symFaces === 'mirror' ? r : c;
+      const c2 = symFaces === 'rot180' ? fc - 1 - c : symFaces === 'mirror' ? fc - 1 - c : r;
+      return (r2 === r && c2 === c) ? [[r, c]] : [[r, c], [r2, c2]];
+    }
+    const pts = [[r, c], [c, fr - 1 - r], [fr - 1 - r, fc - 1 - c], [fc - 1 - c, r]];
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+      const rr = pts[i][0], cc = pts[i][1];
+      let dup = false;
+      for (let j = 0; j < out.length; j++) if (out[j][0] === rr && out[j][1] === cc) { dup = true; break; }
+      if (!dup) out.push([rr, cc]);
     }
     return out;
   };
@@ -454,12 +471,18 @@ export function tightLoop(rows, cols, rng, {
     }
     const orb = orbitOf(r, c);
     const v0 = inS[orb[0][0] * fc + orb[0][1]];
-    if (orb.some(([rr, cc]) => inS[rr * fc + cc] !== v0)) return null;
+    for (let k = 1; k < orb.length; k++) if (inS[orb[k][0] * fc + orb[k][1]] !== v0) return null;
     if (v0 && faceCount - orb.length < minFaces) return null;
-    for (const [rr, cc] of orb) inS[rr * fc + cc] ^= 1;
+    if (orb.length === 1 || orbitIsDisjoint(orb)) {
+      if (!canToggle(r, c)) return null;
+      for (let k = 0; k < orb.length; k++) inS[orb[k][0] * fc + orb[k][1]] ^= 1;
+      faceCount += v0 ? -orb.length : orb.length;
+      return orb;
+    }
+    for (let k = 0; k < orb.length; k++) inS[orb[k][0] * fc + orb[k][1]] ^= 1;
     const { edges, loopCells } = toEdges();
     if (loopCells < 4 || !isSolved(emptyBoard, edges)) {
-      for (const [rr, cc] of orb) inS[rr * fc + cc] ^= 1;
+      for (let k = 0; k < orb.length; k++) inS[orb[k][0] * fc + orb[k][1]] ^= 1;
       return null;
     }
     faceCount += v0 ? -orb.length : orb.length;
@@ -964,37 +987,74 @@ function symEdgeMapFor(P, layout) {
   return em;
 }
 
-/** Sample a random symmetric Hamiltonian cycle on `emptyFull` for 'rot180' or 'mirror'. */
+/** Sample a random symmetric Hamiltonian cycle on `emptyFull` for 'rot180', 'mirror', or 'transpose'. */
 function sampleSymmetricFullLoop(emptyFull, layout, rand, maxNodes = 4000) {
+  if (layout === 'transpose' && emptyFull.rows !== emptyFull.cols) return null;
   const em = symEdgeMapFor(emptyFull, layout);
+  const { N, numEdges, ed, edgeA } = emptyFull;
   let nodes = 0;
+
+  const pickBranchEdge = (st) => {
+    const e = st.e;
+    // Prefer an unknown edge incident to an open degree-1 endpoint with fewest unknown exits (MRV)
+    let bestUnk = 5;
+    const mrv = [];
+    for (let i = 0; i < N; i++) {
+      if (emptyFull.isVoid && emptyFull.isVoid[i]) continue;
+      let on = 0, unk = 0;
+      const i4 = i * 4;
+      for (let d = 0; d < 4; d++) {
+        const x = ed[i4 + d];
+        if (x < 0) continue;
+        if (e[x] === E_ON) on++;
+        else if (e[x] === E_UNKNOWN) unk++;
+      }
+      if (on === 1 && unk > 0) {
+        if (unk < bestUnk) { bestUnk = unk; mrv.length = 0; }
+        if (unk === bestUnk) {
+          for (let d = 0; d < 4; d++) {
+            const x = ed[i4 + d];
+            if (x >= 0 && e[x] === E_UNKNOWN) mrv.push(x);
+          }
+        }
+      }
+    }
+    if (mrv.length) return mrv[(rand() * mrv.length) | 0];
+    const cands = [];
+    for (let x = 0; x < numEdges; x++) if (edgeA[x] >= 0 && e[x] === E_UNKNOWN) cands.push(x);
+    return cands.length ? cands[(rand() * cands.length) | 0] : -1;
+  };
+
   const dfs = (st) => {
     if (++nodes > maxNodes) return null;
-    const cands = [];
-    for (let x = 0; x < emptyFull.numEdges; x++) {
-      if (emptyFull.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) cands.push(x);
-    }
-    if (!cands.length) return isSolved(emptyFull, st.e) ? st.e : null;
-    const x = cands[(rand() * cands.length) | 0];
+    const x = pickBranchEdge(st);
+    if (x < 0) return isSolved(emptyFull, st.e) ? st.e : null;
     const tx = em[x];
     const vals = rand() < 0.5 ? [E_ON, E_OFF] : [E_OFF, E_ON];
     for (const v of vals) {
       const s2 = cloneState(st);
       s2.e[x] = v;
+      if (!propagate(emptyFull, s2, x)) continue;
       if (tx >= 0 && tx !== x) {
-        if (s2.e[tx] !== E_UNKNOWN && s2.e[tx] !== v) continue;
-        s2.e[tx] = v;
+        if (s2.e[tx] === E_UNKNOWN) {
+          s2.e[tx] = v;
+          if (!propagate(emptyFull, s2, tx)) continue;
+        } else if (s2.e[tx] !== v) {
+          continue;
+        }
       }
-      if (!propagate(emptyFull, s2)) continue;
-      let symOk = true;
-      for (let e = 0; e < emptyFull.numEdges; e++) {
-        if (emptyFull.edgeA[e] < 0) continue;
-        const te = em[e];
-        if (te < 0 || te === e) continue;
-        if (s2.e[e] !== E_UNKNOWN) {
+      // Fixpoint symmetry closure: any newly propagated edge forces its symmetric partner
+      let symOk = true, symChanged = true;
+      while (symChanged && symOk) {
+        symChanged = false;
+        for (let e = 0; e < numEdges; e++) {
+          if (edgeA[e] < 0 || s2.e[e] === E_UNKNOWN) continue;
+          const te = em[e];
+          if (te < 0 || te === e) continue;
           if (s2.e[te] === E_UNKNOWN) {
             s2.e[te] = s2.e[e];
-            if (!propagate(emptyFull, s2)) { symOk = false; break; }
+            if (!propagate(emptyFull, s2, te)) { symOk = false; break; }
+            symChanged = true;
           } else if (s2.e[te] !== s2.e[e]) {
             symOk = false;
             break;
@@ -1024,9 +1084,10 @@ function generateFullBoardPuzzle({
   rows, cols, style, layout = 'none', voids = null, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier,
   wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
 }) {
-  if ((rows * cols) & 1) return null;
-  const isSwiss = style === 'full-swiss' || (voids && voids.length > 0);
-  const symLayout = (layout === 'rot180' || layout === 'mirror') ? layout : null;
+  const hasExplicitVoids = Boolean(voids && voids.length > 0);
+  if (!hasExplicitVoids && ((rows * cols) & 1)) return null;
+  const isSwiss = style === 'full-swiss' || hasExplicitVoids;
+  const symLayout = (!isSwiss && style !== 'full-masyu' && (layout === 'rot180' || layout === 'mirror')) ? layout : null;
   const N = rows * cols;
   const pruneNodeCap = N <= 64 ? 15000 : N <= 100 ? 25000 : 40000;
   const solvedByPropagate = (P) => {
@@ -1041,12 +1102,16 @@ function generateFullBoardPuzzle({
 
   while (Date.now() < deadline) {
     const useVoids = isSwiss
-      ? ((voids && voids.length) ? voids : swissCheeseVoids(rows, cols, rand, { balanced: true }))
+      ? (hasExplicitVoids ? voids : swissCheeseVoids(rows, cols, rand, { balanced: true }))
       : [];
     if (isSwiss && !useVoids.length) continue;
     const emptyFull = isSwiss
       ? compile({ name: 'ef', rows, cols, clues: [], voids: useVoids, fullBoard: true })
       : baseEmpty;
+    if (emptyFull.activeLight !== emptyFull.activeDark) {
+      if (hasExplicitVoids) return null;
+      continue;
+    }
     const isCornerEdge = (x) => {
       const a = emptyFull.edgeA[x], b = emptyFull.edgeB[x];
       const degOf = (i) => {
@@ -1069,21 +1134,30 @@ function generateFullBoardPuzzle({
     }
 
     if (style === 'full-masyu') {
+      const compileFM = (clues, extra = {}) => compile({
+        name, rows, cols, clues,
+        ...(useVoids.length ? { voids: useVoids } : {}),
+        fullBoard: true,
+        ...extra,
+      });
       const { whites, blacks } = allowedClues(rows, cols, edges, emptyFull);
       let current = shuffle(whites.concat(blacks), rand);
       if (current.length < 4) continue;
-      const Pfull = compile({ name, rows, cols, clues: current, fullBoard: true });
+      const Pfull = compileFM(current);
       let baseTight = solvedByPropagate(Pfull);
       if (!baseTight) {
-        const chk = solve(Pfull, { limit: 2, maxNodes: pruneNodeCap });
-        if (chk.exceeded || chk.count !== 1) continue;
+        if (beginnerOnly && !solvedByRules(Pfull, BEGINNER_UPTO).solved) continue;
+        if (!beginnerOnly) {
+          const chk = solve(Pfull, { limit: 2, maxNodes: pruneNodeCap });
+          if (chk.exceeded || chk.count !== 1) continue;
+        }
       }
 
       // Pass 0: propagation-only pruning
       if (baseTight) {
         for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2; i--) {
           const trial = current.slice(0, i).concat(current.slice(i + 1));
-          if (solvedByPropagate(compile({ name, rows, cols, clues: trial, fullBoard: true }))) current = trial;
+          if (solvedByPropagate(compileFM(trial))) current = trial;
         }
       }
       // Pass 1: sound human-rule pruning
@@ -1091,15 +1165,15 @@ function generateFullBoardPuzzle({
       shuffle(current, rand);
       for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2; i--) {
         const trial = current.slice(0, i).concat(current.slice(i + 1));
-        if (solvedByRules(compile({ name, rows, cols, clues: trial, fullBoard: true }), fastUpto).solved) current = trial;
+        if (solvedByRules(compileFM(trial), fastUpto).solved) current = trial;
       }
       const sortClues = (list) => list.slice().sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
       // Pass 2: exact-search pruning + binary search back to effectiveMaxTier
       let cachedRated = null;
       let skipPass2 = beginnerOnly;
       if (!skipPass2 && mediumOnly && Date.now() < deadline) {
-        const r1 = rate(compile({ name, rows, cols, clues: sortClues(current), fullBoard: true }));
-        if (r1.solved && r1.tier === 'Medium') { cachedRated = r1; skipPass2 = true; }
+        const r1 = rate(compileFM(sortClues(current)));
+        if (!r1.solved || TIERS.indexOf(r1.tier) >= 1) { cachedRated = r1; skipPass2 = true; }
       }
       if (!skipPass2 && Date.now() < deadline) {
         shuffle(current, rand);
@@ -1108,12 +1182,12 @@ function generateFullBoardPuzzle({
         const removed = [];
         for (let i = current.length - 1; i >= 0 && Date.now() < deadline && current.length > 2 && removed.length < maxStrips; i--) {
           const trial = current.slice(0, i).concat(current.slice(i + 1));
-          const ex = solve(compile({ name, rows, cols, clues: trial, fullBoard: true }), { limit: 2, maxNodes: pruneNodeCap });
+          const ex = solve(compileFM(trial), { limit: 2, maxNodes: pruneNodeCap });
           if (ex.exceeded || ex.count !== 1) continue;
           removed.push(current[i]);
           current = trial;
         }
-        const rated = rate(compile({ name, rows, cols, clues: sortClues(current), fullBoard: true }));
+        const rated = rate(compileFM(sortClues(current)));
         if (wantUnsolved || isWithin(rated)) {
           cachedRated = rated;
         } else if (removed.length > 0 && Date.now() < deadline) {
@@ -1122,7 +1196,7 @@ function generateFullBoardPuzzle({
           while (lo + 1 < hi && Date.now() < deadline) {
             const mid = (lo + hi) >> 1;
             const cand = sortClues(base.concat(removed.slice(mid)));
-            const r = rate(compile({ name, rows, cols, clues: cand, fullBoard: true }));
+            const r = rate(compileFM(cand));
             if (isWithin(r)) { lo = mid; bestC = cand; bestR = r; }
             else hi = mid;
           }
@@ -1135,7 +1209,7 @@ function generateFullBoardPuzzle({
       if (!current.some((c) => c.t === 'W') || !current.some((c) => c.t === 'B')) continue;
       current = sortClues(current);
 
-      const P = compile({ name, rows, cols, clues: current, fullBoard: true });
+      const P = compileFM(current);
       const rated = cachedRated || rate(P);
       if (wantUnsolved) { if (rated.solved) continue; }
       else if (!rated.solved) { if (!allowUnsolved) continue; }
@@ -1145,7 +1219,7 @@ function generateFullBoardPuzzle({
       }
 
       // Must GENUINELY require the full-board rule (standard Masyu without fullBoard must have >= 2 solutions!)
-      const withoutFull = solve(compile({ name, rows, cols, clues: current }), { limit: 2, maxNodes: 50000, rng: rand });
+      const withoutFull = solve(compileFM(current, { fullBoard: false }), { limit: 2, maxNodes: 50000, rng: rand });
       if (withoutFull.count < 2) continue;
 
       const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
@@ -1216,7 +1290,7 @@ function generateFullBoardPuzzle({
     let skipPass2 = beginnerOnly;
     if (!skipPass2 && mediumOnly && Date.now() < deadline) {
       const r1 = rate(compileG(current));
-      if (r1.solved && r1.tier === 'Medium') { cachedRated = r1; skipPass2 = true; }
+      if (!r1.solved || TIERS.indexOf(r1.tier) >= 1) { cachedRated = r1; skipPass2 = true; }
     }
     if (!skipPass2 && Date.now() < deadline) {
       const remUnits = shuffle(buildGivenUnits(current), rand);
@@ -1688,9 +1762,10 @@ function generateSlitherPuzzle({
   const isSingleDigit = isAll3 || isAll2Full;
   const isFull = style === 'slither-full' || isAll2Full;
   const isHybrid = style === 'slither-masyu';
-  const isSwiss = style === 'slither-swiss' || (voids && voids.length > 0);
+  const hasExplicitVoids = Boolean(voids && voids.length > 0);
+  const isSwiss = style === 'slither-swiss' || hasExplicitVoids;
   const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
-  if ((isFull || isAll3) && ((rows * cols) & 1)) return null;
+  if ((isFull || isAll3) && !hasExplicitVoids && ((rows * cols) & 1)) return null;
   if (symLayout === 'transpose' && rows !== cols) return null;
   const N = rows * cols;
   const fr = rows - 1, fc = cols - 1;
@@ -1728,6 +1803,10 @@ function generateSlitherPuzzle({
     const empty = isSwiss
       ? compile({ name: 'esl', rows, cols, clues: [], voids: useVoids, fullBoard: isFull })
       : baseEmpty;
+    if (isFull && empty.activeLight !== empty.activeDark) {
+      if (hasExplicitVoids) return null;
+      continue;
+    }
     const compileS = (clues, slither, extra = {}) => compile({
       name, rows, cols, clues, slither,
       ...(useVoids.length ? { voids: useVoids } : {}),
@@ -1740,9 +1819,14 @@ function generateSlitherPuzzle({
       const sampleGrid = isAll3
         ? (hamEmpty || compile({ name: 'eham', rows, cols, clues: [], voids: useVoids, fullBoard: true }))
         : empty;
-      const sample = solve(sampleGrid, { limit: 1, maxNodes: 4000, rng: rand });
-      if (sample.count === 0) continue;
-      edges = sample.solutions[0].e;
+      if (symLayout) {
+        edges = sampleSymmetricFullLoop(sampleGrid, symLayout, rand);
+        if (!edges) continue;
+      } else {
+        const sample = solve(sampleGrid, { limit: 1, maxNodes: 4000, rng: rand });
+        if (sample.count === 0) continue;
+        edges = sample.solutions[0].e;
+      }
     } else if (isSwiss) {
       const res = randomShapedLoop(empty, rand, {
         targetFill: 0.44 + 0.14 * rand(),
@@ -1755,6 +1839,7 @@ function generateSlitherPuzzle({
       const res = randomSymmetricLoop(rows, cols, rand, symLayout, {
         targetFill: 0.44 + 0.14 * rand(),
         steps: Math.max(160, fr * fc * 24),
+        empty,
       });
       if (!res || res.loopCells < minLoopCells || res.emptyBorders > 0) continue;
       if (reqQuadFill > 0 && res.minQuadFill < reqQuadFill) continue;
@@ -1788,13 +1873,21 @@ function generateSlitherPuzzle({
     // Verify full pool is uniquely solvable before stripping
     const P0 = compileS(cluesInit, slitherInit);
     let baseTight = solvedByPropagate(P0);
+    let p0FastOk = baseTight;
     if (!baseTight) {
-      if (beginnerOnly && !solvedByRules(P0, BEGINNER_UPTO).solved) continue;
-      const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
-      if (ex.exceeded || ex.count !== 1) continue;
-      if (mediumOnly && !solvedByRules(P0, MEDIUM_UPTO).solved) {
-        const r0 = rate(P0);
-        if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+      if (beginnerOnly) {
+        if (!solvedByRules(P0, BEGINNER_UPTO).solved) continue;
+        p0FastOk = true;
+      } else {
+        p0FastOk = solvedByRules(P0, fastUpto).solved;
+        if (!p0FastOk) {
+          const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
+          if (ex.exceeded || ex.count !== 1) continue;
+        }
+        if (mediumOnly && !p0FastOk) {
+          const r0 = rate(P0);
+          if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+        }
       }
     }
 
@@ -1870,15 +1963,17 @@ function generateSlitherPuzzle({
       }
     }
 
-    // Pass 1: sound human-rule pruning (capped on large boards for fast scaling)
-    const p1Units = buildUnits();
-    const pass1Cap = N >= 200 ? 24 : p1Units.length;
-    for (let k = 0; k < p1Units.length && k < pass1Cap; k++) {
-      if (Date.now() >= deadline) break;
-      const u = p1Units[k];
-      if (!canDrop(u)) continue;
-      const { clues: tc, slither: ts } = extractActive(u.idxs);
-      if (solvedByRules(compileS(tc, ts), fastUpto).solved) dropUnit(u);
+    // Pass 1: sound human-rule pruning (capped on large boards; skip if full pool wasn't solved by fastUpto)
+    if (p0FastOk) {
+      const p1Units = buildUnits();
+      const pass1Cap = N >= 200 ? 24 : p1Units.length;
+      for (let k = 0; k < p1Units.length && k < pass1Cap; k++) {
+        if (Date.now() >= deadline) break;
+        const u = p1Units[k];
+        if (!canDrop(u)) continue;
+        const { clues: tc, slither: ts } = extractActive(u.idxs);
+        if (solvedByRules(compileS(tc, ts), fastUpto).solved) dropUnit(u);
+      }
     }
 
     // Pass 2: exact uniqueness pruning + binary-search rollback to stay within effectiveMaxTier
@@ -1888,7 +1983,7 @@ function generateSlitherPuzzle({
     if (!skipPass2 && mediumOnly && Date.now() < deadline) {
       const { clues: tc, slither: ts } = extractActive();
       r1Pre = rate(compileS(tc, ts));
-      if (r1Pre.solved && r1Pre.tier === 'Medium') {
+      if (!r1Pre.solved || TIERS.indexOf(r1Pre.tier) >= 1) {
         cachedRated = r1Pre;
         skipPass2 = true;
       }
@@ -2005,7 +2100,7 @@ function generateSlitherPuzzle({
 
 /**
  * Generate one verified, rated Mid-loop or Mid-loop hybrid puzzle:
- *   - 'midloop'         pure Mid-loop (teal midpoint dots only)
+ *   - 'midloop'         pure Mid-loop (teal midpoint dots only; supports `layout`: 'rot180'|'mirror'|'transpose')
  *   - 'midloop-masyu'   Mid-loop + Masyu hybrid (verified mutual necessity)
  *   - 'midloop-slither' Mid-loop + Slitherlink hybrid (verified mutual necessity)
  *   - 'midloop-full'    Mid-loop + Hamilton cycle hybrid (verified full-board necessity)
@@ -2018,16 +2113,20 @@ function generateMidloopPuzzle({
   const isMasyu = style === 'midloop-masyu';
   const isSlither = style === 'midloop-slither';
   const isSwiss = Boolean(voids && voids.length > 0);
-  if (isFull && ((rows * cols) & 1)) return null;
+  const symLayout = (!isSwiss && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
+  if (layout && layout !== 'none' && !symLayout) return null;
+  if (symLayout === 'transpose' && rows !== cols) return null;
+  if (isFull && !isSwiss && ((rows * cols) & 1)) return null;
   const N = rows * cols;
   const fr = rows - 1, fc = cols - 1;
-  const pruneNodeCap = N >= 200 ? 10000 : N <= 64 ? 15000 : 25000;
+  const pruneNodeCap = N >= 225 ? 8000 : N >= 200 ? 10000 : N <= 64 ? 15000 : 25000;
   const useVoids = isSwiss ? voids : [];
   const empty = compile({
     name: 'eml', rows, cols, clues: [],
     ...(useVoids.length ? { voids: useVoids } : {}),
     ...(isFull ? { fullBoard: true } : {}),
   });
+  if (isFull && empty.activeLight !== empty.activeDark) return null;
   const compileM = (clues, slither, midloop, extra = {}) => compile({
     name, rows, cols, clues,
     ...(slither.length ? { slither } : {}),
@@ -2047,19 +2146,62 @@ function generateMidloopPuzzle({
   const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
   const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
   const reqQuadFill = (!isSwiss && rows >= 10 && cols >= 10) ? 0.35 : (!isSwiss && rows >= 8 && cols >= 8) ? 0.28 : 0;
+  const reqQuadItems = (!isSwiss && rows >= 10 && cols >= 10) ? Math.max(2, Math.floor((N / 4) * 0.08)) : 0;
   const minClues = isMasyu ? (N >= 100 ? 5 : N >= 64 ? 4 : 3) : 0;
   const minSlither = isSlither ? (N >= 100 ? 7 : N >= 64 ? 5 : 4) : 0;
   const minMid = (isMasyu || isSlither) ? (N >= 100 ? 6 : N >= 64 ? 5 : 4) : Math.max(4, Math.floor(N * 0.10));
 
+  const dirCode = (d) => (d === 'C' ? 0 : d === 'H' ? 1 : 2);
+  const midKey = (r, c, dir) => (r * cols + c) * 3 + dirCode(dir);
+  const midOrbitKeys = (r, c, dir) => {
+    const k0 = midKey(r, c, dir);
+    if (!symLayout) return [k0];
+    let r2, c2, d2 = dir;
+    if (symLayout === 'rot180') {
+      r2 = dir === 'V' ? rows - 2 - r : rows - 1 - r;
+      c2 = dir === 'H' ? cols - 2 - c : cols - 1 - c;
+    } else if (symLayout === 'mirror') {
+      r2 = r;
+      c2 = dir === 'H' ? cols - 2 - c : cols - 1 - c;
+    } else {
+      r2 = c;
+      c2 = r;
+      d2 = dir === 'H' ? 'V' : dir === 'V' ? 'H' : 'C';
+    }
+    const k1 = midKey(r2, c2, d2);
+    return k1 === k0 ? [k0] : [k0, k1];
+  };
+  const faceOrbitKeys = (r, c) => {
+    if (!symLayout) return [r * fc + c];
+    const r2 = symLayout === 'rot180' ? fr - 1 - r : symLayout === 'mirror' ? r : c;
+    const c2 = symLayout === 'rot180' ? fc - 1 - c : symLayout === 'mirror' ? fc - 1 - c : r;
+    const k0 = r * fc + c, k1 = r2 * fc + c2;
+    return k1 === k0 ? [k0] : [k0, k1];
+  };
+
   while (Date.now() < deadline) {
     let edges;
     if (isFull) {
-      const sample = solve(empty, { limit: 1, maxNodes: 4000, rng: rand });
-      if (sample.count === 0) continue;
-      edges = sample.solutions[0].e;
+      if (symLayout) {
+        edges = sampleSymmetricFullLoop(empty, symLayout, rand);
+        if (!edges) continue;
+      } else {
+        const sample = solve(empty, { limit: 1, maxNodes: 4000, rng: rand });
+        if (sample.count === 0) continue;
+        edges = sample.solutions[0].e;
+      }
     } else if (isSwiss) {
       const res = randomShapedLoop(empty, rand, { targetFill: 0.45 + 0.16 * rand(), steps: Math.max(160, fr * fc * 24) });
       if (!res.valid || res.loopCells < Math.max(10, Math.floor(empty.activeCount * 0.48))) continue;
+      edges = res.edges;
+    } else if (symLayout) {
+      const res = randomSymmetricLoop(rows, cols, rand, symLayout, {
+        targetFill: 0.44 + 0.16 * rand(),
+        steps: Math.max(160, fr * fc * 24),
+        empty,
+      });
+      if (!res || res.loopCells < minLoopCells || res.emptyBorders > 0) continue;
+      if (reqQuadFill > 0 && res.minQuadFill < reqQuadFill) continue;
       edges = res.edges;
     } else {
       const res = randomLoop(rows, cols, rand, {
@@ -2079,12 +2221,24 @@ function generateMidloopPuzzle({
       const allC = whites.concat(blacks);
       const midCSet = new Set(midInit.filter((m) => m.dir === 'C').map((m) => m.r * cols + m.c));
       const dropMidC = new Set();
-      for (const cl of allC) {
-        const ci = cl.r * cols + cl.c;
-        if (midCSet.has(ci)) {
-          if (rand() < 0.5) { dropMidC.add(ci); cluesInit.push(cl); }
-        } else {
-          cluesInit.push(cl);
+      if (!symLayout) {
+        for (const cl of allC) {
+          const ci = cl.r * cols + cl.c;
+          if (midCSet.has(ci)) {
+            if (rand() < 0.5) { dropMidC.add(ci); cluesInit.push(cl); }
+          } else {
+            cluesInit.push(cl);
+          }
+        }
+      } else {
+        const keepAsClue = new Map();
+        for (const cl of allC) {
+          const ci = cl.r * cols + cl.c;
+          if (!midCSet.has(ci)) { cluesInit.push(cl); continue; }
+          const orb = clueOrbitKeys(symLayout, rows, cols, cl.r, cl.c);
+          const rep = Math.min(...orb);
+          if (!keepAsClue.has(rep)) keepAsClue.set(rep, rand() < 0.5);
+          if (keepAsClue.get(rep)) { dropMidC.add(ci); cluesInit.push(cl); }
         }
       }
       if (dropMidC.size) midInit = midInit.filter((m) => m.dir !== 'C' || !dropMidC.has(m.r * cols + m.c));
@@ -2097,16 +2251,23 @@ function generateMidloopPuzzle({
     }
     if (midInit.length < Math.max(4, minMid)) continue;
 
-    // Verify full pool is uniquely solvable (with early tier reject on Beginner/Medium)
+    // Verify full pool is uniquely solvable (note: propagateMidloopDot uses Medium logic, so beginnerOnly must check BEGINNER_UPTO directly)
     const P0 = compileM(cluesInit, slitherInit, midInit);
-    let baseTight = solvedByPropagate(P0);
-    if (!baseTight) {
-      if (beginnerOnly && !solvedByRules(P0, BEGINNER_UPTO).solved) continue;
-      const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
-      if (ex.exceeded || ex.count !== 1) continue;
-      if (mediumOnly && !solvedByRules(P0, MEDIUM_UPTO).solved) {
-        const r0 = rate(P0);
-        if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+    let baseTight = false;
+    let p0FastOk = false;
+    if (beginnerOnly) {
+      if (!solvedByRules(P0, BEGINNER_UPTO).solved) continue;
+      p0FastOk = true;
+    } else {
+      baseTight = solvedByPropagate(P0);
+      p0FastOk = baseTight || solvedByRules(P0, fastUpto).solved;
+      if (!p0FastOk) {
+        const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
+        if (ex.exceeded || ex.count !== 1) continue;
+        if (mediumOnly) {
+          const r0 = rate(P0);
+          if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+        }
       }
     }
 
@@ -2116,50 +2277,105 @@ function generateMidloopPuzzle({
     const active = new Uint8Array(totalItems).fill(1);
     let nC = cLen, nS = sLen, nM = mLen;
 
-    const kindOf = (idx) => (idx < cLen ? 0 : idx < cLen + sLen ? 1 : 2);
-    const canDrop = (idx) => {
-      const k = kindOf(idx);
-      return k === 0 ? nC > minClues : k === 1 ? nS > minSlither : nM > minMid;
-    };
-    const dropIdx = (idx) => {
-      active[idx] = 0;
-      const k = kindOf(idx);
-      if (k === 0) nC--; else if (k === 1) nS--; else nM--;
-    };
-    const extractActive = (skipIdx = -1) => {
-      const cs = [], ss = [], ms = [];
-      for (let i = 0; i < cLen; i++) if (active[i] && i !== skipIdx) cs.push(cluesInit[i]);
-      for (let i = 0; i < sLen; i++) if (active[cLen + i] && cLen + i !== skipIdx) ss.push(slitherInit[i]);
-      for (let i = 0; i < mLen; i++) if (active[cLen + sLen + i] && cLen + sLen + i !== skipIdx) ms.push(midInit[i]);
-      return { clues: cs, slither: ss, midloop: ms };
-    };
-    const buildOrder = () => {
-      const idxs = [];
-      for (let i = 0; i < totalItems; i++) if (active[i]) idxs.push(i);
-      if (isMasyu || isSlither) {
-        const keyed = idxs.map((i) => ({ i, k: (kindOf(i) === 2 ? 0.15 : 0) + rand() }));
-        keyed.sort((a, b) => a.k - b.k);
-        return keyed.map((x) => x.i);
+    // Build stripping units (single items normally, or symmetric orbits when symLayout is set)
+    const allUnits = [];
+    if (!symLayout) {
+      for (let i = 0; i < totalItems; i++) {
+        allUnits.push({ idxs: [i], kind: i < cLen ? 0 : i < cLen + sLen ? 1 : 2 });
       }
-      return shuffle(idxs, rand);
-    };
-
-    // Pass 0: ultra-fast propagation-only pruning
-    if (baseTight) {
-      for (const idx of buildOrder()) {
-        if (Date.now() >= deadline) break;
-        if (!canDrop(idx)) continue;
-        const t = extractActive(idx);
-        if (solvedByPropagate(compileM(t.clues, t.slither, t.midloop))) dropIdx(idx);
+    } else {
+      const cByKey = new Map();
+      for (let i = 0; i < cLen; i++) cByKey.set(cluesInit[i].r * cols + cluesInit[i].c, i);
+      const usedC = new Set();
+      for (let i = 0; i < cLen; i++) {
+        if (usedC.has(i)) continue;
+        const orb = clueOrbitKeys(symLayout, rows, cols, cluesInit[i].r, cluesInit[i].c)
+          .map((k) => cByKey.get(k))
+          .filter((x) => x !== undefined);
+        for (const x of orb) usedC.add(x);
+        allUnits.push({ idxs: orb, kind: 0 });
+      }
+      const sByKey = new Map();
+      for (let i = 0; i < sLen; i++) sByKey.set(slitherInit[i].r * fc + slitherInit[i].c, cLen + i);
+      const usedS = new Set();
+      for (let i = 0; i < sLen; i++) {
+        const idx = cLen + i;
+        if (usedS.has(idx)) continue;
+        const orb = faceOrbitKeys(slitherInit[i].r, slitherInit[i].c)
+          .map((k) => sByKey.get(k))
+          .filter((x) => x !== undefined);
+        for (const x of orb) usedS.add(x);
+        allUnits.push({ idxs: orb, kind: 1 });
+      }
+      const mByKey = new Map();
+      for (let i = 0; i < mLen; i++) mByKey.set(midKey(midInit[i].r, midInit[i].c, midInit[i].dir), cLen + sLen + i);
+      const usedM = new Set();
+      for (let i = 0; i < mLen; i++) {
+        const idx = cLen + sLen + i;
+        if (usedM.has(idx)) continue;
+        const orb = midOrbitKeys(midInit[i].r, midInit[i].c, midInit[i].dir)
+          .map((k) => mByKey.get(k))
+          .filter((x) => x !== undefined);
+        for (const x of orb) usedM.add(x);
+        allUnits.push({ idxs: orb, kind: 2 });
       }
     }
 
-    // Pass 1: sound human-rule pruning
-    for (const idx of buildOrder()) {
-      if (Date.now() >= deadline) break;
-      if (!canDrop(idx)) continue;
-      const t = extractActive(idx);
-      if (solvedByRules(compileM(t.clues, t.slither, t.midloop), fastUpto).solved) dropIdx(idx);
+    const canDrop = (u) => {
+      const k = u.kind, len = u.idxs.length;
+      return k === 0 ? nC - len >= minClues : k === 1 ? nS - len >= minSlither : nM - len >= minMid;
+    };
+    const dropUnit = (u) => {
+      for (const idx of u.idxs) active[idx] = 0;
+      const len = u.idxs.length;
+      if (u.kind === 0) nC -= len; else if (u.kind === 1) nS -= len; else nM -= len;
+    };
+    const extractActive = (skipIdxs = null) => {
+      const s0 = skipIdxs && skipIdxs.length > 0 ? skipIdxs[0] : -1;
+      const s1 = skipIdxs && skipIdxs.length > 1 ? skipIdxs[1] : -1;
+      const cs = [], ss = [], ms = [];
+      for (let i = 0; i < cLen; i++) if (active[i] && i !== s0 && i !== s1) cs.push(cluesInit[i]);
+      for (let i = 0; i < sLen; i++) {
+        const idx = cLen + i;
+        if (active[idx] && idx !== s0 && idx !== s1) ss.push(slitherInit[i]);
+      }
+      for (let i = 0; i < mLen; i++) {
+        const idx = cLen + sLen + i;
+        if (active[idx] && idx !== s0 && idx !== s1) ms.push(midInit[i]);
+      }
+      return { clues: cs, slither: ss, midloop: ms };
+    };
+    const buildUnits = () => {
+      const us = allUnits.filter((u) => active[u.idxs[0]]);
+      if (isMasyu || isSlither) {
+        const keyed = us.map((u) => ({ u, k: (u.kind === 2 ? 0.15 : 0) + rand() }));
+        keyed.sort((a, b) => a.k - b.k);
+        return keyed.map((x) => x.u);
+      }
+      return shuffle(us, rand);
+    };
+
+    // Pass 0: ultra-fast propagation-only pruning (skipped for beginnerOnly since propagateMidloopDot uses Medium logic)
+    if (baseTight && !beginnerOnly) {
+      for (const u of buildUnits()) {
+        if (Date.now() >= deadline) break;
+        if (!canDrop(u)) continue;
+        const t = extractActive(u.idxs);
+        if (solvedByPropagate(compileM(t.clues, t.slither, t.midloop))) dropUnit(u);
+      }
+    }
+
+    // Pass 1: sound human-rule pruning (capped on large boards; skipped if full pool wasn't solved by fastUpto)
+    if (p0FastOk) {
+      const p1Units = buildUnits();
+      const pass1Cap = N >= 200 ? 24 : p1Units.length;
+      for (let k = 0; k < p1Units.length && k < pass1Cap; k++) {
+        if (Date.now() >= deadline) break;
+        const u = p1Units[k];
+        if (!canDrop(u)) continue;
+        const t = extractActive(u.idxs);
+        if (solvedByRules(compileM(t.clues, t.slither, t.midloop), fastUpto).solved) dropUnit(u);
+      }
     }
 
     // Pass 2: exact uniqueness pruning + binary-search rollback to effectiveMaxTier
@@ -2169,23 +2385,26 @@ function generateMidloopPuzzle({
     if (!skipPass2 && mediumOnly && Date.now() < deadline) {
       const t = extractActive();
       r1Pre = rate(compileM(t.clues, t.slither, t.midloop));
-      if (r1Pre.solved && r1Pre.tier === 'Medium') { cachedRated = r1Pre; skipPass2 = true; }
+      if (!r1Pre.solved || TIERS.indexOf(r1Pre.tier) >= 1) { cachedRated = r1Pre; skipPass2 = true; }
     }
     if (!skipPass2 && Date.now() < deadline) {
-      const rem = buildOrder();
-      const maxStrips = deepStrip ? rem.length
+      const rem = buildUnits();
+      const maxStrips = N >= 225 && !wantUnsolved ? (deepStrip ? 8 : 4)
+        : deepStrip ? rem.length
         : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(2, Math.min(8, Math.ceil(rem.length * 0.30)))
         : Math.max(3, Math.min(12, Math.ceil(rem.length * 0.50)));
-      let stripped = 0;
+      const maxPass2Tries = N >= 200 && !wantUnsolved ? 40 : rem.length;
+      let stripped = 0, tried = 0;
       const removed = [];
-      for (const idx of rem) {
-        if (Date.now() >= deadline || stripped >= maxStrips) break;
-        if (!canDrop(idx)) continue;
-        const t = extractActive(idx);
+      for (const u of rem) {
+        if (Date.now() >= deadline || stripped >= maxStrips || tried >= maxPass2Tries) break;
+        if (!canDrop(u)) continue;
+        tried++;
+        const t = extractActive(u.idxs);
         const exact = solve(compileM(t.clues, t.slither, t.midloop), { limit: 2, maxNodes: pruneNodeCap });
         if (exact.exceeded || exact.count !== 1) continue;
-        dropIdx(idx);
-        removed.push(idx);
+        dropUnit(u);
+        removed.push(u.idxs);
         stripped++;
       }
 
@@ -2198,14 +2417,14 @@ function generateMidloopPuzzle({
         let bestRated = (r1Pre && isWithin(r1Pre)) ? r1Pre : null;
         while (lo + 1 < hi && Date.now() < deadline) {
           const mid = (lo + hi) >> 1;
-          for (let j = mid; j < removed.length; j++) active[removed[j]] = 1;
+          for (let j = mid; j < removed.length; j++) for (const idx of removed[j]) active[idx] = 1;
           const cc = extractActive();
-          for (let j = mid; j < removed.length; j++) active[removed[j]] = 0;
+          for (let j = mid; j < removed.length; j++) for (const idx of removed[j]) active[idx] = 0;
           const r = rate(compileM(cc.clues, cc.slither, cc.midloop));
           if (isWithin(r)) { lo = mid; bestMid = mid; bestRated = r; }
           else hi = mid;
         }
-        for (let j = bestMid; j < removed.length; j++) active[removed[j]] = 1;
+        for (let j = bestMid; j < removed.length; j++) for (const idx of removed[j]) active[idx] = 1;
         cachedRated = bestRated;
       }
     }
@@ -2226,6 +2445,15 @@ function generateMidloopPuzzle({
     }
     if (isSlither) {
       if (fin.slither.length < minSlither || new Set(fin.slither.map((s) => s.n)).size < 2) continue;
+    }
+    if (reqQuadItems > 0) {
+      const midR = rows >> 1, midC = cols >> 1;
+      const fMidR = fr >> 1, fMidC = fc >> 1;
+      const qCnt = [0, 0, 0, 0];
+      for (const c of fin.clues) qCnt[(c.r >= midR ? 2 : 0) + (c.c >= midC ? 1 : 0)]++;
+      for (const s of fin.slither) qCnt[(s.r >= fMidR ? 2 : 0) + (s.c >= fMidC ? 1 : 0)]++;
+      for (const m of fin.midloop) qCnt[(m.r >= midR ? 2 : 0) + (m.c >= midC ? 1 : 0)]++;
+      if (Math.min(...qCnt) < reqQuadItems) continue;
     }
 
     const P = compileM(fin.clues, fin.slither, fin.midloop);
@@ -2273,7 +2501,7 @@ function generateMidloopPuzzle({
  * Options:
  *   rows, cols           board dimensions (each >= 4)
  *   seed                 PRNG seed (or pass `rng` directly)
- *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all' | 'full-masyu' | 'full-lines' | 'full-walls' | 'full-mixed' | 'full-swiss' | 'shaped' | 'swiss-cheese' | 'slither' | 'slither-swiss' | 'slither-all3' | 'slither-all2-full' | 'slither-masyu' | 'slither-full'
+ *   style                'balanced' | 'white' | 'black' | 'sparse' | 'gray-mixed' | 'gray-all' | 'full-masyu' | 'full-lines' | 'full-walls' | 'full-mixed' | 'full-swiss' | 'shaped' | 'swiss-cheese' | 'slither' | 'slither-swiss' | 'slither-all3' | 'slither-all2-full' | 'slither-masyu' | 'slither-full' | 'midloop' | 'midloop-masyu' | 'midloop-slither' | 'midloop-full'
  *   voids                optional explicit array of `{ r, c }` cutout voids
  *   layout               clue filter or geometric pattern mask name (default 'none')
  *   minFill              minimum loop fill fraction (e.g. 1.0 for Full board)

@@ -187,19 +187,18 @@ export function autoXForced(P, m, { useShade = false } = {}) {
   if (P.hasSlither) autoXSlither(P, w, add);
   if (P.hasMidloop) autoXMidloop(P, w, add);
 
-  const isRequiredCell = (i) => {
-    if (clue[i] !== NONE) return true;
-    if (!P.hasMidloop) return false;
-    if (P.midloopAtCell[i] >= 0) return true;
-    const i4 = i * 4;
-    for (let d = 0; d < 4; d++) {
-      const x = ed[i4 + d];
-      if (x >= 0 && P.midloopAtEdge[x] >= 0) return true;
+  const reqCell = new Uint8Array(N);
+  for (let i = 0; i < N; i++) if (clue[i] !== NONE) reqCell[i] = 1;
+  if (P.hasMidloop) {
+    for (let k = 0; k < P.midloop.length; k++) {
+      const md = P.midloop[k];
+      reqCell[md.a] = 1;
+      reqCell[md.b] = 1;
     }
-    return false;
-  };
-  const cycleViolatesMidloop = (cycleEdges) => {
+  }
+  const cycleViolatesMidloopAt = (t, cycleEdges) => {
     if (!P.hasMidloop) return false;
+    if (P.midloop.length > 1 || P.midloop[0].dir !== 'C' || P.midloop[0].cell !== t) return true;
     const cyc = new Uint8Array(numEdges);
     for (let k = 0; k < cycleEdges.length; k++) cyc[cycleEdges[k]] = 1;
     return !isMidloopSatisfied(P, cyc);
@@ -211,7 +210,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     // Rule 4: dead-end intersections & pockets (disabled on fullBoard since every intersection must be visited)
     if (!P.fullBoard) {
       for (let i = 0; i < N; i++) {
-        if (isRequiredCell(i) || deg[i] !== 0) continue;
+        if (reqCell[i] || deg[i] !== 0) continue;
         let avail = 0, lastX = -1;
         for (let d = 0; d < 4; d++) {
           const x = ed[i * 4 + d];
@@ -228,7 +227,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
       const isCorridorNode = new Uint8Array(N);
       const nodeExits = new Array(N);
       for (let i = 0; i < N; i++) {
-        if (isRequiredCell(i) || deg[i] !== 0) continue;
+        if (reqCell[i] || deg[i] !== 0) continue;
         const ex = availEdges(i);
         if (ex.length === 2) { isCorridorNode[i] = 1; nodeExits[i] = ex; }
       }
@@ -255,7 +254,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
 
         const w1 = walk(eA);
         if (w1.closed) {
-          const impossible = P.clueCells.length > 0 || anyDegGt0 || cycleViolatesSlither(w1.edges) || cycleViolatesMidloop(w1.edges);
+          const impossible = P.clueCells.length > 0 || P.hasMidloop || anyDegGt0 || cycleViolatesSlither(w1.edges);
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
           }
@@ -268,7 +267,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           if (!impossible) for (const ci of P.clueCells) if (ci !== t) { impossible = true; break; }
           if (!impossible && anyDegGt0) impossible = true;
           if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
-          if (!impossible && P.hasMidloop) impossible = cycleViolatesMidloop(w1.edges.concat(w2.edges));
+          if (!impossible && P.hasMidloop) impossible = cycleViolatesMidloopAt(t, w1.edges.concat(w2.edges));
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
             for (const x of w2.edges) if (add(x)) changed = true;

@@ -120,6 +120,7 @@ for (const ex of examples) {
   if (P.fullBoard) {
     for (let i = 0; i < P.N; i++) {
       if ((P.hasVoids && P.isVoid[i]) || P.clue[i]) continue;
+      if (P.hasMidloop && P.midloopAtCell[i] >= 0) continue;
       g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="2.3" fill="#666666"/>`;
     }
   }
@@ -129,13 +130,27 @@ for (const ex of examples) {
     }
   }
 
-  // Existing segments (behind all pearls so circles read cleanly; given segments in dark ink)
+  // Existing segments (behind all pearls & Mid-loop dots so clues read cleanly; given segments in dark ink)
   const givenE = P.hasGivens ? P.givenE : null;
   for (let x = 0; x < P.numEdges; x++) {
     if (edges[x] !== 1) continue;
     const [x1, y1, x2, y2] = segCoords(x);
     const isGiven = givenE && givenE[x] === 1;
     g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${isGiven ? '#111111' : '#1976d2'}" stroke-width="${S * (isGiven ? 0.16 : 0.14)}" stroke-linecap="round"/>`;
+  }
+
+  // Hint chain & ghost segments (drawn below pearls and Mid-loop dots so clues stay crisp)
+  const targets = ex.targets || {};
+  for (const x of ex.chain || []) {
+    const [x1, y1, x2, y2] = segCoords(x);
+    g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d55e00" stroke-width="${S * 0.11}" stroke-linecap="round" stroke-dasharray="6 5" opacity="0.92"/>`;
+  }
+  for (const x of targets.segOn || []) {
+    const [x1, y1, x2, y2] = segCoords(x);
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const inset = (P.hasMidloop && P.midloopAtEdge[x] >= 0) ? S * 0.12 : S * 0.24;
+    const k = inset / len;
+    g += `<line x1="${x1 + (x2 - x1) * k}" y1="${y1 + (y2 - y1) * k}" x2="${x2 - (x2 - x1) * k}" y2="${y2 - (y2 - y1) * k}" stroke="#8a6d00" stroke-width="${S * 0.14}" stroke-linecap="round" stroke-dasharray="5 4"/>`;
   }
 
   // Circles (white, black, unlabeled gray, and 0° 2×2 checkerboard labeled gray) on top of segments
@@ -185,20 +200,10 @@ for (const ex of examples) {
     g += `<path d="${p}" stroke="#ffffff" stroke-width="${isGivenWall ? 5.0 : 3.6}" stroke-linecap="round"/><path d="${p}" stroke="${isGivenWall ? '#111111' : '#757575'}" stroke-width="${isGivenWall ? 2.6 : 1.8}" stroke-linecap="round"/>`;
   }
 
-  // Hint overlays
+  // Hint overlays (rings, ghost X, gray label ghosts)
   for (const i of roles.exit || []) g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.36}" fill="none" stroke="#2e7d32" stroke-width="2.2" stroke-dasharray="4 3"/>`;
   for (const i of roles.focus || []) g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.38}" fill="none" stroke="#8a6d00" stroke-width="2.8"/>`;
 
-  for (const x of ex.chain || []) {
-    const [x1, y1, x2, y2] = segCoords(x);
-    g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d55e00" stroke-width="${S * 0.11}" stroke-linecap="round" stroke-dasharray="6 5" opacity="0.92"/>`;
-  }
-  const targets = ex.targets || {};
-  for (const x of targets.segOn || []) {
-    const [x1, y1, x2, y2] = segCoords(x);
-    const len = Math.hypot(x2 - x1, y2 - y1), k = (S * 0.24) / len;
-    g += `<line x1="${x1 + (x2 - x1) * k}" y1="${y1 + (y2 - y1) * k}" x2="${x2 - (x2 - x1) * k}" y2="${y2 - (y2 - y1) * k}" stroke="#8a6d00" stroke-width="${S * 0.14}" stroke-linecap="round" stroke-dasharray="5 4"/>`;
-  }
   for (const x of targets.segOff || []) {
     const [x1, y1, x2, y2] = segCoords(x);
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.11;

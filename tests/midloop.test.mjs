@@ -5,6 +5,7 @@ import {
   toCsvRow, parseCsv, symmetryKey, puzzleHash, initialState, E_ON, E_OFF,
 } from '../js/logic.js';
 import { rate, nextSteps, detectSymmetries } from '../js/rating.js';
+import { explainStep } from '../js/explain.js';
 import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
 import { autoXForced } from '../js/marks.js';
 import { midloopStates, earlyLoopEdges } from '../js/clues.js';
@@ -150,7 +151,7 @@ test('Mid-loop CSV round-trip, symmetryKey dihedral invariance, puzzleHash, rota
 test('Mid-loop human rules are 100% sound on unique boards and hints solve end-to-end', () => {
   const rng = makeRng(777);
   const empty = compile({ name: 'e6', rows: 6, cols: 6, clues: [] });
-  let tested = 0;
+  let tested = 0, replayed = 0;
   const firedRules = new Set();
 
   for (let t = 0; t < 160 && tested < 30; t++) {
@@ -199,10 +200,12 @@ test('Mid-loop human rules are 100% sound on unique boards and hints solve end-t
       }
       assert.equal(isSolved(P, marks.edges), true);
       assert.equal(checkMarksAgainstSolution(P, marks).total, 0);
+      replayed++;
     }
     tested++;
   }
   assert.ok(tested >= 15, `expected >=15 unique 6x6 Mid-loop boards, got ${tested}`);
+  assert.ok(replayed >= 1, `expected >=1 end-to-end Mid-loop hint replay, got ${replayed}`);
   assert.ok(firedRules.has('midEdgeDot'), 'midEdgeDot should fire');
   assert.ok(firedRules.has('midSymCap') || firedRules.has('midSymExtend'), 'Mid-loop symmetry rules should fire');
 });
@@ -258,6 +261,7 @@ test('generatePuzzle supports midloop, midloop-masyu, midloop-slither, and midlo
   assert.ok(pmm, 'failed to generate midloop-masyu');
   assert.ok(pmm.midloop.length >= 4 && pmm.clues.length >= 3);
   assert.equal(solve(pmm, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pmm)).score, pmm.score);
   assert.ok(solve(compile({ name: 'a', rows: 6, cols: 6, clues: [], midloop: pmm.midloop }), { limit: 2, maxNodes: 50000 }).count >= 2);
   assert.ok(solve(compile({ name: 'b', rows: 6, cols: 6, clues: pmm.clues }), { limit: 2, maxNodes: 50000 }).count >= 2);
 
@@ -265,6 +269,7 @@ test('generatePuzzle supports midloop, midloop-masyu, midloop-slither, and midlo
   assert.ok(pms, 'failed to generate midloop-slither');
   assert.ok(pms.midloop.length >= 4 && pms.slither.length >= 4);
   assert.equal(solve(pms, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pms)).score, pms.score);
   assert.ok(solve(compile({ name: 'c', rows: 6, cols: 6, clues: [], midloop: pms.midloop }), { limit: 2, maxNodes: 50000 }).count >= 2);
   assert.ok(solve(compile({ name: 'd', rows: 6, cols: 6, clues: [], slither: pms.slither }), { limit: 2, maxNodes: 50000 }).count >= 2);
 
@@ -273,5 +278,57 @@ test('generatePuzzle supports midloop, midloop-masyu, midloop-slither, and midlo
   assert.equal(pmf.fullBoard, true);
   assert.ok(pmf.midloop.length >= 4);
   assert.equal(solve(pmf, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pmf)).score, pmf.score);
   assert.ok(solve(compile({ name: 'e', rows: 6, cols: 6, clues: [], midloop: pmf.midloop, fullBoard: false }), { limit: 2, maxNodes: 50000 }).count >= 2);
+
+  // Symmetric & Beginner Mid-loop generation
+  const pSym = generatePuzzle({ rows: 7, cols: 7, style: 'midloop', layout: 'rot180', seed: 605, budgetMs: 8000 });
+  assert.ok(pSym, 'failed to generate rot180 midloop');
+  assert.ok(detectSymmetries(pSym).some((s) => s.id === 'rot180'), 'rot180 midloop should preserve 180° symmetry');
+  const pBeg = generatePuzzle({ rows: 8, cols: 8, style: 'midloop', targetTier: 'Beginner', seed: 606, budgetMs: 8000 });
+  assert.ok(pBeg && pBeg.tier === 'Beginner', 'failed to generate Beginner 8x8 midloop');
+});
+
+test('Mid-loop validation, 1-step rectangular rotation, answer-key print SVG, and noEarlyClose explanation', () => {
+  // Validation errors
+  assert.throws(() => compile({ name: 'b1', rows: 4, cols: 4, clues: [], midloop: [{ r: 0, c: 0, dir: 'X' }] }));
+  assert.throws(() => compile({ name: 'b2', rows: 4, cols: 4, clues: [], midloop: [{ r: 0, c: 3, dir: 'H' }] }));
+  assert.throws(() => compile({ name: 'b3', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'W' }], midloop: [{ r: 1, c: 1, dir: 'C' }] }));
+  assert.throws(() => compile({ name: 'b4', rows: 4, cols: 4, clues: [], voids: [{ r: 1, c: 1 }], midloop: [{ r: 1, c: 0, dir: 'H' }] }));
+  assert.throws(() => compile({ name: 'b5', rows: 4, cols: 4, clues: [], givens: [{ r: 0, c: 1, dir: 'H', v: 0 }], midloop: [{ r: 0, c: 1, dir: 'H' }] }));
+  assert.throws(() => compile({ name: 'b6', rows: 4, cols: 4, clues: [], midloop: [{ r: 1, c: 1, dir: 'C' }, { r: 1, c: 1, dir: 'C' }] }));
+
+  // 1-step CW rotation on rectangular 5x6 -> 6x5 checks exact coordinates
+  const rect = compile({
+    name: 'rect', rows: 5, cols: 6, clues: [],
+    midloop: [{ r: 1, c: 2, dir: 'C' }, { r: 0, c: 2, dir: 'H' }, { r: 2, c: 0, dir: 'V' }],
+  });
+  const r1 = rotatePuzzleCW(rect);
+  assert.equal(r1.rows, 6);
+  assert.equal(r1.cols, 5);
+  assert.deepEqual(
+    r1.midloop.map(({ r, c, dir }) => ({ r, c, dir })),
+    [{ r: 2, c: 3, dir: 'C' }, { r: 2, c: 4, dir: 'V' }, { r: 0, c: 1, dir: 'H' }],
+  );
+
+  // Answer-key print SVG includes solution loop and widened Mid-loop bullseye
+  const sq = compile({
+    name: 'sq4', rows: 4, cols: 4, clues: [],
+    midloop: [{ r: 0, c: 1, dir: 'H' }, { r: 3, c: 1, dir: 'H' }, { r: 1, c: 0, dir: 'V' }, { r: 1, c: 3, dir: 'V' }],
+  });
+  const sol = solve(sq, { limit: 1 }).solutions[0];
+  const keySvg = boardSvg(sq, sol);
+  assert.ok(keySvg.includes('class="loop"'));
+  assert.ok(keySvg.includes('class="midloop-halo"'));
+  assert.ok(keySvg.includes('r="0.20"'));
+
+  // noEarlyClose explanation with midIdx mentions the Mid-loop dot and highlights it
+  const st = initialState(sq);
+  st.e[sq.ed[0 * 4 + 1]] = E_ON;
+  st.e[sq.ed[1 * 4 + 2]] = E_ON;
+  st.e[sq.ed[4 * 4 + 0]] = E_ON;
+  const closeEdge = sq.ed[4 * 4 + 1];
+  const exp = explainStep(sq, { rule: 'noEarlyClose', tier: 'Beginner', weight: 3, sets: [['e', closeEdge, E_OFF]], info: { edge: closeEdge, a: 4, b: 5, midIdx: 0 } }, st);
+  assert.match(exp.text, /Mid-loop dot/);
+  assert.ok(exp.roles.clue.includes(sq.midloop[0].a));
 });

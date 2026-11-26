@@ -13,7 +13,7 @@ import {
   CORNER_SPEC, isBlockedDir,
 } from './variants/slitherlink.js';
 import {
-  isMidloopSatisfied, isMidloopEdge, firstUnsatisfiedMidloopOnClose,
+  firstUnsatisfiedMidloop, isMidloopEdge, firstUnsatisfiedMidloopOnClose,
   findEasyMidloopStep, midloopContradiction,
 } from './variants/midloop.js';
 
@@ -186,6 +186,7 @@ let propEdgeBuf = new Int8Array(0);
 let propClueBuf = new Uint8Array(0);
 let dirtyFlag = new Uint8Array(0);
 let dirtyFaceFlag = new Uint8Array(0);
+let dirtyMidFlag = new Uint8Array(0);
 
 /**
  * Easy contradiction check (local rule violations + early closed loop).
@@ -343,6 +344,12 @@ export function easyContradiction(P, st, scope = null) {
     }
   }
 
+  // 3d. Mid-loop dot contradiction (before O(N+E) cycle check; scoped to dirty rows/cols when scoped)
+  if (P.hasMidloop) {
+    const mc = midloopContradiction(P, st, scope ? scope.mids : null);
+    if (mc) return mc;
+  }
+
   // 4. Early closed loop (or 2 cycles) — skip when no E_ON edge was added in the hypothesis
   if (scope) {
     if (!scope.checkCycle) return null;
@@ -407,14 +414,13 @@ export function easyContradiction(P, st, scope = null) {
         if (on !== sc.n) return { kind: 'earlyClose', face: sc.f, n: sc.n };
       }
     }
-    if (P.hasMidloop && !isMidloopSatisfied(P, e)) {
-      const bad = midloopContradiction(P, st);
-      return bad || { kind: 'earlyClose', midIdx: 0 };
+    if (P.hasMidloop) {
+      const badMid = firstUnsatisfiedMidloop(P, e);
+      if (badMid >= 0) {
+        const mc = midloopContradiction(P, st, null);
+        return mc || { kind: 'earlyClose', midIdx: badMid };
+      }
     }
-  }
-  if (P.hasMidloop) {
-    const mc = midloopContradiction(P, st);
-    if (mc) return mc;
   }
   return null;
 }
@@ -522,13 +528,10 @@ function findEasyStep(P, st, forbid, scope = null) {
     return { rule, sets: fresh, sig, info };
   };
 
-  // 0a. Mid-loop easy rules
+  // 0a. Mid-loop easy rules (passes tryEmit so forbid ablation never skips later hits/rules)
   if (P.hasMidloop) {
-    const ms = findEasyMidloopStep(P, st);
-    if (ms) {
-      const emitted = tryEmit(ms.rule, ms.sets, ms.info);
-      if (emitted) return emitted;
-    }
+    const emitted = findEasyMidloopStep(P, st, tryEmit, scope ? scope.mids : null);
+    if (emitted) return emitted;
   }
 
   // 0b. Slitherlink easy rules (slitherZero / slitherCount / slitherCorner 3&1 / slitherLineIn)
@@ -873,14 +876,17 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
   const st = cloneState(baseState);
   if (grayCell >= 0) st.clue[grayCell] = val;
   else st.e[edge] = val;
-  // On gray or Mid-loop puzzles, run unscoped so mid-chain gray promotions and row/col Mid-loop wakeups never miss dirty cones
-  if (st.hasGray || P.hasMidloop) scoped = false;
+  // On gray puzzles (small N), run unscoped so mid-chain gray->W/B promotions never miss dirty-cone wakeups
+  if (st.hasGray) scoped = false;
 
   let scope = null;
   let dirtyAdded = false;
   let dirtyFaceAdded = false;
+  let dirtyMidAdded = false;
   const cols = P.cols, fr = P.rows - 1, fc = cols - 1;
   const slitherAt = P.hasSlither ? P.slitherAt : null;
+  const hasMid = Boolean(P.hasMidloop);
+  const midByRow = P.midloopByRow, midByCol = P.midloopByCol;
   const markFace = (f) => {
     const si = slitherAt[f];
     if (si < 0 || dirtyFaceFlag[si]) return;
@@ -895,6 +901,19 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
     if (r < fr && col > 0) markFace(r * fc + (col - 1));
     if (r < fr && col < fc) markFace(r * fc + col);
   };
+  const markCellMids = (c) => {
+    const r = (c / cols) | 0, col = c - r * cols;
+    const rl = midByRow[r];
+    for (let j = 0; j < rl.length; j++) {
+      const mi = rl[j];
+      if (!dirtyMidFlag[mi]) { dirtyMidFlag[mi] = 1; scope.mids.push(mi); dirtyMidAdded = true; }
+    }
+    const cl = midByCol[col];
+    for (let j = 0; j < cl.length; j++) {
+      const mi = cl[j];
+      if (!dirtyMidFlag[mi]) { dirtyMidFlag[mi] = 1; scope.mids.push(mi); dirtyMidAdded = true; }
+    }
+  };
   const markCell = (c) => {
     if (c < 0 || dirtyFlag[c]) return;
     dirtyFlag[c] = 1;
@@ -906,6 +925,7 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
   const touchCell = (i, addedOn) => {
     if (addedOn) { scope.hasOn = true; scope.checkCycle = true; }
     if (slitherAt) markCellFaces(i);
+    if (hasMid) markCellMids(i);
     markCell(i);
     const b = i * 4;
     for (let d = 0; d < 4; d++) {
@@ -924,6 +944,10 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
       dirtyFaceAdded = false;
       insertSortNum(scope.faces);
     }
+    if (dirtyMidAdded) {
+      dirtyMidAdded = false;
+      insertSortNum(scope.mids);
+    }
   };
   const clearDirty = () => {
     if (!scope) return;
@@ -931,16 +955,21 @@ function runHypothesis(P, baseState, edge, val, { maxSteps = MAX_STEPS, checkAre
     if (scope.faces) {
       for (let k = 0; k < scope.faces.length; k++) dirtyFaceFlag[scope.faces[k]] = 0;
     }
+    if (scope.mids) {
+      for (let k = 0; k < scope.mids.length; k++) dirtyMidFlag[scope.mids[k]] = 0;
+    }
   };
 
   if (scoped) {
     if (dirtyFlag.length < P.N) dirtyFlag = new Uint8Array(P.N);
     if (slitherAt && dirtyFaceFlag.length < P.slither.length) dirtyFaceFlag = new Uint8Array(P.slither.length);
+    if (hasMid && dirtyMidFlag.length < P.midloop.length) dirtyMidFlag = new Uint8Array(P.midloop.length);
     scope = {
       cells: [],
       whites: [],
       blacks: [],
       faces: slitherAt ? [] : null,
+      mids: hasMid ? [] : null,
       newOn: val === E_ON ? [edge] : [],
       hasOn: val === E_ON,
       checkCycle: val === E_ON,
