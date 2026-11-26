@@ -47,11 +47,26 @@ if (process.argv.includes('--worker')) {
       if (seenV.has(idx)) return fail('duplicate void');
       seenV.add(idx);
     }
+    const seenCW = new Set();
+    for (const cw of raw.castle || []) {
+      if (!Number.isInteger(cw.r) || !Number.isInteger(cw.c) || cw.r < 0 || cw.c < 0 || cw.r >= raw.rows || cw.c >= raw.cols) {
+        return fail('castle wall tile outside the board');
+      }
+      if (cw.wall !== 'W' && cw.wall !== 'B' && cw.wall !== 'G') return fail(`bad castle wall color "${cw.wall}"`);
+      if (cw.dir && cw.dir !== 'U' && cw.dir !== 'R' && cw.dir !== 'D' && cw.dir !== 'L') return fail(`bad castle dir "${cw.dir}"`);
+      if (cw.dir && (!Number.isInteger(cw.n) || cw.n < 0)) return fail(`bad castle count "${cw.n}"`);
+      if (cw.wall === 'G' && !cw.dir) return fail('unnumbered gray castle wall tile');
+      const idx = cw.r * raw.cols + cw.c;
+      if (seenCW.has(idx)) return fail('duplicate castle wall tile on one cell');
+      if (seenV.has(idx)) return fail('castle wall tile collides with plain void');
+      seenCW.add(idx);
+    }
+    const allVoids = seenCW.size ? new Set([...seenV, ...seenCW]) : seenV;
     const seen = new Set();
     for (const c of raw.clues) {
       if (c.r < 0 || c.c < 0 || c.r >= raw.rows || c.c >= raw.cols) return fail('clue outside the board');
       const idx = c.r * raw.cols + c.c;
-      if (seenV.has(idx)) return fail('clue on void cell');
+      if (allVoids.has(idx)) return fail('clue on void/castle cell');
       if (seen.has(idx)) return fail('two clues on one cell');
       seen.add(idx);
       if (c.t !== 'W' && c.t !== 'B' && c.t !== 'G') return fail(`bad clue type "${c.t}"`);
@@ -66,7 +81,7 @@ if (process.argv.includes('--worker')) {
       }
       const a = gv.r * raw.cols + gv.c;
       const b = gv.dir === 'H' ? a + 1 : a + raw.cols;
-      if (seenV.has(a) || seenV.has(b)) return fail('given edge touches a void cell');
+      if (allVoids.has(a) || allVoids.has(b)) return fail('given edge touches a void/castle cell');
       const ek = `${gv.r}:${gv.c}:${gv.dir}`;
       if (seenG.has(ek)) return fail('duplicate given edge');
       seenG.add(ek);
@@ -79,9 +94,9 @@ if (process.argv.includes('--worker')) {
       const fk = sc.r * (raw.cols - 1) + sc.c;
       if (seenS.has(fk)) return fail('duplicate slither clue on one square');
       seenS.add(fk);
-      if (seenV.has(sc.r * raw.cols + sc.c) || seenV.has(sc.r * raw.cols + sc.c + 1)
-        || seenV.has((sc.r + 1) * raw.cols + sc.c) || seenV.has((sc.r + 1) * raw.cols + sc.c + 1)) {
-        return fail('slither clue touches a void cell');
+      if (allVoids.has(sc.r * raw.cols + sc.c) || allVoids.has(sc.r * raw.cols + sc.c + 1)
+        || allVoids.has((sc.r + 1) * raw.cols + sc.c) || allVoids.has((sc.r + 1) * raw.cols + sc.c + 1)) {
+        return fail('slither clue touches a void/castle cell');
       }
     }
     const seenM = new Set();
@@ -97,30 +112,25 @@ if (process.argv.includes('--worker')) {
       seenM.add(mk);
       if (md.dir === 'C') {
         const idx = md.r * raw.cols + md.c;
-        if (seenV.has(idx)) return fail('midloop dot on void cell');
+        if (allVoids.has(idx)) return fail('midloop dot on void/castle cell');
         if (seen.has(idx)) return fail('midloop dot collides with circle clue');
       } else {
         const a = md.r * raw.cols + md.c;
         const b = md.dir === 'H' ? a + 1 : a + raw.cols;
-        if (seenV.has(a) || seenV.has(b)) return fail('midloop edge dot touches a void cell');
+        if (allVoids.has(a) || allVoids.has(b)) return fail('midloop edge dot touches a void/castle cell');
         if (givenWalls.has(mk)) return fail('midloop edge dot on a given wall');
       }
-    }
-    const seenCW = new Set();
-    for (const cw of raw.castle || []) {
-      if (cw.r < 0 || cw.c < 0 || cw.r >= raw.rows || cw.c >= raw.cols) return fail('castle wall tile outside the board');
-      if (cw.wall !== 'W' && cw.wall !== 'B' && cw.wall !== 'G') return fail(`bad castle wall color "${cw.wall}"`);
-      if (cw.dir && cw.dir !== 'U' && cw.dir !== 'R' && cw.dir !== 'D' && cw.dir !== 'L') return fail(`bad castle dir "${cw.dir}"`);
-      if (cw.dir && (!Number.isInteger(cw.n) || cw.n < 0)) return fail(`bad castle count "${cw.n}"`);
-      const idx = cw.r * raw.cols + cw.c;
-      if (seenCW.has(idx)) return fail('duplicate castle wall tile on one cell');
-      if (seenV.has(idx)) return fail('castle wall tile collides with plain void');
-      if (seen.has(idx)) return fail('castle wall tile collides with circle clue');
-      seenCW.add(idx);
     }
 
     let P;
     try { P = compile(raw); } catch (e) { return fail(`does not compile: ${e.message}`); }
+    if (P.hasCastle) {
+      for (const cw of P.castle) {
+        if (cw.wall === 'W' && cw.isExterior) return fail('white castle wall tile on exterior/border');
+        if (cw.wall === 'B' && !cw.dir && cw.isExterior) return fail('meaningless unnumbered exterior black castle wall tile');
+        if (cw.dir && (cw.edges.length === 0 || cw.n > cw.edges.length)) return fail(`invalid castle arrow ray count ${cw.n}/${cw.edges.length}`);
+      }
+    }
     if (!raw.solution || raw.solution.length !== P.N) return fail('missing or wrong-length stored solution');
 
     const sol = decodeSolution(P, raw.solution);
@@ -170,6 +180,21 @@ if (process.argv.includes('--worker')) {
       const alt = proveNonUnique(noFull, 12345 + from + k);
       if (alt.exceeded && alt.count < 2) return fail('fullBoard necessity not proved: hit node cap');
       if (alt.count < 2) return fail('fullBoard rule is redundant (uniquely solvable without fullBoard)');
+      // For Castle Wall + Hamilton cycle, also verify Castle Wall clues themselves aren't redundant given plain voids + fullBoard
+      if (P.hasCastle && P.clueCells.length === 0 && !P.hasSlither && !P.hasMidloop) {
+        const noCastle = compile({
+          name: raw.name,
+          rows: raw.rows,
+          cols: raw.cols,
+          clues: [],
+          voids: [...(raw.voids || []), ...raw.castle.map(({ r, c }) => ({ r, c }))],
+          ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
+          fullBoard: true,
+        });
+        const altCw = proveNonUnique(noCastle, 67890 + from + k);
+        if (altCw.exceeded && altCw.count < 2) return fail('castle-full Castle Wall necessity not proved: hit node cap');
+        if (altCw.count < 2) return fail('Castle Wall clues are redundant on castle-full (plain voids + fullBoard already unique)');
+      }
     }
 
     // Verify mutual necessity across any 2-way or 3-way clue-family hybrid (Masyu / Slitherlink / Mid-loop / Castle Wall):

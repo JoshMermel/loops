@@ -110,16 +110,27 @@ export function compileCastle(P, raw) {
   P.hasCastle = hasCastle;
   P.castleAtCell = castleAtCell;
 
-  // Precompute CSR edge -> numbered Castle Wall clue wakeup table + static impossibility check
+  // Precompute CSR edge -> numbered Castle Wall clue wakeup table + static tables & impossibility check
   let _ecwOff = null, _ecwData = null;
+  let _cwEdgeX = null, _cwEdgeFA = null, _cwEdgeFB = null;
+  let _cwAnchorF = null, _cwAnchorWant = null, _cwAnchorK = null;
+  let _castleWallGroups = null;
+  let _castleRayDiffPairs = null;
+  let castleByRow = null, castleByCol = null;
   let castleImpossible = false;
   let hasCastleWalls = false;
   if (hasCastle) {
     const counts = new Int32Array(P.numEdges);
     const repWall = new Map(); // canonical face rep -> 'W' | 'B'
+    const byRow = Array.from({ length: rows }, () => []);
+    const byCol = Array.from({ length: cols }, () => []);
     for (let k = 0; k < castle.length; k++) {
       const cw = castle[k];
-      if (cw.dir && cw.n > cw.edges.length) castleImpossible = true;
+      if (cw.dir) {
+        if (cw.n > cw.edges.length) castleImpossible = true;
+        if (cw.dir === 'L' || cw.dir === 'R') byRow[cw.r].push(k);
+        else byCol[cw.c].push(k);
+      }
       if (cw.wall === 'W') {
         hasCastleWalls = true;
         if (cw.isExterior || cw.face < 0) castleImpossible = true;
@@ -138,6 +149,8 @@ export function compileCastle(P, raw) {
       }
       for (let j = 0; j < cw.edges.length; j++) counts[cw.edges[j]]++;
     }
+    castleByRow = byRow.map((a) => Int16Array.from(a));
+    castleByCol = byCol.map((a) => Int16Array.from(a));
     _ecwOff = new Int32Array(P.numEdges + 1);
     for (let x = 0; x < P.numEdges; x++) _ecwOff[x + 1] = _ecwOff[x] + counts[x];
     _ecwData = new Int32Array(_ecwOff[P.numEdges]);
@@ -146,9 +159,119 @@ export function compileCastle(P, raw) {
       const es = castle[k].edges;
       for (let j = 0; j < es.length; j++) _ecwData[pos[es[j]]++] = k;
     }
+
+    // Precompute collinear same-direction pairs for findCastleRayDiff (c2.edges is always an exact suffix of c1.edges)
+    const diffPairs = [];
+    for (let i = 0; i < castle.length; i++) {
+      const c1 = castle[i];
+      if (!c1.dir) continue;
+      let bestJ = -1, bestDist = Infinity;
+      for (let j = 0; j < castle.length; j++) {
+        if (j === i) continue;
+        const c2 = castle[j];
+        if (c2.dir !== c1.dir) continue;
+        let dist = -1;
+        if (c1.dir === 'R' && c2.r === c1.r && c2.c > c1.c) dist = c2.c - c1.c;
+        else if (c1.dir === 'L' && c2.r === c1.r && c2.c < c1.c) dist = c1.c - c2.c;
+        else if (c1.dir === 'D' && c2.c === c1.c && c2.r > c1.r) dist = c2.r - c1.r;
+        else if (c1.dir === 'U' && c2.c === c1.c && c2.r < c1.r) dist = c1.r - c2.r;
+        if (dist > 0 && dist < bestDist) { bestDist = dist; bestJ = j; }
+      }
+      if (bestJ < 0) continue;
+      const c2 = castle[bestJ];
+      const diff = c1.n - c2.n;
+      const diffLen = c1.edges.length - c2.edges.length;
+      if (diff < 0 || diff > diffLen) { castleImpossible = true; continue; }
+      if (diffLen <= 0) continue;
+      diffPairs.push({
+        i, j: bestJ, cell1: c1.cell, cell2: c2.cell,
+        dir: c1.dir, n1: c1.n, n2: c2.n, diff,
+        edges: c1.edges.subarray(0, diffLen),
+      });
+    }
+    _castleRayDiffPairs = diffPairs;
+
+    // Precompute flat active-edge canonical face pairs & static wall-boundary edge groups
+    if (hasCastleWalls && fr > 0 && fc > 0) {
+      const F = fr * fc, EXT = F;
+      const canon = (f) => {
+        if (f < 0 || f >= F) return EXT;
+        if (faceExterior && faceExterior[f]) return EXT;
+        return faceRep ? faceRep[f] : f;
+      };
+      const exList = [], faList = [], fbList = [];
+      for (let x = 0; x < P.numEdges; x++) {
+        if (edgeA[x] < 0) continue;
+        const cell = x >> 1;
+        const r = (cell / cols) | 0, c = cell % cols;
+        const a = (x & 1) === 0
+          ? canon(r > 0 && c < fc ? (r - 1) * fc + c : EXT)
+          : canon(r < fr && c > 0 ? r * fc + (c - 1) : EXT);
+        const b = canon(r < fr && c < fc ? r * fc + c : EXT);
+        exList.push(x);
+        faList.push(a);
+        fbList.push(b);
+      }
+      _cwEdgeX = Int32Array.from(exList);
+      _cwEdgeFA = Int32Array.from(faList);
+      _cwEdgeFB = Int32Array.from(fbList);
+
+      const afList = [], awList = [], akList = [];
+      const known = new Map();
+      known.set(EXT, { par: 0, idx: -1 });
+      for (let k = 0; k < castle.length; k++) {
+        const cw = castle[k];
+        if (cw.wall === 'G') continue;
+        const want = cw.wall === 'W' ? 1 : 0;
+        const f = cw.isExterior ? EXT : canon(cw.face);
+        afList.push(f);
+        awList.push(want);
+        akList.push(k);
+        if (!cw.isExterior && cw.face >= 0 && !known.has(f)) {
+          known.set(f, { par: want, idx: k });
+        }
+      }
+      _cwAnchorF = Int32Array.from(afList);
+      _cwAnchorWant = Uint8Array.from(awList);
+      _cwAnchorK = Int16Array.from(akList);
+
+      const grouped = new Map();
+      for (let i = 0; i < _cwEdgeX.length; i++) {
+        const a = _cwEdgeFA[i], b = _cwEdgeFB[i];
+        if (a === b) continue;
+        const ka = known.get(a), kb = known.get(b);
+        if (!ka || !kb || (ka.idx < 0 && kb.idx < 0)) continue;
+        const val = (ka.par !== kb.par) ? E_ON : E_OFF;
+        const i1 = ka.idx >= 0 ? ka.idx : kb.idx;
+        const i2 = ka.idx >= 0 && kb.idx >= 0 ? kb.idx : -1;
+        const key = i2 >= 0 ? (i1 < i2 ? `${i1}:${i2}` : `${i2}:${i1}`) : `${i1}:EXT`;
+        let rec = grouped.get(key);
+        if (!rec) {
+          rec = { edges: [], info: { castleIdx: i1, castleIdx2: i2, val } };
+          grouped.set(key, rec);
+        }
+        rec.edges.push(_cwEdgeX[i]);
+      }
+      _castleWallGroups = [...grouped.values()].map((g) => ({
+        edges: Int32Array.from(g.edges),
+        info: g.info,
+      }));
+    } else {
+      _castleWallGroups = [];
+    }
   }
   P._ecwOff = _ecwOff;
   P._ecwData = _ecwData;
+  P._cwEdgeX = _cwEdgeX;
+  P._cwEdgeFA = _cwEdgeFA;
+  P._cwEdgeFB = _cwEdgeFB;
+  P._cwAnchorF = _cwAnchorF;
+  P._cwAnchorWant = _cwAnchorWant;
+  P._cwAnchorK = _cwAnchorK;
+  P._castleWallGroups = _castleWallGroups;
+  P._castleRayDiffPairs = _castleRayDiffPairs;
+  P.castleByRow = castleByRow;
+  P.castleByCol = castleByCol;
   P.hasCastleWalls = hasCastleWalls;
   P.castleImpossible = castleImpossible;
   // Ensure every Castle Wall cell is marked void (caller marks before void topology; double-check here)
@@ -217,85 +340,119 @@ export function rotateCastleCW(P) {
 
 // ------------------------------------------------------------ Exact satisfaction & solver propagation
 
+// Reusable scratch arrays for satisfaction BFS, parity union-find, and zero-alloc ray bounds
+let satPar = new Int8Array(0);
+let satQ = new Int32Array(0);
+let cwPar = new Int32Array(0);
+let cwDiff = new Uint8Array(0);
+let cwCompBad = new Uint8Array(0);
+let cwCompSeen = new Int8Array(0);
+let cwUnk = new Int32Array(0);
+let lastParityBadIdx = 0;
+
+// Zero-allocation scratch arrays for evalCastleRayBoundFast / propagateCastleMedium
+const GRP_SINGLE = 0, GRP_RUN = 1, GRP_EXACT1 = 2, GRP_MAX1 = 3;
+let rbUnks = new Int32Array(64);
+let rbKind = new Uint8Array(64);
+let rbStart = new Int16Array(64);
+let rbLen = new Int16Array(64);
+let rbMin = new Int16Array(64);
+let rbMax = new Int16Array(64);
+let rbPerp = new Int32Array(64);
+
+function ensureRbScratch(len) {
+  if (rbUnks.length >= len) return;
+  const cap = Math.max(len, rbUnks.length * 2);
+  rbUnks = new Int32Array(cap);
+  rbKind = new Uint8Array(cap);
+  rbStart = new Int16Array(cap);
+  rbLen = new Int16Array(cap);
+  rbMin = new Int16Array(cap);
+  rbMax = new Int16Array(cap);
+  rbPerp = new Int32Array(cap);
+}
+
 /**
- * Check whether a complete closed loop `e` (E_ON=1 marks) satisfies all Castle Wall constraints:
- *   1. Every numbered ray has exact parallel segment count `cw.n`.
- *   2. Every White ('W') wall lies strictly Inside (odd crossings to exterior) and every
- *      Black ('B') wall lies strictly Outside (even crossings to exterior).
+ * Check a complete closed loop `e` (E_ON=1 marks) against all Castle Wall constraints.
+ * Returns the exact index `k` of the first violated Castle Wall tile (ray count OR W/B parity),
+ * or -1 if every Castle Wall tile is satisfied.
  */
-export function isCastleSatisfied(P, e) {
-  if (!P.hasCastle) return true;
-  if (P.castleImpossible) return false;
-  const { castle, rows, cols } = P;
+export function firstUnsatisfiedCastle(P, e) {
+  if (!P.hasCastle) return -1;
+  if (P.castleImpossible) return 0;
+  const { castle, rows, cols, edgeA } = P;
   for (let k = 0; k < castle.length; k++) {
     const cw = castle[k];
     if (!cw.dir) continue;
     let on = 0;
     const es = cw.edges;
     for (let j = 0; j < es.length; j++) if (e[es[j]] === E_ON) on++;
-    if (on !== cw.n) return false;
+    if (on !== cw.n) return k;
   }
-  if (!P.hasCastleWalls) return true;
+  if (!P.hasCastleWalls) return -1;
   const fr = rows - 1, fc = cols - 1;
-  if (fr <= 0 || fc <= 0) return false;
+  if (fr <= 0 || fc <= 0) return 0;
   const F = fr * fc;
-  // BFS dual-face parity from the exterior (0 = Outside, 1 = Inside)
-  const par = new Int8Array(F).fill(-1);
-  const q = new Int32Array(F);
+  if (satPar.length < F) {
+    satPar = new Int8Array(F);
+    satQ = new Int32Array(F);
+  }
+  satPar.fill(-1, 0, F);
   let qh = 0, qt = 0;
   const seed = (f, p) => {
-    if (par[f] !== -1) return par[f] === p;
-    par[f] = p;
-    q[qt++] = f;
+    if (satPar[f] !== -1) return satPar[f] === p;
+    satPar[f] = p;
+    satQ[qt++] = f;
     return true;
   };
-  // Top & bottom border dual faces
   for (let c = 0; c < fc; c++) {
     const topE = 2 * c;
-    if (!seed(c, (P.edgeA[topE] >= 0 && e[topE] === E_ON) ? 1 : 0)) return false;
+    if (!seed(c, (edgeA[topE] >= 0 && e[topE] === E_ON) ? 1 : 0)) return 0;
     const botE = 2 * ((rows - 1) * cols + c);
-    if (!seed((fr - 1) * fc + c, (P.edgeA[botE] >= 0 && e[botE] === E_ON) ? 1 : 0)) return false;
+    if (!seed((fr - 1) * fc + c, (edgeA[botE] >= 0 && e[botE] === E_ON) ? 1 : 0)) return 0;
   }
-  // Left & right border dual faces
   for (let r = 0; r < fr; r++) {
     const leftE = 2 * (r * cols) + 1;
-    if (!seed(r * fc, (P.edgeA[leftE] >= 0 && e[leftE] === E_ON) ? 1 : 0)) return false;
+    if (!seed(r * fc, (edgeA[leftE] >= 0 && e[leftE] === E_ON) ? 1 : 0)) return 0;
     const rightE = 2 * (r * cols + cols - 1) + 1;
-    if (!seed(r * fc + fc - 1, (P.edgeA[rightE] >= 0 && e[rightE] === E_ON) ? 1 : 0)) return false;
+    if (!seed(r * fc + fc - 1, (edgeA[rightE] >= 0 && e[rightE] === E_ON) ? 1 : 0)) return 0;
   }
   while (qh < qt) {
-    const f = q[qh++];
+    const f = satQ[qh++];
     const r = (f / fc) | 0, c = f % fc;
-    const fp = par[f];
-    // North neighbor (shared horizontal edge at row r, col c)
+    const fp = satPar[f];
     if (r > 0) {
       const x = 2 * (r * cols + c);
-      if (!seed(f - fc, fp ^ ((P.edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return false;
+      if (!seed(f - fc, fp ^ ((edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return 0;
     }
-    // South neighbor (shared horizontal edge at row r+1, col c)
     if (r + 1 < fr) {
       const x = 2 * ((r + 1) * cols + c);
-      if (!seed(f + fc, fp ^ ((P.edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return false;
+      if (!seed(f + fc, fp ^ ((edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return 0;
     }
-    // West neighbor (shared vertical edge at row r, col c)
     if (c > 0) {
       const x = 2 * (r * cols + c) + 1;
-      if (!seed(f - 1, fp ^ ((P.edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return false;
+      if (!seed(f - 1, fp ^ ((edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return 0;
     }
-    // East neighbor (shared vertical edge at row r, col c+1)
     if (c + 1 < fc) {
       const x = 2 * (r * cols + c + 1) + 1;
-      if (!seed(f + 1, fp ^ ((P.edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return false;
+      if (!seed(f + 1, fp ^ ((edgeA[x] >= 0 && e[x] === E_ON) ? 1 : 0))) return 0;
     }
   }
   for (let k = 0; k < castle.length; k++) {
     const cw = castle[k];
     if (cw.wall === 'G') continue;
     const want = cw.wall === 'W' ? 1 : 0;
-    const got = cw.isExterior ? 0 : par[cw.face];
-    if (got !== want) return false;
+    const got = cw.isExterior ? 0 : satPar[cw.face];
+    if (got !== want) return k;
   }
-  return true;
+  return -1;
+}
+
+/**
+ * Check whether a complete closed loop `e` (E_ON=1 marks) satisfies all Castle Wall constraints.
+ */
+export function isCastleSatisfied(P, e) {
+  return firstUnsatisfiedCastle(P, e) < 0;
 }
 
 /**
@@ -322,28 +479,29 @@ export function propagateCastleClue(P, st, ci, setEdge) {
   return true;
 }
 
-// Reusable scratch arrays for fast dual-face parity union-find in exact search
-let cwPar = new Int32Array(0);
-let cwDiff = new Uint8Array(0);
-
 /**
  * Fast dual-face Inside/Outside union-find for Castle Wall exact propagation.
- * Anchors W=1, B=0, merges known ON/OFF edges, detects parity conflicts, and forces
- * any unknown edge whose two flanking dual faces already have known relative parity.
- * Returns false on contradiction.
+ * Uses precomputed flat active-edge canonical face tables (zero div/mod).
+ * Pass `setEdge = null` for contradiction-only checks (skips Pass 2 completely).
+ * Returns false on contradiction (setting `lastParityBadIdx` to the offending W/B tile).
  */
 export function propagateCastleParity(P, st, setEdge) {
   if (!P.hasCastleWalls) return true;
-  if (P.castleImpossible) return false;
-  const { rows, cols, edgeA, faceExterior, faceRep, castle } = P;
-  const fr = rows - 1, fc = cols - 1;
-  if (fr <= 0 || fc <= 0) return true;
-  const F = fr * fc, EXT = F, V = F + 1;
+  if (P.castleImpossible) { lastParityBadIdx = 0; return false; }
+  const { rows, cols, _cwEdgeX, _cwEdgeFA, _cwEdgeFB, _cwAnchorF, _cwAnchorWant, _cwAnchorK } = P;
+  if (!_cwEdgeX) return true;
+  const F = (rows - 1) * (cols - 1), EXT = F, V = F + 1;
   if (cwPar.length < V) {
     cwPar = new Int32Array(V);
     cwDiff = new Uint8Array(V);
+    cwCompBad = new Uint8Array(V);
+    cwCompSeen = new Int8Array(V);
   }
   for (let i = 0; i < V; i++) { cwPar[i] = i; cwDiff[i] = 0; }
+  if (!setEdge) {
+    cwCompBad.fill(0, 0, V);
+    cwCompSeen.fill(-1, 0, V);
+  }
   const find = (u) => {
     let r = u, p = 0;
     while (cwPar[r] !== r) { p ^= cwDiff[r]; r = cwPar[r]; }
@@ -362,52 +520,75 @@ export function propagateCastleParity(P, st, setEdge) {
     const ru = find(u), rv = find(v);
     const pu = cwDiff[u], pv = cwDiff[v];
     if (ru === rv) return (pu ^ pv) === xor;
-    if (rv === EXT) { cwPar[ru] = rv; cwDiff[ru] = pu ^ pv ^ xor; }
-    else { cwPar[rv] = ru; cwDiff[rv] = pu ^ pv ^ xor; }
+    if (rv === EXT) { cwPar[ru] = rv; cwDiff[ru] = pu ^ pv ^ xor; if (!setEdge) cwCompBad[rv] |= cwCompBad[ru]; }
+    else { cwPar[rv] = ru; cwDiff[rv] = pu ^ pv ^ xor; if (!setEdge) cwCompBad[ru] |= cwCompBad[rv]; }
     return true;
   };
-  const canon = (f) => {
-    if (f < 0 || f >= F) return EXT;
-    if (faceExterior && faceExterior[f]) return EXT;
-    return faceRep ? faceRep[f] : f;
-  };
 
-  // Anchor White (1) and Black (0) Castle Wall holes
-  for (let k = 0; k < castle.length; k++) {
-    const cw = castle[k];
-    if (cw.wall === 'G') continue;
-    const f = cw.isExterior ? EXT : canon(cw.face);
-    if (!link(EXT, f, cw.wall === 'W' ? 1 : 0)) return false;
-  }
-
-  // Link all known ON/OFF active edges
+  // Link all known ON/OFF active edges first (capturing unknown edge indices for Pass 2 if setEdge is provided)
   const e = st.e;
-  const numEdges = P.numEdges;
-  for (let x = 0; x < numEdges; x++) {
-    if (edgeA[x] < 0) continue;
-    const ev = e[x];
-    if (ev !== E_ON && ev !== E_OFF) continue;
-    const cell = x >> 1;
-    const r = (cell / cols) | 0, c = cell % cols;
-    const a = (x & 1) === 0
-      ? canon(r > 0 && c < fc ? (r - 1) * fc + c : EXT)
-      : canon(r < fr && c > 0 ? r * fc + (c - 1) : EXT);
-    const b = canon(r < fr && c < fc ? r * fc + c : EXT);
-    if (!link(a, b, ev === E_ON ? 1 : 0)) return false;
+  const nEdges = _cwEdgeX.length;
+  let nUnk = 0;
+  if (setEdge && cwUnk.length < nEdges) cwUnk = new Int32Array(nEdges);
+  for (let i = 0; i < nEdges; i++) {
+    const ev = e[_cwEdgeX[i]];
+    if (ev === E_UNKNOWN) {
+      if (setEdge) cwUnk[nUnk++] = i;
+      continue;
+    }
+    const a = _cwEdgeFA[i], b = _cwEdgeFB[i];
+    if (!link(a, b, ev === E_ON ? 1 : 0)) {
+      if (setEdge) {
+        lastParityBadIdx = _cwAnchorK.length ? _cwAnchorK[0] : 0;
+        return false;
+      }
+      // In contradiction-only mode (castleContradiction), mark this edge-edge conflicted component
+      // rather than falsely blaming an innocent W/B Castle Wall tile or hijacking unanchored pocket parity!
+      cwCompBad[find(a)] = 1;
+    }
   }
 
-  // Force any unknown active edge whose two flanking faces are in the same parity component
-  for (let x = 0; x < numEdges; x++) {
-    if (edgeA[x] < 0 || e[x] !== E_UNKNOWN) continue;
-    const cell = x >> 1;
-    const r = (cell / cols) | 0, c = cell % cols;
-    const a = (x & 1) === 0
-      ? canon(r > 0 && c < fc ? (r - 1) * fc + c : EXT)
-      : canon(r < fr && c > 0 ? r * fc + (c - 1) : EXT);
-    const b = canon(r < fr && c < fc ? r * fc + c : EXT);
+  if (!setEdge) {
+    // Only report a Castle Wall parity contradiction when a W/B anchor actually conflicts in a non-corrupted component
+    const extRoot = find(EXT);
+    const extBad = cwCompBad[extRoot];
+    for (let i = 0; i < _cwAnchorF.length; i++) {
+      const f = _cwAnchorF[i], want = _cwAnchorWant[i];
+      const r = find(f);
+      if (cwCompBad[r]) continue;
+      if (r === extRoot) {
+        if (!extBad && (cwDiff[f] ^ cwDiff[EXT]) !== want) {
+          lastParityBadIdx = _cwAnchorK[i];
+          return false;
+        }
+      } else {
+        const eff = cwDiff[f] ^ want;
+        const prev = cwCompSeen[r];
+        if (prev < 0) cwCompSeen[r] = eff;
+        else if (prev !== eff) {
+          lastParityBadIdx = _cwAnchorK[i];
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  // Anchor White (1) and Black (0) Castle Wall holes after edges
+  for (let i = 0; i < _cwAnchorF.length; i++) {
+    if (!link(EXT, _cwAnchorF[i], _cwAnchorWant[i])) {
+      lastParityBadIdx = _cwAnchorK[i];
+      return false;
+    }
+  }
+
+  // Pass 2: force any unknown active edge whose two flanking faces are in the same parity component
+  for (let j = 0; j < nUnk; j++) {
+    const i = cwUnk[j];
+    const a = _cwEdgeFA[i], b = _cwEdgeFB[i];
     if (find(a) === find(b)) {
       const want = (cwDiff[a] ^ cwDiff[b]) ? E_ON : E_OFF;
-      if (!setEdge(x, want)) return false;
+      if (!setEdge(_cwEdgeX[i], want)) return false;
     }
   }
   return true;
@@ -416,44 +597,26 @@ export function propagateCastleParity(P, st, setEdge) {
 /**
  * Check whether closing `closingEdge` (currently UNKNOWN -> ON) would leave any Castle Wall
  * constraint unsatisfied (wrong arrow count, or wrong W/B inside/outside parity).
- * Returns the first unsatisfied castle index, or -1 if all match.
+ * Returns the exact first unsatisfied castle index, or -1 if all match.
  */
 export function firstUnsatisfiedCastleOnClose(P, st, closingEdge) {
   if (!P.hasCastle) return -1;
-  const { castle } = P;
   const e = st.e;
-  // Fast ray count check first
-  for (let k = 0; k < castle.length; k++) {
-    const cw = castle[k];
-    if (!cw.dir) continue;
-    let on = 0;
-    const es = cw.edges;
-    for (let j = 0; j < es.length; j++) {
-      const x = es[j];
-      if (x === closingEdge || e[x] === E_ON) on++;
-    }
-    if (on !== cw.n) return k;
-  }
-  if (!P.hasCastleWalls) return -1;
-  // Temporarily set closingEdge ON to check W/B parity
   const prev = e[closingEdge];
   e[closingEdge] = E_ON;
-  const ok = isCastleSatisfied(P, e);
+  const bad = firstUnsatisfiedCastle(P, e);
   e[closingEdge] = prev;
-  if (ok) return -1;
-  for (let k = 0; k < castle.length; k++) {
-    if (castle[k].wall !== 'G') return k;
-  }
-  return 0;
+  return bad;
 }
 
-/** Contradiction check for `js/imagine.js` lookahead (ray bounds + W/B parity). */
-export function castleContradiction(P, st) {
+/** Contradiction check for `js/imagine.js` lookahead (ray counts, ray-diff, ray-bound, and W/B parity). */
+export function castleContradiction(P, st, scopeCastles = null) {
   if (!P.hasCastle) return null;
   if (P.castleImpossible) return { kind: 'castleBroken', castleIdx: 0, over: false };
   const { castle } = P;
   const e = st.e;
   for (let k = 0; k < castle.length; k++) {
+    if (scopeCastles && !scopeCastles[k]) continue;
     const cw = castle[k];
     if (!cw.dir) continue;
     let on = 0, unk = 0;
@@ -466,12 +629,30 @@ export function castleContradiction(P, st) {
     if (on > cw.n) return { kind: 'castleBroken', castleIdx: k, over: true };
     if (on + unk < cw.n) return { kind: 'castleBroken', castleIdx: k, over: false };
   }
+  const pairs = P._castleRayDiffPairs;
+  if (pairs && pairs.length) {
+    for (let p = 0; p < pairs.length; p++) {
+      const pr = pairs[p];
+      if (scopeCastles && !scopeCastles[pr.i] && !scopeCastles[pr.j]) continue;
+      const es = pr.edges;
+      let on = 0, unk = 0;
+      for (let j = 0; j < es.length; j++) {
+        const v = e[es[j]];
+        if (v === E_ON) on++;
+        else if (v === E_UNKNOWN) unk++;
+      }
+      if (on > pr.diff) return { kind: 'castleBroken', castleIdx: pr.i, over: true };
+      if (on + unk < pr.diff) return { kind: 'castleBroken', castleIdx: pr.i, over: false };
+    }
+  }
+  for (let k = 0; k < castle.length; k++) {
+    if (scopeCastles && !scopeCastles[k]) continue;
+    const rc = propagateCastleRayBoundOne(P, st, k, null);
+    if (rc < 0) return { kind: 'castleBroken', castleIdx: k, over: rc === -1 };
+  }
   if (P.hasCastleWalls) {
-    // Check W/B parity consistency without mutating `st`
-    const ok = propagateCastleParity(P, st, () => true);
-    if (!ok) {
-      const idx = castle.findIndex((c) => c.wall !== 'G');
-      return { kind: 'castleParity', castleIdx: idx >= 0 ? idx : 0 };
+    if (!propagateCastleParity(P, st, null)) {
+      return { kind: 'castleParity', castleIdx: lastParityBadIdx };
     }
   }
   return null;
@@ -521,11 +702,13 @@ export function castleStates(P, marks) {
     }
     if (on > cw.n || on + unk < cw.n) out[k] = 'bad';
   }
-  // Also flag W/B tiles whose Inside/Outside parity is already contradicted by drawn lines & X's
-  if (P.hasCastleWalls && rows > 1 && cols > 1) {
-    const fr = rows - 1, fc = cols - 1, F = fr * fc, EXT = F, V = F + 1;
+  // Also flag W/B tiles whose Inside/Outside parity is contradicted in non-conflicted components
+  if (P.hasCastleWalls && P._cwEdgeX) {
+    const { _cwEdgeX, _cwEdgeFA, _cwEdgeFB, _cwAnchorF, _cwAnchorWant, _cwAnchorK } = P;
+    const F = (rows - 1) * (cols - 1), EXT = F, V = F + 1;
     const par = new Int32Array(V);
     const diff = new Uint8Array(V);
+    const compBad = new Uint8Array(V);
     for (let i = 0; i < V; i++) par[i] = i;
     const find = (u) => {
       let r = u, p = 0;
@@ -540,53 +723,39 @@ export function castleStates(P, marks) {
     const link = (u, v, xor) => {
       const ru = find(u), rv = find(v);
       const pu = diff[u], pv = diff[v];
-      if (ru === rv) return (pu ^ pv) === xor;
-      if (rv === EXT) { par[ru] = rv; diff[ru] = pu ^ pv ^ xor; }
-      else { par[rv] = ru; diff[rv] = pu ^ pv ^ xor; }
-      return true;
+      if (ru === rv) {
+        if ((pu ^ pv) !== xor) compBad[ru] = 1;
+        return;
+      }
+      const bad = compBad[ru] | compBad[rv];
+      if (rv === EXT) { par[ru] = rv; diff[ru] = pu ^ pv ^ xor; compBad[rv] = bad; }
+      else { par[rv] = ru; diff[rv] = pu ^ pv ^ xor; compBad[ru] = bad; }
     };
-    const canon = (f) => {
-      if (f < 0 || f >= F) return EXT;
-      if (faceExterior && faceExterior[f]) return EXT;
-      return faceRep ? faceRep[f] : f;
-    };
-    let edgeConflict = false;
-    for (let x = 0; x < P.numEdges; x++) {
-      if (edgeA[x] < 0) continue;
-      const ev = e[x];
+    for (let i = 0; i < _cwEdgeX.length; i++) {
+      const ev = e[_cwEdgeX[i]];
       if (ev !== 1 && ev !== 2) continue;
-      const cell = x >> 1;
-      const r = (cell / cols) | 0, c = cell % cols;
-      const a = (x & 1) === 0
-        ? canon(r > 0 && c < fc ? (r - 1) * fc + c : EXT)
-        : canon(r < fr && c > 0 ? r * fc + (c - 1) : EXT);
-      const b = canon(r < fr && c < fc ? r * fc + c : EXT);
-      if (!link(a, b, ev === 1 ? 1 : 0)) edgeConflict = true;
+      link(_cwEdgeFA[i], _cwEdgeFB[i], ev === 1 ? 1 : 0);
     }
-    if (!edgeConflict) {
-      // Check each W/B tile against EXT parity and against any other W/B tile in the same component
-      const compWall = new Map(); // root -> { par, idxs }
-      for (let k = 0; k < castle.length; k++) {
-        const cw = castle[k];
-        if (cw.wall === 'G') continue;
-        const want = cw.wall === 'W' ? 1 : 0;
-        const f = cw.isExterior ? EXT : canon(cw.face);
-        const r = find(f);
-        if (r === find(EXT)) {
-          if ((diff[f] ^ diff[EXT]) !== want) out[k] = 'bad';
-        } else {
-          const eff = diff[f] ^ want;
-          const prev = compWall.get(r);
-          if (!prev) compWall.set(r, { eff, idxs: [k], bad: false });
-          else {
-            prev.idxs.push(k);
-            if (prev.eff !== eff) prev.bad = true;
-          }
+    const extRoot = find(EXT);
+    const compWall = new Map(); // root -> { eff, idxs, bad }
+    for (let i = 0; i < _cwAnchorF.length; i++) {
+      const f = _cwAnchorF[i], want = _cwAnchorWant[i], k = _cwAnchorK[i];
+      const r = find(f);
+      if (compBad[r]) continue; // skip components with an unrelated edge-cycle mistake
+      if (r === extRoot) {
+        if ((diff[f] ^ diff[EXT]) !== want) out[k] = 'bad';
+      } else {
+        const eff = diff[f] ^ want;
+        const prev = compWall.get(r);
+        if (!prev) compWall.set(r, { eff, idxs: [k], bad: false });
+        else {
+          prev.idxs.push(k);
+          if (prev.eff !== eff) prev.bad = true;
         }
       }
-      for (const rec of compWall.values()) {
-        if (rec.bad) for (const idx of rec.idxs) out[idx] = 'bad';
-      }
+    }
+    for (const rec of compWall.values()) {
+      if (rec.bad) for (const idx of rec.idxs) out[idx] = 'bad';
     }
   }
   return out;
@@ -648,113 +817,58 @@ export function findCastleCount(P, st) {
 }
 
 /**
- * Beginner Rule 3: direct 1-hop Inside/Outside wall edge.
- * Any active edge directly separating a White (Inside) block from the outer border or a Black (Outside) block
- * must be ON; any active edge directly separating a Black (Outside) block from the border, or two same-color
- * blocks (W/W or B/B), must be OFF.
+ * Beginner Rule 3: direct 1-hop Inside/Outside wall edge (uses precomputed static boundary groups).
  */
 export function findCastleWallEdge(P, st) {
-  if (!P.hasCastleWalls || P.rows <= 1 || P.cols <= 1) return [];
-  const { rows, cols, edgeA, faceExterior, faceRep, castle } = P;
-  const fr = rows - 1, fc = cols - 1, F = fr * fc, EXT = F;
-  const canon = (f) => {
-    if (f < 0 || f >= F) return EXT;
-    if (faceExterior && faceExterior[f]) return EXT;
-    return faceRep ? faceRep[f] : f;
-  };
-  // Map canonical face rep -> { par: 0|1, castleIdx: index or -1 for EXT }
-  const known = new Map();
-  known.set(EXT, { par: 0, idx: -1 });
-  for (let k = 0; k < castle.length; k++) {
-    const cw = castle[k];
-    if (cw.wall === 'G' || cw.isExterior || cw.face < 0) continue;
-    const rep = canon(cw.face);
-    if (!known.has(rep)) known.set(rep, { par: cw.wall === 'W' ? 1 : 0, idx: k });
-  }
+  const groups = P._castleWallGroups;
+  if (!groups || !groups.length) return [];
   const e = st.e;
-  // Group deduced edges by unordered pair of anchors so all edges along the same wall/border boundary fire together
-  const grouped = new Map();
-  for (let x = 0; x < P.numEdges; x++) {
-    if (edgeA[x] < 0 || e[x] !== E_UNKNOWN) continue;
-    const cell = x >> 1;
-    const r = (cell / cols) | 0, c = cell % cols;
-    const a = (x & 1) === 0
-      ? canon(r > 0 && c < fc ? (r - 1) * fc + c : EXT)
-      : canon(r < fr && c > 0 ? r * fc + (c - 1) : EXT);
-    const b = canon(r < fr && c < fc ? r * fc + c : EXT);
-    if (a === b) continue;
-    const ka = known.get(a), kb = known.get(b);
-    if (!ka || !kb) continue;
-    // Skip EXT-to-EXT (shouldn't happen for active edges)
-    if (ka.idx < 0 && kb.idx < 0) continue;
-    const val = (ka.par !== kb.par) ? E_ON : E_OFF;
-    const i1 = ka.idx >= 0 ? ka.idx : kb.idx;
-    const i2 = ka.idx >= 0 && kb.idx >= 0 ? kb.idx : -1;
-    const key = i2 >= 0 ? (i1 < i2 ? `${i1}:${i2}` : `${i2}:${i1}`) : `${i1}:EXT`;
-    let rec = grouped.get(key);
-    if (!rec) {
-      rec = { sets: [], info: { castleIdx: i1, castleIdx2: i2, val } };
-      grouped.set(key, rec);
+  const out = [];
+  for (let i = 0; i < groups.length; i++) {
+    const gr = groups[i];
+    const es = gr.edges;
+    let sets = null;
+    for (let j = 0; j < es.length; j++) {
+      if (e[es[j]] === E_UNKNOWN) {
+        if (!sets) sets = [];
+        sets.push(['e', es[j], gr.info.val]);
+      }
     }
-    rec.sets.push(['e', x, val]);
+    if (sets) out.push({ sets, info: gr.info });
   }
-  return [...grouped.values()];
+  return out;
 }
 
 /**
- * Medium Rule 4: collinear same-direction ray difference.
- * When two Castle Wall arrows point in the same direction along the same row or column,
- * the closer arrow's ray is a strict subset of the farther arrow's ray, so the edges strictly
- * between them must contain exactly `n1 - n2` loop segments.
+ * Medium Rule 4: collinear same-direction ray difference (uses precomputed collinear suffix pairs).
  */
 export function findCastleRayDiff(P, st) {
-  if (!P.hasCastle) return [];
-  const { castle } = P;
+  const pairs = P._castleRayDiffPairs;
+  if (!pairs || !pairs.length) return [];
   const e = st.e;
   const out = [];
-  for (let i = 0; i < castle.length; i++) {
-    const c1 = castle[i];
-    if (!c1.dir) continue;
-    // Find the nearest collinear same-direction clue strictly ahead of c1
-    let bestJ = -1, bestDist = Infinity;
-    for (let j = 0; j < castle.length; j++) {
-      if (j === i) continue;
-      const c2 = castle[j];
-      if (c2.dir !== c1.dir) continue;
-      let dist = -1;
-      if (c1.dir === 'R' && c2.r === c1.r && c2.c > c1.c) dist = c2.c - c1.c;
-      else if (c1.dir === 'L' && c2.r === c1.r && c2.c < c1.c) dist = c1.c - c2.c;
-      else if (c1.dir === 'D' && c2.c === c1.c && c2.r > c1.r) dist = c2.r - c1.r;
-      else if (c1.dir === 'U' && c2.c === c1.c && c2.r < c1.r) dist = c1.r - c2.r;
-      if (dist > 0 && dist < bestDist) { bestDist = dist; bestJ = j; }
-    }
-    if (bestJ < 0) continue;
-    const c2 = castle[bestJ];
-    const diffNeed = c1.n - c2.n;
-    if (diffNeed < 0) continue;
-    const s2 = new Set(c2.edges);
-    const diffEdges = [];
+  for (let p = 0; p < pairs.length; p++) {
+    const pr = pairs[p];
+    const es = pr.edges;
     let on = 0, unk = 0;
-    for (let k = 0; k < c1.edges.length; k++) {
-      const x = c1.edges[k];
-      if (s2.has(x)) continue;
-      diffEdges.push(x);
-      if (e[x] === E_ON) on++;
-      else if (e[x] === E_UNKNOWN) unk++;
+    for (let k = 0; k < es.length; k++) {
+      const v = e[es[k]];
+      if (v === E_ON) on++;
+      else if (v === E_UNKNOWN) unk++;
     }
     if (unk === 0) continue;
-    if (on === diffNeed || on + unk === diffNeed) {
-      const val = on === diffNeed ? E_OFF : E_ON;
+    if (on === pr.diff || on + unk === pr.diff) {
+      const val = on === pr.diff ? E_OFF : E_ON;
       const sets = [];
-      for (let k = 0; k < diffEdges.length; k++) {
-        if (e[diffEdges[k]] === E_UNKNOWN) sets.push(['e', diffEdges[k], val]);
+      for (let k = 0; k < es.length; k++) {
+        if (e[es[k]] === E_UNKNOWN) sets.push(['e', es[k], val]);
       }
       if (sets.length) {
         out.push({
           sets,
           info: {
-            castleIdx: i, castleIdx2: bestJ, cell: c1.cell, cell2: c2.cell,
-            dir: c1.dir, n1: c1.n, n2: c2.n, diff: diffNeed, mode: val === E_ON ? 'fill' : 'done',
+            castleIdx: pr.i, castleIdx2: pr.j, cell: pr.cell1, cell2: pr.cell2,
+            dir: pr.dir, n1: pr.n1, n2: pr.n2, diff: pr.diff, mode: val === E_ON ? 'fill' : 'done',
           },
         });
       }
@@ -763,180 +877,347 @@ export function findCastleRayDiff(P, st) {
   return out;
 }
 
+// Hoisted helpers for findCastleRayBound / propagateCastleMedium
+function cwIsBlk(ed, nb, e, cell, v, d) {
+  const x = ed[v * 4 + d];
+  if (x < 0 || e[x] === E_OFF) return true;
+  const j = nb[v * 4 + d];
+  return j < 0 || cell[j] === OFF;
+}
+function cwIsOn(ed, e, v, d) {
+  const x = ed[v * 4 + d];
+  return x >= 0 && e[x] === E_ON;
+}
+function cwSharedVert(edgeA, edgeB, xA, xB) {
+  const a1 = edgeA[xA], b1 = edgeB[xA];
+  const a2 = edgeA[xB], b2 = edgeB[xB];
+  if (a1 === a2 || a1 === b2) return a1;
+  if (b1 === a2 || b1 === b2) return b1;
+  return -1;
+}
+
+/**
+ * Evaluate ray-bound partition for one Castle Wall clue `k`.
+ * Returns:
+ *   - `{ contradiction: true }` if `rem < minTotal || rem > maxTotal`
+ *   - `{ sets, info }` if a deduction is found
+ *   - `null` otherwise
+ */
+function evalCastleRayBoundOne(P, st, k) {
+  const cw = P.castle[k];
+  if (!cw.dir) return null;
+  const { ed, nb, edgeA, edgeB } = P;
+  const e = st.e, cell = st.cell;
+  const es = cw.edges;
+  let on = 0;
+  const unks = [];
+  for (let j = 0; j < es.length; j++) {
+    const v = e[es[j]];
+    if (v === E_ON) on++;
+    else if (v === E_UNKNOWN) unks.push(es[j]);
+  }
+  const rem = cw.n - on;
+  if (unks.length <= 1 || rem <= 0 || rem >= unks.length) return null;
+
+  const p0 = (cw.d + 1) & 3, p1 = (cw.d + 3) & 3;
+  const groups = [];
+  let i = 0;
+  while (i < unks.length) {
+    if (i + 1 < unks.length) {
+      const sv = cwSharedVert(edgeA, edgeB, unks[i], unks[i + 1]);
+      if (sv >= 0) {
+        const on0 = cwIsOn(ed, e, sv, p0), on1 = cwIsOn(ed, e, sv, p1);
+        if (on0 !== on1) {
+          const otherBlk = on0 ? cwIsBlk(ed, nb, e, cell, sv, p1) : cwIsBlk(ed, nb, e, cell, sv, p0);
+          const otherPerp = on0 ? ed[sv * 4 + p1] : ed[sv * 4 + p0];
+          groups.push({
+            kind: otherBlk ? 'exact1' : 'max1',
+            edges: [unks[i], unks[i + 1]],
+            min: otherBlk ? 1 : 0,
+            max: 1,
+            otherPerp: otherBlk ? -1 : otherPerp,
+          });
+          i += 2;
+          continue;
+        }
+      }
+    }
+    const run = [unks[i]];
+    while (i + 1 < unks.length) {
+      const sv = cwSharedVert(edgeA, edgeB, unks[i], unks[i + 1]);
+      if (sv < 0) break;
+      if (!cwIsBlk(ed, nb, e, cell, sv, p0) || !cwIsBlk(ed, nb, e, cell, sv, p1)) break;
+      run.push(unks[i + 1]);
+      i++;
+    }
+    groups.push({
+      kind: run.length >= 2 ? 'run' : 'single',
+      edges: run,
+      min: 0,
+      max: run.length,
+      otherPerp: -1,
+    });
+    i++;
+  }
+
+  let minTotal = 0, maxTotal = 0;
+  let oddIdx = -1, oddCount = 0;
+  for (let g = 0; g < groups.length; g++) {
+    const gr = groups[g];
+    minTotal += gr.min;
+    maxTotal += gr.max;
+    if (gr.kind === 'run' || gr.kind === 'single') {
+      if ((gr.max & 1) === 1) { oddIdx = g; oddCount++; }
+    } else if (gr.kind === 'max1') {
+      oddIdx = g; oddCount++;
+    }
+  }
+
+  if (rem < minTotal || rem > maxTotal) return { contradiction: true };
+
+  const sets = [];
+  let reason = null;
+  if (rem === minTotal) {
+    for (let g = 0; g < groups.length; g++) {
+      const gr = groups[g];
+      if (gr.min === 0 && gr.max > 0) {
+        for (let j = 0; j < gr.edges.length; j++) sets.push(['e', gr.edges[j], E_OFF]);
+      }
+    }
+    reason = 'turnCap';
+  } else if (rem === maxTotal) {
+    for (let g = 0; g < groups.length; g++) {
+      const gr = groups[g];
+      if (gr.kind === 'run' || gr.kind === 'single') {
+        for (let j = 0; j < gr.edges.length; j++) sets.push(['e', gr.edges[j], E_ON]);
+      } else if (gr.kind === 'max1' && gr.otherPerp >= 0 && e[gr.otherPerp] === E_UNKNOWN) {
+        sets.push(['e', gr.otherPerp, E_OFF]);
+      }
+    }
+    reason = 'turnNeed';
+  } else {
+    // Emit only matching-reason runs so explanation stays exact (runTooLong first, else runRequired)
+    for (let g = 0; g < groups.length; g++) {
+      const gr = groups[g];
+      if (gr.kind !== 'run') continue;
+      if (minTotal + gr.max > rem && (!reason || reason === 'runTooLong')) {
+        for (let j = 0; j < gr.edges.length; j++) sets.push(['e', gr.edges[j], E_OFF]);
+        reason = 'runTooLong';
+      } else if (maxTotal - gr.max < rem && (!reason || reason === 'runRequired')) {
+        for (let j = 0; j < gr.edges.length; j++) sets.push(['e', gr.edges[j], E_ON]);
+        reason = 'runRequired';
+      }
+    }
+    if (!sets.length && oddCount === 1) {
+      const gr = groups[oddIdx];
+      const needOdd = ((rem - minTotal) & 1) === 1;
+      if (gr.kind === 'run' || gr.kind === 'single') {
+        const val = needOdd ? E_ON : E_OFF;
+        for (let j = 0; j < gr.edges.length; j++) sets.push(['e', gr.edges[j], val]);
+        reason = 'rayParity';
+      } else if (gr.kind === 'max1') {
+        if (needOdd) {
+          if (gr.otherPerp >= 0 && e[gr.otherPerp] === E_UNKNOWN) {
+            sets.push(['e', gr.otherPerp, E_OFF]);
+            reason = 'rayParity';
+          }
+        } else {
+          for (let j = 0; j < gr.edges.length; j++) sets.push(['e', gr.edges[j], E_OFF]);
+          reason = 'rayParity';
+        }
+      }
+    }
+  }
+
+  if (!sets.length) return null;
+  return {
+    sets,
+    info: { castleIdx: k, cell: cw.cell, dir: cw.dir, n: cw.n, rem, reason },
+  };
+}
+
 /**
  * Medium Rule 5: coupled straight runs & forced/at-most-1 turn pairs along a Castle Wall ray.
- * Partitions the remaining unknown edges of a ray into disjoint atomic groups:
- *   - Coupled straight run (consecutive unknown edges whose shared vertices have both perpendicular
- *     exits blocked): contributes either 0 or L.
- *   - Forced-turn pair (two unknown edges sharing a vertex with 1 perpendicular edge ON and the other
- *     blocked): contributes exactly 1 (min=1, max=1).
- *   - At-most-1 pair (two unknown edges sharing a vertex with 1 perpendicular edge ON and the other
- *     unknown): contributes 0 or 1 (min=0, max=1).
- *   - Single free edge: contributes 0 or 1.
- * Deduces forced ON/OFF groups from min/max capacity and odd/even parity!
  */
 export function findCastleRayBound(P, st) {
   if (!P.hasCastle) return [];
-  const { castle, ed, nb } = P;
-  const e = st.e, cell = st.cell;
   const out = [];
-
-  const isBlk = (v, d) => {
-    const x = ed[v * 4 + d];
-    if (x < 0 || e[x] === E_OFF) return true;
-    const j = nb[v * 4 + d];
-    return j < 0 || cell[j] === OFF;
-  };
-  const isOn = (v, d) => {
-    const x = ed[v * 4 + d];
-    return x >= 0 && e[x] === E_ON;
-  };
-
-  for (let k = 0; k < castle.length; k++) {
-    const cw = castle[k];
-    if (!cw.dir) continue;
-    const es = cw.edges;
-    const p0 = (cw.d + 1) & 3, p1 = (cw.d + 3) & 3;
-    let on = 0;
-    const unks = [];
-    for (let j = 0; j < es.length; j++) {
-      const v = e[es[j]];
-      if (v === E_ON) on++;
-      else if (v === E_UNKNOWN) unks.push(es[j]);
-    }
-    const rem = cw.n - on;
-    if (unks.length <= 1 || rem <= 0 || rem >= unks.length) continue;
-
-    // Helper: shared vertex if unknown edges xA and xB are consecutive along the ray
-    const sharedVert = (xA, xB) => {
-      const a1 = P.edgeA[xA], b1 = P.edgeB[xA];
-      const a2 = P.edgeA[xB], b2 = P.edgeB[xB];
-      if (a1 === a2 || a1 === b2) return a1;
-      if (b1 === a2 || b1 === b2) return b1;
-      return -1;
-    };
-
-    // Greedily partition `unks` into disjoint atomic groups
-    const groups = [];
-    let i = 0;
-    while (i < unks.length) {
-      // Check if unks[i] and unks[i+1] meet at a vertex with 1 perpendicular edge ON (turn pair)
-      if (i + 1 < unks.length) {
-        const sv = sharedVert(unks[i], unks[i + 1]);
-        if (sv >= 0) {
-          const on0 = isOn(sv, p0), on1 = isOn(sv, p1);
-          if (on0 !== on1) {
-            const otherBlk = on0 ? isBlk(sv, p1) : isBlk(sv, p0);
-            const otherPerp = on0 ? ed[sv * 4 + p1] : ed[sv * 4 + p0];
-            groups.push({
-              kind: otherBlk ? 'exact1' : 'max1',
-              edges: [unks[i], unks[i + 1]],
-              min: otherBlk ? 1 : 0,
-              max: 1,
-              v: sv,
-              otherPerp: otherBlk ? -1 : otherPerp,
-            });
-            i += 2;
-            continue;
-          }
-        }
-      }
-      // Otherwise extend a coupled straight run while shared vertices have BOTH perpendicular edges blocked
-      const run = [unks[i]];
-      while (i + 1 < unks.length) {
-        const sv = sharedVert(unks[i], unks[i + 1]);
-        if (sv < 0) break;
-        if (!isBlk(sv, p0) || !isBlk(sv, p1)) break;
-        run.push(unks[i + 1]);
-        i++;
-      }
-      groups.push({
-        kind: run.length >= 2 ? 'run' : 'single',
-        edges: run,
-        min: 0,
-        max: run.length,
-        v: -1,
-      });
-      i++;
-    }
-
-    let minTotal = 0, maxTotal = 0;
-    let oddRuns = [];
-    for (let g = 0; g < groups.length; g++) {
-      const gr = groups[g];
-      minTotal += gr.min;
-      maxTotal += gr.max;
-      if (gr.kind === 'run' || gr.kind === 'single') {
-        if ((gr.max & 1) === 1) oddRuns.push(g);
-      } else if (gr.kind === 'max1') {
-        oddRuns.push(g); // can contribute 0 or 1 (parity flexible)
-      }
-    }
-
-    if (rem < minTotal || rem > maxTotal) continue;
-
-    const sets = [];
-    let reason = null;
-    if (rem === minTotal) {
-      // Every non-fixed group must be 0
-      for (const gr of groups) {
-        if (gr.min === 0 && gr.max > 0) {
-          for (const x of gr.edges) sets.push(['e', x, E_OFF]);
-        }
-      }
-      reason = 'turnCap';
-    } else if (rem === maxTotal) {
-      // Every coupled run or single edge must be ON, and every max1 turn pair must turn onto the ray (blocking its straight perpendicular)
-      for (const gr of groups) {
-        if (gr.kind === 'run' || gr.kind === 'single') {
-          for (const x of gr.edges) sets.push(['e', x, E_ON]);
-        } else if (gr.kind === 'max1' && gr.otherPerp >= 0 && e[gr.otherPerp] === E_UNKNOWN) {
-          sets.push(['e', gr.otherPerp, E_OFF]);
-        }
-      }
-      reason = 'turnNeed';
-    } else {
-      // Check individual coupled runs (length >= 2) against minTotal / maxTotal
-      for (const gr of groups) {
-        if (gr.kind !== 'run') continue;
-        if (minTotal + gr.max > rem) {
-          for (const x of gr.edges) sets.push(['e', x, E_OFF]);
-          reason = reason || 'runTooLong';
-        } else if (maxTotal - gr.max < rem) {
-          for (const x of gr.edges) sets.push(['e', x, E_ON]);
-          reason = reason || 'runRequired';
-        }
-      }
-      // Parity check when all variable groups are even-length runs except a single odd run/single/max1
-      if (!sets.length && oddRuns.length === 1) {
-        const gr = groups[oddRuns[0]];
-        const needOdd = ((rem - minTotal) & 1) === 1;
-        if (gr.kind === 'run' || gr.kind === 'single') {
-          const val = needOdd ? E_ON : E_OFF;
-          for (const x of gr.edges) sets.push(['e', x, val]);
-          reason = 'rayParity';
-        } else if (gr.kind === 'max1') {
-          if (needOdd) {
-            if (gr.otherPerp >= 0 && e[gr.otherPerp] === E_UNKNOWN) {
-              sets.push(['e', gr.otherPerp, E_OFF]);
-              reason = 'rayParity';
-            }
-          } else {
-            for (const x of gr.edges) sets.push(['e', x, E_OFF]);
-            reason = 'rayParity';
-          }
-        }
-      }
-    }
-
-    if (sets.length) {
-      out.push({
-        sets,
-        info: { castleIdx: k, cell: cw.cell, dir: cw.dir, n: cw.n, rem, reason },
-      });
-    }
+  for (let k = 0; k < P.castle.length; k++) {
+    const res = evalCastleRayBoundOne(P, st, k);
+    if (res && !res.contradiction) out.push(res);
   }
   return out;
+}
+
+/**
+ * Zero-allocation ray-bound partition & propagator for one Castle Wall clue `k`.
+ * If `setEdge` is null, runs as a fast contradiction-only check.
+ * Returns:
+ *   -1 if `rem < minTotal` (over-committed)
+ *   -2 if `rem > maxTotal` (under-capacity) or `setEdge` rejected
+ *    0 if consistent (all forced edges emitted via `setEdge` when provided)
+ */
+function propagateCastleRayBoundOne(P, st, k, setEdge) {
+  const cw = P.castle[k];
+  if (!cw.dir) return 0;
+  const { ed, nb, edgeA, edgeB } = P;
+  const e = st.e, cell = st.cell;
+  const es = cw.edges;
+  ensureRbScratch(es.length);
+  let on = 0, nUnk = 0;
+  for (let j = 0; j < es.length; j++) {
+    const x = es[j];
+    const v = e[x];
+    if (v === E_ON) on++;
+    else if (v === E_UNKNOWN) rbUnks[nUnk++] = x;
+  }
+  const rem = cw.n - on;
+  if (nUnk <= 1 || rem <= 0 || rem >= nUnk) return 0;
+
+  const p0 = (cw.d + 1) & 3, p1 = (cw.d + 3) & 3;
+  let ng = 0;
+  let i = 0;
+  while (i < nUnk) {
+    if (i + 1 < nUnk) {
+      const sv = cwSharedVert(edgeA, edgeB, rbUnks[i], rbUnks[i + 1]);
+      if (sv >= 0) {
+        const on0 = cwIsOn(ed, e, sv, p0), on1 = cwIsOn(ed, e, sv, p1);
+        if (on0 !== on1) {
+          const otherBlk = on0 ? cwIsBlk(ed, nb, e, cell, sv, p1) : cwIsBlk(ed, nb, e, cell, sv, p0);
+          rbKind[ng] = otherBlk ? GRP_EXACT1 : GRP_MAX1;
+          rbStart[ng] = i;
+          rbLen[ng] = 2;
+          rbMin[ng] = otherBlk ? 1 : 0;
+          rbMax[ng] = 1;
+          rbPerp[ng] = otherBlk ? -1 : (on0 ? ed[sv * 4 + p1] : ed[sv * 4 + p0]);
+          ng++;
+          i += 2;
+          continue;
+        }
+      }
+    }
+    const start = i;
+    while (i + 1 < nUnk) {
+      const sv = cwSharedVert(edgeA, edgeB, rbUnks[i], rbUnks[i + 1]);
+      if (sv < 0) break;
+      if (!cwIsBlk(ed, nb, e, cell, sv, p0) || !cwIsBlk(ed, nb, e, cell, sv, p1)) break;
+      i++;
+    }
+    const len = i - start + 1;
+    rbKind[ng] = len >= 2 ? GRP_RUN : GRP_SINGLE;
+    rbStart[ng] = start;
+    rbLen[ng] = len;
+    rbMin[ng] = 0;
+    rbMax[ng] = len;
+    rbPerp[ng] = -1;
+    ng++;
+    i++;
+  }
+
+  let minTotal = 0, maxTotal = 0;
+  let oddIdx = -1, oddCount = 0;
+  for (let g = 0; g < ng; g++) {
+    minTotal += rbMin[g];
+    maxTotal += rbMax[g];
+    const kd = rbKind[g];
+    if (kd === GRP_RUN || kd === GRP_SINGLE) {
+      if ((rbMax[g] & 1) === 1) { oddIdx = g; oddCount++; }
+    } else if (kd === GRP_MAX1) {
+      oddIdx = g; oddCount++;
+    }
+  }
+
+  if (rem < minTotal) return -1;
+  if (rem > maxTotal) return -2;
+  if (!setEdge) return 0;
+
+  if (rem === minTotal) {
+    for (let g = 0; g < ng; g++) {
+      if (rbMin[g] === 0 && rbMax[g] > 0) {
+        const s = rbStart[g], end = s + rbLen[g];
+        for (let j = s; j < end; j++) if (!setEdge(rbUnks[j], E_OFF)) return -2;
+      }
+    }
+  } else if (rem === maxTotal) {
+    for (let g = 0; g < ng; g++) {
+      const kd = rbKind[g];
+      if (kd === GRP_RUN || kd === GRP_SINGLE) {
+        const s = rbStart[g], end = s + rbLen[g];
+        for (let j = s; j < end; j++) if (!setEdge(rbUnks[j], E_ON)) return -2;
+      } else if (kd === GRP_MAX1) {
+        const px = rbPerp[g];
+        if (px >= 0 && e[px] === E_UNKNOWN && !setEdge(px, E_OFF)) return -2;
+      }
+    }
+  } else {
+    let emitted = false;
+    for (let g = 0; g < ng; g++) {
+      if (rbKind[g] !== GRP_RUN) continue;
+      if (minTotal + rbMax[g] > rem) {
+        const s = rbStart[g], end = s + rbLen[g];
+        for (let j = s; j < end; j++) if (!setEdge(rbUnks[j], E_OFF)) return -2;
+        emitted = true;
+      } else if (maxTotal - rbMax[g] < rem) {
+        const s = rbStart[g], end = s + rbLen[g];
+        for (let j = s; j < end; j++) if (!setEdge(rbUnks[j], E_ON)) return -2;
+        emitted = true;
+      }
+    }
+    if (!emitted && oddCount === 1) {
+      const kd = rbKind[oddIdx];
+      const needOdd = ((rem - minTotal) & 1) === 1;
+      if (kd === GRP_RUN || kd === GRP_SINGLE) {
+        const val = needOdd ? E_ON : E_OFF;
+        const s = rbStart[oddIdx], end = s + rbLen[oddIdx];
+        for (let j = s; j < end; j++) if (!setEdge(rbUnks[j], val)) return -2;
+      } else if (kd === GRP_MAX1) {
+        if (needOdd) {
+          const px = rbPerp[oddIdx];
+          if (px >= 0 && e[px] === E_UNKNOWN && !setEdge(px, E_OFF)) return -2;
+        } else {
+          const s = rbStart[oddIdx], end = s + rbLen[oddIdx];
+          for (let j = s; j < end; j++) if (!setEdge(rbUnks[j], E_OFF)) return -2;
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+/**
+ * Medium Castle Wall propagation pass (ray-diff + zero-alloc ray bounds) for `propagate()` in `js/logic.js`.
+ * Pass optional `dirtyFlags` (`Uint8Array` indexed by castleIdx) to scan only dirty rays!
+ */
+export function propagateCastleMedium(P, st, setEdge, dirtyFlags = null) {
+  if (!P.hasCastle) return true;
+  const e = st.e;
+  const pairs = P._castleRayDiffPairs;
+  if (pairs && pairs.length) {
+    for (let p = 0; p < pairs.length; p++) {
+      const pr = pairs[p];
+      if (dirtyFlags && !dirtyFlags[pr.i] && !dirtyFlags[pr.j]) continue;
+      const es = pr.edges;
+      let on = 0, unk = 0;
+      for (let k = 0; k < es.length; k++) {
+        const v = e[es[k]];
+        if (v === E_ON) on++;
+        else if (v === E_UNKNOWN) unk++;
+      }
+      if (on > pr.diff || on + unk < pr.diff) return false;
+      if (unk === 0) continue;
+      if (on === pr.diff || on + unk === pr.diff) {
+        const val = on === pr.diff ? E_OFF : E_ON;
+        for (let k = 0; k < es.length; k++) {
+          if (e[es[k]] === E_UNKNOWN && !setEdge(es[k], val)) return false;
+        }
+      }
+    }
+  }
+  for (let k = 0; k < P.castle.length; k++) {
+    if (dirtyFlags && !dirtyFlags[k]) continue;
+    if (propagateCastleRayBoundOne(P, st, k, setEdge) < 0) return false;
+  }
+  return true;
 }
 
 export const CASTLE_RULES = [
@@ -947,32 +1228,112 @@ export const CASTLE_RULES = [
   { id: 'castleRayBound', tier: 'Medium', weight: 12, find: findCastleRayBound, label: 'coupled straight corridors and forced turns along an arrow ray bound which segments can fit its count' },
 ];
 
-/** Fast Beginner-level step for `js/imagine.js` lookahead propagation. */
-export function findEasyCastleStep(P, st, tryEmit) {
-  for (const [rule, fn] of [
-    ['castleZero', findCastleZero],
-    ['castleCount', findCastleCount],
-    ['castleWallEdge', findCastleWallEdge],
-  ]) {
-    const fs = fn(P, st);
-    for (let i = 0; i < fs.length; i++) {
-      const emitted = tryEmit(rule, fs[i].sets, fs[i].info);
-      if (emitted) return emitted;
+/** Fast short-circuiting Beginner-level step for `js/imagine.js` lookahead propagation. */
+export function findEasyCastleStep(P, st, tryEmit, scopeCastles = null) {
+  if (!P.hasCastle) return null;
+  const { castle } = P;
+  const e = st.e;
+  // 1. castleZero & castleCount
+  for (let k = 0; k < castle.length; k++) {
+    if (scopeCastles && !scopeCastles[k]) continue;
+    const cw = castle[k];
+    if (!cw.dir) continue;
+    const es = cw.edges;
+    if (cw.n === 0) {
+      let sets = null;
+      for (let j = 0; j < es.length; j++) {
+        if (e[es[j]] === E_UNKNOWN) {
+          if (!sets) sets = [];
+          sets.push(['e', es[j], E_OFF]);
+        }
+      }
+      if (sets) {
+        const em = tryEmit('castleZero', sets, { castleIdx: k, cell: cw.cell, dir: cw.dir, n: 0 });
+        if (em) return em;
+      }
+      continue;
+    }
+    let on = 0, unk = 0;
+    for (let j = 0; j < es.length; j++) {
+      const v = e[es[j]];
+      if (v === E_ON) on++;
+      else if (v === E_UNKNOWN) unk++;
+    }
+    if (unk === 0) continue;
+    if (on === cw.n || on + unk === cw.n) {
+      const val = on === cw.n ? E_OFF : E_ON;
+      const sets = [];
+      for (let j = 0; j < es.length; j++) {
+        if (e[es[j]] === E_UNKNOWN) sets.push(['e', es[j], val]);
+      }
+      if (sets.length) {
+        const em = tryEmit('castleCount', sets, { castleIdx: k, cell: cw.cell, dir: cw.dir, n: cw.n, mode: val === E_ON ? 'fill' : 'done' });
+        if (em) return em;
+      }
+    }
+  }
+  // 2. castleWallEdge (static precomputed groups are tiny and already decided after turn 1;
+  //    skip scope filter so multi-tile holes touching a distant anchor are never missed)
+  const groups = P._castleWallGroups;
+  if (groups && groups.length) {
+    for (let i = 0; i < groups.length; i++) {
+      const gr = groups[i];
+      const es = gr.edges;
+      let sets = null;
+      for (let j = 0; j < es.length; j++) {
+        if (e[es[j]] === E_UNKNOWN) {
+          if (!sets) sets = [];
+          sets.push(['e', es[j], gr.info.val]);
+        }
+      }
+      if (sets) {
+        const em = tryEmit('castleWallEdge', sets, gr.info);
+        if (em) return em;
+      }
     }
   }
   return null;
 }
 
 /** Medium-level step for `js/imagine.js` lookahead (used when easy steps are exhausted). */
-export function findMediumCastleStep(P, st, tryEmit) {
-  for (const [rule, fn] of [
-    ['castleRayDiff', findCastleRayDiff],
-    ['castleRayBound', findCastleRayBound],
-  ]) {
-    const fs = fn(P, st);
-    for (let i = 0; i < fs.length; i++) {
-      const emitted = tryEmit(rule, fs[i].sets, fs[i].info);
-      if (emitted) return emitted;
+export function findMediumCastleStep(P, st, tryEmit, scopeCastles = null) {
+  if (!P.hasCastle) return null;
+  const e = st.e;
+  const pairs = P._castleRayDiffPairs;
+  if (pairs && pairs.length) {
+    for (let p = 0; p < pairs.length; p++) {
+      const pr = pairs[p];
+      if (scopeCastles && !scopeCastles[pr.i] && !scopeCastles[pr.j]) continue;
+      const es = pr.edges;
+      let on = 0, unk = 0;
+      for (let k = 0; k < es.length; k++) {
+        const v = e[es[k]];
+        if (v === E_ON) on++;
+        else if (v === E_UNKNOWN) unk++;
+      }
+      if (unk === 0) continue;
+      if (on === pr.diff || on + unk === pr.diff) {
+        const val = on === pr.diff ? E_OFF : E_ON;
+        const sets = [];
+        for (let k = 0; k < es.length; k++) {
+          if (e[es[k]] === E_UNKNOWN) sets.push(['e', es[k], val]);
+        }
+        if (sets.length) {
+          const em = tryEmit('castleRayDiff', sets, {
+            castleIdx: pr.i, castleIdx2: pr.j, cell: pr.cell1, cell2: pr.cell2,
+            dir: pr.dir, n1: pr.n1, n2: pr.n2, diff: pr.diff, mode: val === E_ON ? 'fill' : 'done',
+          });
+          if (em) return em;
+        }
+      }
+    }
+  }
+  for (let k = 0; k < P.castle.length; k++) {
+    if (scopeCastles && !scopeCastles[k]) continue;
+    const res = evalCastleRayBoundOne(P, st, k);
+    if (res && !res.contradiction) {
+      const em = tryEmit('castleRayBound', res.sets, res.info);
+      if (em) return em;
     }
   }
   return null;

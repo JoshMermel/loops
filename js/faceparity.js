@@ -160,7 +160,11 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
   if (P.hasCastleWalls) {
     for (let k = 0; k < P.castle.length; k++) {
       const cw = P.castle[k];
-      if (cw.wall === 'G' || cw.isExterior || cw.face < 0) continue;
+      if (cw.wall === 'G') continue;
+      if (cw.isExterior || cw.face < 0) {
+        if (cw.wall === 'W') conflict = true;
+        continue;
+      }
       link(EXT, canonFace(cw.face), cw.wall === 'W' ? 1 : 0, buildGraph ? { kind: 'castleWall', cell: cw.cell, wall: cw.wall } : null);
     }
   }

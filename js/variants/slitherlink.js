@@ -1076,9 +1076,12 @@ export function explainSlitherStep(P, step, helpers) {
       addFace(faces.focus, info.face);
       roles.focus.push(info.cell);
       nudgeRoles.focus.push(info.cell);
+      const hasOff = targets.segOff.length > 0;
       return {
         nudge: `Look at the must-visit ${who} at corner ${cn} of the ${info.n} square at ${fn} and check its outside exits.`,
-        text: `Corner ${cn} must be visited and has only one open exit outside the ${info.n} square at ${fn}, while the square can take at most one more segment — so ${cn} must use its outside exit and one side of the square, leaving no segments for the square's other open sides: ${marks}.`,
+        text: hasOff
+          ? `Corner ${cn} must be visited and has only one open exit outside the ${info.n} square at ${fn}, while the square can take at most one more segment — so ${cn} must use its outside exit and one side of the square, leaving no segments for the square's other open sides: ${marks}.`
+          : `Corner ${cn} must be visited and has only one open exit outside the ${info.n} square at ${fn}, while the square can take at most one more segment — so ${cn} cannot take both of the square's sides and must use its outside exit: ${marks}.`,
       };
     }
     case 'slitherDiag32':

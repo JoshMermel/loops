@@ -84,3 +84,36 @@ test('bestImagine and replayImagine produce sound deductions consistent with cos
   assert.equal(stUnprop.e[hit.edge], E_UNKNOWN, 'bestImagine must not mutate caller state');
   assert.ok(hit.deduce === E_ON || hit.deduce === E_OFF);
 });
+
+test('bestImagine handles Castle Wall frontier rays and ray-bound pre-filter superset cleanly', () => {
+  // Reviewer-found regression: 4x5 board with 1-> at (1,0), void at (0,2), and (1,3)-(1,4) = OFF.
+  // Hypothesizing (1,2)-(2,2) = OFF creates a length-2 coupled run on the 1-> ray, triggering castleRayBound contradiction;
+  // propagate() must catch it so bestImagine's pre-filter never silently skips it.
+  const P = compile({
+    name: 'cw_img_superset',
+    rows: 4,
+    cols: 5,
+    clues: [],
+    castle: [
+      { r: 1, c: 0, wall: 'B', dir: 'R', n: 1 },
+      { r: 0, c: 2, wall: 'G', dir: 'D', n: 1 },
+    ],
+  });
+  const st = initialState(P);
+  const rayEdge = P.castle[0].edges[0];
+  assert.equal(isFrontierEdge(P, st, rayEdge), true, 'Castle Wall ray edge must count as frontier');
+
+  // Clear trivial dead-end edges at (0,0)-(0,1)-(1,1) and cross out (1,3)-(1,4) so the only remaining
+  // deduction is (1,2)-(2,2) = ON via castleRayBound (a 2-run on {(1,1)-(1,2), (1,2)-(1,3)} cannot fit n=1).
+  st.e[P.ed[(1 * 5 + 3) * 4 + 1]] = E_OFF;
+  st.e[P.ed[(0 * 5 + 0) * 4 + 1]] = E_OFF;
+  st.e[P.ed[(0 * 5 + 0) * 4 + 2]] = E_OFF;
+  st.e[P.ed[(0 * 5 + 1) * 4 + 2]] = E_OFF;
+  st.e[P.ed[(0 * 5 + 3) * 4 + 1]] = E_OFF;
+  st.e[P.ed[(0 * 5 + 4) * 4 + 2]] = E_OFF;
+  st.e[P.ed[(0 * 5 + 3) * 4 + 2]] = E_OFF;
+  const hit = bestImagine(P, st, { costCap: Infinity });
+  assert.ok(hit, 'bestImagine must not miss a hypothesis whose contradiction uses castleRayBound');
+  assert.equal(hit.edge, P.ed[(1 * 5 + 2) * 4 + 2]);
+  assert.equal(hit.deduce, E_ON);
+});

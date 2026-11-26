@@ -144,37 +144,29 @@ function getShapePaths(P) {
   if (P._shapePaths) return P._shapePaths;
   const { rows, cols, isVoid, holeList } = P;
   const fr = rows - 1, fc = cols - 1;
-  const inset = 1.5;
   const ox = PAD - S / 2;
   const oy = PAD - S / 2;
-  const boardPath = tilesOutlinePath(
-    rows, cols,
-    (r, c) => !isVoid[r * cols + c],
-    ox, oy, S, S, 8,
-  );
-  // Separate interior void cutouts (voids adjacent to at least one interior hole square) for crisp inner framing
+  const hasPlainVoids = Boolean(P.voids && P.voids.length > 0);
+  const isPlainVoid = (u) => isVoid[u] && !(P.hasCastle && P.castleAtCell[u] >= 0);
+  const boardPath = hasPlainVoids
+    ? tilesOutlinePath(rows, cols, (r, c) => !isPlainVoid(r * cols + c), ox, oy, S, S, 8)
+    : '';
+  // Separate interior plain-void cutouts (excluding Castle Wall tiles) for crisp inner framing
   const interiorVoid = new Uint8Array(P.N);
-  if (holeList && holeList.length) {
+  if (hasPlainVoids && holeList && holeList.length) {
     for (const grp of holeList) {
       for (const f of grp) {
         const r = (f / fc) | 0, c = f % fc;
         for (const u of [r * cols + c, r * cols + c + 1, (r + 1) * cols + c, (r + 1) * cols + c + 1]) {
-          if (isVoid[u]) interiorVoid[u] = 1;
+          if (isPlainVoid(u)) interiorVoid[u] = 1;
         }
       }
     }
   }
-  const innerVoidPath = tilesOutlinePath(
-    rows, cols,
-    (r, c) => interiorVoid[r * cols + c],
-    ox + inset, oy + inset, S, S, 0,
-  );
   // Exact un-shifted inner cutout path (matches the hole in boardPath) for subtle hatch overlay
-  const voidHatchPath = tilesOutlinePath(
-    rows, cols,
-    (r, c) => interiorVoid[r * cols + c],
-    ox, oy, S, S, 6,
-  );
+  const voidHatchPath = hasPlainVoids
+    ? tilesOutlinePath(rows, cols, (r, c) => interiorVoid[r * cols + c], ox, oy, S, S, 6)
+    : '';
   const holePaths = (holeList || []).map((grp) => {
     const inH = new Uint8Array(fr * fc);
     for (const f of grp) inH[f] = 1;
@@ -185,7 +177,7 @@ function getShapePaths(P) {
     for (const f of grp) inH[f] = 1;
     return tilesOutlinePath(fr, fc, (r, c) => inH[r * fc + c], PAD, PAD, S, S, 4);
   });
-  P._shapePaths = { boardPath, innerVoidPath, voidHatchPath, holePaths, holeInsetPaths };
+  P._shapePaths = { boardPath, voidHatchPath, holePaths, holeInsetPaths };
   return P._shapePaths;
 }
 
@@ -653,7 +645,7 @@ export class Board {
     const boardH = (P.rows - 1) * S + 2 * PAD;
 
     const shape = getShapePaths(P);
-    let g = shape
+    let g = (shape && shape.boardPath)
       ? `<path class="board-bg" fill-rule="evenodd" d="${shape.boardPath}"/>`
       : `<rect class="board-bg" x="1.5" y="1.5" width="${boardW - 3}" height="${boardH - 3}" rx="8"/>`;
 
@@ -727,13 +719,15 @@ export class Board {
       g += `<path class="void-cutout-frame" d="${shape.voidHatchPath}"/>`;
     }
 
-    // Lattice tracks (only active edges so cutouts have no stray tracks)
+    // Lattice tracks (only active edges so cutouts/walls have no stray tracks; batched into one <path>)
     if (P.hasVoids) {
+      let dGrid = '';
       for (let x = 0; x < P.numEdges; x++) {
         if (P.edgeA[x] < 0) continue;
         const [x1, y1, x2, y2] = segCoords(x);
-        g += `<line class="grid-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+        dGrid += `M${x1} ${y1}L${x2} ${y2}`;
       }
+      if (dGrid) g += `<path class="grid-line" d="${dGrid}"/>`;
     } else {
       for (let r = 0; r < P.rows; r++) {
         g += `<line class="grid-line" x1="${vx(0)}" y1="${vy(r)}" x2="${vx(P.cols - 1)}" y2="${vy(r)}"/>`;
@@ -874,7 +868,7 @@ export class Board {
         g += `<rect class="castle-tile-${cw.wall}${st}" x="${cx - half}" y="${cy - half}" width="${tileSz}" height="${tileSz}" rx="5"/>`;
         if (cw.dir) {
           const tc = `castle-text-${cw.wall}${st}`;
-          const fs = cw.n >= 10 ? S * 0.34 : S * 0.40;
+          const fs = cw.n >= 10 ? S * 0.30 : S * 0.40;
           if (cw.dir === 'R') {
             g += `<text class="${tc}" x="${cx}" y="${cy}" font-size="${fs}">${cw.n}→</text>`;
           } else if (cw.dir === 'L') {
@@ -906,12 +900,28 @@ export class Board {
     if (dManual) g += `<path class="edge-x-halo" d="${dManual}"/><path class="edge-x" d="${dManual}"/>`;
     if (dGiven) g += `<path class="wall-given-halo" d="${dGiven}"/><path class="wall-given" d="${dGiven}"/>`;
 
-    // Hint overlays (rings, ghost X, gray label ghosts, wrong marks)
+    // Hint overlays (rings, Castle Wall tile frames, ghost X, gray label ghosts, wrong marks)
     if (hint) {
       const roles = hint.roles || {};
       const targets = hint.targets || {};
+      if (P.hasCastle) {
+        const half = (S - 4) / 2 + 1.5;
+        const sz = half * 2;
+        const emitCwFrame = (list, cls) => {
+          for (const i of list || []) {
+            if (P.castleAtCell[i] < 0) continue;
+            g += `<rect class="${cls}" x="${ix(i) - half}" y="${iy(i) - half}" width="${sz}" height="${sz}" rx="6.5"/>`;
+          }
+        };
+        emitCwFrame(roles.clue, 'hint-castle-clue');
+        emitCwFrame(roles.focus, 'hint-castle-focus');
+        emitCwFrame(roles.problem, 'hint-castle-problem');
+      }
       for (const i of roles.exit || []) g += `<circle class="hint-exit" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.30}"/>`;
-      for (const i of roles.focus || []) g += `<circle class="hint-focus-ring" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.32}"/>`;
+      for (const i of roles.focus || []) {
+        if (P.hasCastle && P.castleAtCell[i] >= 0) continue;
+        g += `<circle class="hint-focus-ring" cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.32}"/>`;
+      }
       for (const x of targets.segOff || []) {
         const [x1, y1, x2, y2] = segCoords(x);
         const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, d = S * 0.11;

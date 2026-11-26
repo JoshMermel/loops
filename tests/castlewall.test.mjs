@@ -7,8 +7,9 @@ import {
 import { rate, nextSteps, detectSymmetries } from '../js/rating.js';
 import { explainStep } from '../js/explain.js';
 import { computeHint, checkMarksAgainstSolution } from '../js/hintstep.js';
-import { autoXForced, autoShadeCompute, FACE_IN, FACE_OUT } from '../js/marks.js';
+import { autoXForced, autoShadeCompute, shadeConflicts, FACE_IN, FACE_OUT } from '../js/marks.js';
 import { castleStates, earlyLoopEdges } from '../js/clues.js';
+import { findCastleRayBound, castleContradiction } from '../js/variants/castlewall.js';
 import { rotatePuzzleCW } from '../js/rotate.js';
 import { boardSvg } from '../js/print.js';
 import { makeRng, randomLoop, generatePuzzle } from '../js/generator.js';
@@ -138,8 +139,26 @@ test('Castle Wall exact solver matches independent brute-force reference across 
         }
       }
 
+      const midloop = [];
+      if (t % 4 === 3) {
+        const blocked = new Set(castle.map((cw) => cw.r * cols + cw.c));
+        for (let r = 0; r < rows && !midloop.length; r++) {
+          for (let c = 0; c < cols - 1; c++) {
+            const a = r * cols + c, b = a + 1;
+            if (blocked.has(a) || blocked.has(b)) continue;
+            const x = empty.ed[a * 4 + 1];
+            if (x < 0 || edges[x] !== E_ON) continue;
+            const prevE = empty.ed[a * 4 + 3], nextE = empty.ed[b * 4 + 1];
+            if ((prevE < 0 || edges[prevE] !== E_ON) && (nextE < 0 || edges[nextE] !== E_ON)) {
+              midloop.push({ r, c, dir: 'H' });
+              break;
+            }
+          }
+        }
+      }
+
       const fullBoard = t % 7 === 0 && castle.length === unused.length && ((rows * cols - castle.length) & 1) === 0;
-      const raw = { name: `cw_${rows}x${cols}_${t}`, rows, cols, clues, slither, castle, fullBoard };
+      const raw = { name: `cw_${rows}x${cols}_${t}`, rows, cols, clues, slither, midloop, castle, fullBoard };
       const P = compile({ ...raw, castle: castle.map((cw) => ({ ...cw })) });
       const fast = solve(P, { limit: 200 });
       const ref = referenceCount(raw);
@@ -370,4 +389,226 @@ test('generatePuzzle supports castle, castle-masyu, castle-slither, castle-midlo
 
   const pBeg = generatePuzzle({ rows: 7, cols: 7, style: 'castle', targetTier: 'Beginner', seed: 706, budgetMs: 8000 });
   assert.ok(pBeg && pBeg.tier === 'Beginner', 'failed to generate Beginner 7x7 castle');
+
+  // Verify castle-full ALSO requires Castle Wall clues (plain voids + fullBoard is non-unique)
+  const plainVoidsF = pcf.castle.map(({ r, c }) => ({ r, c }));
+  assert.ok(
+    solve(compile({ name: 'h', rows: 7, cols: 7, clues: [], voids: plainVoidsF, fullBoard: true }), { limit: 2, maxNodes: 50000 }).count >= 2,
+    'castle-full Castle Wall clues must not be redundant given plain voids + fullBoard',
+  );
+});
+
+test('Castle Wall regression coverage: Auto-X closed corridor, castleRayBound modes, noEarlyClose exact tile, impossible boards, 1-step rotation, answer-key print, per-component parity errors', () => {
+  // 1. Auto-X MUST NOT cross out valid solution edges on a closed corridor in pure Castle Wall
+  const p3 = compile({ name: 'cw_3x3', rows: 3, cols: 3, clues: [], castle: [{ r: 1, c: 1, wall: 'W', dir: '', n: -1 }] });
+  assert.equal(solve(p3, { limit: 2 }).count, 1);
+  const m3 = { edges: new Uint8Array(p3.numEdges), autoE: new Uint8Array(p3.numEdges) };
+  const fx3 = autoXForced(p3, m3);
+  for (let x = 0; x < p3.numEdges; x++) {
+    if (p3.edgeA[x] >= 0) assert.equal(fx3[x], 0, 'Auto-X must not cross out valid closed-corridor solution edge');
+  }
+
+  // 2. castleRayBound targeted modes:
+  //    (a) max1 with rem === maxTotal -> turnNeed sets perpendicular otherPerp OFF
+  const pTurnNeed = compile({
+    name: 'cw_turn_need',
+    rows: 4,
+    cols: 5,
+    clues: [],
+    castle: [{ r: 1, c: 0, wall: 'B', dir: 'R', n: 2 }],
+  });
+  const stTN = initialState(pTurnNeed);
+  // Ray from (1,0) R has 3 edges: (1,1)-(1,2), (1,2)-(1,3), (1,3)-(1,4).
+  // Put perpendicular ON at (1,2) going UP ((0,2)-(1,2)), leaving (1,2)-(2,2) UNKNOWN -> {(1,1)-(1,2), (1,2)-(1,3)} is max1 (cap 1),
+  // plus single edge (1,3)-(1,4) (cap 1) -> maxTotal = 2 === rem! So (1,3)-(1,4) is ON and (1,2)-(2,2) is OFF!
+  stTN.e[pTurnNeed.ed[(1 * 5 + 2) * 4 + 0]] = E_ON;
+  const rbTN = findCastleRayBound(pTurnNeed, stTN);
+  assert.equal(rbTN.length, 1);
+  assert.equal(rbTN[0].info.reason, 'turnNeed');
+  const perpDown = pTurnNeed.ed[(1 * 5 + 2) * 4 + 2];
+  assert.ok(rbTN[0].sets.some(([k, idx, v]) => k === 'e' && idx === perpDown && v === E_OFF), 'turnNeed must cross out straight perpendicular of max1 pair');
+
+  //    (b) runRequired on 2-run + max1 with rem = 2 (maxTotal = 3, 3 - 2 < 2 -> 2-run must be ON)
+  const pRunReq = compile({
+    name: 'cw_run_req',
+    rows: 4,
+    cols: 7,
+    clues: [],
+    castle: [{ r: 1, c: 0, wall: 'B', dir: 'R', n: 2 }],
+  });
+  const stRR = initialState(pRunReq);
+  stRR.e[pRunReq.ed[(1 * 7 + 3) * 4 + 1]] = E_OFF;
+  stRR.e[pRunReq.ed[(1 * 7 + 5) * 4 + 0]] = E_OFF;
+  stRR.e[pRunReq.ed[(1 * 7 + 5) * 4 + 2]] = E_OFF;
+  stRR.e[pRunReq.ed[(1 * 7 + 2) * 4 + 0]] = E_ON;
+  const rbRR = findCastleRayBound(pRunReq, stRR);
+  assert.equal(rbRR.length, 1);
+  assert.equal(rbRR[0].info.reason, 'runRequired');
+  assert.equal(rbRR[0].sets.length, 2);
+  assert.ok(rbRR[0].sets.every(([, , v]) => v === E_ON), 'runRequired draws the 2-run ON');
+
+  //    (c) rayParity on TWO 2-runs (0|2 each) + ONE max1 (0|1) with rem = 2:
+  //        maxTotal = 5, neither 2-run is individually too long or required -> only rayParity forces max1 to 0!
+  const pPar2 = compile({
+    name: 'cw_ray_parity_even',
+    rows: 4,
+    cols: 10,
+    clues: [],
+    castle: [{ r: 1, c: 0, wall: 'B', dir: 'R', n: 2 }],
+  });
+  const stPar2 = initialState(pPar2);
+  // Ray edges: (1,1)-(1,2)-(1,3) [max1 at (1,2)], gap (1,3)-(1,4) OFF,
+  //            (1,4)-(1,5)-(1,6) [2-run at (1,5)], gap (1,6)-(1,7) OFF,
+  //            (1,7)-(1,8)-(1,9) [2-run at (1,8)].
+  stPar2.e[pPar2.ed[(1 * 10 + 3) * 4 + 1]] = E_OFF;
+  stPar2.e[pPar2.ed[(1 * 10 + 6) * 4 + 1]] = E_OFF;
+  stPar2.e[pPar2.ed[(1 * 10 + 5) * 4 + 0]] = E_OFF;
+  stPar2.e[pPar2.ed[(1 * 10 + 5) * 4 + 2]] = E_OFF;
+  stPar2.e[pPar2.ed[(1 * 10 + 8) * 4 + 0]] = E_OFF;
+  stPar2.e[pPar2.ed[(1 * 10 + 8) * 4 + 2]] = E_OFF;
+  stPar2.e[pPar2.ed[(1 * 10 + 2) * 4 + 0]] = E_ON;
+  const rbPar2 = findCastleRayBound(pPar2, stPar2);
+  assert.equal(rbPar2.length, 1);
+  assert.equal(rbPar2[0].info.reason, 'rayParity');
+  assert.equal(rbPar2[0].sets.length, 2);
+  assert.ok(rbPar2[0].sets.every(([, , v]) => v === E_OFF), 'even parity with two 2-runs + max1 forces max1 ray edges OFF');
+
+  // 3. noEarlyClose reports exact failing castleIdx (satisfied Black at index 0, unsatisfied White at index 1)
+  const pNec = compile({
+    name: 'cw_nec',
+    rows: 5,
+    cols: 5,
+    clues: [],
+    castle: [
+      { r: 0, c: 0, wall: 'B', dir: '', n: -1 },
+      { r: 2, c: 2, wall: 'W', dir: '', n: -1 },
+    ],
+  });
+  const stNec = initialState(pNec);
+  // Draw 3 sides of a 1x1 square (0,2)-(0,3)-(1,3)-(1,2) leaving (0,2)-(1,2) unknown; closing it leaves White at (2,2) outside
+  stNec.e[pNec.ed[(0 * 5 + 2) * 4 + 1]] = E_ON;
+  stNec.e[pNec.ed[(0 * 5 + 3) * 4 + 2]] = E_ON;
+  stNec.e[pNec.ed[(1 * 5 + 3) * 4 + 3]] = E_ON;
+  stNec.cell[0 * 5 + 2] = 2; stNec.cell[0 * 5 + 3] = 2; stNec.cell[1 * 5 + 3] = 2; stNec.cell[1 * 5 + 2] = 2;
+  let sawNec = false;
+  for (let iter = 0; iter < 15; iter++) {
+    const nxt = nextSteps(pNec, stNec);
+    if (!nxt) break;
+    if (nxt.rule === 'noEarlyClose') {
+      const f = nxt.firings.find((x) => x.info && x.info.castleIdx !== undefined);
+      if (f) {
+        assert.equal(f.info.castleIdx, 1, 'noEarlyClose must blame exact unsatisfied White tile (idx 1), not satisfied Black tile (idx 0)');
+        sawNec = true;
+        break;
+      }
+    }
+    for (const [k, idx, v] of nxt.firings[0].sets) {
+      if (k === 'e') stNec.e[idx] = v;
+      else if (k === 'c') stNec.cell[idx] = v;
+    }
+  }
+  assert.ok(sawNec, 'noEarlyClose should fire with exact castleIdx');
+
+  // 4. Impossible boards & compiler validation
+  const pBorderW = compile({ name: 'bad_bw', rows: 4, cols: 4, clues: [], castle: [{ r: 0, c: 1, wall: 'W', dir: '', n: -1 }] });
+  assert.equal(pBorderW.castleImpossible, true);
+  assert.equal(solve(pBorderW, { limit: 2 }).count, 0);
+  assert.equal(referenceCount({ rows: 4, cols: 4, clues: [], castle: [{ r: 0, c: 1, wall: 'W', dir: '', n: -1 }] }), 0);
+
+  const pAdjWB = compile({
+    name: 'bad_wb', rows: 5, cols: 5, clues: [],
+    castle: [{ r: 2, c: 2, wall: 'W', dir: '', n: -1 }, { r: 2, c: 3, wall: 'B', dir: '', n: -1 }],
+  });
+  assert.equal(pAdjWB.castleImpossible, true);
+  assert.equal(solve(pAdjWB, { limit: 2 }).count, 0);
+
+  assert.throws(() => compile({ name: 'bad_dup', rows: 4, cols: 4, clues: [], castle: [{ r: 1, c: 1, wall: 'W', dir: '', n: -1 }, { r: 1, c: 1, wall: 'B', dir: '', n: -1 }] }));
+  assert.throws(() => compile({ name: 'bad_col', rows: 4, cols: 4, clues: [{ r: 1, c: 1, t: 'W' }], castle: [{ r: 1, c: 1, wall: 'B', dir: '', n: -1 }] }));
+  assert.throws(() => compile({ name: 'bad_dir', rows: 4, cols: 4, clues: [], castle: [{ r: 1, c: 1, wall: 'G', dir: 'Z', n: 1 }] }));
+
+  // 5. 1-step rectangular rotation exact mapping + answer-key print SVG
+  const pRect = compile({
+    name: 'cw_rect',
+    rows: 5,
+    cols: 6,
+    clues: [],
+    castle: [
+      { r: 0, c: 1, wall: 'B', dir: 'R', n: 1 },
+      { r: 1, c: 4, wall: 'G', dir: 'D', n: 0 },
+      { r: 3, c: 2, wall: 'W', dir: 'U', n: 1 },
+      { r: 2, c: 4, wall: 'G', dir: 'L', n: 0 },
+    ],
+  });
+  const rot1 = rotatePuzzleCW(pRect);
+  assert.equal(rot1.rows, 6);
+  assert.equal(rot1.cols, 5);
+  const rotRaw = rot1.castle.map(({ r, c, wall, dir, n }) => ({ r, c, wall, dir, n }));
+  assert.deepEqual(rotRaw, [
+    { r: 1, c: 4, wall: 'B', dir: 'D', n: 1 },
+    { r: 4, c: 3, wall: 'G', dir: 'L', n: 0 },
+    { r: 2, c: 1, wall: 'W', dir: 'R', n: 1 },
+    { r: 4, c: 2, wall: 'G', dir: 'U', n: 0 },
+  ]);
+  const sol3 = solve(p3, { limit: 1 }).solutions[0];
+  const svgAns = boardSvg(pRect, null);
+  assert.ok(svgAns.includes('→') && svgAns.includes('↓') && svgAns.includes('↑') && svgAns.includes('←'), 'print SVG renders all 4 arrow glyphs');
+  assert.ok(svgAns.includes('fill="#111"'), 'print SVG renders black tile fill');
+  assert.ok(!svgAns.includes('class="shape-outline"'), 'pure Castle Wall print SVG should not draw Swiss-cheese shape-outline');
+  const svgWithSol = boardSvg(p3, sol3);
+  assert.ok(svgWithSol.includes('class="loop"'), 'answer-key print SVG renders solution loop');
+
+  // 6. Per-component parity isolation in castleStates + direct manual shadeConflicts on W/B tiles
+  const pIso = compile({
+    name: 'cw_iso',
+    rows: 6,
+    cols: 6,
+    clues: [],
+    castle: [
+      { r: 1, c: 1, wall: 'W', dir: '', n: -1 },
+      { r: 4, c: 4, wall: 'B', dir: '', n: -1 },
+    ],
+  });
+  const mIso = { edges: new Uint8Array(pIso.numEdges), faces: new Uint8Array(25) };
+  // Create a direct White-to-border contradiction at (1,1): cross out top edge (0,1)-(0,2)
+  mIso.edges[pIso.ed[(0 * 6 + 1) * 4 + 1]] = 2; // E_OFF -> connects White hole (1,1) to EXT (Outside)!
+  // Also create an unrelated parity conflict around interior vertex (3,2) in a separate component
+  mIso.edges[pIso.ed[(3 * 6 + 2) * 4 + 0]] = 1;
+  mIso.edges[pIso.ed[(3 * 6 + 2) * 4 + 1]] = 2;
+  mIso.edges[pIso.ed[(3 * 6 + 2) * 4 + 2]] = 2;
+  mIso.edges[pIso.ed[(3 * 6 + 2) * 4 + 3]] = 2;
+  assert.equal(castleStates(pIso, mIso)[0], 'bad', 'White wall parity error must still report bad despite unrelated conflict in another component');
+
+  // Direct manual shade contradicting White tile (shaded Outside) triggers shadeConflicts when checkBorder=true
+  mIso.faces[pIso.castle[0].face] = FACE_OUT;
+  assert.ok(shadeConflicts(pIso, mIso, true).has(pIso.castle[0].face), 'manual Outside shade on White wall should flag shade conflict');
+
+  // 7. Round 2 regressions:
+  //    (a) Unanchored edge-edge parity conflict MUST NOT trigger false-blame castleParity!
+  const stUnanch = initialState(pIso);
+  stUnanch.e[pIso.ed[(3 * 6 + 2) * 4 + 0]] = E_ON;
+  stUnanch.e[pIso.ed[(3 * 6 + 2) * 4 + 1]] = E_OFF;
+  stUnanch.e[pIso.ed[(3 * 6 + 2) * 4 + 2]] = E_OFF;
+  stUnanch.e[pIso.ed[(3 * 6 + 2) * 4 + 3]] = E_OFF;
+  assert.equal(castleContradiction(pIso, stUnanch), null, 'unanchored edge-edge parity conflict must not falsely blame Castle Wall');
+
+  //    (b) castleContradiction catches 2nd exact1 turn pair on n=1 ray (minTotal=2 > rem=1)
+  const pMinOv = compile({ name: 'cw_min_ov', rows: 4, cols: 7, clues: [], castle: [{ r: 1, c: 0, wall: 'B', dir: 'R', n: 1 }] });
+  const stMO = initialState(pMinOv);
+  // Two disjoint exact1 turn pairs at (1,2) and (1,5) with gap (1,3)-(1,4) OFF
+  stMO.e[pMinOv.ed[(1 * 7 + 3) * 4 + 1]] = E_OFF;
+  stMO.e[pMinOv.ed[(1 * 7 + 2) * 4 + 0]] = E_ON; stMO.e[pMinOv.ed[(1 * 7 + 2) * 4 + 2]] = E_OFF;
+  stMO.e[pMinOv.ed[(1 * 7 + 5) * 4 + 0]] = E_ON; stMO.e[pMinOv.ed[(1 * 7 + 5) * 4 + 2]] = E_OFF;
+  const cMO = castleContradiction(pMinOv, stMO);
+  assert.ok(cMO && cMO.kind === 'castleBroken' && cMO.over === true, 'castleContradiction must catch exact1 minTotal > rem');
+
+  //    (c) castleContradiction catches over-filled collinear ray-diff gap (3-> vs 2-> with 2 gap edges ON)
+  const pDiffOv = compile({
+    name: 'cw_diff_ov', rows: 4, cols: 8, clues: [],
+    castle: [{ r: 1, c: 0, wall: 'G', dir: 'R', n: 3 }, { r: 1, c: 4, wall: 'G', dir: 'R', n: 2 }],
+  });
+  const stDO = initialState(pDiffOv);
+  stDO.e[pDiffOv.ed[(1 * 8 + 1) * 4 + 1]] = E_ON;
+  stDO.e[pDiffOv.ed[(1 * 8 + 2) * 4 + 1]] = E_ON;
+  const cDO = castleContradiction(pDiffOv, stDO);
+  assert.ok(cDO && cDO.kind === 'castleBroken' && cDO.castleIdx === 0 && cDO.over === true, 'castleContradiction must catch ray-diff gap > diff');
 });

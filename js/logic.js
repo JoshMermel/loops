@@ -20,7 +20,8 @@ import {
 } from './variants/midloop.js';
 import {
   compileCastle, serializeCastle, parseCastleToken, symmetryCastle,
-  isCastleSatisfied, propagateCastleClue, propagateCastleParity, firstUnsatisfiedCastleOnClose,
+  isCastleSatisfied, propagateCastleClue, propagateCastleParity, propagateCastleMedium,
+  firstUnsatisfiedCastleOnClose,
 } from './variants/castlewall.js';
 
 /** Column letters like a spreadsheet: 0 -> A, 25 -> Z, 26 -> AA. */
@@ -300,6 +301,11 @@ let scratchInFaceQ = new Uint8Array(0);
 let scratchMidQ = new Int16Array(0);
 let scratchInMidQ = new Uint8Array(0);
 let scratchMidCap = 0;
+let scratchCwQ = new Int16Array(0);
+let scratchInCwQ = new Uint8Array(0);
+let scratchCwDirty = new Uint8Array(0);
+let scratchCwDirtyList = new Int16Array(0);
+let scratchCwCap = 0;
 let scratchQCap = 0;
 
 /** Number of edge assignments or cell=OFF deductions made by the most recent propagate() call. */
@@ -312,6 +318,20 @@ function ensureMidScratch(M) {
     while (cap <= M) cap <<= 1;
     scratchMidCap = cap;
     scratchMidQ = new Int16Array(cap);
+  }
+}
+
+function ensureCwScratch(K) {
+  if (scratchInCwQ.length < K) {
+    scratchInCwQ = new Uint8Array(K);
+    scratchCwDirty = new Uint8Array(K);
+    scratchCwDirtyList = new Int16Array(K);
+  }
+  if (scratchCwCap <= K) {
+    let cap = 32;
+    while (cap <= K) cap <<= 1;
+    scratchCwCap = cap;
+    scratchCwQ = new Int16Array(cap);
   }
 }
 
@@ -404,16 +424,33 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   const hasCastle = Boolean(P.hasCastle);
   if (hasCastle && P.castleImpossible) return false;
   const ecwOff = P._ecwOff, ecwData = P._ecwData;
+  const cwByRow = P.castleByRow, cwByCol = P.castleByCol;
   const cwLen = hasCastle ? P.castle.length : 0;
-  const qCw = hasCastle ? new Int32Array(cwLen + 1) : null;
-  const inCwQ = hasCastle ? new Uint8Array(cwLen) : null;
+  if (hasCastle) ensureCwScratch(cwLen);
+  const qCw = scratchCwQ, inCwQ = scratchInCwQ;
+  const cwDirty = scratchCwDirty, cwDirtyList = scratchCwDirtyList;
+  let cwDirtyLen = 0;
+  const cwMask = scratchCwCap - 1;
   let cwHead = 0, cwTail = 0;
   const pushCw = (k) => {
     if (!inCwQ[k]) {
       inCwQ[k] = 1;
-      qCw[cwTail++] = k;
-      if (cwTail > cwLen) cwTail = 0;
+      qCw[cwTail] = k;
+      cwTail = (cwTail + 1) & cwMask;
     }
+  };
+  const markCwDirty = (k) => {
+    if (!cwDirty[k]) {
+      cwDirty[k] = 1;
+      cwDirtyList[cwDirtyLen++] = k;
+    }
+  };
+  const markCellCw = (u) => {
+    const r = (u / cols) | 0, col = u - r * cols;
+    const rl = cwByRow[r];
+    for (let j = 0; j < rl.length; j++) markCwDirty(rl[j]);
+    const cl = cwByCol[col];
+    for (let j = 0; j < cl.length; j++) markCwDirty(cl[j]);
   };
 
   const pushCell = (i) => {
@@ -482,6 +519,8 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (hasCastle) {
       const cEnd = ecwOff[x + 1];
       for (let k = ecwOff[x]; k < cEnd; k++) pushCw(ecwData[k]);
+      markCellCw(a);
+      markCellCw(b);
     }
   };
 
@@ -538,7 +577,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (grays) for (let gi = 0; gi < grays.length; gi++) pushClue(grays[gi]);
     if (hasSlither) for (let si = 0; si < P.slither.length; si++) pushFace(P.slither[si].f);
     if (hasMidloop) for (let mi = 0; mi < P.midloop.length; mi++) pushMid(mi);
-    if (hasCastle) for (let ci = 0; ci < cwLen; ci++) if (P.castle[ci].dir) pushCw(ci);
+    if (hasCastle) for (let ci = 0; ci < cwLen; ci++) if (P.castle[ci].dir) { pushCw(ci); markCwDirty(ci); }
   }
 
   while (ok) {
@@ -736,16 +775,24 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       }
 
       while (ok && cwHead !== cwTail) {
-        const ci = qCw[cwHead++];
-        if (cwHead > cwLen) cwHead = 0;
+        const ci = qCw[cwHead];
+        cwHead = (cwHead + 1) & cwMask;
         inCwQ[ci] = 0;
         if (!propagateCastleClue(P, st, ci, setEdgeOk)) ok = false;
       }
     }
     if (!ok) break;
-    if (hasCastle && P.hasCastleWalls) {
+    if (hasCastle && !st.cycle && (seedEdge >= 0 || seedCell < 0 || changes > 0)) {
       const before = changes;
-      if (!propagateCastleParity(P, st, setEdgeOk)) { ok = false; break; }
+      if (P.hasCastleWalls) {
+        if (!propagateCastleParity(P, st, setEdgeOk)) { ok = false; break; }
+      }
+      if (cwDirtyLen > 0) {
+        const okMed = propagateCastleMedium(P, st, setEdgeOk, cwDirty);
+        for (let i = 0; i < cwDirtyLen; i++) cwDirty[cwDirtyList[i]] = 0;
+        cwDirtyLen = 0;
+        if (!okMed) { ok = false; break; }
+      }
       if (changes > before) continue;
     }
     if (!needLoopCheck) break;
@@ -862,6 +909,8 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   while (kHead !== kTail) { inClueQ[qClue[kHead]] = 0; kHead = (kHead + 1) & qMask; }
   while (fHead !== fTail) { inFaceQ[qFace[fHead]] = 0; fHead = (fHead + 1) & qMask; }
   while (mHead !== mTail) { inMidQ[qMid[mHead]] = 0; mHead = (mHead + 1) & midMask; }
+  while (cwHead !== cwTail) { inCwQ[qCw[cwHead]] = 0; cwHead = (cwHead + 1) & cwMask; }
+  for (let i = 0; i < cwDirtyLen; i++) cwDirty[cwDirtyList[i]] = 0;
   lastPropChanges = changes;
   return ok;
 }

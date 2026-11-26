@@ -385,10 +385,10 @@
     "cols": 6,
     "hints": 0,
     "edges": "000000000000000000000000000000000000000000000000000000000000000000000000",
-    "text": "The 0↑ clue at E4 allows zero parallel loop segments up from it — cross out E2–E3 and E1–E2.",
+    "text": "The 0← clue at E6 allows zero parallel loop segments left from it — cross out A6–B6.",
     "roles": {
       "clue": [
-        22
+        34
       ],
       "area": [],
       "focus": [],
@@ -399,8 +399,7 @@
     "targets": {
       "segOn": [],
       "segOff": [
-        21,
-        9
+        60
       ],
       "grayWhite": [],
       "grayBlack": []
@@ -418,10 +417,10 @@
     "cols": 6,
     "hints": 0,
     "edges": "000000000000000000000000000000000000000000000000000000000000000000000000",
-    "text": "The 2← clue at F2 needs every remaining open segment left from it to reach 2 — draw B2–C2 and A2–B2.",
+    "text": "The 2← clue at D3 needs every remaining open segment left from it to reach 2 — draw B3–C3 and A3–B3.",
     "roles": {
       "clue": [
-        11
+        15
       ],
       "area": [],
       "focus": [],
@@ -431,8 +430,8 @@
     },
     "targets": {
       "segOn": [
-        14,
-        12
+        26,
+        24
       ],
       "segOff": [],
       "grayWhite": [],
@@ -449,9 +448,9 @@
     "name": "ARMORY-12",
     "rows": 6,
     "cols": 6,
-    "hints": 1,
-    "edges": "000000000000000000001000000000000000000000000000000000000000000000000000",
-    "text": "Both the black wall at B2 and the board edge lie outside the loop, so no loop segment can separate them — cross out 4 edges.",
+    "hints": 0,
+    "edges": "000000000000000000000000000000000000000000000000000000000000000000000000",
+    "text": "The white wall at B2 must lie inside the loop while the board edge is outside, so the loop must pass between them — draw 6 segments.",
     "roles": {
       "clue": [
         7
@@ -463,13 +462,15 @@
       "path": []
     },
     "targets": {
-      "segOn": [],
-      "segOff": [
+      "segOn": [
         0,
         1,
         2,
-        13
+        13,
+        19,
+        31
       ],
+      "segOff": [],
       "grayWhite": [],
       "grayBlack": []
     },
@@ -1175,13 +1176,13 @@
     "name": "ARMORY-29",
     "rows": 10,
     "cols": 10,
-    "hints": 8,
-    "edges": "20000020000000000000000000000000000000000000000000000000000000000000000000000001000000000020000000010002000000000000000000000020000000000000000000000000000000000000002000000000000200000000000020000000",
-    "text": "Comparing 3→ at A2 with 1→ at E2 leaves exactly 2 segments in the gap between them — draw B2–C2 and C2–D2.",
+    "hints": 13,
+    "edges": "00001010001010000000000000000002000000000000000200222000000000000000000000010000000000000000100000000200020000000000000202000200000000000000000020000000000000000000000022000200000000002020000000000000",
+    "text": "Both 3← at J4 and 3← at G4 count the same total left, so there can be zero segments in the gap between them — cross out H4–I4.",
     "roles": {
       "clue": [
-        10,
-        14
+        39,
+        36
       ],
       "area": [],
       "focus": [],
@@ -1190,11 +1191,10 @@
       "path": []
     },
     "targets": {
-      "segOn": [
-        22,
-        24
+      "segOn": [],
+      "segOff": [
+        74
       ],
-      "segOff": [],
       "grayWhite": [],
       "grayBlack": []
     },
@@ -1209,12 +1209,12 @@
     "name": "ARMORY-30",
     "rows": 7,
     "cols": 7,
-    "hints": 3,
-    "edges": "11100100000000010000000000000000000000000000000000000000000000000002000000000000000020000020200000",
-    "text": "Along the 1← ray from G5, a forced straight corridor along the ray is longer than the 1 remaining segment allowed — cross out E5–F5 and D5–E5.",
+    "hints": 4,
+    "edges": "00000020202200000000000002000000000000000000000000000000101010100000000000000000000000101010000000",
+    "text": "Along the 3↓ ray from E2, turn limits along the ray leave zero spare capacity to reach 3 remaining segments — draw E3–E4 and E6–E7.",
     "roles": {
       "clue": [
-        34
+        11
       ],
       "area": [],
       "focus": [],
@@ -1223,11 +1223,11 @@
       "path": []
     },
     "targets": {
-      "segOn": [],
-      "segOff": [
-        64,
-        62
+      "segOn": [
+        37,
+        79
       ],
+      "segOff": [],
       "grayWhite": [],
       "grayBlack": []
     },
@@ -1813,35 +1813,29 @@
     "name": "ARMORY-44",
     "rows": 7,
     "cols": 7,
-    "hints": 13,
-    "edges": "22202200002002020002000200020002000000010000020000000100001100020001000001002220210000101010000000",
-    "text": "The forced corridor (G7, G6, G5, G4, and G3) only connects the two ends of one open path (F7 and F3) while other loop cells lie outside it: entering it would close the loop early, so cross out 6 edges.",
+    "hints": 12,
+    "edges": "00002000000000000000002210000000000002000020000020020000000100101200001100001012000010101000002000",
+    "text": "The forced corridor (G1 and F1) only connects the two ends of one open path (G2 and F2) while other loop cells lie outside it: entering it would close the loop early, so cross out G1–G2, F1–G1, and F1–F2.",
     "roles": {
       "clue": [],
       "area": [
-        48,
-        41,
-        34,
-        27,
-        20
+        6,
+        5
       ],
       "focus": [],
       "problem": [],
       "exit": [],
       "path": [
-        47,
-        19
+        13,
+        12
       ]
     },
     "targets": {
       "segOn": [],
       "segOff": [
-        94,
-        83,
-        69,
-        55,
-        41,
-        38
+        13,
+        10,
+        11
       ],
       "grayWhite": [],
       "grayBlack": []
@@ -1997,36 +1991,35 @@
     "name": "ARMORY-47",
     "rows": 7,
     "cols": 7,
-    "hints": 19,
-    "edges": "00202000002000000000000000000000000010200200011012021201110000202020010100111001000110100020101000",
-    "text": "The highlighted area has only two open ends (B4 and C4), so they must connect inside it; that makes F4 and E4 ends of one path, so E4–F4 cannot close them early.",
+    "hints": 26,
+    "edges": "00101200000000001010000200020121111012100121212111120101000020212021010000000011020100000020101000",
+    "text": "The highlighted area has only two open ends (D1 and D2), so they must connect inside it; that makes B1 and B2 ends of one path, so B1–B2 cannot close them early.",
     "roles": {
       "clue": [],
       "area": [
-        0,
-        7,
-        14,
-        15,
-        22,
-        23,
-        16,
-        8,
-        1
+        3,
+        10,
+        11,
+        12,
+        13,
+        6,
+        5,
+        4
       ],
       "focus": [],
       "problem": [],
       "exit": [],
       "path": [
-        22,
-        23,
-        26,
-        25
+        3,
+        10,
+        1,
+        8
       ]
     },
     "targets": {
       "segOn": [],
       "segOff": [
-        50
+        3
       ],
       "grayWhite": [],
       "grayBlack": []
@@ -2282,25 +2275,25 @@
     "name": "ARMORY-51",
     "rows": 8,
     "cols": 8,
-    "hints": 28,
-    "edges": "22000000000000021102000002000000212210101220000001200020220200000100201012122002210000010000220012202021202002002000000000202000",
-    "text": "Imagine no segment at C2–C3 and follow the forced deductions (starting with: the black circle at C3 is blocked up and goes two cells down; then the 1← clue at H4 needs all of its remaining open segments; then D4 becomes a dead end; then F4 must use F3–F4; reaching a contradiction after 5 steps). So draw C2–C3.",
+    "hints": 30,
+    "edges": "02111021021110012001001001011102000000001200010200000010121020020000001010010002000000000010100100000000101201010000000020001000",
+    "text": "Imagine a segment at C6–C7 and follow the forced deductions (starting with: the white circle at C7 must go vertically; then the 2↓ clue at C2 already has 2 segments, so the rest of its ray is off; then C3 becomes a dead end; then B3 must use B3–B4; reaching a contradiction after 18 steps). So cross out C6–C7.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        10,
-        18
+        42,
+        50
       ],
       "problem": [],
       "exit": [],
       "path": []
     },
     "targets": {
-      "segOn": [
-        21
+      "segOn": [],
+      "segOff": [
+        85
       ],
-      "segOff": [],
       "grayWhite": [],
       "grayBlack": []
     },
@@ -2315,33 +2308,33 @@
     "name": "ARMORY-52",
     "rows": 7,
     "cols": 7,
-    "hints": 11,
-    "edges": "11100100000000010000000000020000000000000000000000000000010001000020001210020002000000002020202000",
-    "text": "Imagine no segment at E3–E4: then the 2↑ clue at E5 needs all of its remaining open segments; and finally a white/black Castle Wall inside-outside constraint is violated. So draw E3–E4.",
+    "hints": 18,
+    "edges": "11120000000000120000000000000000020000000000000100010002000001000010010000010002200100201010101000",
+    "text": "Imagine a segment at C2–D2: then the Mid-loop dot at C2 must extend symmetrically horizontally; and finally the Mid-loop dot at B3 has no valid symmetric straight segment. So cross out C2–D2.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        18,
-        25
+        9,
+        10
       ],
       "problem": [
-        3
+        15
       ],
       "exit": [],
       "path": []
     },
     "targets": {
-      "segOn": [
-        37
+      "segOn": [],
+      "segOff": [
+        18
       ],
-      "segOff": [],
       "grayWhite": [],
       "grayBlack": []
     },
     "chain": [
-      9,
-      23
+      18,
+      16
     ],
     "faces": null
   },
@@ -2387,41 +2380,42 @@
   {
     "rule": "imagineChain",
     "tier": "Expert",
-    "weight": 96,
-    "puzzle": 30,
-    "name": "ARMORY-30",
+    "weight": 114,
+    "puzzle": 54,
+    "name": "ARMORY-54",
     "rows": 7,
     "cols": 7,
-    "hints": 5,
-    "edges": "11100100000000010000000000000000000000000000000000000200000000202002000000000000000020000020200000",
-    "text": "Imagine no segment at C6–D6: then the 2→ clue at A6 needs all of its remaining open segments; then F6 must use F6–F7; then G6 must use G6–G7; then F7 must use F7–G7; and finally the loop closes early while A1 is still outside it. So draw C6–D6.",
+    "hints": 14,
+    "edges": "02002200000000000020202020000000000000000002000000000002000000000100020000000021220200001010202000",
+    "text": "Imagine no segment at A5–B5: then A5 becomes a dead end; then the 1↓ clue at A3 needs all of its remaining open segments; then A6 must use A6–B6; then A7 must use A7–B7; then B6–B7 cannot close the loop early; then B7 must use B7–C7; then the 2↓ clue at C3 needs all of its remaining open segments; and finally the Castle Wall clue at F5 cannot reach 2 segments along its ray. So draw A5–B5.",
     "roles": {
       "clue": [],
       "area": [],
       "focus": [
-        37,
-        38
+        28,
+        29
       ],
       "problem": [
-        0
+        33
       ],
       "exit": [],
       "path": []
     },
     "targets": {
       "segOn": [
-        74
+        56
       ],
       "segOff": [],
       "grayWhite": [],
       "grayBlack": []
     },
     "chain": [
-      72,
-      80,
-      81,
-      83,
-      94
+      47,
+      61,
+      70,
+      71,
+      84,
+      86
     ],
     "faces": null
   }

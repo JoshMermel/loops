@@ -85,6 +85,7 @@ test('style.css has no unscoped screen rules that collide with print SVG classes
     boardSvg(compile({ name: 'a', rows: 4, cols: 4, clues: [{ r: 0, c: 0, t: 'B' }, { r: 0, c: 1, t: 'W' }, { r: 2, c: 2, t: 'G' }] })),
     boardSvg(compile({ name: 'b', rows: 4, cols: 4, clues: [], fullBoard: true, givens: [{ r: 0, c: 0, dir: 'H', v: 1 }, { r: 1, c: 1, dir: 'V', v: 0 }] })),
     boardSvg(compile({ name: 'c', rows: 5, cols: 5, clues: [], voids: [{ r: 2, c: 2 }], slither: [{ r: 0, c: 0, n: 2 }], midloop: [{ r: 0, c: 1, dir: 'H' }] })),
+    boardSvg(compile({ name: 'd', rows: 5, cols: 5, clues: [], castle: [{ r: 0, c: 1, wall: 'B', dir: 'D', n: 1 }, { r: 2, c: 2, wall: 'W', dir: '', n: -1 }, { r: 4, c: 3, wall: 'G', dir: 'L', n: 0 }] })),
   ];
   const printClasses = new Set();
   for (const s of svgs) {

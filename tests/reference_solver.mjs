@@ -125,12 +125,8 @@ export function referenceCount(p) {
           if (cnt !== cw.n) return false;
         }
         if (cw.wall === 'W' || cw.wall === 'B') {
-          // Independent ray-casting point-in-polygon test: shoot a horizontal ray from (cw.r + 0.5, cw.c + 0.5)
-          // wait: (cw.r, cw.c) is strictly not on the polygon, so shoot a horizontal ray along y = cw.r + 0.25 to +inf
-          // Wait: any vertical polygon edge from (r0, c0) to (r0+1, c0) with c0 > cw.c crosses y = cw.r + 0.25 iff r0 === cw.r!
-          // Even simpler: standard Jordan-curve ray from (cw.r, cw.c) along y = cw.r + 0.25? Since (cw.r, cw.c) is an isolated
-          // grid vertex not on the cycle, the 4 half-grid shifts (±0.25, ±0.25) all lie in the same region!
-          // Specifically, for point (cw.r + 0.25, cw.c + 0.25): a vertical edge (rr, cc)-(rr+1, cc) crosses the +x ray iff rr === cw.r && cc > cw.c!
+          // Independent Jordan-curve ray-casting from (cw.r + 0.25, cw.c + 0.25) toward +x:
+          // a vertical loop segment (rr, cc)-(rr+1, cc) crosses y = cw.r + 0.25 iff rr === cw.r && cc > cw.c.
           let crossings = 0;
           if (cw.r < rows - 1) {
             for (let cc = cw.c + 1; cc < cols; cc++) {

@@ -133,6 +133,7 @@ while (added < count && Date.now() < deadline) {
   if (p.clues.length) parts.push(`${p.clues.length} circles`);
   if (p.slither && p.slither.length) parts.push(`${p.slither.length} numbers`);
   if (p.midloop && p.midloop.length) parts.push(`${p.midloop.length} dots`);
+  if (p.castle && p.castle.length) parts.push(`${p.castle.length} walls`);
   if (p.givens && p.givens.length) parts.push(`${p.givens.length} givens`);
   process.stdout.write(`[${added}/${count}] ${p.name} (${parts.join(', ') || '0 clues'}) -> ${p.tier} / ${p.rules} / ${p.score}\n`);
 }

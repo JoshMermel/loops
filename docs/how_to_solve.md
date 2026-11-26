@@ -149,9 +149,9 @@ Imagine a segment on or off at a circle or open end: one local step immediately 
 
 <a href="../index.html?book=armory&puzzle=52"><img src="images/imagineLocal.svg" width="480" alt="imagineLocal hint example"></a>
 
-*ARMORY-52 (7×7, after 11 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-52 (7×7, after 18 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine no segment at E3–E4: then the 2↑ clue at E5 needs all of its remaining open segments; and finally a white/black Castle Wall inside-outside constraint is violated. So draw E3–E4."
+> Hint says: "Imagine a segment at C2–D2: then the Mid-loop dot at C2 must extend symmetrically horizontally; and finally the Mid-loop dot at B3 has no valid symmetric straight segment. So cross out C2–D2."
 
 ---
 
@@ -167,9 +167,9 @@ A forced multi-cell corridor joining the two ends of one path would close the lo
 
 <a href="../index.html?book=armory&puzzle=44"><img src="images/corridorNoEarlyClose.svg" width="480" alt="corridorNoEarlyClose hint example"></a>
 
-*ARMORY-44 (7×7, after 13 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-44 (7×7, after 12 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The forced corridor (G7, G6, G5, G4, and G3) only connects the two ends of one open path (F7 and F3) while other loop cells lie outside it: entering it would close the loop early, so cross out 6 edges."
+> Hint says: "The forced corridor (G1 and F1) only connects the two ends of one open path (G2 and F2) while other loop cells lie outside it: entering it would close the loop early, so cross out G1–G2, F1–G1, and F1–F2."
 
 ---
 
@@ -195,9 +195,9 @@ A sealed area with just two open ends must connect them, so their far ends canno
 
 <a href="../index.html?book=armory&puzzle=47"><img src="images/twoEndsJoin.svg" width="480" alt="twoEndsJoin hint example"></a>
 
-*ARMORY-47 (7×7, after 19 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-47 (7×7, after 26 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The highlighted area has only two open ends (B4 and C4), so they must connect inside it; that makes F4 and E4 ends of one path, so E4–F4 cannot close them early."
+> Hint says: "The highlighted area has only two open ends (D1 and D2), so they must connect inside it; that makes B1 and B2 ends of one path, so B1–B2 cannot close them early."
 
 ---
 
@@ -305,11 +305,11 @@ A puzzle is rated **Expert** when its hardest required step is in this tier: lon
 
 Imagine a segment on or off and follow a long, multi-front, or area-parity chain until something breaks.
 
-<a href="../index.html?book=armory&puzzle=30"><img src="images/imagineChain.svg" width="480" alt="imagineChain hint example"></a>
+<a href="../index.html?book=armory&puzzle=54"><img src="images/imagineChain.svg" width="480" alt="imagineChain hint example"></a>
 
-*ARMORY-30 (7×7, after 5 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-54 (7×7, after 14 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine no segment at C6–D6: then the 2→ clue at A6 needs all of its remaining open segments; then F6 must use F6–F7; then G6 must use G6–G7; then F7 must use F7–G7; and finally the loop closes early while A1 is still outside it. So draw C6–D6."
+> Hint says: "Imagine no segment at A5–B5: then A5 becomes a dead end; then the 1↓ clue at A3 needs all of its remaining open segments; then A6 must use A6–B6; then A7 must use A7–B7; then B6–B7 cannot close the loop early; then B7 must use B7–C7; then the 2↓ clue at C3 needs all of its remaining open segments; and finally the Castle Wall clue at F5 cannot reach 2 segments along its ray. So draw A5–B5."
 
 ---
 
@@ -321,9 +321,9 @@ Trying a segment one way leads to a contradiction.
 
 <a href="../index.html?book=armory&puzzle=51"><img src="images/tryEdge.svg" width="480" alt="tryEdge hint example"></a>
 
-*ARMORY-51 (8×8, after 28 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-51 (8×8, after 30 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Imagine no segment at C2–C3 and follow the forced deductions (starting with: the black circle at C3 is blocked up and goes two cells down; then the 1← clue at H4 needs all of its remaining open segments; then D4 becomes a dead end; then F4 must use F3–F4; reaching a contradiction after 5 steps). So draw C2–C3."
+> Hint says: "Imagine a segment at C6–C7 and follow the forced deductions (starting with: the white circle at C7 must go vertically; then the 2↓ clue at C2 already has 2 segments, so the rest of its ray is off; then C3 becomes a dead end; then B3 must use B3–B4; reaching a contradiction after 18 steps). So cross out C6–C7."
 
 ---
 
@@ -845,7 +845,7 @@ A 0 arrow crosses out every parallel segment along its ray.
 
 *ARMORY-10 (6×6, the empty board). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The 0↑ clue at E4 allows zero parallel loop segments up from it — cross out E2–E3 and E1–E2."
+> Hint says: "The 0← clue at E6 allows zero parallel loop segments left from it — cross out A6–B6."
 
 ---
 
@@ -859,7 +859,7 @@ A numbered arrow whose open segments match its count fills or crosses out the re
 
 *ARMORY-11 (6×6, the empty board). Click the picture to open this puzzle in the app.*
 
-> Hint says: "The 2← clue at F2 needs every remaining open segment left from it to reach 2 — draw B2–C2 and A2–B2."
+> Hint says: "The 2← clue at D3 needs every remaining open segment left from it to reach 2 — draw B3–C3 and A3–B3."
 
 ---
 
@@ -871,9 +871,9 @@ An edge directly separating a white (inside) wall from the border or a black (ou
 
 <a href="../index.html?book=armory&puzzle=12"><img src="images/castleWallEdge.svg" width="480" alt="castleWallEdge hint example"></a>
 
-*ARMORY-12 (6×6, after 1 earlier hint). Click the picture to open this puzzle in the app.*
+*ARMORY-12 (6×6, the empty board). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Both the black wall at B2 and the board edge lie outside the loop, so no loop segment can separate them — cross out 4 edges."
+> Hint says: "The white wall at B2 must lie inside the loop while the board edge is outside, so the loop must pass between them — draw 6 segments."
 
 ---
 
@@ -885,9 +885,9 @@ Two same-direction arrows in the same row or column pin the exact segment count 
 
 <a href="../index.html?book=armory&puzzle=29"><img src="images/castleRayDiff.svg" width="480" alt="castleRayDiff hint example"></a>
 
-*ARMORY-29 (10×10, after 8 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-29 (10×10, after 13 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Comparing 3→ at A2 with 1→ at E2 leaves exactly 2 segments in the gap between them — draw B2–C2 and C2–D2."
+> Hint says: "Both 3← at J4 and 3← at G4 count the same total left, so there can be zero segments in the gap between them — cross out H4–I4."
 
 ---
 
@@ -899,9 +899,9 @@ Coupled straight corridors and forced turns along an arrow ray bound which segme
 
 <a href="../index.html?book=armory&puzzle=30"><img src="images/castleRayBound.svg" width="480" alt="castleRayBound hint example"></a>
 
-*ARMORY-30 (7×7, after 3 earlier hints). Click the picture to open this puzzle in the app.*
+*ARMORY-30 (7×7, after 4 earlier hints). Click the picture to open this puzzle in the app.*
 
-> Hint says: "Along the 1← ray from G5, a forced straight corridor along the ray is longer than the 1 remaining segment allowed — cross out E5–F5 and D5–E5."
+> Hint says: "Along the 3↓ ray from E2, turn limits along the ray leave zero spare capacity to reach 3 remaining segments — draw E3–E4 and E6–E7."
 
 ---
 

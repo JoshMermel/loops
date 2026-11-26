@@ -174,6 +174,12 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     }
     return false;
   };
+  const cycleViolatesCastle = (cycleEdges) => {
+    if (!P.hasCastle) return false;
+    const cyc = new Uint8Array(numEdges);
+    for (let k = 0; k < cycleEdges.length; k++) cyc[cycleEdges[k]] = 1;
+    return !isCastleSatisfied(P, cyc);
+  };
 
   const availEdges = (i) => {
     const out = [];
@@ -256,7 +262,8 @@ export function autoXForced(P, m, { useShade = false } = {}) {
 
         const w1 = walk(eA);
         if (w1.closed) {
-          const impossible = P.clueCells.length > 0 || P.hasMidloop || P.hasCastle || anyDegGt0 || cycleViolatesSlither(w1.edges);
+          const impossible = P.clueCells.length > 0 || P.hasMidloop || anyDegGt0
+            || cycleViolatesSlither(w1.edges) || cycleViolatesCastle(w1.edges);
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
           }
@@ -270,12 +277,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           if (!impossible && anyDegGt0) impossible = true;
           if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
           if (!impossible && P.hasMidloop) impossible = cycleViolatesMidloopAt(t, w1.edges.concat(w2.edges));
-          if (!impossible && P.hasCastle) {
-            const cyc = new Uint8Array(numEdges);
-            for (const x of w1.edges) cyc[x] = 1;
-            for (const x of w2.edges) cyc[x] = 1;
-            impossible = !isCastleSatisfied(P, cyc);
-          }
+          if (!impossible && P.hasCastle) impossible = cycleViolatesCastle(w1.edges.concat(w2.edges));
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
             for (const x of w2.edges) if (add(x)) changed = true;
@@ -576,6 +578,16 @@ export function shadeConflicts(P, m, checkBorder = true) {
     if ((ev === 1 && va === vb) || (ev === 2 && va !== vb)) {
       addBad(a);
       addBad(b);
+    }
+  }
+  if (checkBorder && P.hasCastleWalls) {
+    for (let k = 0; k < P.castle.length; k++) {
+      const cw = P.castle[k];
+      if (cw.wall === 'G' || cw.isExterior || cw.face < 0) continue;
+      const v = m.faces[cw.face];
+      if (!v) continue;
+      const want = cw.wall === 'W' ? FACE_IN : FACE_OUT;
+      if (v !== want) addBad(cw.face);
     }
   }
   return bad;

@@ -17,7 +17,7 @@ import {
   findEasyMidloopStep, findMediumMidloopStep, midloopContradiction,
 } from './variants/midloop.js';
 import {
-  isCastleSatisfied, firstUnsatisfiedCastleOnClose,
+  firstUnsatisfiedCastle, firstUnsatisfiedCastleOnClose,
   findEasyCastleStep, findMediumCastleStep, castleContradiction,
 } from './variants/castlewall.js';
 
@@ -193,6 +193,7 @@ let propClueBuf = new Uint8Array(0);
 let dirtyFlag = new Uint8Array(0);
 let dirtyFaceFlag = new Uint8Array(0);
 let dirtyMidFlag = new Uint8Array(0);
+let dirtyCastleFlag = new Uint8Array(0);
 
 /**
  * Easy contradiction check (local rule violations + early closed loop).
@@ -358,7 +359,7 @@ export function easyContradiction(P, st, scope = null) {
 
   // 3e. Castle Wall ray/parity contradiction
   if (P.hasCastle) {
-    const cc = castleContradiction(P, st);
+    const cc = castleContradiction(P, st, scope ? scope.castles : null);
     if (cc) return cc;
   }
 
@@ -433,9 +434,12 @@ export function easyContradiction(P, st, scope = null) {
         return mc || { kind: 'earlyClose', midIdx: badMid };
       }
     }
-    if (P.hasCastle && !isCastleSatisfied(P, e)) {
-      const cc = castleContradiction(P, st);
-      return cc || { kind: 'earlyClose', castleIdx: 0 };
+    if (P.hasCastle) {
+      const badCw = firstUnsatisfiedCastle(P, e);
+      if (badCw >= 0) {
+        const cc = castleContradiction(P, st, null);
+        return cc || { kind: 'earlyClose', castleIdx: badCw };
+      }
     }
   }
   return null;
@@ -552,7 +556,7 @@ function findEasyStep(P, st, forbid, scope = null) {
 
   // 0a2. Castle Wall easy rules
   if (P.hasCastle) {
-    const emitted = findEasyCastleStep(P, st, tryEmit);
+    const emitted = findEasyCastleStep(P, st, tryEmit, scope ? scope.castles : null);
     if (emitted) return emitted;
   }
 
@@ -840,7 +844,7 @@ function findEasyStep(P, st, forbid, scope = null) {
     if (emitted) return emitted;
   }
   if (P.hasCastle) {
-    const emitted = findMediumCastleStep(P, st, tryEmit);
+    const emitted = findMediumCastleStep(P, st, tryEmit, scope ? scope.castles : null);
     if (emitted) return emitted;
   }
 
@@ -923,6 +927,20 @@ function runHypothesis(P, baseState, edge, val, {
   const slitherAt = P.hasSlither ? P.slitherAt : null;
   const hasMid = Boolean(P.hasMidloop);
   const midByRow = P.midloopByRow, midByCol = P.midloopByCol;
+  const hasCastle = Boolean(P.hasCastle);
+  const castleByRow = P.castleByRow, castleByCol = P.castleByCol;
+  const markCastleIdx = (ci) => {
+    if (ci < 0 || dirtyCastleFlag[ci]) return;
+    dirtyCastleFlag[ci] = 1;
+    scope.castleList.push(ci);
+  };
+  const markCellCastles = (c) => {
+    const r = (c / cols) | 0, col = c - r * cols;
+    const rl = castleByRow[r];
+    for (let j = 0; j < rl.length; j++) markCastleIdx(rl[j]);
+    const cl = castleByCol[col];
+    for (let j = 0; j < cl.length; j++) markCastleIdx(cl[j]);
+  };
   const markFace = (f) => {
     const si = slitherAt[f];
     if (si < 0 || dirtyFaceFlag[si]) return;
@@ -962,6 +980,7 @@ function runHypothesis(P, baseState, edge, val, {
     if (addedOn) { scope.hasOn = true; scope.checkCycle = true; }
     if (slitherAt) markCellFaces(i);
     if (hasMid) markCellMids(i);
+    if (hasCastle) markCellCastles(i);
     markCell(i);
     const b = i * 4;
     for (let d = 0; d < 4; d++) {
@@ -994,18 +1013,24 @@ function runHypothesis(P, baseState, edge, val, {
     if (scope.mids) {
       for (let k = 0; k < scope.mids.length; k++) dirtyMidFlag[scope.mids[k]] = 0;
     }
+    if (scope.castleList) {
+      for (let k = 0; k < scope.castleList.length; k++) dirtyCastleFlag[scope.castleList[k]] = 0;
+    }
   };
 
   if (scoped) {
     if (dirtyFlag.length < P.N) dirtyFlag = new Uint8Array(P.N);
     if (slitherAt && dirtyFaceFlag.length < P.slither.length) dirtyFaceFlag = new Uint8Array(P.slither.length);
     if (hasMid && dirtyMidFlag.length < P.midloop.length) dirtyMidFlag = new Uint8Array(P.midloop.length);
+    if (hasCastle && dirtyCastleFlag.length < P.castle.length) dirtyCastleFlag = new Uint8Array(P.castle.length);
     scope = {
       cells: [],
       whites: [],
       blacks: [],
       faces: slitherAt ? [] : null,
       mids: hasMid ? [] : null,
+      castles: hasCastle ? dirtyCastleFlag : null,
+      castleList: hasCastle ? [] : null,
       newOn: val === E_ON ? [edge] : [],
       hasOn: val === E_ON,
       checkCycle: val === E_ON,

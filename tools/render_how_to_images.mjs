@@ -59,8 +59,10 @@ for (const ex of examples) {
     return [ix(a), iy(a), ix(b), iy(b)];
   };
 
-  let g = P.hasVoids
-    ? `<path fill="#ffffff" fill-rule="evenodd" stroke="#e0e0e0" stroke-width="1.5" d="${tilesOutlinePath(P.rows, P.cols, (r, c) => !P.isVoid[r * P.cols + c], PAD - S / 2, PAD - S / 2, S, S, 8)}"/>`
+  const hasPlainVoids = Boolean(P.voids && P.voids.length > 0);
+  const isPlainVoid = (u) => P.isVoid[u] && !(P.hasCastle && P.castleAtCell[u] >= 0);
+  let g = hasPlainVoids
+    ? `<path fill="#ffffff" fill-rule="evenodd" stroke="#e0e0e0" stroke-width="1.5" d="${tilesOutlinePath(P.rows, P.cols, (r, c) => !isPlainVoid(r * P.cols + c), PAD - S / 2, PAD - S / 2, S, S, 8)}"/>`
     : `<rect x="1" y="1" width="${innerW - 2}" height="${innerH - 2}" rx="8" fill="#ffffff" stroke="#e0e0e0" stroke-width="1.5"/>`;
 
   // Dual-face Inside/Outside hint shading (for faceParity)
@@ -98,10 +100,12 @@ for (const ex of examples) {
     focus: 'rgba(244,236,156,0.8)',
   };
   for (const i of roles.area || []) {
+    if (P.hasVoids && P.isVoid[i]) continue;
     g += `<rect x="${ix(i) - S / 2}" y="${iy(i) - S / 2}" width="${S}" height="${S}" fill="${roleFill.area}"/>`;
   }
   for (const role of ['clue', 'path', 'problem', 'focus']) {
     for (const i of roles[role] || []) {
+      if (P.hasVoids && P.isVoid[i]) continue;
       g += `<rect x="${ix(i) - S / 2 + 3}" y="${iy(i) - S / 2 + 3}" width="${S - 6}" height="${S - 6}" rx="8" fill="${roleFill[role]}"/>`;
     }
   }
@@ -193,12 +197,12 @@ for (const ex of examples) {
     const tileSz = S - 4, half = tileSz / 2;
     for (const cw of P.castle) {
       const cx = vx(cw.c), cy = vy(cw.r);
-      const fill = cw.wall === 'W' ? '#ffffff' : cw.wall === 'B' ? '#1f2429' : '#9aa3ad';
+      const fill = cw.wall === 'W' ? '#ffffff' : cw.wall === 'B' ? '#1f2429' : '#c4cbd3';
       const stroke = cw.wall === 'G' ? '#4b5563' : '#1f2429';
-      const ink = cw.wall === 'W' ? '#111111' : '#ffffff';
+      const ink = cw.wall === 'B' ? '#ffffff' : '#111111';
       g += `<rect x="${cx - half}" y="${cy - half}" width="${tileSz}" height="${tileSz}" rx="5" fill="${fill}" stroke="${stroke}" stroke-width="2.2"/>`;
       if (cw.dir) {
-        const fs = cw.n >= 10 ? S * 0.34 : S * 0.40;
+        const fs = cw.n >= 10 ? S * 0.30 : S * 0.40;
         const attrs = `font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="${ink}"`;
         if (cw.dir === 'R') g += `<text x="${cx}" y="${cy}" font-size="${fs}" ${attrs}>${cw.n}→</text>`;
         else if (cw.dir === 'L') g += `<text x="${cx}" y="${cy}" font-size="${fs}" ${attrs}>←${cw.n}</text>`;
@@ -211,6 +215,17 @@ for (const ex of examples) {
         }
       }
     }
+    // Outer highlight frames above Castle Wall tiles so clue/focus/problem highlights are clearly visible
+    const fHalf = half + 1.5, fSz = fHalf * 2;
+    const emitCwFrame = (list, strokeCol, dash = '') => {
+      for (const i of list || []) {
+        if (P.castleAtCell[i] < 0) continue;
+        g += `<rect x="${ix(i) - fHalf}" y="${iy(i) - fHalf}" width="${fSz}" height="${fSz}" rx="6.5" fill="none" stroke="${strokeCol}" stroke-width="3.2"${dash}/>`;
+      }
+    };
+    emitCwFrame(roles.clue, '#1976d2');
+    emitCwFrame(roles.focus, '#8a6d00');
+    emitCwFrame(roles.problem, '#d55e00', ' stroke-dasharray="5 3"');
   }
 
   // Existing edge X marks (given walls in bold dark ink)
@@ -225,7 +240,10 @@ for (const ex of examples) {
 
   // Hint overlays (rings, ghost X, gray label ghosts)
   for (const i of roles.exit || []) g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.36}" fill="none" stroke="#2e7d32" stroke-width="2.2" stroke-dasharray="4 3"/>`;
-  for (const i of roles.focus || []) g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.38}" fill="none" stroke="#8a6d00" stroke-width="2.8"/>`;
+  for (const i of roles.focus || []) {
+    if (P.hasCastle && P.castleAtCell[i] >= 0) continue;
+    g += `<circle cx="${ix(i)}" cy="${iy(i)}" r="${S * 0.38}" fill="none" stroke="#8a6d00" stroke-width="2.8"/>`;
+  }
 
   for (const x of targets.segOff || []) {
     const [x1, y1, x2, y2] = segCoords(x);
