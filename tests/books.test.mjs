@@ -60,7 +60,7 @@ test('manifest.json matches every shipped CSV file, count, and section hierarchy
 
 test('following hints from an empty board solves shipped Beginner and Medium puzzles across sizes and variants', () => {
   const bookIds = [
-    'intro', 'intro-slither', 'intro-midloop', 'intro-castle', 'intro-hamilton',
+    'intro', 'intro-slither', 'intro-midloop', 'intro-castle', 'intro-corral', 'intro-hamilton',
     '8x8-beginner', '8x8-medium', '12x12-beginner', '12x12-medium',
     '16x16-beginner', '16x16-medium', '12x20-beginner', '12x20-medium',
     '16x24-beginner', '16x24-medium',
@@ -149,7 +149,7 @@ test('docs/how_to_solve.md and docs/how_to_solve.html exist with all referenced 
   for (const rel of imgs) {
     assert.ok(fs.existsSync(path.join(root, 'docs', rel)), `missing doc image docs/${rel}`);
   }
-  for (const anchor of ['variant-gray', 'variant-full', 'variant-swiss', 'variant-slitherlink', 'variant-midloop', 'variant-castlewall']) {
+  for (const anchor of ['variant-gray', 'variant-full', 'variant-swiss', 'variant-slitherlink', 'variant-midloop', 'variant-castlewall', 'variant-corral']) {
     assert.ok(html.includes(`id="${anchor}"`), `missing #${anchor} anchor in docs/how_to_solve.html`);
   }
 });

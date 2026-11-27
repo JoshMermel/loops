@@ -4,7 +4,7 @@
     {
       "name": "Start here",
       "icon": "🌱",
-      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, Castle Wall, and Hamilton cycle."
+      "blurb": "Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, Castle Wall, Corral, and Hamilton cycle."
     },
     {
       "name": "Masyu",
@@ -270,6 +270,15 @@
       "count": 100,
       "group": "Start here",
       "blurb": "Small 6×6 and 7×7 Beginner Castle Wall warm-ups, easiest first."
+    },
+    {
+      "id": "intro-corral",
+      "name": "Corral intro",
+      "label": "🐄 Corral",
+      "file": "data/intro-corral.csv",
+      "count": 100,
+      "group": "Start here",
+      "blurb": "Small 4×4 and 5×5-square Beginner Corral (Bag / Cave) warm-ups, easiest first."
     },
     {
       "id": "intro-hamilton",

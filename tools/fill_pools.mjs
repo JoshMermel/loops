@@ -751,7 +751,9 @@ if (!isMainThread) {
       budgetSec: 90, perPuzzleMs: 15000,
     },
 
-    // ---- Corral (Bag / Cave) tasting pools (24-puzzle tasting books at 4 B / 8 M / 8 H / 4 E)
+    // ---- Corral (Bag / Cave) intro + tasting pools
+    { group: 'corral-intro', pool: 'intro_corral_5x5', cols: 5, rows: 5, style: 'corral', tier: 'Beginner', total: 55, budgetSec: 40, perPuzzleMs: 6000 },
+    { group: 'corral-intro', pool: 'intro_corral_6x6', cols: 6, rows: 6, style: 'corral', tier: 'Beginner', total: 55, budgetSec: 40, perPuzzleMs: 8000 },
     {
       group: 'corral-token', pool: 'corral_8x8', cols: 8, rows: 8, style: 'corral',
       buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },

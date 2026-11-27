@@ -19,7 +19,7 @@ const manifest = {
     {
       name: 'Start here',
       icon: '🌱',
-      blurb: 'Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, Castle Wall, and Hamilton cycle.',
+      blurb: 'Small Beginner warm-ups to learn Masyu, Slitherlink, Mid-loop, Castle Wall, Corral, and Hamilton cycle.',
     },
     {
       name: 'Masyu',
@@ -272,6 +272,11 @@ const recipes = [
     id: 'intro-castle', name: 'Castle Wall intro', label: '🏰 Castle Wall', group: 'Start here',
     glob: 'intro_castle_6x6,intro_castle_7x7', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
     blurb: 'Small 6×6 and 7×7 Beginner Castle Wall warm-ups, easiest first.',
+  },
+  {
+    id: 'intro-corral', name: 'Corral intro', label: '🐄 Corral', group: 'Start here',
+    glob: 'intro_corral_5x5,intro_corral_6x6', limit: 100, onlyTier: 'Beginner', balanceGroups: true,
+    blurb: 'Small 4×4 and 5×5-square Beginner Corral (Bag / Cave) warm-ups, easiest first.',
   },
   {
     id: 'intro-hamilton', name: 'Hamilton cycle intro', label: '🔁 Hamilton cycle', group: 'Start here',
