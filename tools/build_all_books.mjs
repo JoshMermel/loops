@@ -106,7 +106,25 @@ const manifest = {
       subs: {
         Classic: {
           icon: '📚',
-          blurb: 'Standard Mid-loop boards across three sizes.',
+          blurb: 'Standard Mid-loop boards by size, from 7×7 up to tall 10×16.',
+          subs: {
+            '7×7': {
+              icon: '7️⃣',
+              blurb: 'Compact 7×7 boards across all four difficulties.',
+            },
+            '10×10': {
+              icon: '🔟',
+              blurb: 'Classic 10×10 boards across all four difficulties.',
+            },
+            '12×12': {
+              icon: '🔷',
+              blurb: 'Big 12×12 boards across all four difficulties.',
+            },
+            '10×16': {
+              icon: '📏',
+              blurb: 'Tall magazine-page 10×16 boards across all four difficulties.',
+            },
+          },
         },
         Bonus: {
           icon: '🎁',
@@ -117,7 +135,7 @@ const manifest = {
     {
       name: 'Castle Wall',
       icon: '🏰',
-      blurb: 'Keep white walls inside the loop, black walls outside, and match every directional segment count.',
+      blurb: 'Keep white walls inside the loop, black walls outside, and match every directional segment count — Classic sizes plus Bonus gimmicks.',
       subs: {
         Classic: {
           icon: '📚',
@@ -140,6 +158,10 @@ const manifest = {
               blurb: 'Tall magazine-page 10×16 boards across all four difficulties.',
             },
           },
+        },
+        Bonus: {
+          icon: '🎁',
+          blurb: 'Themed variations with the same Castle Wall rules.',
         },
       },
     },
@@ -494,22 +516,34 @@ const recipes = [
     blurb: 'Pure Slitherlink where every single numbered square is a 3.',
   },
 
-  // ---- Mid-loop Classic (full-size 500-puzzle books at 10/40/40/10) + Bonus gimmick token books (24 puzzles each)
-  {
-    id: 'midloop-small', name: 'Mid-loop — Small', label: 'Small (7×7)', group: 'Mid-loop', sub: 'Classic',
-    glob: 'midloop_7x7', tiers: '50,200,200,50',
-    blurb: 'Compact 7×7 Mid-loop boards across all four difficulties.',
-  },
-  {
-    id: 'midloop-classic', name: 'Mid-loop — Classic', label: 'Classic (10×10)', group: 'Mid-loop', sub: 'Classic',
-    glob: 'midloop_10x10', tiers: '50,200,200,50',
-    blurb: 'Classic 10×10 Mid-loop boards across all four difficulties.',
-  },
-  {
-    id: 'midloop-large', name: 'Mid-loop — Large', label: 'Large (12×12)', group: 'Mid-loop', sub: 'Classic',
-    glob: 'midloop_12x12', tiers: '50,200,200,50',
-    blurb: 'Big 12×12 Mid-loop boards across all four difficulties.',
-  },
+  // ---- Mid-loop Classic (per-size/per-difficulty 500-puzzle books, like Masyu, Slitherlink & Castle Wall) + Bonus
+  ...([
+    ['7x7', '7×7', 'midloop_7x7'],
+    ['10x10', '10×10', 'midloop_10x10'],
+    ['12x12', '12×12', 'midloop_12x12'],
+    ['10x16', '10×16', 'midloop_10x16'],
+  ].flatMap(([slug, dimLabel, glob]) => [
+    {
+      id: `midloop-${slug}-beginner`, name: `Mid-loop ${dimLabel} Beginner`, label: 'Beginner',
+      group: 'Mid-loop', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Beginner',
+      blurb: 'Warm-up Mid-loop boards using core midpoint and border rules.',
+    },
+    {
+      id: `midloop-${slug}-medium`, name: `Mid-loop ${dimLabel} Medium`, label: 'Medium',
+      group: 'Mid-loop', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Medium',
+      blurb: 'Symmetric reach, cap bounds, basic shading, and 1-step lookahead.',
+    },
+    {
+      id: `midloop-${slug}-hard`, name: `Mid-loop ${dimLabel} Hard`, label: 'Hard',
+      group: 'Mid-loop', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Hard',
+      blurb: 'Midpoint shading, loop topology, and short single-thread lookahead.',
+    },
+    {
+      id: `midloop-${slug}-expert`, name: `Mid-loop ${dimLabel} Expert`, label: 'Expert',
+      group: 'Mid-loop', sub: 'Classic', sub2: dimLabel, glob, limit: 500, onlyTier: 'Expert',
+      blurb: 'Deep lookahead chains on pure Mid-loop grids.',
+    },
+  ])),
   {
     id: 'midloop-even-7x7', name: 'Mid-loop — All even', label: '✚ All even (7×7)', group: 'Mid-loop', sub: 'Bonus',
     glob: 'midloop_even_7x7', tiers: '50,200,200,50',
@@ -565,6 +599,37 @@ const recipes = [
       blurb: 'Deep lookahead chains on pure Castle Wall grids.',
     },
   ])),
+  {
+    id: 'castle-allgray-8x8', name: 'Castle Wall — All gray', label: '🌫️ All gray (8×8)', group: 'Castle Wall', sub: 'Bonus',
+    glob: 'castle_allgray_8x8', tiers: '4,8,8,4',
+    blurb: 'Every tile is mystery gray with an arrow — zero inside/outside wall hints, pure directional counts.',
+  },
+  {
+    id: 'castle-allwhite-8x8', name: 'Castle Wall — All white', label: '⬜ All white (8×8)', group: 'Castle Wall', sub: 'Bonus',
+    glob: 'castle_allwhite_8x8', tiers: '4,8,8,4',
+    blurb: 'Every Castle Wall tile is white — the single loop must enclose every tile while matching every arrow.',
+  },
+  {
+    id: 'castle-allblack-8x8', name: 'Castle Wall — All black', label: '⬛ All black (8×8)', group: 'Castle Wall', sub: 'Bonus',
+    glob: 'castle_allblack_8x8', tiers: '4,8,8,4',
+    blurb: 'Every Castle Wall tile is black — weave the loop strictly outside every obstacle while matching every arrow.',
+  },
+  {
+    id: 'castle-swiss-10x10', name: 'Castle Wall — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Castle Wall', sub: 'Bonus',
+    glob: 'castle_swiss_10x10', tiers: '4,8,8,4',
+    blurb: 'Castle Wall boards punched with plain interior cutout holes alongside colored clue tiles.',
+  },
+  {
+    id: 'castle-sky-6x18', name: 'Castle Wall — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Castle Wall', sub: 'Bonus',
+    glob: 'castle_sky_6x18', tiers: '4,8,8,4',
+    blurb: 'Tall, narrow Castle Wall towers with sweeping vertical arrow sightlines.',
+  },
+  {
+    id: 'castle-sym-9x9', name: 'Castle Wall — Symmetry', label: '🪞 Symmetry (9×9)', group: 'Castle Wall', sub: 'Bonus',
+    glob: 'castle_sym_rot180_9x9,castle_sym_mirror_9x9,castle_sym_transpose_9x9',
+    tiers: '4,8,8,4', balanceGroups: true, interleaveGroups: true, maxRun: 2,
+    blurb: 'Mirror, diagonal, and 180° symmetric Castle Wall tiles, arrows, and loops.',
+  },
 
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)
   {

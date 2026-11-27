@@ -91,7 +91,25 @@
       "subs": {
         "Classic": {
           "icon": "📚",
-          "blurb": "Standard Mid-loop boards across three sizes."
+          "blurb": "Standard Mid-loop boards by size, from 7×7 up to tall 10×16.",
+          "subs": {
+            "7×7": {
+              "icon": "7️⃣",
+              "blurb": "Compact 7×7 boards across all four difficulties."
+            },
+            "10×10": {
+              "icon": "🔟",
+              "blurb": "Classic 10×10 boards across all four difficulties."
+            },
+            "12×12": {
+              "icon": "🔷",
+              "blurb": "Big 12×12 boards across all four difficulties."
+            },
+            "10×16": {
+              "icon": "📏",
+              "blurb": "Tall magazine-page 10×16 boards across all four difficulties."
+            }
+          }
         },
         "Bonus": {
           "icon": "🎁",
@@ -102,7 +120,7 @@
     {
       "name": "Castle Wall",
       "icon": "🏰",
-      "blurb": "Keep white walls inside the loop, black walls outside, and match every directional segment count.",
+      "blurb": "Keep white walls inside the loop, black walls outside, and match every directional segment count — Classic sizes plus Bonus gimmicks.",
       "subs": {
         "Classic": {
           "icon": "📚",
@@ -125,6 +143,10 @@
               "blurb": "Tall magazine-page 10×16 boards across all four difficulties."
             }
           }
+        },
+        "Bonus": {
+          "icon": "🎁",
+          "blurb": "Themed variations with the same Castle Wall rules."
         }
       }
     },
@@ -829,34 +851,180 @@
       "sub": "Bonus"
     },
     {
-      "id": "midloop-small",
-      "name": "Mid-loop — Small",
-      "label": "Small (7×7)",
-      "file": "data/midloop-small.csv",
+      "id": "midloop-7x7-beginner",
+      "name": "Mid-loop 7×7 Beginner",
+      "label": "Beginner",
+      "file": "data/midloop-7x7-beginner.csv",
       "count": 500,
       "group": "Mid-loop",
-      "blurb": "Compact 7×7 Mid-loop boards across all four difficulties.",
-      "sub": "Classic"
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Warm-up Mid-loop boards using core midpoint and border rules."
     },
     {
-      "id": "midloop-classic",
-      "name": "Mid-loop — Classic",
-      "label": "Classic (10×10)",
-      "file": "data/midloop-classic.csv",
+      "id": "midloop-7x7-medium",
+      "name": "Mid-loop 7×7 Medium",
+      "label": "Medium",
+      "file": "data/midloop-7x7-medium.csv",
       "count": 500,
       "group": "Mid-loop",
-      "blurb": "Classic 10×10 Mid-loop boards across all four difficulties.",
-      "sub": "Classic"
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Symmetric reach, cap bounds, basic shading, and 1-step lookahead."
     },
     {
-      "id": "midloop-large",
-      "name": "Mid-loop — Large",
-      "label": "Large (12×12)",
-      "file": "data/midloop-large.csv",
+      "id": "midloop-7x7-hard",
+      "name": "Mid-loop 7×7 Hard",
+      "label": "Hard",
+      "file": "data/midloop-7x7-hard.csv",
       "count": 500,
       "group": "Mid-loop",
-      "blurb": "Big 12×12 Mid-loop boards across all four difficulties.",
-      "sub": "Classic"
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Midpoint shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "midloop-7x7-expert",
+      "name": "Mid-loop 7×7 Expert",
+      "label": "Expert",
+      "file": "data/midloop-7x7-expert.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Deep lookahead chains on pure Mid-loop grids."
+    },
+    {
+      "id": "midloop-10x10-beginner",
+      "name": "Mid-loop 10×10 Beginner",
+      "label": "Beginner",
+      "file": "data/midloop-10x10-beginner.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Warm-up Mid-loop boards using core midpoint and border rules."
+    },
+    {
+      "id": "midloop-10x10-medium",
+      "name": "Mid-loop 10×10 Medium",
+      "label": "Medium",
+      "file": "data/midloop-10x10-medium.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Symmetric reach, cap bounds, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "midloop-10x10-hard",
+      "name": "Mid-loop 10×10 Hard",
+      "label": "Hard",
+      "file": "data/midloop-10x10-hard.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Midpoint shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "midloop-10x10-expert",
+      "name": "Mid-loop 10×10 Expert",
+      "label": "Expert",
+      "file": "data/midloop-10x10-expert.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Deep lookahead chains on pure Mid-loop grids."
+    },
+    {
+      "id": "midloop-12x12-beginner",
+      "name": "Mid-loop 12×12 Beginner",
+      "label": "Beginner",
+      "file": "data/midloop-12x12-beginner.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Warm-up Mid-loop boards using core midpoint and border rules."
+    },
+    {
+      "id": "midloop-12x12-medium",
+      "name": "Mid-loop 12×12 Medium",
+      "label": "Medium",
+      "file": "data/midloop-12x12-medium.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Symmetric reach, cap bounds, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "midloop-12x12-hard",
+      "name": "Mid-loop 12×12 Hard",
+      "label": "Hard",
+      "file": "data/midloop-12x12-hard.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Midpoint shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "midloop-12x12-expert",
+      "name": "Mid-loop 12×12 Expert",
+      "label": "Expert",
+      "file": "data/midloop-12x12-expert.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Deep lookahead chains on pure Mid-loop grids."
+    },
+    {
+      "id": "midloop-10x16-beginner",
+      "name": "Mid-loop 10×16 Beginner",
+      "label": "Beginner",
+      "file": "data/midloop-10x16-beginner.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Warm-up Mid-loop boards using core midpoint and border rules."
+    },
+    {
+      "id": "midloop-10x16-medium",
+      "name": "Mid-loop 10×16 Medium",
+      "label": "Medium",
+      "file": "data/midloop-10x16-medium.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Symmetric reach, cap bounds, basic shading, and 1-step lookahead."
+    },
+    {
+      "id": "midloop-10x16-hard",
+      "name": "Mid-loop 10×16 Hard",
+      "label": "Hard",
+      "file": "data/midloop-10x16-hard.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Midpoint shading, loop topology, and short single-thread lookahead."
+    },
+    {
+      "id": "midloop-10x16-expert",
+      "name": "Mid-loop 10×16 Expert",
+      "label": "Expert",
+      "file": "data/midloop-10x16-expert.csv",
+      "count": 500,
+      "group": "Mid-loop",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Deep lookahead chains on pure Mid-loop grids."
     },
     {
       "id": "midloop-even-7x7",
@@ -1083,6 +1251,66 @@
       "sub": "Classic",
       "sub2": "10×16",
       "blurb": "Deep lookahead chains on pure Castle Wall grids."
+    },
+    {
+      "id": "castle-allgray-8x8",
+      "name": "Castle Wall — All gray",
+      "label": "🌫️ All gray (8×8)",
+      "file": "data/castle-allgray-8x8.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "sub": "Bonus",
+      "blurb": "Every tile is mystery gray with an arrow — zero inside/outside wall hints, pure directional counts."
+    },
+    {
+      "id": "castle-allwhite-8x8",
+      "name": "Castle Wall — All white",
+      "label": "⬜ All white (8×8)",
+      "file": "data/castle-allwhite-8x8.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "sub": "Bonus",
+      "blurb": "Every Castle Wall tile is white — the single loop must enclose every tile while matching every arrow."
+    },
+    {
+      "id": "castle-allblack-8x8",
+      "name": "Castle Wall — All black",
+      "label": "⬛ All black (8×8)",
+      "file": "data/castle-allblack-8x8.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "sub": "Bonus",
+      "blurb": "Every Castle Wall tile is black — weave the loop strictly outside every obstacle while matching every arrow."
+    },
+    {
+      "id": "castle-swiss-10x10",
+      "name": "Castle Wall — Swiss cheese",
+      "label": "🧀 Swiss cheese (10×10)",
+      "file": "data/castle-swiss-10x10.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "sub": "Bonus",
+      "blurb": "Castle Wall boards punched with plain interior cutout holes alongside colored clue tiles."
+    },
+    {
+      "id": "castle-sky-6x18",
+      "name": "Castle Wall — Skyscraper",
+      "label": "🏙️ Skyscraper (6×18)",
+      "file": "data/castle-sky-6x18.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "sub": "Bonus",
+      "blurb": "Tall, narrow Castle Wall towers with sweeping vertical arrow sightlines."
+    },
+    {
+      "id": "castle-sym-9x9",
+      "name": "Castle Wall — Symmetry",
+      "label": "🪞 Symmetry (9×9)",
+      "file": "data/castle-sym-9x9.csv",
+      "count": 24,
+      "group": "Castle Wall",
+      "sub": "Bonus",
+      "blurb": "Mirror, diagonal, and 180° symmetric Castle Wall tiles, arrows, and loops."
     },
     {
       "id": "full-masyu-8x8",

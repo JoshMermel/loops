@@ -863,3 +863,36 @@ test('Castle Wall live error highlights catch closed-loop, deg-blocked, ray-boun
     }
   }
 });
+
+test('generatePuzzle supports Castle Wall Bonus gimmicks (allgray, allwhite, allblack, swiss, symmetry)', () => {
+  const pag = generatePuzzle({ rows: 8, cols: 8, style: 'castle-allgray', seed: 801, budgetMs: 8000 });
+  assert.ok(pag && pag.castle.length >= 4);
+  assert.ok(pag.castle.every((cw) => cw.wall === 'G' && Boolean(cw.dir) && !cw.isExterior));
+  assert.equal(solve(pag, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pag)).score, pag.score);
+
+  const paw = generatePuzzle({ rows: 8, cols: 8, style: 'castle-allwhite', seed: 802, budgetMs: 8000 });
+  assert.ok(paw && paw.castle.length >= 4);
+  assert.ok(paw.castle.every((cw) => cw.wall === 'W' && !cw.isExterior));
+  assert.equal(solve(paw, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(paw)).score, paw.score);
+
+  const pab = generatePuzzle({ rows: 8, cols: 8, style: 'castle-allblack', seed: 803, budgetMs: 8000 });
+  assert.ok(pab && pab.castle.length >= 4);
+  assert.ok(pab.castle.every((cw) => cw.wall === 'B'));
+  assert.equal(solve(pab, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(pab)).score, pab.score);
+
+  const psw = generatePuzzle({ rows: 10, cols: 10, style: 'castle-swiss', seed: 804, budgetMs: 8000 });
+  assert.ok(psw && psw.castle.length >= 4 && psw.voids && psw.voids.length >= 1);
+  assert.equal(solve(psw, { limit: 2, maxNodes: 50000 }).count, 1);
+  assert.equal(rate(compile(psw)).score, psw.score);
+
+  for (const layout of ['rot180', 'mirror', 'transpose']) {
+    const psym = generatePuzzle({ rows: 9, cols: 9, style: 'castle', layout, seed: 805, budgetMs: 8000 });
+    assert.ok(psym, `failed to generate castle ${layout} puzzle`);
+    assert.ok(detectSymmetries(psym).length > 0, `castle ${layout} must have detected symmetry`);
+    assert.equal(solve(psym, { limit: 2, maxNodes: 50000 }).count, 1);
+    assert.equal(rate(compile(psym)).score, psym.score);
+  }
+});

@@ -37,7 +37,7 @@ const VALID_STYLES = new Set([
   'slither-full', 'slither-full-swiss',
   'midloop', 'midloop-swiss', 'midloop-even', 'midloop-odd', 'midloop-long',
   'midloop-masyu', 'midloop-gray', 'midloop-slither', 'midloop-slither-swiss', 'midloop-slither2', 'midloop-full',
-  'castle', 'castle-masyu', 'castle-gray', 'castle-slither', 'castle-midloop', 'castle-full',
+  'castle', 'castle-allgray', 'castle-allwhite', 'castle-allblack', 'castle-swiss', 'castle-masyu', 'castle-gray', 'castle-slither', 'castle-midloop', 'castle-full',
 ]);
 const style = arg('style', 'balanced');
 if (!VALID_STYLES.has(style)) {
