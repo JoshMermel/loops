@@ -1,10 +1,10 @@
-# Masyu
+# Loops
 
-**Play online:** <https://joshmermelstein.com/masyu/> · **[How to solve (illustrated guide)](https://joshmermelstein.com/masyu/docs/how_to_solve.html)**
+**Play online:** <https://joshmermelstein.com/loops/> · **[How to solve (illustrated guide)](https://joshmermelstein.com/loops/docs/how_to_solve.html)**
 
-A browser game and puzzle toolkit for **Masyu**, built in the same puzzle-toolkit pattern as `yajilin`, `polyomino-panel`, and `multiverse-star-battle`: an exact uniqueness solver cross-checked against a brute-force reference, a human-style rule scorer, self-explaining hints, a solution-first generator, verified books, and a zero-build static HTML/CSS/ES-modules GUI.
+A browser game and puzzle toolkit for **single-loop logic puzzles** (**Masyu**, **Slitherlink**, **Mid-loop**, **Castle Wall**, **Hamilton cycle**, and cross-family **Hybrids**), built in the same puzzle-toolkit pattern as `yajilin`, `polyomino-panel`, and `multiverse-star-battle`: an exact uniqueness solver cross-checked against a brute-force reference, a human-style rule scorer, self-explaining hints, a solution-first generator, verified books, and a zero-build static HTML/CSS/ES-modules GUI.
 
-**Rules:** draw **one single closed loop** along the grid lines orthogonally, passing through every circle (white and black) with no crossings or branches.
+**Rules:** draw **one single closed loop** along the grid lines orthogonally with no crossings or branches, satisfying every clue family on the board:
 
 - **White circle (○):** the loop goes **straight through** it, and must **turn 90°** at least once at the immediately adjacent intersections along the loop.
 - **Black circle (●):** the loop **turns 90°** at it, and must go **straight through** both immediately adjacent intersections along the loop (at least two segments straight in each direction).
@@ -81,7 +81,7 @@ name,rows,cols,clues,solution,rules,tier,score
 - `solution`: one char per cell, row-major: a hex digit of the loop cell's exits (`U=1, R=2, D=4, L=8`, so `3`=UR, `5`=UD, `6`=RD, `9`=UL, `a`=RL, `c`=DL), or `#` for a cell not on the loop.
 - `rules`, `tier`, `score`: hardest rule needed, difficulty tier (`Beginner`, `Medium`, `Hard`, `Expert`), and integer step-cost sum from `js/rating.js`.
 
-Progress is saved in `localStorage` keyed by `ms_save_<puzzleHash>` (a stable hash of size and clues), so saves survive book renumbering and board rotation.
+Progress is saved in `localStorage` keyed by `loops_save_<puzzleHash>` (a stable hash of size and clues), so saves survive book renumbering and board rotation.
 
 ## Layout
 

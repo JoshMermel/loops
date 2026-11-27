@@ -1,4 +1,4 @@
-// Human-style Masyu scorer and rule table (pure logic, no DOM).
+// Human-style single-loop scorer and rule table (pure logic, no DOM).
 // The same RULES table drives both puzzle difficulty rating and the Hint button.
 //
 // Each step applies the cheapest applicable rule and never looks at the stored solution.

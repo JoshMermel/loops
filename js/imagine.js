@@ -1,4 +1,4 @@
-// "Imagine a segment on or off": unified short-to-medium lookahead rule for Masyu rating and Hint.
+// "Imagine a segment on or off": unified short-to-medium lookahead rule for rating and Hint.
 //
 // A hypothesis (e[x] = E_ON or e[x] = E_OFF on an undecided frontier edge) is followed with the easy
 // Beginner rules + bookkeeping until something breaks (easy contradiction, or within AREA_STEPS steps

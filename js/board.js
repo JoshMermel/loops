@@ -1,4 +1,4 @@
-// SVG Masyu board renderer and pointer gestures (intersection-grid layout).
+// SVG single-loop board renderer and pointer gestures (intersection-grid layout).
 //
 // Coordinates: intersection (r, c) sits at (PAD + c*S, PAD + r*S). Grid tracks connect adjacent
 // intersections; circles sit on intersections; drawn segments and small ✕ marks sit directly on tracks;

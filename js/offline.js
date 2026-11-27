@@ -1,6 +1,6 @@
 // Page-side controller for opt-in offline play (sw.js + Cache Storage).
-export const CACHE_PREFIX = 'masyu-';
-export const BOOK_CACHE = 'masyu-books-v1';
+export const CACHE_PREFIX = 'loops-';
+export const BOOK_CACHE = 'loops-books-v1';
 export const SW_PATH = './sw.js';
 
 const CONCURRENCY = 4;

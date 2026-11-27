@@ -1,4 +1,4 @@
-// Shared CLI helpers for Masyu tooling scripts in tools/.
+// Shared CLI helpers for Loops tooling scripts in tools/.
 import { fileURLToPath } from 'node:url';
 import { compile, solve, isSolved, decodeSolution, encodeSolution } from '../js/logic.js';
 import { rate, solvedByRules, FIRST_LOOKAHEAD, TIERS } from '../js/rating.js';

@@ -31,7 +31,7 @@ function walkJsImports(entryRel) {
   return seen;
 }
 
-function makeMockEnv({ scope = 'https://example.com/masyu/', fetchImpl }) {
+function makeMockEnv({ scope = 'https://example.com/loops/', fetchImpl }) {
   const store = new Map(); // cacheName -> Map<url, Response>
   const getMap = (name) => {
     if (!store.has(name)) store.set(name, new Map());
@@ -167,14 +167,14 @@ test('sw.js APP_SHELL covers all browser modules and static assets', () => {
 
   // Web app manifest is valid JSON and all icons exist
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
-  assert.equal(manifest.name, 'Masyu');
+  assert.equal(manifest.name, 'Loops');
   assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2);
   for (const icon of manifest.icons) {
     assert.ok(fs.existsSync(path.join(ROOT, icon.src)), `Manifest icon missing on disk: ${icon.src}`);
   }
 });
 
-test('sw.js install precaches app shell and activate prunes old masyu caches only', async () => {
+test('sw.js install precaches app shell and activate prunes old loops caches only', async () => {
   const fetched = [];
   const env = makeMockEnv({
     fetchImpl: async (req) => {
@@ -183,9 +183,9 @@ test('sw.js install precaches app shell and activate prunes old masyu caches onl
     },
   });
 
-  // Pre-seed an obsolete masyu cache, the current book cache, and an unrelated cache
-  await (await env.caches.open('masyu-app-v0')).put('https://example.com/masyu/old.js', new Response('old'));
-  await (await env.caches.open(BOOK_CACHE)).put('https://example.com/masyu/data/intro.csv', new Response('csv'));
+  // Pre-seed an obsolete loops cache, the current book cache, and an unrelated cache
+  await (await env.caches.open('loops-app-v0')).put('https://example.com/loops/old.js', new Response('old'));
+  await (await env.caches.open(BOOK_CACHE)).put('https://example.com/loops/data/intro.csv', new Response('csv'));
   await (await env.caches.open('other-site-v1')).put('https://example.com/other', new Response('other'));
 
   await env.dispatchLifecycle('install');
@@ -195,7 +195,7 @@ test('sw.js install precaches app shell and activate prunes old masyu caches onl
 
   await env.dispatchLifecycle('activate');
   assert.equal(env.claimed, true);
-  assert.equal(await env.caches.has('masyu-app-v0'), false);
+  assert.equal(await env.caches.has('loops-app-v0'), false);
   assert.equal(await env.caches.has(env.exports.APP_CACHE), true);
   assert.equal(await env.caches.has(BOOK_CACHE), true);
   assert.equal(await env.caches.has('other-site-v1'), true);
@@ -215,7 +215,7 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   await env.dispatchLifecycle('install');
 
   // Deep-link navigation online updates canonical index.html without creating duplicate query-string entries
-  const navReq = { url: 'https://example.com/masyu/?book=8x8-medium&puzzle=5', method: 'GET', mode: 'navigate' };
+  const navReq = { url: 'https://example.com/loops/?book=8x8-medium&puzzle=5', method: 'GET', mode: 'navigate' };
   const navOnline = await env.dispatchFetch(navReq);
   assert.equal(navOnline.handled, true);
   assert.match(await navOnline.response.text(), /^v1:/);
@@ -223,12 +223,12 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   assert.equal(appKeysAfterNav.some((u) => u.includes('?book=')), false, 'query-string URL should not be cached');
 
   // Non-root navigation (solving guide) caches under its own URL
-  const guideReq = { url: 'https://example.com/masyu/docs/how_to_solve.html', method: 'GET', mode: 'navigate' };
+  const guideReq = { url: 'https://example.com/loops/docs/how_to_solve.html', method: 'GET', mode: 'navigate' };
   const guideOnline = await env.dispatchFetch(guideReq);
   assert.match(await guideOnline.response.text(), /how_to_solve\.html/);
 
   // Book CSV cache miss -> fetches v1 and caches in BOOK_CACHE
-  const csvUrl = 'https://example.com/masyu/data/intro.csv';
+  const csvUrl = 'https://example.com/loops/data/intro.csv';
   const csvMiss = await env.dispatchFetch(new Request(csvUrl));
   assert.equal(await csvMiss.response.text(), `v1:${csvUrl}`);
 
@@ -249,21 +249,21 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   // Go offline: deep-link navigation, JS asset, solving guide, and cached CSV all work
   online = false;
   const navOffline = await env.dispatchFetch({
-    url: 'https://example.com/masyu/?book=12x12-hard&puzzle=99',
+    url: 'https://example.com/loops/?book=12x12-hard&puzzle=99',
     method: 'GET',
     mode: 'navigate',
   });
-  assert.match(await navOffline.response.text(), /v1:https:\/\/example\.com\/masyu\/\?book=8x8-medium&puzzle=5/);
+  assert.match(await navOffline.response.text(), /v1:https:\/\/example\.com\/loops\/\?book=8x8-medium&puzzle=5/);
 
-  const jsOffline = await env.dispatchFetch(new Request('https://example.com/masyu/js/main.js'));
-  assert.equal(await jsOffline.response.text(), 'v1:https://example.com/masyu/js/main.js');
+  const jsOffline = await env.dispatchFetch(new Request('https://example.com/loops/js/main.js'));
+  assert.equal(await jsOffline.response.text(), 'v1:https://example.com/loops/js/main.js');
 
   const guideOffline = await env.dispatchFetch(guideReq);
   assert.match(await guideOffline.response.text(), /how_to_solve\.html/);
 
   // Unvisited non-root page does NOT wrongly return index.html
   await assert.rejects(() => env.dispatchFetch({
-    url: 'https://example.com/masyu/docs/other.html',
+    url: 'https://example.com/loops/docs/other.html',
     method: 'GET',
     mode: 'navigate',
   }));
@@ -277,7 +277,7 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   assert.equal(xOrigin.handled, false);
   const outScope = await env.dispatchFetch(new Request('https://example.com/other/app.js'));
   assert.equal(outScope.handled, false);
-  const postReq = await env.dispatchFetch(new Request('https://example.com/masyu/data/intro.csv', { method: 'POST' }));
+  const postReq = await env.dispatchFetch(new Request('https://example.com/loops/data/intro.csv', { method: 'POST' }));
   assert.equal(postReq.handled, false);
 
   // REFRESH_APP message refreshes app shell when online and reports error when offline
@@ -286,8 +286,8 @@ test('sw.js handles navigation with query params, asset fallback, and book CSV S
   const reply = await env.dispatchMessage({ type: 'REFRESH_APP' });
   assert.equal(reply?.ok, true);
   online = false;
-  const jsRefreshed = await env.dispatchFetch(new Request('https://example.com/masyu/js/main.js'));
-  assert.equal(await jsRefreshed.response.text(), 'v4:https://example.com/masyu/js/main.js');
+  const jsRefreshed = await env.dispatchFetch(new Request('https://example.com/loops/js/main.js'));
+  assert.equal(await jsRefreshed.response.text(), 'v4:https://example.com/loops/js/main.js');
   const failReply = await env.dispatchMessage({ type: 'REFRESH_APP' });
   assert.equal(failReply?.ok, false);
   assert.ok(failReply?.error);
@@ -322,29 +322,29 @@ test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededEr
   mode = 'fail-one';
   const failedRefresh = await env.dispatchMessage({ type: 'REFRESH_APP' });
   assert.equal(failedRefresh?.ok, false);
-  const cachedMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/masyu/js/main.js');
-  assert.equal(await cachedMain.text(), 'v1:https://example.com/masyu/js/main.js');
+  const cachedMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/loops/js/main.js');
+  assert.equal(await cachedMain.text(), 'v1:https://example.com/loops/js/main.js');
 
   // Redirected navigation response is cleaned before returning and caching
   mode = 'redirect';
-  const redNav = await env.dispatchFetch({ url: 'https://example.com/masyu/', method: 'GET', mode: 'navigate' });
+  const redNav = await env.dispatchFetch({ url: 'https://example.com/loops/', method: 'GET', mode: 'navigate' });
   assert.equal(redNav.response.redirected, false);
   assert.equal(await redNav.response.text(), 'redirected-body');
 
   // Non-200 / 206 responses never overwrite good cached entries and never fail online fetches
   mode = 'ok';
-  const csvUrl = 'https://example.com/masyu/data/intro.csv';
+  const csvUrl = 'https://example.com/loops/data/intro.csv';
   await env.dispatchFetch(new Request(csvUrl));
   mode = 'status-500';
-  const badAsset = await env.dispatchFetch(new Request('https://example.com/masyu/js/main.js'));
+  const badAsset = await env.dispatchFetch(new Request('https://example.com/loops/js/main.js'));
   assert.equal(badAsset.response.status, 500);
-  const stillGoodMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/masyu/js/main.js');
-  assert.equal(await stillGoodMain.text(), 'v1:https://example.com/masyu/js/main.js');
+  const stillGoodMain = await (await env.caches.open(env.exports.APP_CACHE)).match('https://example.com/loops/js/main.js');
+  assert.equal(await stillGoodMain.text(), 'v1:https://example.com/loops/js/main.js');
 
   mode = 'status-206';
-  const partialRes = await env.dispatchFetch(new Request('https://example.com/masyu/data/other.csv'));
+  const partialRes = await env.dispatchFetch(new Request('https://example.com/loops/data/other.csv'));
   assert.equal(partialRes.response.status, 206);
-  assert.equal(await (await env.caches.open(BOOK_CACHE)).match('https://example.com/masyu/data/other.csv'), undefined);
+  assert.equal(await (await env.caches.open(BOOK_CACHE)).match('https://example.com/loops/data/other.csv'), undefined);
 
   // QuotaExceededError during cache.put must not break normal online fetches, but MUST fail cache: 'reload'
   const origOpen = env.caches.open.bind(env.caches);
@@ -360,17 +360,17 @@ test('sw.js handles redirected responses, non-200/206 responses, QuotaExceededEr
   };
   mode = 'ok';
   quotaFail = true;
-  const onlineRes = await env.dispatchFetch(new Request('https://example.com/masyu/data/new.csv'));
+  const onlineRes = await env.dispatchFetch(new Request('https://example.com/loops/data/new.csv'));
   assert.equal(onlineRes.response.status, 200);
-  assert.equal(await onlineRes.response.text(), 'v2:https://example.com/masyu/data/new.csv');
+  assert.equal(await onlineRes.response.text(), 'v2:https://example.com/loops/data/new.csv');
   await assert.rejects(
-    () => env.dispatchFetch(new Request('https://example.com/masyu/data/new.csv', { cache: 'reload' })),
+    () => env.dispatchFetch(new Request('https://example.com/loops/data/new.csv', { cache: 'reload' })),
     /QuotaExceededError/,
   );
 });
 
 test('js/offline.js controller handles status, cacheBooks pruning/abort, enableOffline, disableOffline, and syncMissingBooks', async () => {
-  const base = 'https://example.com/masyu/';
+  const base = 'https://example.com/loops/';
   const books = [
     { id: 'intro', file: 'data/intro.csv' },
     { id: '8x8-beginner', file: 'data/8x8-beginner.csv' },
@@ -521,13 +521,13 @@ test('js/offline.js controller handles status, cacheBooks pruning/abort, enableO
     assert.equal(aborted.aborted, true);
     assert.ok(currentReg !== null, 'aborting a force-refresh must keep offline enabled');
 
-    // disableOffline unregisters SW and deletes all masyu-* caches (preserving unrelated caches)
-    await (await mockCaches.open('masyu-app-v1')).put(`${base}index.html`, new Response('html'));
+    // disableOffline unregisters SW and deletes all loops-* caches (preserving unrelated caches)
+    await (await mockCaches.open('loops-app-v0')).put(`${base}index.html`, new Response('html'));
     await (await mockCaches.open('unrelated-v1')).put(`${base}x`, new Response('x'));
     await disableOffline();
     assert.equal(currentReg, null);
     assert.equal(await mockCaches.has(BOOK_CACHE), false);
-    assert.equal(await mockCaches.has('masyu-app-v1'), false);
+    assert.equal(await mockCaches.has('loops-app-v0'), false);
     assert.equal(await mockCaches.has('unrelated-v1'), true);
 
     // syncMissingBooks is a no-op when offline or disabled
@@ -550,14 +550,14 @@ test('bookUrlsOf separates visible and hidden books and ignores file uploads', (
     { id: 'armory', file: 'data/armory.csv', hidden: true },
     { id: 'file:custom.csv', puzzles: [] },
   ];
-  const { all, visible } = bookUrlsOf(books, 'https://example.com/masyu/index.html?book=intro');
+  const { all, visible } = bookUrlsOf(books, 'https://example.com/loops/index.html?book=intro');
   assert.deepEqual(all, [
-    'https://example.com/masyu/data/intro.csv',
-    'https://example.com/masyu/data/8x8-beginner.csv',
-    'https://example.com/masyu/data/armory.csv',
+    'https://example.com/loops/data/intro.csv',
+    'https://example.com/loops/data/8x8-beginner.csv',
+    'https://example.com/loops/data/armory.csv',
   ]);
   assert.deepEqual(visible, [
-    'https://example.com/masyu/data/intro.csv',
-    'https://example.com/masyu/data/8x8-beginner.csv',
+    'https://example.com/loops/data/intro.csv',
+    'https://example.com/loops/data/8x8-beginner.csv',
   ]);
 });

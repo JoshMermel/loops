@@ -1,11 +1,11 @@
-// Printable Masyu booklets: fixed black-and-white SVG laid out by cell size to fit both A4 and Letter.
+// Printable Loops booklets: fixed black-and-white SVG laid out by cell size to fit both A4 and Letter.
 // Every page header links back to the site. Everything except buildPrintRoot is pure (tested in tests/print.test.mjs).
 import { E_ON } from './logic.js';
 import { tilesOutlinePath, interiorPlainVoids } from './board.js';
 
 const INK = '#111', GRID = '#8c8c8c';
 export const MAX_PRINT = 500;
-export const SITE_URL = 'https://joshmermelstein.com/masyu/';
+export const SITE_URL = 'https://joshmermelstein.com/loops/';
 export const SITE_TEXT = SITE_URL.replace(/^https:\/\//, '').replace(/\/$/, '');
 
 /** "1-10, 15, 20-22" -> { ids: [1..10, 15, 20, 21, 22] } or { error }. */
@@ -197,7 +197,7 @@ export function buildPrintRoot({ book, puzzles, ids, size = 'comfortable', inclu
     for (let i = 0; i < list.length; i += k) {
       const page = div('print-page', root);
       const head = div('print-head', page);
-      div('print-brand', head).append(link('Masyu', 'print-name'));
+      div('print-brand', head).append(link('Loops', 'print-name'));
       head.append(link(SITE_TEXT, 'print-url'));
       div('print-book', head, `${book.title}${heading ? ` · ${heading}` : ''}`);
       const slice = list.slice(i, i + k);

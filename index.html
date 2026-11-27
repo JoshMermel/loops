@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Masyu</title>
-  <meta name="description" content="Masyu, Slitherlink, Mid-loop, Castle Wall, Hamilton cycle, and hybrid loop logic puzzles in your browser: 34,400+ verified unique puzzles graded by human solving rules, hints that explain the logic, and printable booklets.">
+  <title>Loops</title>
+  <meta name="description" content="Masyu, Slitherlink, Mid-loop, Castle Wall, Hamilton cycle, and hybrid loop logic puzzles in your browser: 54,600+ verified unique puzzles graded by human solving rules, hints that explain the logic, and printable booklets.">
   <meta name="theme-color" content="#1976d2">
-  <meta property="og:title" content="Masyu — Loop Logic Puzzles">
-  <meta property="og:description" content="34,400+ verified unique loop logic puzzles in your browser, with human-style hints that explain the logic, Auto-Shade, dark mode, and printable booklets.">
+  <meta property="og:title" content="Loops — Single-Loop Logic Puzzles">
+  <meta property="og:description" content="54,600+ verified unique loop logic puzzles in your browser — Masyu, Slitherlink, Mid-loop, Castle Wall, Hamilton cycle, and Hybrids — with hints that explain the logic, Auto-Shade, dark mode, and printable booklets.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://joshmermelstein.com/masyu/">
-  <meta property="og:image" content="https://joshmermelstein.com/masyu/og-image.png">
+  <meta property="og:url" content="https://joshmermelstein.com/loops/">
+  <meta property="og:image" content="https://joshmermelstein.com/loops/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
@@ -20,7 +20,7 @@
   <script>
     (function () {
       var dark = false;
-      try { dark = localStorage.getItem('ms_dark') === '1'; } catch (e) {}
+      try { dark = localStorage.getItem('loops_dark') === '1'; } catch (e) {}
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       var meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute('content', dark ? '#1a1a1a' : '#1976d2');
@@ -31,7 +31,7 @@
 <body>
   <div id="game-container">
     <header class="topbar">
-      <h1 id="page-title">Masyu</h1>
+      <h1 id="page-title">Loops</h1>
       <div class="topbar-actions">
         <button id="settings-btn" class="icon-btn" aria-label="Settings" aria-haspopup="dialog">⚙</button>
         <button id="help-btn" class="icon-btn" aria-label="How to play" aria-haspopup="dialog">?</button>
@@ -68,7 +68,7 @@
     </div>
 
     <div class="board-wrap">
-      <div id="board" aria-label="Masyu board"></div>
+      <div id="board" aria-label="Puzzle board"></div>
     </div>
     <div id="toast" class="toast" role="status" hidden></div>
   </div>

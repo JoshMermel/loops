@@ -52,14 +52,14 @@ const state = {
   hint: null, // { sig, kind, index, hints, ... }
 };
 
-const savedCustom = (() => { try { return sanitizeCustom(JSON.parse(store.get('ms_pathCustom'))); } catch { return null; } })();
+const savedCustom = (() => { try { return sanitizeCustom(JSON.parse(store.get('loops_pathCustom'))); } catch { return null; } })();
 const settings = {
-  colorLines: store.get('ms_colorLines') === '1',
-  palette: validId(store.get('ms_pathPalette'), savedCustom),
+  colorLines: store.get('loops_colorLines') === '1',
+  palette: validId(store.get('loops_pathPalette'), savedCustom),
   custom: savedCustom,
-  autoX: store.get('ms_autoX') !== '0',
-  autoShade: store.get('ms_autoShade') !== '0',
-  incrementalHints: store.get('ms_incrementalHints') !== '0',
+  autoX: store.get('loops_autoX') !== '0',
+  autoShade: store.get('loops_autoShade') !== '0',
+  incrementalHints: store.get('loops_incrementalHints') !== '0',
 };
 
 const board = new Board($('board'), {
@@ -472,7 +472,7 @@ function updateButtons() {
 
 // ------------------------------------------------------------ persistence
 
-const saveKey = (P) => `ms_save_${puzzleHash(P)}`;
+const saveKey = (P) => `loops_save_${puzzleHash(P)}`;
 const hasSave = (P) => store.get(saveKey(P)) !== null;
 
 function save() {
@@ -528,10 +528,10 @@ function load(P) {
   return freshMarks(P);
 }
 
-const solvedSet = () => { try { return new Set(JSON.parse(store.get('ms_solved') || '[]')); } catch { return new Set(); } };
+const solvedSet = () => { try { return new Set(JSON.parse(store.get('loops_solved') || '[]')); } catch { return new Set(); } };
 const bookSolvedMap = () => {
   try {
-    const o = JSON.parse(store.get('ms_book_solved') || '{}');
+    const o = JSON.parse(store.get('loops_book_solved') || '{}');
     return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
   } catch { return {}; }
 };
@@ -542,7 +542,7 @@ function recordBookSolved(book) {
   const n = book.puzzles.filter((p) => solved.has(puzzleHash(p))).length;
   const map = bookSolvedMap();
   map[book.id] = n;
-  store.set('ms_book_solved', JSON.stringify(map));
+  store.set('loops_book_solved', JSON.stringify(map));
 }
 
 function markSolved() {
@@ -550,7 +550,7 @@ function markSolved() {
   const set = solvedSet();
   if (set.has(h)) return;
   set.add(h);
-  store.set('ms_solved', JSON.stringify([...set]));
+  store.set('loops_solved', JSON.stringify([...set]));
   recordBookSolved(state.book);
 }
 
@@ -826,7 +826,7 @@ function openPuzzle(idx) {
   applyBoardSize(layout.px);
   showInfo();
   refresh();
-  store.set('ms_last', JSON.stringify({ book: book.id, idx }));
+  store.set('loops_last', JSON.stringify({ book: book.id, idx }));
   updateUrl();
 }
 
@@ -854,10 +854,10 @@ async function openBook(bookId, idx = 0) {
   openPuzzle(idx);
 }
 
-function rememberFileBook(name, text) { store.set('ms_file_book', JSON.stringify({ name, text })); }
+function rememberFileBook(name, text) { store.set('loops_file_book', JSON.stringify({ name, text })); }
 function restoreFileBook() {
   try {
-    const f = JSON.parse(store.get('ms_file_book') || 'null');
+    const f = JSON.parse(store.get('loops_file_book') || 'null');
     const puzzles = f && parseCsv(f.text);
     if (puzzles && puzzles.length) state.books.push({ id: `file:${f.name}`, name: f.name, puzzles, count: puzzles.length });
   } catch { /* ignore */ }
@@ -875,7 +875,7 @@ async function init() {
 
   const params = new URLSearchParams(location.search);
   let last = null;
-  try { last = JSON.parse(store.get('ms_last') || 'null'); } catch { /* ignore */ }
+  try { last = JSON.parse(store.get('loops_last') || 'null'); } catch { /* ignore */ }
   let bookId = params.get('book') || (last && last.book) || manifest.default || state.books[0].id;
   const known = state.books.some((b) => b.id === bookId);
   if (!known) bookId = manifest.default || state.books[0].id;
@@ -976,7 +976,7 @@ function renderBrowse() {
       grid.append(head);
       sectionNodes.push({ label: sec, el: head });
     }
-    const done = solved.has(hashes[i]), started = !done && store.get(`ms_save_${hashes[i]}`) !== null;
+    const done = solved.has(hashes[i]), started = !done && store.get(`loops_save_${hashes[i]}`) !== null;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'browse-tile' + (done ? ' bt-solved' : started ? ' bt-in-progress' : '') + (i === state.idx ? ' bt-current' : '');
@@ -1281,15 +1281,15 @@ function renderHelpModal() {
 }
 const helpModal = setupModal('help-modal', 'help-btn', renderHelpModal);
 // Don't auto-open help if deep-linking directly to a puzzle (e.g. from docs/how_to_solve.md or armory)
-if (!store.get('ms_seenHelp') && !new URLSearchParams(location.search).has('book')) {
-  store.set('ms_seenHelp', '1');
+if (!store.get('loops_seenHelp') && !new URLSearchParams(location.search).has('book')) {
+  store.set('loops_seenHelp', '1');
   helpModal.open();
 }
 
 $('setting-dark-mode').addEventListener('change', (e) => {
   document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : 'light');
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', e.target.checked ? '#1a1a1a' : '#1976d2');
-  store.set('ms_dark', e.target.checked ? '1' : '0');
+  store.set('loops_dark', e.target.checked ? '1' : '0');
   board.setOptions(paletteOptions());
   renderPaletteUI();
 });
@@ -1297,7 +1297,7 @@ $('setting-dark-mode').addEventListener('change', (e) => {
 $('setting-color-lines').checked = settings.colorLines;
 $('setting-color-lines').addEventListener('change', (e) => {
   settings.colorLines = e.target.checked;
-  store.set('ms_colorLines', settings.colorLines ? '1' : '0');
+  store.set('loops_colorLines', settings.colorLines ? '1' : '0');
   board.setOptions({ colorLines: settings.colorLines });
   renderPaletteUI();
 });
@@ -1306,7 +1306,7 @@ $('setting-auto-x').checked = settings.autoX;
 $('setting-auto-x').addEventListener('change', (e) => {
   autoGrace.cancel();
   settings.autoX = e.target.checked;
-  store.set('ms_autoX', settings.autoX ? '1' : '0');
+  store.set('loops_autoX', settings.autoX ? '1' : '0');
   if (state.P) {
     const syncOne = (m) => {
       reconcileAutoGray(state.P, m);
@@ -1327,7 +1327,7 @@ $('setting-auto-shade').checked = settings.autoShade;
 $('setting-auto-shade').addEventListener('change', (e) => {
   autoGrace.cancel();
   settings.autoShade = e.target.checked;
-  store.set('ms_autoShade', settings.autoShade ? '1' : '0');
+  store.set('loops_autoShade', settings.autoShade ? '1' : '0');
   if (state.P) {
     const syncOne = (m) => {
       reconcileAutoGray(state.P, m);
@@ -1348,7 +1348,7 @@ $('setting-auto-shade').addEventListener('change', (e) => {
 $('setting-incremental-hints').checked = settings.incrementalHints;
 $('setting-incremental-hints').addEventListener('change', (e) => {
   settings.incrementalHints = e.target.checked;
-  store.set('ms_incrementalHints', settings.incrementalHints ? '1' : '0');
+  store.set('loops_incrementalHints', settings.incrementalHints ? '1' : '0');
 });
 
 function renderPaletteUI() {
@@ -1381,7 +1381,7 @@ function renderPaletteUI() {
   $('palette-add').disabled = custom && settings.custom.length >= MAX_CUSTOM;
 }
 function changeCustom(redraw) {
-  store.set('ms_pathCustom', JSON.stringify(settings.custom));
+  store.set('loops_pathCustom', JSON.stringify(settings.custom));
   board.setOptions(paletteOptions());
   if (redraw) renderPaletteUI();
 }
@@ -1389,7 +1389,7 @@ for (const p of [...PRESETS, { id: CUSTOM, name: 'Custom…' }]) $('setting-pale
 $('setting-palette').addEventListener('change', (e) => {
   if (e.target.value === CUSTOM && !settings.custom) settings.custom = lightColors(settings.palette, null).slice(0, 8);
   settings.palette = e.target.value;
-  store.set('ms_pathPalette', settings.palette);
+  store.set('loops_pathPalette', settings.palette);
   changeCustom(true);
 });
 $('palette-add').addEventListener('click', () => {
@@ -1408,7 +1408,7 @@ clearBtn.addEventListener('click', () => {
   autoGrace.cancel();
   try {
     Object.keys(localStorage)
-      .filter((k) => k.startsWith('ms_save_') || k === 'ms_solved' || k === 'ms_book_solved')
+      .filter((k) => k.startsWith('loops_save_') || k === 'loops_solved' || k === 'loops_book_solved')
       .forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
   disarmClear();
@@ -1601,9 +1601,9 @@ const printSolution = (P) => {
 function setupPrint() {
   const sel = $('print-selection'), sizeSel = $('print-size'), keyBox = $('print-answer-key');
   const err = $('print-error'), summary = $('print-summary'), go = $('print-go-btn');
-  const savedSize = store.get('ms_printSize');
+  const savedSize = store.get('loops_printSize');
   if ([...sizeSel.options].some((o) => o.value === savedSize)) sizeSel.value = savedSize;
-  keyBox.checked = store.get('ms_printKey') !== '0';
+  keyBox.checked = store.get('loops_printKey') !== '0';
 
   const update = () => {
     const puzzles = state.book ? state.book.puzzles : [];
@@ -1633,8 +1633,8 @@ function setupPrint() {
   }, 'settings-btn');
 
   sel.addEventListener('input', update);
-  sizeSel.addEventListener('change', () => { store.set('ms_printSize', sizeSel.value); update(); });
-  keyBox.addEventListener('change', () => { store.set('ms_printKey', keyBox.checked ? '1' : '0'); update(); });
+  sizeSel.addEventListener('change', () => { store.set('loops_printSize', sizeSel.value); update(); });
+  keyBox.addEventListener('change', () => { store.set('loops_printKey', keyBox.checked ? '1' : '0'); update(); });
   go.addEventListener('click', () => {
     const r = update();
     if (!r) return;
@@ -1678,7 +1678,7 @@ document.addEventListener('keydown', (e) => {
 
 // Expose a small test/screenshot hook on localhost (used by tools/capture_how_to_images.py)
 if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-  window.__masyu = {
+  window.__loops = {
     get state() { return state; },
     applyHint() {
       if (!state.hint || state.hint.kind !== 'step') return false;

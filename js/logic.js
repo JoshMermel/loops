@@ -1,4 +1,4 @@
-// Single-loop puzzle core (Masyu, Slitherlink, Full board, and hybrids; pure logic, no DOM).
+// Single-loop puzzle core (Masyu, Slitherlink, Mid-loop, Castle Wall, Hamilton cycle, and hybrids; pure logic, no DOM).
 //
 // Shared rules: draw one single closed loop along the orthogonal grid lines (no crossings, no branches).
 // Modular constraint layers compose freely on the same board:

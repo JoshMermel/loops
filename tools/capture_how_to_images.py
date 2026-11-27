@@ -25,7 +25,7 @@ def capture(page, base, ex, out_path):
         """async (n) => {
             const { parseCsv, compile, puzzleHash } = await import('./js/logic.js');
             const text = await (await fetch('data/armory.csv')).text();
-            return 'ms_save_' + puzzleHash(compile(parseCsv(text)[n - 1]));
+            return 'loops_save_' + puzzleHash(compile(parseCsv(text)[n - 1]));
         }""",
         ex["puzzle"],
     )
@@ -36,10 +36,10 @@ def capture(page, base, ex, out_path):
     page.evaluate(
         """([key, save]) => {
             localStorage.setItem(key, JSON.stringify(save));
-            localStorage.setItem('ms_dark', '0');
-            localStorage.setItem('ms_seenHelp', '1');
-            localStorage.setItem('ms_autoX', '0');
-            localStorage.setItem('ms_autoShade', '0');
+            localStorage.setItem('loops_dark', '0');
+            localStorage.setItem('loops_seenHelp', '1');
+            localStorage.setItem('loops_autoX', '0');
+            localStorage.setItem('loops_autoShade', '0');
         }""",
         [key, save],
     )

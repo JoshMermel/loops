@@ -1,4 +1,4 @@
-// Solution-first Masyu generator (pure JS, no DOM).
+// Solution-first single-loop puzzle generator (pure JS, no DOM).
 //
 // 1. Build a random simple closed loop on rows x cols using O(1) simple-point toggles on the
 //    (rows-1) x (cols-1) dual face grid, then locally anneal faces near undecided edges until

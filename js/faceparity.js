@@ -1,4 +1,4 @@
-// Inside / Outside dual-face parity inference for Masyu (pure logic, no DOM).
+// Inside / Outside dual-face parity inference for single-loop puzzles (pure logic, no DOM).
 //
 // Models the (rows-1) x (cols-1) dual squares plus one virtual exterior node EXT (= rows-1 * cols-1, always OUT).
 // Maintains a 2-coloring parity union-find + proof graph from:

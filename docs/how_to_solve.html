@@ -9,7 +9,7 @@
   <script>
     (function () {
       var dark = false;
-      try { dark = localStorage.getItem('ms_dark') === '1'; } catch (e) {}
+      try { dark = localStorage.getItem('loops_dark') === '1'; } catch (e) {}
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     })();
   </script>

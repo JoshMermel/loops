@@ -1,7 +1,7 @@
 {
-  "name": "Masyu",
-  "short_name": "Masyu",
-  "description": "13,500+ verified unique Masyu pearl-loop logic puzzles with human-style hints.",
+  "name": "Loops",
+  "short_name": "Loops",
+  "description": "54,600+ verified unique loop logic puzzles (Masyu, Slitherlink, Mid-loop, Castle Wall, Hamilton cycle, and Hybrids) with human-style hints.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
