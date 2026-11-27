@@ -9,6 +9,7 @@ import { NONE, WHITE, BLACK } from './logic.js';
 import { autoXSlither } from './variants/slitherlink.js';
 import { autoXMidloop, isMidloopSatisfied } from './variants/midloop.js';
 import { autoXCastle, isCastleSatisfied } from './variants/castlewall.js';
+import { autoXCorral, isCorralSatisfied } from './variants/corral.js';
 
 export const FACE_BLANK = 0, FACE_IN = 1, FACE_OUT = 2;
 
@@ -180,6 +181,12 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     for (let k = 0; k < cycleEdges.length; k++) cyc[cycleEdges[k]] = 1;
     return !isCastleSatisfied(P, cyc);
   };
+  const cycleViolatesCorral = (cycleEdges) => {
+    if (!P.hasCorral) return false;
+    const cyc = new Uint8Array(numEdges);
+    for (let k = 0; k < cycleEdges.length; k++) cyc[cycleEdges[k]] = 1;
+    return !isCorralSatisfied(P, cyc);
+  };
 
   const availEdges = (i) => {
     const out = [];
@@ -190,9 +197,10 @@ export function autoXForced(P, m, { useShade = false } = {}) {
     return out;
   };
 
-  // Slitherlink & Castle Wall bookkeeping (only needs one pass since `add` never turns an edge ON)
+  // Slitherlink, Castle Wall & Corral bookkeeping (only needs one pass since `add` never turns an edge ON)
   if (P.hasSlither) autoXSlither(P, w, add);
   if (P.hasCastle) autoXCastle(P, w, add);
+  if (P.hasCorral) autoXCorral(P, w, add);
 
   const reqCell = new Uint8Array(N);
   for (let i = 0; i < N; i++) if (clue[i] !== NONE) reqCell[i] = 1;
@@ -263,7 +271,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
         const w1 = walk(eA);
         if (w1.closed) {
           const impossible = P.clueCells.length > 0 || P.hasMidloop || anyDegGt0
-            || cycleViolatesSlither(w1.edges) || cycleViolatesCastle(w1.edges);
+            || cycleViolatesSlither(w1.edges) || cycleViolatesCastle(w1.edges) || cycleViolatesCorral(w1.edges);
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
           }
@@ -278,6 +286,7 @@ export function autoXForced(P, m, { useShade = false } = {}) {
           if (!impossible && P.hasSlither) impossible = cycleViolatesSlither(w1.edges.concat(w2.edges));
           if (!impossible && P.hasMidloop) impossible = cycleViolatesMidloopAt(t, w1.edges.concat(w2.edges));
           if (!impossible && P.hasCastle) impossible = cycleViolatesCastle(w1.edges.concat(w2.edges));
+          if (!impossible && P.hasCorral) impossible = cycleViolatesCorral(w1.edges.concat(w2.edges));
           if (impossible) {
             for (const x of w1.edges) if (add(x)) changed = true;
             for (const x of w2.edges) if (add(x)) changed = true;
@@ -447,6 +456,11 @@ export function autoShadeCompute(P, m) {
     }
   }
 
+  // Seed 1c: Corral numbered squares always lie strictly Inside the loop
+  if (P.hasCorral) {
+    for (let k = 0; k < P.corral.length; k++) mark(P.corral[k].f, FACE_IN);
+  }
+
   // Seed 2: any active edge bordering exterior (outer rectangle edge OR indented exterior cutout)
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;
@@ -591,6 +605,12 @@ export function shadeConflicts(P, m, checkBorder = true) {
       if (!v) continue;
       const want = cw.wall === 'W' ? FACE_IN : FACE_OUT;
       if (v !== want) addBad(cw.face);
+    }
+  }
+  if (checkBorder && P.hasCorral) {
+    for (let k = 0; k < P.corral.length; k++) {
+      const f = P.corral[k].f;
+      if (m.faces[f] === FACE_OUT) addBad(f);
     }
   }
   return bad;

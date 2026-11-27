@@ -13,6 +13,7 @@ import { findFaceShade, findFaceCircle, findFaceSlither } from './faceparity.js'
 import { SLITHER_RULES, isSlitherEdge, firstUnsatisfiedSlitherOnClose } from './variants/slitherlink.js';
 import { MIDLOOP_RULES, firstUnsatisfiedMidloopOnClose } from './variants/midloop.js';
 import { CASTLE_RULES, firstUnsatisfiedCastleOnClose } from './variants/castlewall.js';
+import { CORRAL_RULES, firstUnsatisfiedCorralOnClose } from './variants/corral.js';
 
 export const TIERS = ['Beginner', 'Medium', 'Hard', 'Expert'];
 
@@ -778,10 +779,12 @@ function findNoEarlyClose(P, st, opts) {
     const slFace = missesLoop ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
     const midIdx = (missesLoop || slFace >= 0) ? -1 : firstUnsatisfiedMidloopOnClose(P, st, x);
     const castleIdx = (missesLoop || slFace >= 0 || midIdx >= 0) ? -1 : firstUnsatisfiedCastleOnClose(P, st, x);
-    if (missesLoop || slFace >= 0 || midIdx >= 0 || castleIdx >= 0) {
+    const corralIdx = (missesLoop || slFace >= 0 || midIdx >= 0 || castleIdx >= 0) ? -1 : firstUnsatisfiedCorralOnClose(P, st, x);
+    if (missesLoop || slFace >= 0 || midIdx >= 0 || castleIdx >= 0 || corralIdx >= 0) {
       const info = slFace >= 0 ? { edge: x, a, b, slitherFace: slFace }
         : midIdx >= 0 ? { edge: x, a, b, midIdx }
         : castleIdx >= 0 ? { edge: x, a, b, castleIdx }
+        : corralIdx >= 0 ? { edge: x, a, b, corralIdx }
         : { edge: x, a, b };
       out.push({ sets: [['e', x, E_OFF]], info });
     }
@@ -1755,6 +1758,15 @@ export function detectSymmetries(P) {
         }
       }
     }
+    if (ok && P.hasCorral) {
+      const fr = rows - 1, fc = cols - 1;
+      for (let r = 0; r < fr && ok; r++) {
+        for (let c = 0; c < fc; c++) {
+          const [r2, c2] = def.map(r, c, fr, fc);
+          if (P.corralNum[r * fc + c] !== P.corralNum[r2 * fc + c2]) { ok = false; break; }
+        }
+      }
+    }
     if (!ok) continue;
     out.push({ id: def.id, refl: def.refl, cellMap, edgeMap });
   }
@@ -2241,6 +2253,7 @@ export const RULES = [
   ...SLITHER_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, slitherOnly: true })),
   ...MIDLOOP_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, midloopOnly: true })),
   ...CASTLE_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, castleOnly: true })),
+  ...CORRAL_RULES.filter((r) => r.tier === 'Beginner').map((r) => defRule({ ...r, corralOnly: true })),
   defRule({ id: 'grayMustBeBlack', tier: 'Beginner', weight: 2, grayOnly: true, find: findGrayMustBeBlack, label: 'a gray circle that cannot go straight along either axis must be black' }),
   defRule({ id: 'whiteStraight', tier: 'Beginner', weight: 2, circleOnly: true, find: findWhiteStraight, label: 'a white circle blocked on one axis goes straight along the other' }),
   defRule({ id: 'blackExtend', tier: 'Beginner', weight: 2, circleOnly: true, find: findBlackExtend, label: 'a black circle continues straight two cells from an existing segment and turns away from the opposite side' }),
@@ -2258,6 +2271,7 @@ export const RULES = [
   ...SLITHER_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, slitherOnly: true })),
   ...MIDLOOP_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, midloopOnly: true })),
   ...CASTLE_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, castleOnly: true })),
+  ...CORRAL_RULES.filter((r) => r.tier === 'Medium').map((r) => defRule({ ...r, corralOnly: true })),
   defRule({ id: 'whiteBothStraight', tier: 'Medium', weight: 10, circleOnly: true, find: findWhiteBothStraight, label: 'a white circle cannot use an axis where both neighbors already continue straight' }),
   defRule({ id: 'closingCell', tier: 'Medium', weight: 11, find: findClosingCell, label: 'an empty cell whose only two exits meet one path cannot be on the loop' }),
   defRule({ id: 'samePathExits', tier: 'Medium', weight: 11, find: findSamePathExits, label: 'a loop cell with three exits where two meet one path must use the third' }),
@@ -2316,6 +2330,7 @@ const isHybridBoard = (P) => (
   (P.hasSlither ? 1 : 0)
   + (P.hasMidloop ? 1 : 0)
   + (P.hasCastle ? 1 : 0)
+  + (P.hasCorral ? 1 : 0)
   + (P.clueCells.length > 0 ? 1 : 0)
   + (P.fullBoard ? 1 : 0)
 ) >= 2;
@@ -2324,6 +2339,7 @@ const ruleApplies = (rule, P, st) => (
   (!rule.slitherOnly || P.hasSlither)
   && (!rule.midloopOnly || P.hasMidloop)
   && (!rule.castleOnly || P.hasCastle)
+  && (!rule.corralOnly || P.hasCorral)
   && (!rule.circleOnly || P.clueCells.length > 0)
   && (!rule.grayOnly || st.hasGray)
   && (!rule.fullBoardOnly || P.fullBoard)

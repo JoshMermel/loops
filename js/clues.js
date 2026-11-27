@@ -6,6 +6,8 @@ import { midloopStates, isMidloopSatisfied } from './variants/midloop.js';
 export { midloopStates };
 import { castleStates, isCastleSatisfied } from './variants/castlewall.js';
 export { castleStates };
+import { corralStates, isCorralSatisfied } from './variants/corral.js';
+export { corralStates };
 
 export function clueStates(P, marks) {
   const { ed, ed2, nb } = P;
@@ -135,7 +137,11 @@ export function earlyLoopEdges(P, marks) {
     if (P.hasCastle && !hasOtherSegments) {
       missesCastle = !isCastleSatisfied(P, e);
     }
-    if (missesClue || missesFull || missesSlither || missesMidloop || missesCastle || hasOtherSegments) {
+    let missesCorral = false;
+    if (P.hasCorral && !hasOtherSegments) {
+      missesCorral = !isCorralSatisfied(P, e);
+    }
+    if (missesClue || missesFull || missesSlither || missesMidloop || missesCastle || missesCorral || hasOtherSegments) {
       for (const x of edges) bad.add(x);
     }
   }

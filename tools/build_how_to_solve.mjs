@@ -30,7 +30,7 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 // Partition rules into universal loop fundamentals vs. puzzle-family-specific & cross-family hybrid rules
 const isGrayRule = (r) => Boolean(r.grayOnly || r.id === 'grayFromShape');
 const isHybridRule = (r) => Boolean(r.hybridOnly);
-const isPuzzleSpecific = (r) => Boolean(r.circleOnly || isGrayRule(r) || r.slitherOnly || r.midloopOnly || r.castleOnly || r.fullBoardOnly || isHybridRule(r));
+const isPuzzleSpecific = (r) => Boolean(r.circleOnly || isGrayRule(r) || r.slitherOnly || r.midloopOnly || r.castleOnly || r.corralOnly || r.fullBoardOnly || isHybridRule(r));
 const sortByLadder = (list) => list.slice().sort((a, b) => (
   TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.cost - b.cost
 ));
@@ -94,6 +94,15 @@ const PUZZLE_SECTIONS = [
     summaryMd: 'Blocked wall tiles cannot be entered by the loop. **White walls** must lie **Inside** the loop, **black walls** must lie **Outside** the loop, and **gray walls** may lie on either side. Each numbered arrow counts the total number of loop segments running **parallel** to the arrow from that tile all the way to the board edge (looking past any other wall tiles). White and black walls automatically anchor Inside/Outside shading (`faceShade`).',
     summaryHtml: 'Blocked wall tiles cannot be entered by the loop. <b>White walls</b> must lie <b>Inside</b> the loop, <b>black walls</b> must lie <b>Outside</b> the loop, and <b>gray walls</b> may lie on either side. Each numbered arrow counts the total number of loop segments running <b>parallel</b> to the arrow from that tile all the way to the board edge (looking past any other wall tiles). White and black walls automatically anchor Inside/Outside shading (<a href="#faceShade"><code>faceShade</code></a>).',
     rules: sortByLadder(RULES.filter((r) => r.castleOnly && !r.free)),
+    subgroups: [],
+  },
+  {
+    id: 'variant-corral',
+    title: 'Corral',
+    icon: '🐄',
+    summaryMd: 'Also known as **Bag** or **Cave**. Every circled number sits strictly **Inside** the single closed loop and counts the total number of **Inside** squares orthogonally visible from that square in all four directions (up, down, left, right), **including itself**, stopping in each direction at the loop fence or board edge. Every Corral square automatically anchors Inside/Outside shading (`faceShade`).',
+    summaryHtml: 'Also known as <b>Bag</b> or <b>Cave</b>. Every circled number sits strictly <b>Inside</b> the single closed loop and counts the total number of <b>Inside</b> squares orthogonally visible from that square in all four directions (up, down, left, right), <b>including itself</b>, stopping in each direction at the loop fence or board edge. Every Corral square automatically anchors Inside/Outside shading (<a href="#faceShade"><code>faceShade</code></a>).',
+    rules: sortByLadder(RULES.filter((r) => r.corralOnly && !r.free)),
     subgroups: [],
   },
   {
@@ -165,6 +174,7 @@ say(
   '- **[Slitherlink](#slitherlink):** Each number `0–3` inside a square tells how many of its four sides belong to the loop.',
   '- **[Mid-loop](#mid-loop):** Pass straight through every teal dot (on intersections for even runs, or segment midpoints for odd runs) with equal straight length on both sides.',
   '- **[Castle Wall](#castle-wall):** Keep white walls inside the loop, black walls outside, and match every directional arrow’s total parallel segment count to the board edge.',
+  '- **[Corral](#corral):** Keep every circled number strictly inside the loop so it sees that many inside squares orthogonally (including itself) — also known as Bag or Cave.',
   '- **[Hamilton cycle](#hamilton-cycle):** Visit every active intersection dot on the grid, respecting any given lines and walls.',
   '- **[Modifiers & Hybrids](#board-modifiers--hybrids):** Gray circles (mystery white/black), Swiss cheese cutout holes (each hole is entirely Inside or Outside), and two-ruleset hybrids where every puzzle genuinely needs both.',
   '',
@@ -328,7 +338,7 @@ htmlParts.push(`<!DOCTYPE html>
   <main>
     <a class="back" href="../index.html">← Back to Puzzles</a>
     <h1>How to Solve — Loop Puzzles</h1>
-    <p class="lead">Every solving technique the Hint button knows across <b>Masyu</b>, <b>Slitherlink</b>, <b>Mid-loop</b>, <b>Castle Wall</b>, <b>Hamilton cycle</b>, and <b>Hybrids</b>. Click any diagram to open that exact puzzle in the app.</p>
+    <p class="lead">Every solving technique the Hint button knows across <b>Masyu</b>, <b>Slitherlink</b>, <b>Mid-loop</b>, <b>Castle Wall</b>, <b>Corral</b>, <b>Hamilton cycle</b>, and <b>Hybrids</b>. Click any diagram to open that exact puzzle in the app.</p>
     <nav class="toc" aria-label="Jump to section">
       <a href="#rules">Rules at a glance</a>
       <a href="#loop-fundamentals">Loop fundamentals</a>
@@ -343,6 +353,7 @@ htmlParts.push(`<!DOCTYPE html>
       <a class="family-card" href="#variant-slitherlink"><b>🔢 Slitherlink</b><span>Each number 0–3 inside a square tells how many of its four sides belong to the single closed loop.</span></a>
       <a class="family-card" href="#variant-midloop"><b>🎯 Mid-loop</b><span>Pass straight through every teal dot at the exact midpoint of its straight segment (equal length on both sides).</span></a>
       <a class="family-card" href="#variant-castlewall"><b>🏰 Castle Wall</b><span>White walls stay inside, black walls stay outside, and arrows count parallel loop segments to the board edge.</span></a>
+      <a class="family-card" href="#variant-corral"><b>🐄 Corral</b><span>Also known as Bag / Cave: circled numbers stay inside the loop and count visible inside squares in all 4 directions.</span></a>
       <a class="family-card" href="#variant-full"><b>🔁 Hamilton cycle</b><span>Visit every active intersection dot on the grid, guided by permanent given lines and ✕ walls.</span></a>
       <a class="family-card" href="#variant-gray"><b>🔘 Gray circles</b><span>Masyu circles whose color (white or black) is hidden — deduce which each one is as you solve.</span></a>
       <a class="family-card" href="#variant-swiss"><b>🧀 Swiss cheese &amp; Hybrids</b><span>Cutout holes (each entirely Inside or Outside) and two-ruleset hybrids that genuinely require both.</span></a>
@@ -393,7 +404,7 @@ htmlParts.push(`
     <h3 class="sub-heading" id="variant-swiss">🧀 Swiss cheese</h3>
     <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All loop techniques — especially border rules, <a href="#chokepoint"><code>chokepoint</code></a>, <a href="#faceShade"><code>faceShade</code></a>, <a href="#faceCircle"><code>faceCircle</code></a>, and <a href="#faceSlither"><code>faceSlither</code></a> — work naturally around and across interior holes.</p>
     <h3 class="sub-heading" id="hybrids">🔀 Hybrids</h3>
-    <p>In <b>Hybrids</b> books, two clue families (Masyu, Slitherlink, Mid-loop, Castle Wall, and Hamilton cycle in pairs) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading, Castle Wall rays, and Mid-loop constraints automatically combine across clue families, and the Hint button also knows these dedicated cross-family deductions:</p>
+    <p>In <b>Hybrids</b> books, two clue families (Masyu, Slitherlink, Mid-loop, Castle Wall, Corral, and Hamilton cycle in pairs) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading, Castle Wall rays, Corral sightlines, and Mid-loop constraints automatically combine across clue families, and the Hint button also knows these dedicated cross-family deductions:</p>
     ${hybridRules.map((r) => renderRuleCardHtml(r)).join('\n')}
   </main>
 </body>

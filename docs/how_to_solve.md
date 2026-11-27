@@ -13,6 +13,7 @@ Every puzzle in the collection shares one core objective: draw **one single clos
 - **[Slitherlink](#slitherlink):** Each number `0–3` inside a square tells how many of its four sides belong to the loop.
 - **[Mid-loop](#mid-loop):** Pass straight through every teal dot (on intersections for even runs, or segment midpoints for odd runs) with equal straight length on both sides.
 - **[Castle Wall](#castle-wall):** Keep white walls inside the loop, black walls outside, and match every directional arrow’s total parallel segment count to the board edge.
+- **[Corral](#corral):** Keep every circled number strictly inside the loop so it sees that many inside squares orthogonally (including itself) — also known as Bag or Cave.
 - **[Hamilton cycle](#hamilton-cycle):** Visit every active intersection dot on the grid, respecting any given lines and walls.
 - **[Modifiers & Hybrids](#board-modifiers--hybrids):** Gray circles (mystery white/black), Swiss cheese cutout holes (each hole is entirely Inside or Outside), and two-ruleset hybrids where every puzzle genuinely needs both.
 
@@ -902,6 +903,70 @@ Coupled straight corridors and forced turns along an arrow ray bound which segme
 *ARMORY-30 (7×7, after 5 earlier hints). Click the picture to open this puzzle in the app.*
 
 > Hint says: "Along the 1↓ ray from C2, a forced straight corridor along the ray is longer than the 1 remaining segment allowed — cross out C5–C6 and C6–C7."
+
+---
+
+## Corral
+
+Also known as **Bag** or **Cave**. Every circled number sits strictly **Inside** the single closed loop and counts the total number of **Inside** squares orthogonally visible from that square in all four directions (up, down, left, right), **including itself**, stopping in each direction at the loop fence or board edge. Every Corral square automatically anchors Inside/Outside shading (`faceShade`).
+
+### corralEdge
+
+*Beginner, cost 3*
+
+A Corral number sits strictly inside the loop (border edges are on, adjacent Corral numbers cannot have a line between them).
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+### corralBound
+
+*Beginner, cost 4*
+
+A Corral number must extend far enough to reach its count and must close off any direction that would overshoot it.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+### corralWallCap
+
+*Medium, cost 12*
+
+A segment completing degree 2 at a corner would cross out its perpendicular edge(s) and make a Corral number see too many squares.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+### corralSameLine
+
+*Medium, cost 13*
+
+Two Corral numbers seeing each other along a row or column share that sightline span, tightening their remaining directions.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+### corralSeparate
+
+*Medium, cost 14*
+
+Two Corral numbers in the same row or column that would exceed one of their counts if connected must be separated by a fence, capping reach toward each other.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
+
+---
+
+### corralParityBound
+
+*Medium, cost 15*
+
+Outside squares block a Corral number’s sightline, forcing it to extend further in the other directions.
+
+*No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).*
 
 ---
 

@@ -178,6 +178,25 @@ button.ghost { background: transparent; }
 :root[data-theme="dark"] #board .slither-num.bad {
   fill: #ff6b6b; paint-order: stroke; stroke: var(--cell-bg); stroke-width: 3px; stroke-linejoin: round;
 }
+:is(#board, .help-fig) .corral-badge {
+  fill: rgba(255, 255, 255, 0.86); stroke: #2f6f4e; stroke-width: 2; pointer-events: none;
+}
+:is(#board, .help-fig) .corral-badge.bad {
+  fill: #fde8e8; stroke: var(--pearl-bad); stroke-width: 2.8;
+}
+:is(#board, .help-fig) .corral-num {
+  fill: #1b4332; font-weight: 700;
+  text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none;
+}
+:is(#board, .help-fig) .corral-num.bad { fill: #b71c1c; }
+:root[data-theme="dark"] :is(#board, .help-fig) .corral-badge {
+  fill: rgba(22, 34, 28, 0.9); stroke: #5fb889;
+}
+:root[data-theme="dark"] :is(#board, .help-fig) .corral-badge.bad {
+  fill: #4a151b; stroke: var(--pearl-bad);
+}
+:root[data-theme="dark"] :is(#board, .help-fig) .corral-num { fill: #d8f3e5; }
+:root[data-theme="dark"] :is(#board, .help-fig) .corral-num.bad { fill: #ff9494; }
 svg [hidden] { display: none; }
 .help-fig .hr-num {
   fill: var(--pearl-ink); font-size: 13px; font-weight: 700;

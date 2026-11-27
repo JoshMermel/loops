@@ -20,11 +20,16 @@ import {
   firstUnsatisfiedCastle, firstUnsatisfiedCastleOnClose,
   findEasyCastleStep, findMediumCastleStep, castleContradiction,
 } from './variants/castlewall.js';
+import {
+  firstUnsatisfiedCorral, firstUnsatisfiedCorralOnClose, isCorralFrontierEdge,
+  findEasyCorralStep, findMediumCorralStep, corralContradiction,
+} from './variants/corral.js';
 
 export const isFrontierEdge = (P, st, x) => (
   st.cell[P.edgeA[x]] === LOOP || st.cell[P.edgeB[x]] === LOOP
   || isSlitherEdge(P, x) || isMidloopEdge(P, x)
   || (P.hasCastle && P._ecwOff[x] < P._ecwOff[x + 1])
+  || isCorralFrontierEdge(P, st, x)
 );
 
 export const MEDIUM_MAX = 28; // imagineLocal (22..26) sits in Medium above faceShade (18)
@@ -194,6 +199,7 @@ let dirtyFlag = new Uint8Array(0);
 let dirtyFaceFlag = new Uint8Array(0);
 let dirtyMidFlag = new Uint8Array(0);
 let dirtyCastleFlag = new Uint8Array(0);
+let dirtyCorralFlag = new Uint8Array(0);
 
 /**
  * Easy contradiction check (local rule violations + early closed loop).
@@ -363,6 +369,12 @@ export function easyContradiction(P, st, scope = null) {
     if (cc) return cc;
   }
 
+  // 3f. Corral sightline/inside contradiction
+  if (P.hasCorral) {
+    const kc = corralContradiction(P, st, scope ? scope.corrals : null);
+    if (kc) return kc;
+  }
+
   // 4. Early closed loop (or 2 cycles) — skip when no E_ON edge was added in the hypothesis
   if (scope) {
     if (!scope.checkCycle) return null;
@@ -439,6 +451,13 @@ export function easyContradiction(P, st, scope = null) {
       if (badCw >= 0) {
         const cc = castleContradiction(P, st, null);
         return cc || { kind: 'earlyClose', castleIdx: badCw };
+      }
+    }
+    if (P.hasCorral) {
+      const badKr = firstUnsatisfiedCorral(P, e);
+      if (badKr >= 0) {
+        const kc = corralContradiction(P, st, null);
+        return kc || { kind: 'earlyClose', corralIdx: badKr };
       }
     }
   }
@@ -557,6 +576,12 @@ function findEasyStep(P, st, forbid, scope = null) {
   // 0a2. Castle Wall easy rules
   if (P.hasCastle) {
     const emitted = findEasyCastleStep(P, st, tryEmit, scope ? scope.castles : null);
+    if (emitted) return emitted;
+  }
+
+  // 0a3. Corral easy rules
+  if (P.hasCorral) {
+    const emitted = findEasyCorralStep(P, st, tryEmit, scope ? scope.corrals : null);
     if (emitted) return emitted;
   }
 
@@ -847,6 +872,10 @@ function findEasyStep(P, st, forbid, scope = null) {
     const emitted = findMediumCastleStep(P, st, tryEmit, scope ? scope.castles : null);
     if (emitted) return emitted;
   }
+  if (P.hasCorral) {
+    const emitted = findMediumCorralStep(P, st, tryEmit, scope ? scope.corrals : null);
+    if (emitted) return emitted;
+  }
 
   // 8. noEarlyClose (skip when no E_ON / LOOP cell has been added in this hypothesis)
   if (scope && !scope.hasOn) return null;
@@ -892,10 +921,12 @@ function findEasyStep(P, st, forbid, scope = null) {
     const slFace = pathVerts < loopCount ? -1 : firstUnsatisfiedSlitherOnClose(P, st, x);
     const midIdx = (pathVerts < loopCount || slFace >= 0) ? -1 : firstUnsatisfiedMidloopOnClose(P, st, x);
     const castleIdx = (pathVerts < loopCount || slFace >= 0 || midIdx >= 0) ? -1 : firstUnsatisfiedCastleOnClose(P, st, x);
-    if (pathVerts < loopCount || slFace >= 0 || midIdx >= 0 || castleIdx >= 0) {
+    const corralIdx = (pathVerts < loopCount || slFace >= 0 || midIdx >= 0 || castleIdx >= 0) ? -1 : firstUnsatisfiedCorralOnClose(P, st, x);
+    if (pathVerts < loopCount || slFace >= 0 || midIdx >= 0 || castleIdx >= 0 || corralIdx >= 0) {
       const info = slFace >= 0 ? { edge: x, a, b, slitherFace: slFace }
         : midIdx >= 0 ? { edge: x, a, b, midIdx }
         : castleIdx >= 0 ? { edge: x, a, b, castleIdx }
+        : corralIdx >= 0 ? { edge: x, a, b, corralIdx }
         : { edge: x, a, b };
       const step = tryEmit('noEarlyClose', [['e', x, E_OFF]], info);
       if (step) return step;
@@ -929,6 +960,20 @@ function runHypothesis(P, baseState, edge, val, {
   const midByRow = P.midloopByRow, midByCol = P.midloopByCol;
   const hasCastle = Boolean(P.hasCastle);
   const castleByRow = P.castleByRow, castleByCol = P.castleByCol;
+  const hasCorral = Boolean(P.hasCorral);
+  const corralByRow = P._corralByRow, corralByCol = P._corralByCol;
+  const markCorralIdx = (ki) => {
+    if (ki < 0 || dirtyCorralFlag[ki]) return;
+    dirtyCorralFlag[ki] = 1;
+    scope.corralList.push(ki);
+  };
+  const markCellCorrals = (c) => {
+    const r = (c / cols) | 0, col = c - r * cols;
+    if (r > 0) { const rl = corralByRow[r - 1]; for (let j = 0; j < rl.length; j++) markCorralIdx(rl[j]); }
+    if (r < fr) { const rl = corralByRow[r]; for (let j = 0; j < rl.length; j++) markCorralIdx(rl[j]); }
+    if (col > 0) { const cl = corralByCol[col - 1]; for (let j = 0; j < cl.length; j++) markCorralIdx(cl[j]); }
+    if (col < fc) { const cl = corralByCol[col]; for (let j = 0; j < cl.length; j++) markCorralIdx(cl[j]); }
+  };
   const markCastleIdx = (ci) => {
     if (ci < 0 || dirtyCastleFlag[ci]) return;
     dirtyCastleFlag[ci] = 1;
@@ -981,6 +1026,7 @@ function runHypothesis(P, baseState, edge, val, {
     if (slitherAt) markCellFaces(i);
     if (hasMid) markCellMids(i);
     if (hasCastle) markCellCastles(i);
+    if (hasCorral) markCellCorrals(i);
     markCell(i);
     const b = i * 4;
     for (let d = 0; d < 4; d++) {
@@ -1016,6 +1062,9 @@ function runHypothesis(P, baseState, edge, val, {
     if (scope.castleList) {
       for (let k = 0; k < scope.castleList.length; k++) dirtyCastleFlag[scope.castleList[k]] = 0;
     }
+    if (scope.corralList) {
+      for (let k = 0; k < scope.corralList.length; k++) dirtyCorralFlag[scope.corralList[k]] = 0;
+    }
   };
 
   if (scoped) {
@@ -1023,6 +1072,7 @@ function runHypothesis(P, baseState, edge, val, {
     if (slitherAt && dirtyFaceFlag.length < P.slither.length) dirtyFaceFlag = new Uint8Array(P.slither.length);
     if (hasMid && dirtyMidFlag.length < P.midloop.length) dirtyMidFlag = new Uint8Array(P.midloop.length);
     if (hasCastle && dirtyCastleFlag.length < P.castle.length) dirtyCastleFlag = new Uint8Array(P.castle.length);
+    if (hasCorral && dirtyCorralFlag.length < P.corral.length) dirtyCorralFlag = new Uint8Array(P.corral.length);
     scope = {
       cells: [],
       whites: [],
@@ -1031,6 +1081,8 @@ function runHypothesis(P, baseState, edge, val, {
       mids: hasMid ? [] : null,
       castles: hasCastle ? dirtyCastleFlag : null,
       castleList: hasCastle ? [] : null,
+      corrals: hasCorral ? dirtyCorralFlag : null,
+      corralList: hasCorral ? [] : null,
       newOn: val === E_ON ? [edge] : [],
       hasOn: val === E_ON,
       checkCycle: val === E_ON,
@@ -1220,6 +1272,18 @@ function candidateEdges(P, st, frontierOnly = false) {
               near[rr * P.cols + cc] = 1;
             }
           }
+        }
+      }
+    }
+  }
+  if (P.hasCorral) {
+    for (let k = 0; k < P.corral.length; k++) {
+      const kr = P.corral[k];
+      for (let d = 0; d < 4; d++) {
+        const ray = kr.rays[d];
+        for (let j = 0; j < ray.length; j++) {
+          const x = ray[j];
+          if (x >= 0 && edgeA[x] >= 0) { near[edgeA[x]] = 1; near[edgeB[x]] = 1; }
         }
       }
     }

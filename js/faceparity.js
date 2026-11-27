@@ -169,6 +169,14 @@ export function buildFaceParity(P, st, { buildGraph = true, useCircles = true, u
     }
   }
 
+  // 0b. Corral clues: every numbered Corral square is strictly Inside (1)
+  if (P.hasCorral) {
+    for (let k = 0; k < P.corral.length; k++) {
+      const kr = P.corral[k];
+      link(EXT, canonFace(kr.f), 1, buildGraph ? { kind: 'corralInside', face: kr.f, n: kr.n } : null);
+    }
+  }
+
   // 1. Known loop segments (E_ON -> opposite) and crosses (E_OFF -> same)
   for (let x = 0; x < P.numEdges; x++) {
     if (P.edgeA[x] < 0) continue;

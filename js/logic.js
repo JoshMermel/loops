@@ -23,6 +23,11 @@ import {
   isCastleSatisfied, propagateCastleClue, propagateCastleParity, propagateCastleMedium,
   firstUnsatisfiedCastleOnClose,
 } from './variants/castlewall.js';
+import {
+  compileCorral, serializeCorral, parseCorralToken, symmetryCorral,
+  isCorralSatisfied, propagateCorralClue, propagateCorralParity,
+  firstUnsatisfiedCorralOnClose,
+} from './variants/corral.js';
 
 /** Column letters like a spreadsheet: 0 -> A, 25 -> Z, 26 -> AA. */
 export function colName(c) {
@@ -240,6 +245,7 @@ export function compile(p) {
   compileSlither(compiled, p);
   compileMidloop(compiled, p);
   compileCastle(compiled, p);
+  compileCorral(compiled, p);
   return compiled;
 }
 
@@ -308,6 +314,9 @@ let scratchCwDirtyList = new Int16Array(0);
 let scratchCwRunDirty = new Uint8Array(0);
 let scratchCwRunList = new Int16Array(0);
 let scratchCwCap = 0;
+let scratchKrQ = new Int16Array(0);
+let scratchInKrQ = new Uint8Array(0);
+let scratchKrCap = 0;
 let scratchQCap = 0;
 
 /** Number of edge assignments or cell=OFF deductions made by the most recent propagate() call. */
@@ -336,6 +345,16 @@ function ensureCwScratch(K) {
     while (cap <= K) cap <<= 1;
     scratchCwCap = cap;
     scratchCwQ = new Int16Array(cap);
+  }
+}
+
+function ensureKrScratch(K) {
+  if (scratchInKrQ.length < K) scratchInKrQ = new Uint8Array(K);
+  if (scratchKrCap <= K) {
+    let cap = 32;
+    while (cap <= K) cap <<= 1;
+    scratchKrCap = cap;
+    scratchKrQ = new Int16Array(cap);
   }
 }
 
@@ -427,6 +446,21 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
 
   const hasCastle = Boolean(P.hasCastle);
   if (hasCastle && P.castleImpossible) return false;
+  const hasCorral = Boolean(P.hasCorral);
+  if (hasCorral && P.corralImpossible) return false;
+  const ekOff = P._ekOff, ekData = P._ekData;
+  const krLen = hasCorral ? P.corral.length : 0;
+  if (hasCorral) ensureKrScratch(krLen);
+  const qKr = scratchKrQ, inKrQ = scratchInKrQ;
+  const krMask = scratchKrCap - 1;
+  let krHead = 0, krTail = 0;
+  const pushKr = (k) => {
+    if (!inKrQ[k]) {
+      inKrQ[k] = 1;
+      qKr[krTail] = k;
+      krTail = (krTail + 1) & krMask;
+    }
+  };
   const ecwOff = P._ecwOff, ecwData = P._ecwData;
   const cwByRow = P.castleByRow, cwByCol = P.castleByCol;
   const cwLen = hasCastle ? P.castle.length : 0;
@@ -526,6 +560,10 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       markCellCw(a);
       markCellCw(b);
     }
+    if (hasCorral) {
+      const kEnd = ekOff[x + 1];
+      for (let k = ekOff[x]; k < kEnd; k++) pushKr(ekData[k]);
+    }
   };
 
   const setCell = (i, v) => {
@@ -582,11 +620,12 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
     if (hasSlither) for (let si = 0; si < P.slither.length; si++) pushFace(P.slither[si].f);
     if (hasMidloop) for (let mi = 0; mi < P.midloop.length; mi++) pushMid(mi);
     if (hasCastle) for (let ci = 0; ci < cwLen; ci++) if (P.castle[ci].dir) { pushCw(ci); markCwDirty(ci); }
+    if (hasCorral) for (let ki = 0; ki < krLen; ki++) pushKr(ki);
   }
 
   while (ok) {
-    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces/midloop/castle clues whose neighborhood changed.
-    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail || mHead !== mTail || cwHead !== cwTail)) {
+    // Inner local fixed-point worklist (Steps 1-4): only revisits cells/clues/faces/midloop/castle/corral clues whose neighborhood changed.
+    while (ok && (cHead !== cTail || kHead !== kTail || fHead !== fTail || mHead !== mTail || cwHead !== cwTail || krHead !== krTail)) {
       while (ok && cHead !== cTail) {
         const i = qCell[cHead];
         cHead = (cHead + 1) & qMask;
@@ -784,11 +823,23 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
         inCwQ[ci] = 0;
         if (!propagateCastleClue(P, st, ci, setEdgeOk)) ok = false;
       }
+
+      while (ok && krHead !== krTail) {
+        const ki = qKr[krHead];
+        krHead = (krHead + 1) & krMask;
+        inKrQ[ki] = 0;
+        if (!propagateCorralClue(P, st, ki, setEdgeOk)) ok = false;
+      }
     }
     if (!ok) break;
+    if (hasCorral && !st.cycle && (seedEdge >= 0 || seedCell < 0 || changes > 0)) {
+      const beforeKr = changes;
+      if (!propagateCorralParity(P, st, setEdgeOk)) { ok = false; break; }
+      if (changes > beforeKr) continue;
+    }
     if (hasCastle && !st.cycle && (seedEdge >= 0 || seedCell < 0 || changes > 0)) {
       const before = changes;
-      if (P.hasCastleWalls) {
+      if (P.hasCastleWalls && !hasCorral) {
         if (!propagateCastleParity(P, st, setEdgeOk)) { ok = false; break; }
       }
       if (cwDirtyLen > 0) {
@@ -861,6 +912,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
                 if (!forbid && hasSlither) forbid = firstUnsatisfiedSlitherOnClose(P, st, ex) >= 0;
                 if (!forbid && hasMidloop) forbid = firstUnsatisfiedMidloopOnClose(P, st, ex) >= 0;
                 if (!forbid && hasCastle) forbid = firstUnsatisfiedCastleOnClose(P, st, ex) >= 0;
+                if (!forbid && hasCorral) forbid = firstUnsatisfiedCorralOnClose(P, st, ex) >= 0;
                 if (forbid) setEdge(ex, E_OFF);
               }
               break;
@@ -904,18 +956,19 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
       for (let i = 0; i < N; i++) {
         if (cell[i] === UNKNOWN) setCell(i, OFF);
       }
-      if (hasSlither || hasMidloop || hasCastle) {
+      if (hasSlither || hasMidloop || hasCastle || hasCorral) {
         for (let x = 0; x < P.numEdges; x++) {
           if (edgeA[x] >= 0 && e[x] === E_UNKNOWN) setEdge(x, E_OFF);
         }
       }
       if (hasMidloop && !isMidloopSatisfied(P, e)) { ok = false; break; }
       if (hasCastle && !isCastleSatisfied(P, e)) { ok = false; break; }
+      if (hasCorral && !isCorralSatisfied(P, e)) { ok = false; break; }
       st.cycle = true;
     } else {
       st.cycle = false;
     }
-    if (cHead === cTail && kHead === kTail && fHead === fTail && mHead === mTail && cwHead === cwTail) break;
+    if (cHead === cTail && kHead === kTail && fHead === fTail && mHead === mTail && cwHead === cwTail && krHead === krTail) break;
   }
 
   // O(touched) cleanup of queued flags on early contradiction exit
@@ -924,6 +977,7 @@ export function propagate(P, st, seedEdge = -1, seedCell = -1) {
   while (fHead !== fTail) { inFaceQ[qFace[fHead]] = 0; fHead = (fHead + 1) & qMask; }
   while (mHead !== mTail) { inMidQ[qMid[mHead]] = 0; mHead = (mHead + 1) & midMask; }
   while (cwHead !== cwTail) { inCwQ[qCw[cwHead]] = 0; cwHead = (cwHead + 1) & cwMask; }
+  while (krHead !== krTail) { inKrQ[qKr[krHead]] = 0; krHead = (krHead + 1) & krMask; }
   for (let i = 0; i < cwDirtyLen; i++) cwDirty[cwDirtyList[i]] = 0;
   lastPropChanges = changes;
   return ok;
@@ -1001,11 +1055,12 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
       return;
     }
 
-    // If a cycle is already closed covering all LOOP cells, verify active constraints (Slitherlink, Mid-loop, Castle Wall) and record.
+    // If a cycle is already closed covering all LOOP cells, verify active constraints (Slitherlink, Mid-loop, Castle Wall, Corral) and record.
     if (st.cycle) {
       if ((!P.hasSlither || isSlitherSatisfied(P, e))
         && (!P.hasMidloop || isMidloopSatisfied(P, e))
-        && (!P.hasCastle || isCastleSatisfied(P, e))) solutions.push(st);
+        && (!P.hasCastle || isCastleSatisfied(P, e))
+        && (!P.hasCorral || isCorralSatisfied(P, e))) solutions.push(st);
       return;
     }
 
@@ -1077,6 +1132,49 @@ export function solve(P, { limit = 2, state = null, maxNodes = Infinity, rng = n
         } else if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
       }
       if (cwTies && cwTies.length) bestEdge = cwTies[(rng() * cwTies.length) | 0];
+      if (bestEdge >= 0) {
+        const onFirst = rng ? rng() < 0.5 : true;
+        const v0 = onFirst ? E_ON : E_OFF;
+        const v1 = onFirst ? E_OFF : E_ON;
+        const a = cloneState(st);
+        a.e[bestEdge] = v0;
+        dfs(a, bestEdge, -1);
+        if (solutions.length >= limit || exceeded) return;
+        st.e[bestEdge] = v1;
+        dfs(st, bestEdge, -1);
+        return;
+      }
+    }
+
+    // If there are no undecided LOOP vertices yet on a Corral board, branch on the first undecided edge of the tightest Corral ray.
+    if (P.hasCorral) {
+      let bestEdge = -1, bestPri = -1e9;
+      const krTies = rng ? [] : null;
+      for (let ki = 0; ki < P.corral.length; ki++) {
+        const kr = P.corral[ki];
+        let minV = 1, maxV = 1, firstUnk = -1;
+        const unks = krTies ? [] : null;
+        for (let d = 0; d < 4; d++) {
+          const ray = kr.rays[d];
+          let mn = 0;
+          while (mn < ray.length && (ray[mn] < 0 || e[ray[mn]] === E_OFF)) mn++;
+          let mx = 0;
+          while (mx < ray.length && (ray[mx] < 0 || e[ray[mx]] !== E_ON)) mx++;
+          minV += mn;
+          maxV += mx;
+          if (mn < ray.length && ray[mn] >= 0 && e[ray[mn]] === E_UNKNOWN) {
+            if (firstUnk < 0) firstUnk = ray[mn];
+            if (unks) unks.push(ray[mn]);
+          }
+        }
+        if (firstUnk < 0) continue;
+        const pri = -(maxV - kr.n) * 10 - (kr.n - minV);
+        if (krTies) {
+          if (pri > bestPri) { bestPri = pri; krTies.length = 0; }
+          if (pri === bestPri) for (let j = 0; j < unks.length; j++) krTies.push(unks[j]);
+        } else if (pri > bestPri) { bestPri = pri; bestEdge = firstUnk; }
+      }
+      if (krTies && krTies.length) bestEdge = krTies[(rng() * krTies.length) | 0];
       if (bestEdge >= 0) {
         const onFirst = rng ? rng() < 0.5 : true;
         const v0 = onFirst ? E_ON : E_OFF;
@@ -1273,6 +1371,7 @@ export function isSolved(P, edges) {
   if (!isSlitherSatisfied(P, edges)) return false;
   if (!isMidloopSatisfied(P, edges)) return false;
   if (!isCastleSatisfied(P, edges)) return false;
+  if (!isCorralSatisfied(P, edges)) return false;
 
   return true;
 }
@@ -1295,13 +1394,14 @@ export function puzzleCluesToString(p) {
   serializeSlither(p, parts);
   serializeMidloop(p, parts);
   serializeCastle(p, parts);
+  serializeCorral(p, parts);
   for (const gv of p.givens || []) parts.push(`${gv.r}:${gv.c}:${gv.dir}${gv.v}`);
   return parts.join(';');
 }
 
-/** Parse the CSV clues field into `{ clues, slither, midloop, castle, fullBoard, givens, voids }`. */
+/** Parse the CSV clues field into `{ clues, slither, midloop, castle, corral, fullBoard, givens, voids }`. */
 export function parseCluesField(s) {
-  const acc = { clues: [], slither: [], midloop: [], castle: [], givens: [], voids: [], fullBoard: false };
+  const acc = { clues: [], slither: [], midloop: [], castle: [], corral: [], givens: [], voids: [], fullBoard: false };
   if (!s) return acc;
   for (const tok of s.split(';')) {
     if (!tok) continue;
@@ -1323,6 +1423,8 @@ export function parseCluesField(s) {
       // handled by Mid-loop variant
     } else if (parseCastleToken(r, c, tag, acc)) {
       // handled by Castle Wall variant
+    } else if (parseCorralToken(r, c, tag, acc)) {
+      // handled by Corral variant
     } else {
       throw new Error(`bad clue "${tok}"`);
     }
@@ -1353,7 +1455,7 @@ export function parseCsv(text) {
     const parts = t.split(',');
     if (parts.length < 4) throw new Error(`malformed CSV row: "${t.slice(0, 60)}"`);
     const [name, rows, cols, cluesStr, solution, rules, tier, score] = parts;
-    const { clues, slither, midloop, castle, fullBoard, givens, voids } = parseCluesField(cluesStr);
+    const { clues, slither, midloop, castle, corral, fullBoard, givens, voids } = parseCluesField(cluesStr);
     const rec = {
       name,
       rows: +rows,
@@ -1367,6 +1469,7 @@ export function parseCsv(text) {
     if (slither.length) rec.slither = slither;
     if (midloop.length) rec.midloop = midloop;
     if (castle.length) rec.castle = castle;
+    if (corral.length) rec.corral = corral;
     if (fullBoard) rec.fullBoard = true;
     if (givens.length) rec.givens = givens;
     if (voids.length) rec.voids = voids;
@@ -1418,7 +1521,8 @@ export function symmetryKey(p) {
     const sPart = symmetrySlither(p, swap, flipR, flipC);
     const mPart = symmetryMidloop(p, swap, flipR, flipC);
     const cPart = symmetryCastle(p, swap, flipR, flipC);
-    const key = `${prefix}${R}x${C}|${items}${sPart}${mPart}${cPart}${vPart}${gPart}`;
+    const kPart = symmetryCorral(p, swap, flipR, flipC);
+    const key = `${prefix}${R}x${C}|${items}${sPart}${mPart}${cPart}${kPart}${vPart}${gPart}`;
     if (best === null || key < best) best = key;
   }
   return best;
@@ -1438,14 +1542,17 @@ export function puzzleHash(p) {
   const sortedC = p.castle && p.castle.length
     ? [...p.castle].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
     : null;
+  const sortedK = p.corral && p.corral.length
+    ? [...p.corral].sort((a, b) => (a.r * (p.cols - 1) + a.c) - (b.r * (p.cols - 1) + b.c))
+    : null;
   const sortedV = p.voids && p.voids.length
     ? [...p.voids].sort((a, b) => (a.r * p.cols + a.c) - (b.r * p.cols + b.c))
     : null;
   const sortedG = p.givens && p.givens.length
     ? [...p.givens].sort((a, b) => ((a.r * p.cols + a.c) * 2 + (a.dir === 'V' ? 1 : 0)) - ((b.r * p.cols + b.c) * 2 + (b.dir === 'V' ? 1 : 0)))
     : null;
-  const body = (p.fullBoard || sortedS || sortedM || sortedC || sortedV || sortedG)
-    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], midloop: sortedM || [], castle: sortedC || [], givens: sortedG || [] })
+  const body = (p.fullBoard || sortedS || sortedM || sortedC || sortedK || sortedV || sortedG)
+    ? puzzleCluesToString({ fullBoard: p.fullBoard, voids: sortedV || [], clues: sorted, slither: sortedS || [], midloop: sortedM || [], castle: sortedC || [], corral: sortedK || [], givens: sortedG || [] })
     : cluesToString(sorted);
   const s = `${p.rows}x${p.cols}|${body}`;
   let h = 5381;

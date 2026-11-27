@@ -133,6 +133,14 @@ for (const ex of examples) {
       g += `<text x="${vx(sc.c) + S / 2}" y="${vy(sc.r) + S / 2}" font-size="${S * 0.48}" font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="#111111">${sc.n}</text>`;
     }
   }
+  if (P.hasCorral) {
+    for (const kr of P.corral) {
+      const cx = vx(kr.c) + S / 2, cy = vy(kr.r) + S / 2;
+      const fs = kr.n >= 10 ? S * 0.36 : S * 0.44;
+      g += `<circle cx="${cx}" cy="${cy}" r="${S * 0.34}" fill="#eef7f0" stroke="#2e7d32" stroke-width="1.8"/>`;
+      g += `<text x="${cx}" y="${cy}" font-size="${fs}" font-weight="700" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central" fill="#1b5e20">${kr.n}</text>`;
+    }
+  }
 
   // Existing segments (behind all pearls & Mid-loop dots so clues read cleanly; given segments in dark ink)
   const givenE = P.hasGivens ? P.givenE : null;

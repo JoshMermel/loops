@@ -166,6 +166,17 @@ const manifest = {
       },
     },
     {
+      name: 'Corral',
+      icon: '🐄',
+      blurb: 'Keep every circled number strictly inside the loop so it sees that many inside squares orthogonally (also known as Bag / Cave).',
+      subs: {
+        Classic: {
+          icon: '📚',
+          blurb: 'Standard Corral boards by size (counted in squares).',
+        },
+      },
+    },
+    {
       name: 'Hamilton cycle',
       icon: '🔁',
       blurb: 'Visit every single dot on the grid — guided by given lines, given walls, or both.',
@@ -214,6 +225,26 @@ const manifest = {
         'Castle Wall + Hamilton cycle': {
           icon: '🏰🔁',
           blurb: 'Castle Wall blocks and arrows on a loop that must visit every remaining dot.',
+        },
+        'Corral + Masyu': {
+          icon: '🐄⚪',
+          blurb: 'Corral sightline numbers paired with Masyu circles.',
+        },
+        'Corral + Slitherlink': {
+          icon: '🐄🔢',
+          blurb: 'Circled Corral sightline numbers paired with plain Slitherlink edge counts.',
+        },
+        'Corral + Mid-loop': {
+          icon: '🐄🎯',
+          blurb: 'Corral sightline numbers paired with teal Mid-loop midpoint dots.',
+        },
+        'Corral + Castle Wall': {
+          icon: '🐄🏰',
+          blurb: 'Corral sightline numbers paired with Castle Wall blocks and arrows.',
+        },
+        'Corral + Hamilton cycle': {
+          icon: '🐄🔁',
+          blurb: 'Corral sightline numbers on a Hamilton cycle visiting every dot.',
         },
       },
     },
@@ -626,6 +657,18 @@ const recipes = [
     blurb: 'Mirror, diagonal, and 180° symmetric Castle Wall tiles, arrows, and loops.',
   },
 
+  // ---- Corral (Bag / Cave) tasting books (24 puzzles each at 4 B / 8 M / 8 H / 4 E)
+  {
+    id: 'corral-7x7', name: 'Corral 7×7', label: '7️⃣ 7×7', group: 'Corral', sub: 'Classic',
+    glob: 'corral_8x8', tiers: '4,8,8,4',
+    blurb: 'Compact 7×7-square Corral (Bag / Cave) puzzles across all four difficulties.',
+  },
+  {
+    id: 'corral-10x10', name: 'Corral 10×10', label: '🔟 10×10', group: 'Corral', sub: 'Classic',
+    glob: 'corral_11x11', tiers: '4,8,8,4',
+    blurb: 'Classic 10×10-square Corral (Bag / Cave) puzzles across all four difficulties.',
+  },
+
   // ---- Hybrids (two loop rule sets combined — every puzzle requires both)
   {
     id: 'full-masyu-8x8', name: 'Masyu + Hamilton cycle', label: '⚪🔁 Classic (8×8)', group: 'Hybrids', sub: 'Masyu + Hamilton cycle',
@@ -711,6 +754,31 @@ const recipes = [
     id: 'hybrid-castle-full', name: 'Castle Wall + Hamilton cycle', label: '🏰🔁 Classic (8×8)', group: 'Hybrids', sub: 'Castle Wall + Hamilton cycle',
     glob: 'hybrid_castle_full_8x8', tiers: '50,200,200,50',
     blurb: 'Castle Wall blocks and arrows on a Hamilton cycle visiting every remaining dot.',
+  },
+  {
+    id: 'hybrid-corral-masyu', name: 'Corral + Masyu', label: '🐄⚪ Classic (8×8)', group: 'Hybrids', sub: 'Corral + Masyu',
+    glob: 'hybrid_corral_masyu_8x8', tiers: '4,8,8,4',
+    blurb: 'Circled Corral sightline numbers paired with Masyu circles — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-corral-slither', name: 'Corral + Slitherlink', label: '🐄🔢 Classic (8×8)', group: 'Hybrids', sub: 'Corral + Slitherlink',
+    glob: 'hybrid_corral_slither_8x8', tiers: '4,8,8,4',
+    blurb: 'Circled Corral sightline numbers paired with plain Slitherlink edge counts — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-corral-midloop', name: 'Corral + Mid-loop', label: '🐄🎯 Classic (8×8)', group: 'Hybrids', sub: 'Corral + Mid-loop',
+    glob: 'hybrid_corral_midloop_8x8', tiers: '4,8,8,4',
+    blurb: 'Circled Corral sightline numbers paired with teal Mid-loop dots — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-corral-castle', name: 'Corral + Castle Wall', label: '🐄🏰 Classic (8×8)', group: 'Hybrids', sub: 'Corral + Castle Wall',
+    glob: 'hybrid_corral_castle_8x8', tiers: '4,8,8,4',
+    blurb: 'Circled Corral sightline numbers paired with Castle Wall blocks and arrows — every puzzle requires both.',
+  },
+  {
+    id: 'hybrid-corral-full', name: 'Corral + Hamilton cycle', label: '🐄🔁 Classic (8×8)', group: 'Hybrids', sub: 'Corral + Hamilton cycle',
+    glob: 'hybrid_corral_full_8x8', tiers: '4,8,8,4',
+    blurb: 'Circled Corral sightline numbers on a Hamilton cycle visiting every dot.',
   },
 ];
 

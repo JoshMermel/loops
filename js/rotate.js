@@ -13,6 +13,7 @@ import { compile, puzzleHash } from './logic.js';
 import { rotateSlitherCW } from './variants/slitherlink.js';
 import { rotateMidloopCW } from './variants/midloop.js';
 import { rotateCastleCW } from './variants/castlewall.js';
+import { rotateCorralCW } from './variants/corral.js';
 import { numFacesOf } from './marks.js';
 
 export const MIN_PX = 26;
@@ -28,6 +29,7 @@ export function rotatePuzzleCW(P) {
   const slither = rotateSlitherCW(P);
   const midloop = rotateMidloopCW(P);
   const castle = rotateCastleCW(P);
+  const corral = rotateCorralCW(P);
   const voids = (P.voids || []).map((v) => ({ r: v.c, c: R - 1 - v.r }));
   const givens = (P.givens || []).map((gv) => (
     gv.dir === 'H'
@@ -56,6 +58,7 @@ export function rotatePuzzleCW(P) {
     ...(slither.length ? { slither } : {}),
     ...(midloop.length ? { midloop } : {}),
     ...(castle.length ? { castle } : {}),
+    ...(corral.length ? { corral } : {}),
     ...(P.fullBoard ? { fullBoard: true } : {}),
     ...(voids.length ? { voids } : {}),
     ...(givens.length ? { givens } : {}),

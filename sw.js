@@ -1,7 +1,7 @@
 // Opt-in service worker for offline Loops play.
 // Registered only when the user enables "Offline play" in Settings.
 const CACHE_PREFIX = 'loops-';
-const APP_CACHE = 'loops-app-v1';
+const APP_CACHE = 'loops-app-v2';
 const BOOK_CACHE = 'loops-books-v1';
 
 const APP_SHELL = [
@@ -32,6 +32,7 @@ const APP_SHELL = [
   'js/rating.js',
   'js/rotate.js',
   'js/variants/castlewall.js',
+  'js/variants/corral.js',
   'js/variants/midloop.js',
   'js/variants/slitherlink.js',
 ];

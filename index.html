@@ -367,6 +367,35 @@
               </figure>
             </div>
           </div>
+          <div class="help-rule-card help-rule-card--wide" id="help-card-corral" hidden>
+            <div class="help-rule-title">Corral numbers (also known as Bag / Cave)</div>
+            <p class="help-rule-desc">Every circled number must lie strictly <b>inside</b> the loop. Its value counts the total number of <b>inside squares</b> visible orthogonally in all four directions (up, down, left, right), <b>including its own square</b>, stopping in each direction at the loop fence or board edge. <i>(In hybrids with Slitherlink, circled green numbers are Corral sightline counts and plain numbers are Slitherlink edge counts.)</i></p>
+            <div class="help-diagrams">
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Valid Corral square seeing 4 inside squares">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="23" y="22" width="66" height="22"/>
+                  <rect class="face-in" x="45" y="44" width="22" height="22"/>
+                  <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <path class="hr-line" d="M23 22H89V44H67V66H45V44H23Z"/>
+                  <circle class="corral-badge" cx="56" cy="33" r="8"/>
+                  <text class="corral-num" x="56" y="33" font-size="10.5">4</text>
+                </svg>
+                <figcaption class="ok-text">✓ Inside, sees 4 (1+1+1+1)</figcaption>
+              </figure>
+              <figure class="help-fig">
+                <svg viewBox="0 0 112 88" aria-label="Invalid Corral square seeing only 3 squares">
+                  <rect class="hr-bg" x="1" y="1" width="110" height="86" rx="6"/>
+                  <rect class="face-in" x="23" y="22" width="66" height="22"/>
+                  <path class="hr-grid" d="M23 22H89M23 44H89M23 66H89M23 22V66M45 22V66M67 22V66M89 22V66"/>
+                  <path class="hr-line-bad" d="M23 22H89V44H23Z"/>
+                  <circle class="corral-badge bad" cx="56" cy="33" r="8"/>
+                  <text class="corral-num bad" x="56" y="33" font-size="10.5">4</text>
+                </svg>
+                <figcaption class="bad-text">✕ Only sees 3 squares</figcaption>
+              </figure>
+            </div>
+          </div>
         </div>
         <h3>Controls</h3>
         <ul class="help-controls">

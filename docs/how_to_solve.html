@@ -75,7 +75,7 @@
   <main>
     <a class="back" href="../index.html">← Back to Puzzles</a>
     <h1>How to Solve — Loop Puzzles</h1>
-    <p class="lead">Every solving technique the Hint button knows across <b>Masyu</b>, <b>Slitherlink</b>, <b>Mid-loop</b>, <b>Castle Wall</b>, <b>Hamilton cycle</b>, and <b>Hybrids</b>. Click any diagram to open that exact puzzle in the app.</p>
+    <p class="lead">Every solving technique the Hint button knows across <b>Masyu</b>, <b>Slitherlink</b>, <b>Mid-loop</b>, <b>Castle Wall</b>, <b>Corral</b>, <b>Hamilton cycle</b>, and <b>Hybrids</b>. Click any diagram to open that exact puzzle in the app.</p>
     <nav class="toc" aria-label="Jump to section">
       <a href="#rules">Rules at a glance</a>
       <a href="#loop-fundamentals">Loop fundamentals</a>
@@ -83,6 +83,7 @@
       <a href="#variant-slitherlink">🔢 Slitherlink</a>
       <a href="#variant-midloop">🎯 Mid-loop</a>
       <a href="#variant-castlewall">🏰 Castle Wall</a>
+      <a href="#variant-corral">🐄 Corral</a>
       <a href="#variant-full">🔁 Hamilton cycle</a>
       <a href="#variant-swiss">🧀 Modifiers &amp; Hybrids</a>
     </nav>
@@ -94,6 +95,7 @@
       <a class="family-card" href="#variant-slitherlink"><b>🔢 Slitherlink</b><span>Each number 0–3 inside a square tells how many of its four sides belong to the single closed loop.</span></a>
       <a class="family-card" href="#variant-midloop"><b>🎯 Mid-loop</b><span>Pass straight through every teal dot at the exact midpoint of its straight segment (equal length on both sides).</span></a>
       <a class="family-card" href="#variant-castlewall"><b>🏰 Castle Wall</b><span>White walls stay inside, black walls stay outside, and arrows count parallel loop segments to the board edge.</span></a>
+      <a class="family-card" href="#variant-corral"><b>🐄 Corral</b><span>Also known as Bag / Cave: circled numbers stay inside the loop and count visible inside squares in all 4 directions.</span></a>
       <a class="family-card" href="#variant-full"><b>🔁 Hamilton cycle</b><span>Visit every active intersection dot on the grid, guided by permanent given lines and ✕ walls.</span></a>
       <a class="family-card" href="#variant-gray"><b>🔘 Gray circles</b><span>Masyu circles whose color (white or black) is hidden — deduce which each one is as you solve.</span></a>
       <a class="family-card" href="#variant-swiss"><b>🧀 Swiss cheese &amp; Hybrids</b><span>Cutout holes (each entirely Inside or Outside) and two-ruleset hybrids that genuinely require both.</span></a>
@@ -686,6 +688,51 @@
       <blockquote>Hint says: "Along the 1↓ ray from C2, a forced straight corridor along the ray is longer than the 1 remaining segment allowed — cross out C5–C6 and C6–C7."</blockquote>
     </section>
 
+    <h2 id="variant-corral">🐄 Corral</h2>
+    <p>Also known as <b>Bag</b> or <b>Cave</b>. Every circled number sits strictly <b>Inside</b> the single closed loop and counts the total number of <b>Inside</b> squares orthogonally visible from that square in all four directions (up, down, left, right), <b>including itself</b>, stopping in each direction at the loop fence or board edge. Every Corral square automatically anchors Inside/Outside shading (<a href="#faceShade"><code>faceShade</code></a>).</p>
+
+    <section class="rule-card" id="corralEdge">
+      <h3><code>corralEdge</code></h3>
+      <div class="rule-meta">Beginner, cost 3</div>
+      <p>A Corral number sits strictly inside the loop (border edges are on, adjacent Corral numbers cannot have a line between them).</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="corralBound">
+      <h3><code>corralBound</code></h3>
+      <div class="rule-meta">Beginner, cost 4</div>
+      <p>A Corral number must extend far enough to reach its count and must close off any direction that would overshoot it.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="corralWallCap">
+      <h3><code>corralWallCap</code></h3>
+      <div class="rule-meta">Medium, cost 12</div>
+      <p>A segment completing degree 2 at a corner would cross out its perpendicular edge(s) and make a Corral number see too many squares.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="corralSameLine">
+      <h3><code>corralSameLine</code></h3>
+      <div class="rule-meta">Medium, cost 13</div>
+      <p>Two Corral numbers seeing each other along a row or column share that sightline span, tightening their remaining directions.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="corralSeparate">
+      <h3><code>corralSeparate</code></h3>
+      <div class="rule-meta">Medium, cost 14</div>
+      <p>Two Corral numbers in the same row or column that would exceed one of their counts if connected must be separated by a fence, capping reach toward each other.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
+    <section class="rule-card" id="corralParityBound">
+      <h3><code>corralParityBound</code></h3>
+      <div class="rule-meta">Medium, cost 15</div>
+      <p>Outside squares block a Corral number’s sightline, forcing it to extend further in the other directions.</p>
+      <p class="none">No puzzle in the current corpus needed this rule as its cheapest next hint yet (cheaper rules resolved those positions first).</p>
+    </section>
+
     <h2 id="variant-full">🔁 Hamilton cycle</h2>
     <p>The loop must visit <b>every</b> active intersection dot on the grid (none may be left empty). Dark pre-filled segments and bold <b>✕</b> walls are permanent givens.</p>
 
@@ -711,7 +758,7 @@
     <h3 class="sub-heading" id="variant-swiss">🧀 Swiss cheese</h3>
     <p>Cutout holes cannot be entered. Every enclosed hole lies entirely <b>Inside</b> or entirely <b>Outside</b> the loop (tap anywhere in a hole to shade it). All loop techniques — especially border rules, <a href="#chokepoint"><code>chokepoint</code></a>, <a href="#faceShade"><code>faceShade</code></a>, <a href="#faceCircle"><code>faceCircle</code></a>, and <a href="#faceSlither"><code>faceSlither</code></a> — work naturally around and across interior holes.</p>
     <h3 class="sub-heading" id="hybrids">🔀 Hybrids</h3>
-    <p>In <b>Hybrids</b> books, two clue families (Masyu, Slitherlink, Mid-loop, Castle Wall, and Hamilton cycle in pairs) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading, Castle Wall rays, and Mid-loop constraints automatically combine across clue families, and the Hint button also knows these dedicated cross-family deductions:</p>
+    <p>In <b>Hybrids</b> books, two clue families (Masyu, Slitherlink, Mid-loop, Castle Wall, Corral, and Hamilton cycle in pairs) share one single closed loop, and every puzzle is verified to genuinely require both rule sets. Inside/Outside shading, Castle Wall rays, Corral sightlines, and Mid-loop constraints automatically combine across clue families, and the Hint button also knows these dedicated cross-family deductions:</p>
     
     <section class="rule-card" id="slitherStraightCorner">
       <h3><code>slitherStraightCorner</code></h3>

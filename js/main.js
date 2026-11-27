@@ -11,7 +11,7 @@ import {
   reconcileAutoX, applyAutoX, reconcileAutoShade, applyAutoShade, shadeConflicts,
   facesFromSolvedLoop,
 } from './marks.js';
-import { clueStates, slitherStates, midloopStates, castleStates, earlyLoopEdges, trappedFullCells } from './clues.js';
+import { clueStates, slitherStates, midloopStates, castleStates, corralStates, earlyLoopEdges, trappedFullCells } from './clues.js';
 import { makeAutoGrace } from './grace.js';
 import { Board, CELL_SIZE } from './board.js';
 import { rotatePuzzleCW, rotateMarksCW, unrotateMarksCW, chooseLayout } from './rotate.js';
@@ -383,6 +383,7 @@ function analyse() {
     slitherState: state.solved || !state.P.hasSlither ? [] : slitherStates(state.P, state.marks),
     midloopState: state.solved || !state.P.hasMidloop ? [] : midloopStates(state.P, state.marks),
     castleState: state.solved || !state.P.hasCastle ? [] : castleStates(state.P, state.marks),
+    corralState: state.solved || !state.P.hasCorral ? [] : corralStates(state.P, state.marks),
     badFaces: state.solved ? new Set() : shadeConflicts(state.P, state.marks, settings.autoShade),
     earlyLoops: earlyLoopEdges(state.P, state.marks),
     trappedCells: state.solved ? new Set() : trappedFullCells(state.P, state.marks),
@@ -1190,6 +1191,7 @@ function renderHelpModal() {
   const hasSlither = Boolean(P && P.hasSlither);
   const hasMidloop = Boolean(P && P.hasMidloop);
   const hasCastle = Boolean(P && P.hasCastle);
+  const hasCorral = Boolean(P && P.hasCorral);
   const hasGray = Boolean(P && P.grays && P.grays.length > 0);
   const isFull = Boolean(P && P.fullBoard);
   const hasGivens = Boolean(P && P.hasGivens);
@@ -1197,7 +1199,19 @@ function renderHelpModal() {
 
   const intro = $('help-intro');
   if (intro) {
-    if (hasCastle && hasClues) {
+    if (hasCorral && hasCastle) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines keeping every circled Corral number strictly <b>inside</b> (matching its visible inside square count) while obeying every Castle Wall tile and arrow, with no crossings or branches.';
+    } else if (hasCorral && hasClues) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting every Masyu circle while keeping every circled Corral number strictly <b>inside</b> and matching its orthogonal sightline count, with no crossings or branches.';
+    } else if (hasCorral && hasSlither) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines matching every plain Slitherlink digit (loop edges around the square) and every circled Corral number (visible inside squares), with no crossings or branches.';
+    } else if (hasCorral && hasMidloop) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines centered on every teal Mid-loop dot while keeping every circled Corral number strictly <b>inside</b> and matching its sightline count, with no crossings or branches.';
+    } else if (hasCorral && isFull) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines visiting <b>every intersection</b> while keeping every circled Corral number strictly <b>inside</b> and matching its visible inside square count.';
+    } else if (hasCorral) {
+      intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines so every circled Corral number lies strictly <b>inside</b> the loop and sees that many inside squares orthogonally (including itself), with no crossings or branches.';
+    } else if (hasCastle && hasClues) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines around the Castle Wall tiles, matching every arrow count, inside/outside wall color, and Masyu circle, with no crossings or branches.';
     } else if (hasCastle && hasSlither) {
       intro.innerHTML = 'Draw <b>one single closed loop</b> along the grid lines around the Castle Wall tiles, matching every arrow count, inside/outside wall color, and numbered square, with no crossings or branches.';
@@ -1246,6 +1260,7 @@ function renderHelpModal() {
   $('help-card-slither').hidden = !hasSlither;
   $('help-card-midloop').hidden = !hasMidloop;
   $('help-card-castle').hidden = !hasCastle;
+  $('help-card-corral').hidden = !hasCorral;
   $('help-card-gray').hidden = !hasGray;
   $('help-card-full').hidden = !isFull;
   $('help-card-voids').hidden = !hasPlainVoids;
@@ -1275,7 +1290,7 @@ function renderHelpModal() {
 
   const link = $('help-guide-link');
   if (link) {
-    const hash = hasCastle ? '#variant-castlewall' : hasMidloop ? '#variant-midloop' : hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasPlainVoids ? '#variant-swiss' : '';
+    const hash = hasCorral ? '#variant-corral' : hasCastle ? '#variant-castlewall' : hasMidloop ? '#variant-midloop' : hasSlither ? '#variant-slitherlink' : hasGray ? '#variant-gray' : isFull ? '#variant-full' : hasPlainVoids ? '#variant-swiss' : '';
     link.setAttribute('href', `docs/how_to_solve.html${hash}`);
   }
 }

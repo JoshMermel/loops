@@ -10,6 +10,7 @@ import { faceCoords } from './faceparity.js';
 import { describeSlitherChainStep, explainSlitherStep } from './variants/slitherlink.js';
 import { describeMidloopChainStep, explainMidloopStep, midDotLoc } from './variants/midloop.js';
 import { describeCastleChainStep, explainCastleStep } from './variants/castlewall.js';
+import { describeCorralChainStep, explainCorralStep } from './variants/corral.js';
 
 export const cellName = (P, i) => `${colName(i % P.cols)}${((i / P.cols) | 0) + 1}`;
 export const edgeName = (P, x) => {
@@ -85,6 +86,8 @@ function describeChainStep(P, s) {
   if (mlText) return mlText;
   const cwText = describeCastleChainStep(P, s, { cellName });
   if (cwText) return cwText;
+  const krText = describeCorralChainStep(P, s, { faceName, cellName, edgeName });
+  if (krText) return krText;
   const { rule, info, sets } = s;
   const c = info && info.cell !== undefined ? cellName(P, info.cell) : '';
   switch (rule) {
@@ -123,6 +126,9 @@ function describeChainStep(P, s) {
       }
       if (info.castleIdx !== undefined && info.castleIdx >= 0 && P.castle && P.castle[info.castleIdx]) {
         return `${edgeName(P, info.edge)} cannot close the loop early before the Castle Wall clue at ${cellName(P, P.castle[info.castleIdx].cell)} is satisfied`;
+      }
+      if (info.corralIdx !== undefined && info.corralIdx >= 0 && P.corral && P.corral[info.corralIdx]) {
+        return `${edgeName(P, info.edge)} cannot close the loop early before the Corral clue at ${faceName(P, P.corral[info.corralIdx].f)} is satisfied`;
       }
       return `${edgeName(P, info.edge)} cannot close the loop early`;
     case 'threeWhites':
@@ -226,6 +232,30 @@ function describeContradiction(P, broke, finalState) {
         area: [],
       };
     }
+    case 'corralOutside':
+      return {
+        text: `the Corral square ${faceName(P, broke.face)} ends up outside the loop`,
+        cells: [],
+        area: [],
+      };
+    case 'corralSplit':
+      return {
+        text: `the loop separates adjacent Corral squares ${faceName(P, broke.face)} and ${faceName(P, broke.face2)}`,
+        cells: [],
+        area: [],
+      };
+    case 'corralHigh':
+      return {
+        text: `the ${broke.n} Corral clue at ${faceName(P, broke.face)} sees too many squares (${broke.got} > ${broke.n})`,
+        cells: [],
+        area: [],
+      };
+    case 'corralLow':
+      return {
+        text: `the ${broke.n} Corral clue at ${faceName(P, broke.face)} can see at most ${broke.max} squares (< ${broke.n})`,
+        cells: [],
+        area: [],
+      };
     case 'earlyClose': {
       if (broke.face !== undefined) {
         return { text: `the loop closes early before the ${broke.n} square ${faceName(P, broke.face)} is satisfied`, cells: [], area: [], face: broke.face };
@@ -244,6 +274,14 @@ function describeContradiction(P, broke, finalState) {
         return {
           text: `the loop closes early before the Castle Wall clue at ${cellName(P, cw.cell)} is satisfied`,
           cells: [cw.cell],
+          area: [],
+        };
+      }
+      if (broke.corralIdx !== undefined && broke.corralIdx >= 0 && P.corral && P.corral[broke.corralIdx]) {
+        const kr = P.corral[broke.corralIdx];
+        return {
+          text: `the loop closes early before the Corral clue ${kr.n} at ${faceName(P, kr.f)} is satisfied`,
+          cells: [],
           area: [],
         };
       }
@@ -434,6 +472,10 @@ export function explainStep(P, step, st = null) {
         const cw = P.castle[info.castleIdx];
         roles.clue.push(cw.cell); nudgeRoles.clue.push(cw.cell);
         text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the Castle Wall clue at ${cellName(P, cw.cell)} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
+      } else if (info.corralIdx !== undefined && info.corralIdx >= 0 && P.corral && P.corral[info.corralIdx]) {
+        const kr = P.corral[info.corralIdx];
+        faces = { in: [kr.f], out: [], clue: [kr.f], focus: [], anchored: true };
+        text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path, and closing them with ${edgeName(P, info.edge)} would leave the Corral clue ${kr.n} at ${faceName(P, kr.f)} unsatisfied — so ${edgeName(P, info.edge)} must be off.`;
       } else {
         text = `${cellName(P, info.a)} and ${cellName(P, info.b)} are the two ends of the same open path while other loop cells lie outside it, so ${edgeName(P, info.edge)} cannot connect them.`;
       }
@@ -633,6 +675,8 @@ export function explainStep(P, step, st = null) {
             return `flipping diagonally across Mid-loop dot ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
           case 'castleWall':
             return `the ${s.reason.wall === 'W' ? 'white (inside)' : 'black (outside)'} wall at ${cellName(P, s.reason.cell)} makes ${dst} ${col}`;
+          case 'corralInside':
+            return `the Corral number ${s.reason.n} at ${faceName(P, s.reason.face)} lies inside the loop, making ${dst} ${col}`;
           case 'blackDiag':
             return `by the 3-to-1 corner rule at black circle ${cellName(P, s.reason.cell)}, ${dst} is ${col}`;
           case 'blackLeg':
@@ -907,6 +951,17 @@ export function explainStep(P, step, st = null) {
       if (cwExp) {
         nudge = cwExp.nudge;
         text = cwExp.text;
+        for (const x of [...targets.segOn, ...targets.segOff]) {
+          const [a, b] = edgeCells(P, x);
+          if (!nudgeRoles.focus.length && !nudgeRoles.clue.length) nudgeRoles.focus.push(a, b);
+        }
+        break;
+      }
+      const krExp = explainCorralStep(P, { rule, info, targets }, { faceName, cellName, edgeName, joinList, describeMarks, roles, nudgeRoles });
+      if (krExp) {
+        nudge = krExp.nudge;
+        text = krExp.text;
+        if (krExp.faces) faces = krExp.faces;
         for (const x of [...targets.segOn, ...targets.segOff]) {
           const [a, b] = edgeCells(P, x);
           if (!nudgeRoles.focus.length && !nudgeRoles.clue.length) nudgeRoles.focus.push(a, b);

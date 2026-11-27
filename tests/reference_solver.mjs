@@ -17,7 +17,7 @@ function isTurn(a, b, c, cols) {
  * Enumerates every undirected simple cycle on the grid and checks Masyu rules directly on the cycle's vertices.
  */
 export function referenceCount(p) {
-  const { rows, cols, clues = [], slither = [], midloop = [], castle = [], fullBoard = false, givens = [], voids = [] } = p;
+  const { rows, cols, clues = [], slither = [], midloop = [], castle = [], corral = [], fullBoard = false, givens = [], voids = [] } = p;
   const N = rows * cols;
   const voidSet = new Set([...voids.map((v) => v.r * cols + v.c), ...castle.map((cw) => cw.r * cols + cw.c)]);
   const activeCount = N - voidSet.size;
@@ -79,7 +79,7 @@ export function referenceCount(p) {
     for (const mi of midVerts) if (!visited[mi]) return false;
     // Must include every required given edge (and Mid-loop edge dot)
     let cycEdges = null;
-    if (reqEdges.size > 0 || slither.length > 0 || castle.length > 0) {
+    if (reqEdges.size > 0 || slither.length > 0 || castle.length > 0 || corral.length > 0) {
       cycEdges = new Set();
       for (let k = 0; k < L; k++) cycEdges.add(edgeKey(path[k], path[(k + 1) % L]));
       if (reqEdges.size > 0) {
@@ -151,6 +151,34 @@ export function referenceCount(p) {
       if (cycEdges.has(edgeKey(c, d))) cnt++;
       if (cycEdges.has(edgeKey(a, c))) cnt++;
       if (cnt !== sc.n) return false;
+    }
+
+    // Check Corral face numbers independently via Jordan-curve ray-casting
+    if (corral.length > 0) {
+      const fr = rows - 1, fc = cols - 1;
+      const inside = Array.from({ length: fr }, (_, r) => {
+        const row = new Uint8Array(fc);
+        for (let c = 0; c < fc; c++) {
+          let crossings = 0;
+          for (let cc = c + 1; cc < cols; cc++) {
+            if (cycEdges.has(edgeKey(r * cols + cc, (r + 1) * cols + cc))) crossings++;
+          }
+          row[c] = crossings & 1;
+        }
+        return row;
+      });
+      for (const kr of corral) {
+        if (!inside[kr.r][kr.c]) return false;
+        let vis = 1;
+        for (const [dr, dc] of DIRS) {
+          let rr = kr.r + dr, cc = kr.c + dc;
+          while (rr >= 0 && rr < fr && cc >= 0 && cc < fc && inside[rr][cc]) {
+            vis++;
+            rr += dr; cc += dc;
+          }
+        }
+        if (vis !== kr.n) return false;
+      }
     }
     // Check white and black rules along the cycle
     for (let k = 0; k < L; k++) {

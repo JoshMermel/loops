@@ -640,6 +640,7 @@ export class Board {
     (info.slitherState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`s${k}`); });
     (info.midloopState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`m${k}`); });
     (info.castleState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`w${k}`); });
+    (info.corralState || []).forEach((st, k) => { if (st === 'bad') wanted.add(`k${k}`); });
     if (info.badFaces) for (const f of info.badFaces) wanted.add(`f${f}`);
     if (info.earlyLoops) for (const x of info.earlyLoops) wanted.add(`l${x}`);
     if (info.trappedCells) for (const i of info.trappedCells) wanted.add(`t${i}`);
@@ -778,6 +779,20 @@ export class Board {
         const sc = P.slither[k];
         const st = sStates[k] === 'bad' && show.has(`s${k}`) ? ' bad' : '';
         g += `<text class="slither-num${st}" x="${vx(sc.c) + S / 2}" y="${vy(sc.r) + S / 2}">${sc.n}</text>`;
+      }
+    }
+
+    // Corral face numbers (circled badge so they stay clearly distinct from Slitherlink digits)
+    if (P.hasCorral) {
+      const kStates = info.corralState || [];
+      const rBadge = S * 0.34;
+      for (let k = 0; k < P.corral.length; k++) {
+        const kr = P.corral[k];
+        const cx = vx(kr.c) + S / 2, cy = vy(kr.r) + S / 2;
+        const st = kStates[k] === 'bad' && show.has(`k${k}`) ? ' bad' : '';
+        const fs = kr.n >= 10 ? S * 0.36 : S * 0.44;
+        g += `<circle class="corral-badge${st}" cx="${cx}" cy="${cy}" r="${rBadge}"/>`;
+        g += `<text class="corral-num${st}" x="${cx}" y="${cy}" font-size="${fs}">${kr.n}</text>`;
       }
     }
 

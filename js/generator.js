@@ -3627,6 +3627,617 @@ function generateCastlePuzzle({
 }
 
 /**
+ * Compute every valid Corral face clue `{ r, c, n }` (with `n >= 2`) for loop `edges` on `rows x cols`.
+ * Every Corral clue sits on an Inside dual face (never exterior/void-hole) and counts visible Inside squares
+ * along all 4 orthogonal rays (stopping at the loop fence or exterior).
+ */
+function allowedCorral(rows, cols, edges, empty = null) {
+  const fr = rows - 1, fc = cols - 1, F = fr * fc;
+  if (fr <= 0 || fc <= 0) return [];
+  const faceExt = empty && empty.faceExterior ? empty.faceExterior : null;
+  const faceHole = empty && empty.faceHoleId ? empty.faceHoleId : null;
+  const edgeA = empty ? empty.edgeA : null;
+  const isWall = (x) => (edgeA ? edgeA[x] >= 0 : true) && edges[x] === E_ON;
+
+  const out = new Uint8Array(F);
+  const q = [];
+  for (let r = 0; r < fr; r++) {
+    for (let c = 0; c < fc; c++) {
+      const f = r * fc + c;
+      if (faceExt && faceExt[f]) { out[f] = 1; q.push(f); continue; }
+      const top = 2 * (r * cols + c);
+      const right = 2 * (r * cols + c + 1) + 1;
+      const bot = 2 * ((r + 1) * cols + c);
+      const left = 2 * (r * cols + c) + 1;
+      if ((r === 0 && !isWall(top))
+        || (c === fc - 1 && !isWall(right))
+        || (r === fr - 1 && !isWall(bot))
+        || (c === 0 && !isWall(left))) {
+        out[f] = 1;
+        q.push(f);
+      }
+    }
+  }
+  for (let head = 0; head < q.length; head++) {
+    const f = q[head];
+    const r = (f / fc) | 0, c = f % fc;
+    if (r > 0 && !out[f - fc] && !isWall(2 * (r * cols + c))) { out[f - fc] = 1; q.push(f - fc); }
+    if (c < fc - 1 && !out[f + 1] && !isWall(2 * (r * cols + c + 1) + 1)) { out[f + 1] = 1; q.push(f + 1); }
+    if (r < fr - 1 && !out[f + fc] && !isWall(2 * ((r + 1) * cols + c))) { out[f + fc] = 1; q.push(f + fc); }
+    if (c > 0 && !out[f - 1] && !isWall(2 * (r * cols + c) + 1)) { out[f - 1] = 1; q.push(f - 1); }
+  }
+
+  const res = [];
+  const kDR = [-1, 0, 1, 0], kDC = [0, 1, 0, -1];
+  for (let r = 0; r < fr; r++) {
+    for (let c = 0; c < fc; c++) {
+      const f = r * fc + c;
+      if (out[f]) continue;
+      if (faceExt && faceExt[f]) continue;
+      if (faceHole && faceHole[f] >= 0) continue;
+      let vis = 1;
+      for (let d = 0; d < 4; d++) {
+        let rr = r + kDR[d], cc = c + kDC[d];
+        while (rr >= 0 && rr < fr && cc >= 0 && cc < fc) {
+          const nf = rr * fc + cc;
+          if (out[nf] || (faceExt && faceExt[nf])) break;
+          vis++;
+          rr += kDR[d]; cc += kDC[d];
+        }
+      }
+      if (vis >= 2) res.push({ r, c, n: vis });
+    }
+  }
+  return res;
+}
+
+/**
+ * Generate a verified, rated Corral (Bag / Cave) puzzle — pure or hybrid:
+ *   - 'corral'          Pure Corral (optional rot180 / mirror / transpose symmetry)
+ *   - 'corral-masyu'    Corral + Masyu circles (verified mutual necessity)
+ *   - 'corral-slither'  Corral + Slitherlink numbers on disjoint squares (verified mutual necessity)
+ *   - 'corral-midloop'  Corral + Mid-loop dots (verified mutual necessity)
+ *   - 'corral-castle'   Corral + Castle Wall tiles & arrows (verified mutual necessity)
+ *   - 'corral-full'     Corral + Hamilton cycle (verified full-board necessity)
+ */
+function generateCorralPuzzle({
+  rows, cols, style, layout = 'none', rand, deadline, maxTierIdx, effectiveMaxTier, targetTier,
+  wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
+}) {
+  const isFull = style === 'corral-full';
+  const isMasyu = style === 'corral-masyu';
+  const isSlither = style === 'corral-slither';
+  const isMidloop = style === 'corral-midloop';
+  const isCastle = style === 'corral-castle';
+  const isHybrid = isMasyu || isSlither || isMidloop || isCastle;
+  const symLayout = (!isHybrid && !isFull && (layout === 'rot180' || layout === 'mirror' || layout === 'transpose')) ? layout : null;
+  if (layout && layout !== 'none' && !symLayout) return null;
+  if (isFull && ((rows * cols) & 1)) return null;
+  if (symLayout === 'transpose' && rows !== cols) return null;
+
+  const N = rows * cols;
+  const fr = rows - 1, fc = cols - 1, F = fr * fc;
+  const pruneNodeCap = N >= 144 ? 10000 : N >= 100 ? 18000 : 25000;
+  const baseEmpty = !isCastle ? compile({ name: 'ekr', rows, cols, clues: [], fullBoard: isFull }) : null;
+
+  const solvedByPropagate = (P) => {
+    const st = initialState(P);
+    if (!propagate(P, st)) return false;
+    for (let x = 0; x < P.numEdges; x++) if (P.edgeA[x] >= 0 && st.e[x] === E_UNKNOWN) return false;
+    return isSolved(P, st.e);
+  };
+  const isWithin = (r) => (allowUnsolved && !r.solved) || (r.solved && TIERS.indexOf(r.tier) <= effectiveMaxTier);
+  const fastUpto = beginnerOnly ? BEGINNER_UPTO : mediumOnly ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
+  const deepStrip = stripMode === 'deep' || wantUnsolved || targetTier === 'Hard' || targetTier === 'Expert';
+  const reqQuadFill = (!isFull && !isCastle && rows >= 10 && cols >= 10) ? 0.30 : (!isFull && !isCastle && rows >= 8 && cols >= 8) ? 0.24 : 0;
+  const reqQuadItems = (!isCastle && fr >= 9 && fc >= 9) ? 2 : (!isCastle && fr >= 7 && fc >= 7 ? 1 : 0);
+
+  const minCorral = isHybrid || isFull
+    ? Math.max(4, Math.floor(F * 0.08))
+    : Math.max(5, Math.floor(F * 0.12));
+  const minClues = isMasyu ? (N >= 64 ? 4 : 3) : 0;
+  const minSlither = isSlither ? (F >= 49 ? 5 : 4) : 0;
+  const minMid = isMidloop ? (N >= 64 ? 4 : 3) : 0;
+  const minCastle = isCastle ? (N >= 64 ? 4 : 3) : 0;
+
+  const kDR = [-1, 0, 1, 0], kDC = [0, 1, 0, -1], dirList = ['U', 'R', 'D', 'L'];
+  const isBorderCell = (r, c) => r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+
+  while (Date.now() < deadline) {
+    let empty = baseEmpty;
+    let edges = null;
+    let castleInit = [];
+
+    if (isCastle) {
+      const targetK = Math.max(5, Math.min(Math.floor(N * 0.18), Math.round(N * (0.10 + 0.05 * rand()))));
+      const maxBorder = Math.max(1, Math.floor(targetK * 0.28));
+      let nBorder = 0;
+      const grid = new Uint8Array(N);
+      const cand = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cand.push([r, c]);
+      shuffle(cand, rand);
+      const tilePts = [];
+      for (const [r, c] of cand) {
+        if (tilePts.length >= targetK) break;
+        if ((r === 0 || r === rows - 1) && (c === 0 || c === cols - 1)) continue;
+        const onB = isBorderCell(r, c);
+        if (onB && nBorder >= maxBorder) continue;
+        let orth = 0;
+        for (let d = 0; d < 4; d++) {
+          const nr = r + kDR[d], nc = c + kDC[d];
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr * cols + nc]) orth++;
+        }
+        if (orth > 1) continue;
+        grid[r * cols + c] = 1;
+        if (onB) nBorder++;
+        tilePts.push({ r, c });
+      }
+      if (tilePts.length < minCastle) continue;
+      empty = compile({ name: 'ekrcw', rows, cols, clues: [], voids: tilePts });
+      const res = randomShapedLoop(empty, rand, {
+        targetFill: 0.50 + 0.16 * rand(),
+        steps: Math.max(180, fr * fc * 26),
+      });
+      if (!res.valid || res.loopCells < Math.max(12, Math.floor(empty.activeCount * 0.45))) continue;
+      edges = res.edges;
+      const isVoidExtAt = (r, c) => {
+        if (isBorderCell(r, c)) return true;
+        for (const [dr, dc] of [[-1, -1], [-1, 0], [0, -1], [0, 0]]) {
+          const rr = r + dr, cc = c + dc;
+          if (rr >= 0 && rr < fr && cc >= 0 && cc < fc && empty.faceExterior && empty.faceExterior[rr * fc + cc]) return true;
+        }
+        return false;
+      };
+      let badTile = false;
+      for (const v of tilePts) {
+        const isExt = isVoidExtAt(v.r, v.c);
+        let crossings = 0;
+        if (v.r < rows - 1) {
+          for (let cc = v.c + 1; cc < cols; cc++) {
+            const ex = 2 * (v.r * cols + cc) + 1;
+            if (empty.edgeA[ex] >= 0 && edges[ex] === E_ON) crossings++;
+          }
+        }
+        const wall = (crossings & 1) === 1 ? 'W' : 'B';
+        const cands = [];
+        for (let d = 0; d < 4; d++) {
+          let len = 0, cnt = 0, rr = v.r + kDR[d], cc = v.c + kDC[d];
+          while (rr >= 0 && rr < rows && cc >= 0 && cc < cols) {
+            const nr = rr + kDR[d], nc = cc + kDC[d];
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) break;
+            const ex = empty.ed[(rr * cols + cc) * 4 + d];
+            if (ex >= 0) { len++; if (edges[ex] === E_ON) cnt++; }
+            rr = nr; cc = nc;
+          }
+          if (len >= 1) cands.push({ dir: dirList[d], n: cnt, len });
+        }
+        if (!cands.length) {
+          if (isExt) { badTile = true; break; }
+          castleInit.push({ r: v.r, c: v.c, wall, dir: '', n: -1, isExt });
+        } else {
+          const weighted = cands.map((cd) => ({ cd, w: (cd.len >= 2 ? 2 : 0.6) * (cd.n > 0 ? 2.5 : 1) * (0.5 + rand()) }));
+          weighted.sort((a, b) => b.w - a.w);
+          const pick = weighted[0].cd;
+          castleInit.push({ r: v.r, c: v.c, wall, dir: pick.dir, n: pick.n, isExt });
+        }
+      }
+      if (badTile) continue;
+      castleInit.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+      if (castleInit.length < minCastle) continue;
+    } else if (isFull) {
+      const sample = solve(empty, { limit: 1, maxNodes: 4000, rng: rand });
+      if (sample.count === 0) continue;
+      edges = sample.solutions[0].e;
+    } else if (symLayout) {
+      const res = randomSymmetricLoop(rows, cols, rand, symLayout, {
+        targetFill: 0.44 + 0.16 * rand(),
+        steps: Math.max(180, fr * fc * 26),
+        empty,
+      });
+      if (!res || res.loopCells < minLoopCells || res.emptyBorders > 0) continue;
+      if (reqQuadFill > 0 && res.minQuadFill < reqQuadFill) continue;
+      edges = res.edges;
+    } else {
+      const res = randomLoop(rows, cols, rand, {
+        targetFill: 0.44 + 0.16 * rand(),
+        steps: Math.max(180, fr * fc * 26),
+      });
+      if (res.loopCells < Math.max(12, Math.floor(N * 0.44)) || res.emptyBorders > 0) continue;
+      if (reqQuadFill > 0 && res.minQuadFill < reqQuadFill) continue;
+      edges = res.edges;
+    }
+
+    let corralInit = allowedCorral(rows, cols, edges, empty);
+    if (corralInit.length < minCorral) continue;
+
+    let cluesInit = [], slitherInit = [], midInit = [];
+    if (isMasyu) {
+      const { whites, blacks } = allowedClues(rows, cols, edges, empty);
+      cluesInit = whites.concat(blacks);
+      if (cluesInit.length < Math.max(4, minClues)) continue;
+      cluesInit.sort((a, b) => (a.r * cols + a.c) - (b.r * cols + b.c));
+    } else if (isSlither) {
+      const allSl = allowedSlither(rows, cols, edges, empty);
+      const keepCorral = [];
+      const corralFaceSet = new Set();
+      for (const kr of corralInit) {
+        if (rand() < 0.62) { keepCorral.push(kr); corralFaceSet.add(kr.r * fc + kr.c); }
+      }
+      corralInit = keepCorral;
+      slitherInit = allSl.filter((sc) => !corralFaceSet.has(sc.r * fc + sc.c));
+      if (corralInit.length < minCorral || slitherInit.length < Math.max(4, minSlither)) continue;
+      slitherInit.sort((a, b) => (a.r * fc + a.c) - (b.r * fc + b.c));
+    } else if (isMidloop) {
+      midInit = allowedMidloop(rows, cols, edges, empty);
+      if (midInit.length < Math.max(4, minMid)) continue;
+    }
+
+    corralInit.sort((a, b) => (a.r * fc + a.c) - (b.r * fc + b.c));
+
+    const compileK = (corral, clues, slither, midloop, castle, extra = {}) => compile({
+      name, rows, cols, clues,
+      ...(corral.length ? { corral } : {}),
+      ...(slither.length ? { slither } : {}),
+      ...(midloop.length ? { midloop } : {}),
+      ...(castle.length ? { castle } : {}),
+      ...(isFull ? { fullBoard: true } : {}),
+      ...extra,
+    });
+    const toRawCw = (list) => list.map(({ r, c, wall, dir, n }) => ({ r, c, wall, dir, n }));
+
+    const P0 = compileK(corralInit, cluesInit, slitherInit, midInit, toRawCw(castleInit));
+    let baseTight = false, p0FastOk = false, provedSol = null;
+    if (beginnerOnly) {
+      const rBeg = solvedByRules(P0, BEGINNER_UPTO);
+      if (!rBeg.solved) continue;
+      p0FastOk = true;
+      provedSol = rBeg.state;
+    } else {
+      baseTight = solvedByPropagate(P0);
+      if (baseTight) {
+        p0FastOk = true;
+      } else {
+        const rFast = solvedByRules(P0, fastUpto);
+        if (rFast.solved) { p0FastOk = true; provedSol = rFast.state; }
+      }
+      if (!p0FastOk) {
+        const ex = solve(P0, { limit: 2, maxNodes: pruneNodeCap });
+        if (ex.exceeded || ex.count !== 1) continue;
+        provedSol = ex.solutions[0];
+        if (mediumOnly) {
+          const r0 = rate(P0);
+          if (!r0.solved || TIERS.indexOf(r0.tier) > 1) continue;
+        }
+      }
+    }
+
+    const krAct = new Uint8Array(corralInit.length).fill(1);
+    const clAct = new Uint8Array(cluesInit.length).fill(1);
+    const slAct = new Uint8Array(slitherInit.length).fill(1);
+    const mlAct = new Uint8Array(midInit.length).fill(1);
+    const cwState = castleInit.map((cw) => ({ ...cw, active: true }));
+    let nKr = corralInit.length, nCl = cluesInit.length, nSl = slitherInit.length, nMl = midInit.length;
+    let nCw = cwState.length;
+    let nWAct = cwState.filter((c) => c.wall === 'W').length;
+    let nBAct = cwState.filter((c) => c.wall === 'B').length;
+    let nGAct = cwState.filter((c) => c.wall === 'G').length;
+    let nNumAct = cwState.filter((c) => c.dir).length;
+    let nClW = isMasyu ? cluesInit.filter((c) => c.t === 'W').length : 0;
+    let nClB = isMasyu ? cluesInit.length - nClW : 0;
+    const minCwNum = Math.max(2, Math.floor(minCastle * 0.6));
+
+    const krOrbits = [];
+    if (!symLayout) {
+      for (let i = 0; i < corralInit.length; i++) krOrbits.push([i]);
+    } else {
+      const byF = new Map();
+      for (let i = 0; i < corralInit.length; i++) byF.set(corralInit[i].r * fc + corralInit[i].c, i);
+      const seenK = new Uint8Array(corralInit.length);
+      for (let i = 0; i < corralInit.length; i++) {
+        if (seenK[i]) continue;
+        const kr = corralInit[i];
+        const [sr, sc] = symLayout === 'rot180' ? [fr - 1 - kr.r, fc - 1 - kr.c]
+          : symLayout === 'mirror' ? [kr.r, fc - 1 - kr.c] : [kr.c, kr.r];
+        const j = byF.get(sr * fc + sc);
+        if (j === undefined || j === i) { seenK[i] = 1; krOrbits.push([i]); }
+        else { seenK[i] = 1; seenK[j] = 1; krOrbits.push([i, j]); }
+      }
+    }
+
+    const extract = () => ({
+      corral: corralInit.filter((_, i) => krAct[i]),
+      clues: cluesInit.filter((_, i) => clAct[i]),
+      slither: slitherInit.filter((_, i) => slAct[i]),
+      midloop: midInit.filter((_, i) => mlAct[i]),
+      castle: cwState.filter((c) => c.active).map(({ r, c, wall, dir, n }) => ({ r, c, wall, dir, n })),
+    });
+
+    const buildActions = () => {
+      const acts = [];
+      for (const idxs of krOrbits) if (krAct[idxs[0]]) acts.push({ kind: 'dropKr', idxs });
+      for (let i = 0; i < cluesInit.length; i++) if (clAct[i]) acts.push({ kind: 'dropCl', i });
+      for (let i = 0; i < slitherInit.length; i++) if (slAct[i]) acts.push({ kind: 'dropSl', i });
+      for (let i = 0; i < midInit.length; i++) if (mlAct[i]) acts.push({ kind: 'dropMl', i });
+      for (let i = 0; i < cwState.length; i++) {
+        const cw = cwState[i];
+        if (!cw.active) continue;
+        acts.push({ kind: 'dropCw', i });
+        if (cw.wall !== 'G' && cw.dir && !cw.isExt) {
+          if (rand() < 0.30) acts.push({ kind: 'grayCw', i });
+          acts.push({ kind: 'bareCw', i });
+        }
+      }
+      if (isHybrid) {
+        const keyed = acts.map((a) => ({ a, k: (a.kind === 'dropKr' ? 0.15 : 0) + rand() }));
+        keyed.sort((x, y) => x.k - y.k);
+        return keyed.map((x) => x.a);
+      }
+      return shuffle(acts, rand);
+    };
+
+    const canAct = (a) => {
+      if (a.kind === 'dropKr') return krAct[a.idxs[0]] && nKr - a.idxs.length >= minCorral;
+      if (a.kind === 'dropCl') {
+        if (!clAct[a.i] || nCl <= minClues) return false;
+        if (cluesInit[a.i].t === 'W' && nClW <= 1) return false;
+        if (cluesInit[a.i].t === 'B' && nClB <= 1) return false;
+        return true;
+      }
+      if (a.kind === 'dropSl') return slAct[a.i] && nSl > minSlither;
+      if (a.kind === 'dropMl') return mlAct[a.i] && nMl > minMid;
+      if (a.kind === 'dropCw') {
+        const cw = cwState[a.i];
+        if (!cw.active || nCw <= minCastle) return false;
+        if (cw.dir && nNumAct - 1 < minCwNum) return false;
+        if (cw.wall === 'W' && nWAct <= 1) return false;
+        if (cw.wall === 'B' && nBAct <= 1) return false;
+        if (cw.wall !== 'G' && nGAct > Math.max(1, Math.floor((nCw - 1) * 0.25))) return false;
+        return true;
+      }
+      if (a.kind === 'grayCw') {
+        const cw = cwState[a.i];
+        if (!cw.active || cw.wall === 'G' || cw.isExt || !cw.dir) return false;
+        if (nGAct + 1 > Math.max(1, Math.floor(nCw * 0.25))) return false;
+        if (cw.wall === 'W' && nWAct <= 1) return false;
+        if (cw.wall === 'B' && nBAct <= 1) return false;
+        return true;
+      }
+      if (a.kind === 'bareCw') {
+        const cw = cwState[a.i];
+        return cw.active && cw.wall !== 'G' && !cw.isExt && Boolean(cw.dir) && nNumAct - 1 >= minCwNum;
+      }
+      return false;
+    };
+
+    const applyAct = (a) => {
+      if (a.kind === 'dropKr') {
+        for (const idx of a.idxs) { krAct[idx] = 0; nKr--; }
+        return () => { for (const idx of a.idxs) { krAct[idx] = 1; nKr++; } };
+      }
+      if (a.kind === 'dropCl') {
+        clAct[a.i] = 0; nCl--;
+        const isW = cluesInit[a.i].t === 'W';
+        if (isW) nClW--; else nClB--;
+        return () => { clAct[a.i] = 1; nCl++; if (isW) nClW++; else nClB++; };
+      }
+      if (a.kind === 'dropSl') { slAct[a.i] = 0; nSl--; return () => { slAct[a.i] = 1; nSl++; }; }
+      if (a.kind === 'dropMl') { mlAct[a.i] = 0; nMl--; return () => { mlAct[a.i] = 1; nMl++; }; }
+      if (a.kind === 'dropCw') {
+        const cw = cwState[a.i];
+        const w = cw.wall, hadDir = Boolean(cw.dir);
+        cw.active = false; nCw--;
+        if (w === 'W') nWAct--; else if (w === 'B') nBAct--; else nGAct--;
+        if (hadDir) nNumAct--;
+        return () => {
+          cw.active = true; nCw++;
+          if (w === 'W') nWAct++; else if (w === 'B') nBAct++; else nGAct++;
+          if (hadDir) nNumAct++;
+        };
+      }
+      if (a.kind === 'grayCw') {
+        const cw = cwState[a.i];
+        const prev = cw.wall;
+        cw.wall = 'G';
+        if (prev === 'W') nWAct--; else nBAct--;
+        nGAct++;
+        return () => { cw.wall = prev; if (prev === 'W') nWAct++; else nBAct++; nGAct--; };
+      }
+      if (a.kind === 'bareCw') {
+        const cw = cwState[a.i];
+        const pd = cw.dir, pn = cw.n;
+        cw.dir = ''; cw.n = -1; nNumAct--;
+        return () => { cw.dir = pd; cw.n = pn; nNumAct++; };
+      }
+      return () => {};
+    };
+
+    if (baseTight && !beginnerOnly) {
+      for (const a of buildActions()) {
+        if (Date.now() >= deadline) break;
+        if (!canAct(a)) continue;
+        const undo = applyAct(a);
+        const cur = extract();
+        if (!solvedByPropagate(compileK(cur.corral, cur.clues, cur.slither, cur.midloop, cur.castle))) undo();
+        else provedSol = null;
+      }
+    }
+
+    if (p0FastOk) {
+      for (const a of buildActions()) {
+        if (Date.now() >= deadline) break;
+        if (!canAct(a)) continue;
+        const undo = applyAct(a);
+        const cur = extract();
+        const r = solvedByRules(compileK(cur.corral, cur.clues, cur.slither, cur.midloop, cur.castle), fastUpto);
+        if (!r.solved) undo();
+        else provedSol = r.state;
+      }
+    }
+
+    let cachedRated = null;
+    let skipPass2 = beginnerOnly;
+    let r1Pre = null;
+    let pass2Failed = false;
+    if (!skipPass2 && mediumOnly && Date.now() < deadline) {
+      const cur = extract();
+      r1Pre = rate(compileK(cur.corral, cur.clues, cur.slither, cur.midloop, cur.castle));
+      if (!r1Pre.solved || TIERS.indexOf(r1Pre.tier) > effectiveMaxTier) {
+        pass2Failed = true;
+        skipPass2 = true;
+      }
+    }
+    if (!skipPass2 && Date.now() < deadline) {
+      const rem = buildActions();
+      const alreadyMed = Boolean(mediumOnly && r1Pre && TIERS.indexOf(r1Pre.tier) === 1);
+      const maxStrips = alreadyMed
+        ? Math.min(rem.length, 6)
+        : N >= 144 ? (deepStrip ? 20 : 10)
+          : deepStrip ? rem.length
+            : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(4, Math.min(12, Math.ceil(rem.length * 0.40)))
+              : Math.max(4, Math.min(14, Math.ceil(rem.length * 0.55)));
+      const maxPass2Tries = N >= 144 ? Math.min(rem.length, 50) : rem.length;
+      const pass2Log = [];
+      let tried = 0;
+      for (const a of rem) {
+        if (Date.now() >= deadline || pass2Log.length >= maxStrips || tried >= maxPass2Tries) break;
+        if (!canAct(a)) continue;
+        tried++;
+        const undo = applyAct(a);
+        const cur = extract();
+        const exact = solve(compileK(cur.corral, cur.clues, cur.slither, cur.midloop, cur.castle), { limit: 2, maxNodes: pruneNodeCap });
+        if (exact.exceeded || exact.count !== 1) { undo(); continue; }
+        pass2Log.push({ act: a, undo, sol: exact.solutions[0] });
+        provedSol = exact.solutions[0];
+      }
+
+      const cur = extract();
+      const rated = (pass2Log.length === 0 && r1Pre) ? r1Pre : rate(compileK(cur.corral, cur.clues, cur.slither, cur.midloop, cur.castle));
+      if (wantUnsolved || isWithin(rated)) {
+        cachedRated = rated;
+      } else if (pass2Log.length > 0 && Date.now() < deadline) {
+        let cursor = pass2Log.length;
+        const setCursor = (target) => {
+          while (cursor > target) { cursor--; pass2Log[cursor].undo(); }
+          while (cursor < target) { pass2Log[cursor].undo = applyAct(pass2Log[cursor].act); cursor++; }
+        };
+        let lo = 0, hi = pass2Log.length;
+        let bestK = -1, bestRated = null;
+        if (r1Pre && isWithin(r1Pre)) { bestK = 0; bestRated = r1Pre; }
+        else {
+          setCursor(0);
+          const cc0 = extract();
+          const r0 = rate(compileK(cc0.corral, cc0.clues, cc0.slither, cc0.midloop, cc0.castle));
+          if (isWithin(r0)) { bestK = 0; bestRated = r0; }
+          else { pass2Failed = true; }
+        }
+        if (!pass2Failed) {
+          while (lo + 1 < hi && Date.now() < deadline) {
+            const mid = (lo + hi) >> 1;
+            setCursor(mid);
+            const cc = extract();
+            const r = rate(compileK(cc.corral, cc.clues, cc.slither, cc.midloop, cc.castle));
+            if (isWithin(r)) { lo = mid; bestK = mid; bestRated = r; }
+            else hi = mid;
+          }
+          setCursor(bestK);
+          provedSol = bestK > 0 ? pass2Log[bestK - 1].sol : null;
+          cachedRated = bestRated;
+        }
+      } else {
+        pass2Failed = true;
+      }
+    }
+
+    if (pass2Failed || Date.now() >= deadline) continue;
+    const fin = extract();
+    if (fin.corral.length < minCorral || new Set(fin.corral.map((k) => k.n)).size < 2) continue;
+    if (isMasyu) {
+      const mcW = fin.clues.filter((c) => c.t === 'W').length;
+      const mcB = fin.clues.length - mcW;
+      if (fin.clues.length < minClues || mcW < 1 || mcB < 1) continue;
+      const ratio = fin.corral.length / fin.clues.length;
+      if (ratio < 0.40 || ratio > 2.5) continue;
+    }
+    if (isSlither) {
+      if (fin.slither.length < minSlither || new Set(fin.slither.map((s) => s.n)).size < 2) continue;
+      const ratio = fin.corral.length / fin.slither.length;
+      if (ratio < 0.40 || ratio > 2.5) continue;
+    }
+    if (isMidloop) {
+      if (fin.midloop.length < minMid) continue;
+      const ratio = fin.corral.length / fin.midloop.length;
+      if (ratio < 0.40 || ratio > 2.5) continue;
+    }
+    if (isCastle) {
+      const nW = fin.castle.filter((c) => c.wall === 'W').length;
+      const nB = fin.castle.filter((c) => c.wall === 'B').length;
+      const nNum = fin.castle.filter((c) => c.dir).length;
+      const nZero = fin.castle.filter((c) => c.dir && c.n === 0).length;
+      if (fin.castle.length < minCastle || nW < 1 || nB < 1 || nNum < minCwNum) continue;
+      if (nZero > Math.max(2, Math.floor(nNum * 0.30))) continue;
+      const ratio = fin.corral.length / fin.castle.length;
+      if (ratio < 0.40 || ratio > 2.5) continue;
+    }
+    if (reqQuadItems > 0) {
+      const mr = fr >> 1, mc = fc >> 1;
+      const qCnt = [0, 0, 0, 0];
+      for (const kr of fin.corral) qCnt[(kr.r >= mr ? 2 : 0) + (kr.c >= mc ? 1 : 0)]++;
+      if (Math.min(...qCnt) < reqQuadItems) continue;
+    }
+
+    const P = compileK(fin.corral, fin.clues, fin.slither, fin.midloop, fin.castle);
+    if (isCastle && P.castle.some((cw) => (cw.wall === 'G' && (!cw.dir || cw.isExterior)) || (cw.wall === 'B' && !cw.dir && cw.isExterior) || (cw.wall === 'W' && cw.isExterior))) continue;
+
+    const rated = cachedRated || rate(P);
+    if (wantUnsolved) {
+      if (rated.solved) continue;
+    } else if (!rated.solved) {
+      if (!allowUnsolved) continue;
+    } else {
+      if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
+      if (targetTier && rated.tier !== targetTier) continue;
+    }
+
+    let sol = provedSol;
+    if (!sol || !isSolved(P, sol.e)) {
+      const verify = solve(P, { limit: 2, maxNodes: verifyMaxNodes });
+      if (verify.exceeded || verify.count !== 1) continue;
+      sol = verify.solutions[0];
+      if (!isSolved(P, sol.e)) continue;
+    }
+
+    const hasSecondSol = (altP) => {
+      if (solvedByPropagate(altP)) return false;
+      return solve(altP, { limit: 2, maxNodes: 30000, rng: rand }).count >= 2;
+    };
+    if (isMasyu) {
+      if (!hasSecondSol(compileK(fin.corral, [], [], [], [], { name: `${name}_kr` }))) continue;
+      if (!hasSecondSol(compileK([], fin.clues, [], [], [], { name: `${name}_ms` }))) continue;
+    } else if (isSlither) {
+      if (!hasSecondSol(compileK(fin.corral, [], [], [], [], { name: `${name}_kr` }))) continue;
+      if (!hasSecondSol(compileK([], [], fin.slither, [], [], { name: `${name}_sl` }))) continue;
+    } else if (isMidloop) {
+      if (!hasSecondSol(compileK(fin.corral, [], [], [], [], { name: `${name}_kr` }))) continue;
+      if (!hasSecondSol(compileK([], [], [], fin.midloop, [], { name: `${name}_ml` }))) continue;
+    } else if (isCastle) {
+      const plainVoids = fin.castle.map(({ r, c }) => ({ r, c }));
+      if (!hasSecondSol(compileK(fin.corral, [], [], [], [], { name: `${name}_kr`, voids: plainVoids }))) continue;
+      if (!hasSecondSol(compileK([], [], [], [], fin.castle, { name: `${name}_cw` }))) continue;
+    } else if (isFull) {
+      if (!hasSecondSol(compileK(fin.corral, [], [], [], [], { name: `${name}_nf`, fullBoard: false }))) continue;
+      if (!hasSecondSol(compileK([], [], [], [], [], { name: `${name}_nk`, fullBoard: true }))) continue;
+    }
+
+    P.solution = encodeSolution(P, sol);
+    P.rules = rated.rules;
+    P.tier = rated.tier;
+    P.score = rated.score;
+    return P;
+  }
+  return null;
+}
+
+/**
  * Generate one verified, rated Masyu puzzle.
  * Options:
  *   rows, cols           board dimensions (each >= 4)
@@ -3703,6 +4314,12 @@ export function generatePuzzle({
     return generateCastlePuzzle({
       rows, cols, style, layout, voids, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
       wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name,
+    });
+  }
+  if (style === 'corral' || style === 'corral-masyu' || style === 'corral-slither' || style === 'corral-midloop' || style === 'corral-castle' || style === 'corral-full') {
+    return generateCorralPuzzle({
+      rows, cols, style, layout, rand, deadline, maxTierIdx, effectiveMaxTier, targetTier: wantUnsolved ? null : targetTier,
+      wantUnsolved, allowUnsolved, beginnerOnly, mediumOnly, stripMode, verifyMaxNodes, name, minLoopCells,
     });
   }
   if ((voids && voids.length) || style === 'shaped' || style === 'swiss-cheese') {

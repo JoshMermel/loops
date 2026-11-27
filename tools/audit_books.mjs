@@ -132,6 +132,11 @@ if (process.argv.includes('--worker')) {
         if (cw.dir && (cw.edges.length === 0 || cw.n > cw.edges.length)) return fail(`invalid castle arrow ray count ${cw.n}/${cw.edges.length}`);
       }
     }
+    if (P.hasCorral) {
+      for (const kr of P.corral) {
+        if (kr.n < 2 || kr.n > kr.maxPossible) return fail(`invalid corral count ${kr.n}/${kr.maxPossible}`);
+      }
+    }
     if (!raw.solution || raw.solution.length !== P.N) return fail('missing or wrong-length stored solution');
 
     const sol = decodeSolution(P, raw.solution);
@@ -174,6 +179,7 @@ if (process.argv.includes('--worker')) {
         ...(raw.slither && raw.slither.length ? { slither: raw.slither } : {}),
         ...(raw.midloop && raw.midloop.length ? { midloop: raw.midloop } : {}),
         ...(raw.castle && raw.castle.length ? { castle: raw.castle } : {}),
+        ...(raw.corral && raw.corral.length ? { corral: raw.corral } : {}),
         ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
         ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
         fullBoard: false,
@@ -207,6 +213,7 @@ if (process.argv.includes('--worker')) {
       if (P.hasSlither) families.push({ key: 'slither', label: 'Slitherlink numbers', seed: 34567 });
       if (P.hasMidloop) families.push({ key: 'midloop', label: 'Mid-loop dots', seed: 45678 });
       if (P.hasCastle) families.push({ key: 'castle', label: 'Castle Wall clues', seed: 56789 });
+      if (P.hasCorral) families.push({ key: 'corral', label: 'Corral numbers', seed: 67891 });
       if (families.length >= 2) {
         const fullOpts = {
           name: raw.name,
@@ -216,6 +223,7 @@ if (process.argv.includes('--worker')) {
           ...(raw.slither && raw.slither.length ? { slither: raw.slither } : {}),
           ...(raw.midloop && raw.midloop.length ? { midloop: raw.midloop } : {}),
           ...(raw.castle && raw.castle.length ? { castle: raw.castle } : {}),
+          ...(raw.corral && raw.corral.length ? { corral: raw.corral } : {}),
           ...(P.fullBoard ? { fullBoard: true } : {}),
           ...(raw.voids && raw.voids.length ? { voids: raw.voids } : {}),
           ...(raw.givens && raw.givens.length ? { givens: raw.givens } : {}),
