@@ -731,11 +731,6 @@ if (!isMainThread) {
       budgetSec: 120, perPuzzleMs: 15000,
     },
     {
-      group: 'castle-bonus', pool: 'castle_swiss_10x10', cols: 10, rows: 10, style: 'castle-swiss',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
-    },
-    {
       group: 'castle-bonus', pool: 'castle_sky_6x18', cols: 6, rows: 18, style: 'castle',
       buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
       budgetSec: 120, perPuzzleMs: 15000,

@@ -1283,16 +1283,6 @@
       "blurb": "Every Castle Wall tile is black — weave the loop strictly outside every obstacle while matching every arrow."
     },
     {
-      "id": "castle-swiss-10x10",
-      "name": "Castle Wall — Swiss cheese",
-      "label": "🧀 Swiss cheese (10×10)",
-      "file": "data/castle-swiss-10x10.csv",
-      "count": 24,
-      "group": "Castle Wall",
-      "sub": "Bonus",
-      "blurb": "Castle Wall boards punched with plain interior cutout holes alongside colored clue tiles."
-    },
-    {
       "id": "castle-sky-6x18",
       "name": "Castle Wall — Skyscraper",
       "label": "🏙️ Skyscraper (6×18)",

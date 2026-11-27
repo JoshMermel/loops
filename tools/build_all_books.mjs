@@ -615,11 +615,6 @@ const recipes = [
     blurb: 'Every Castle Wall tile is black — weave the loop strictly outside every obstacle while matching every arrow.',
   },
   {
-    id: 'castle-swiss-10x10', name: 'Castle Wall — Swiss cheese', label: '🧀 Swiss cheese (10×10)', group: 'Castle Wall', sub: 'Bonus',
-    glob: 'castle_swiss_10x10', tiers: '4,8,8,4',
-    blurb: 'Castle Wall boards punched with plain interior cutout holes alongside colored clue tiles.',
-  },
-  {
     id: 'castle-sky-6x18', name: 'Castle Wall — Skyscraper', label: '🏙️ Skyscraper (6×18)', group: 'Castle Wall', sub: 'Bonus',
     glob: 'castle_sky_6x18', tiers: '4,8,8,4',
     blurb: 'Tall, narrow Castle Wall towers with sweeping vertical arrow sightlines.',
