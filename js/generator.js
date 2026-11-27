@@ -2670,9 +2670,13 @@ function generateCastlePuzzle({
   const isBorderCell = (r, c) => r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
   const sampleCastlePositions = (blockedSet = null) => {
     const baseFrac = (isAllGray || isAllWhite || isAllBlack) ? (0.20 + 0.06 * rand())
-      : beginnerOnly && !isHybrid && !isFull && N >= 100 ? (0.22 + 0.06 * rand())
-        : (0.17 + 0.06 * rand());
-    const maxFrac = beginnerOnly && !isHybrid && !isFull && N >= 100 ? 0.30 : 0.28;
+      : beginnerOnly && !isHybrid && !isFull && N >= 144 ? (0.21 + 0.06 * rand())
+        : beginnerOnly && !isHybrid && !isFull && N >= 100 ? (0.20 + 0.06 * rand())
+          : !isHybrid && !isFull && N >= 100 ? (0.165 + 0.055 * rand())
+            : (0.17 + 0.06 * rand());
+    const maxFrac = !isHybrid && !isFull && N >= 100
+      ? (beginnerOnly ? (N >= 144 ? 0.29 : 0.28) : 0.26)
+      : 0.28;
     const targetK = isHybrid || isFull
       ? Math.max(5, Math.min(Math.floor(N * 0.20), Math.round(N * (0.11 + 0.05 * rand()))))
       : Math.max(6, Math.min(Math.floor(N * maxFrac), Math.round(N * baseFrac)));
@@ -2686,17 +2690,29 @@ function generateCastlePuzzle({
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cand.push([r, c]);
     shuffle(cand, rand);
 
-    const canPlace = (r, c) => {
-      if (grid[r * cols + c]) return false;
-      const onB = isBorderCell(r, c);
-      if (onB && nBorder >= maxBorder) return false;
-      // Avoid 2x2 solid clumps of blocked tiles and avoid sealing off corners
+    const orthNeighbors = (r, c) => {
       let orth = 0;
       for (let d = 0; d < 4; d++) {
         const nr = r + cDR[d], nc = c + cDC[d];
         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr * cols + nc]) orth++;
       }
-      if (orth > 1) return false;
+      return orth;
+    };
+
+    const canPlace = (r, c, maxOrth = 1) => {
+      if (grid[r * cols + c]) return false;
+      const onB = isBorderCell(r, c);
+      if (onB && nBorder >= maxBorder) return false;
+      // Avoid 2x2 solid clumps and 3-cell blobs of blocked tiles
+      let orth = 0;
+      for (let d = 0; d < 4; d++) {
+        const nr = r + cDR[d], nc = c + cDC[d];
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr * cols + nc]) {
+          orth++;
+          if (orthNeighbors(nr, nc) >= 1) return false;
+        }
+      }
+      if (orth > maxOrth) return false;
       // Don't place directly on board corners (useless 0-inside dead corners)
       if ((r === 0 || r === rows - 1) && (c === 0 || c === cols - 1)) return false;
       // On Hamilton cycle (fullBoard), never block a cell orthogonally adjacent to a board corner
@@ -2746,12 +2762,28 @@ function generateCastlePuzzle({
         if (!placedD) { grid[lr * cols + lc] = 0; if (lb) nBorder--; break; }
       }
     } else {
+      const pairProb = !isSwiss && N >= 64 ? (isHybrid ? 0.25 : 0.35) : 0;
+      const dirOrd = [0, 1, 2, 3];
       for (const [r, c] of cand) {
         if (pts.length >= targetK) break;
-        if (canPlace(r, c)) {
-          grid[r * cols + c] = 1;
-          if (isBorderCell(r, c)) nBorder++;
-          pts.push({ r, c });
+        if (!canPlace(r, c)) continue;
+        const wasIso = orthNeighbors(r, c) === 0;
+        grid[r * cols + c] = 1;
+        const onB = isBorderCell(r, c);
+        if (onB) nBorder++;
+        pts.push({ r, c });
+        // Grow an interior 2-cell wall pair (domino) to shape corridors cleanly without scattered singletons
+        if (pairProb > 0 && wasIso && !onB && pts.length < targetK && rand() < pairProb) {
+          shuffle(dirOrd, rand);
+          for (const d of dirOrd) {
+            const nr = r + cDR[d], nc = c + cDC[d];
+            if (nr <= 0 || nr >= rows - 1 || nc <= 0 || nc >= cols - 1) continue;
+            if (grid[nr * cols + nc]) continue;
+            if (orthNeighbors(nr, nc) !== 1) continue;
+            grid[nr * cols + nc] = 1;
+            pts.push({ r: nr, c: nc });
+            break;
+          }
         }
       }
     }
@@ -3195,17 +3227,18 @@ function generateCastlePuzzle({
     });
 
     // Build stripping actions (operating on full symmetric orbits when symLayout is active)
-    const buildActions = () => {
+    const buildActions = (pass2 = false, dropsOnly = false) => {
       const acts = [];
       for (const idxs of cwOrbits) {
         const cw = cwState[idxs[0]];
         if (!cw.active) continue;
         if (!isFull) acts.push({ kind: 'dropCw', idxs });
+        if (dropsOnly) continue;
         if (!isSingleColor && cw.wall !== 'G' && cw.dir && !cw.isExt) {
-          if (rand() < 0.45) acts.push({ kind: 'grayCw', idxs });
-          if (rand() < 0.35) acts.push({ kind: 'bareCw', idxs });
+          if (rand() < 0.30) acts.push({ kind: 'grayCw', idxs });
+          if (!pass2 || N < 144 || isHybrid || isFull || rand() < 0.50) acts.push({ kind: 'bareCw', idxs });
         } else if ((isAllWhite || isAllBlack) && cw.dir && !cw.isExt) {
-          if (rand() < 0.25) acts.push({ kind: 'bareCw', idxs });
+          if (!pass2 || N < 144 || isHybrid || isFull || rand() < 0.50) acts.push({ kind: 'bareCw', idxs });
         }
       }
       for (let i = 0; i < cluesInit.length; i++) if (clAct[i]) acts.push({ kind: 'dropCl', i });
@@ -3213,7 +3246,13 @@ function generateCastlePuzzle({
       for (let i = 0; i < midInit.length; i++) if (mlAct[i]) acts.push({ kind: 'dropMl', i });
       if (isHybrid) {
         // Strip secondary clues slightly earlier so Castle Wall stays prominent
-        const keyed = acts.map((a) => ({ a, k: (a.kind.endsWith('Cw') ? 0.20 : 0) + rand() }));
+        const keyed = acts.map((a) => ({ a, k: (a.kind.endsWith('Cw') ? (a.kind === 'dropCw' ? 0.15 : 0.30) : 0) + rand() }));
+        keyed.sort((x, y) => x.k - y.k);
+        return keyed.map((x) => x.a);
+      }
+      if (pass2) {
+        // Mildly favor dropping whole redundant tiles before bare/gray tweaks in exact Pass 2
+        const keyed = acts.map((a) => ({ a, k: (a.kind === 'dropCw' ? 0 : 0.25) + rand() }));
         keyed.sort((x, y) => x.k - y.k);
         return keyed.map((x) => x.a);
       }
@@ -3233,7 +3272,7 @@ function generateCastlePuzzle({
           const dropB = a.idxs.reduce((s, idx) => s + (cwState[idx].wall === 'B' ? 1 : 0), 0);
           if (nWAct - dropW < 1) return false;
           if (nBAct - dropB < 1) return false;
-          if (cw.wall !== 'G' && nGAct > Math.max(1, Math.floor((nCw - len) * 0.35))) return false;
+          if (cw.wall !== 'G' && nGAct > Math.max(1, Math.floor((nCw - len) * 0.25))) return false;
           if (isHybrid && cw.wall !== 'G' && (nWAct + nBAct - dropW - dropB) < Math.max(2, Math.ceil((nCw - len) * 0.5))) {
             return false;
           }
@@ -3245,7 +3284,7 @@ function generateCastlePuzzle({
         const len = a.idxs.length;
         const cw = cwState[a.idxs[0]];
         if (!cw.active || cw.wall === 'G' || cw.isExt || !cw.dir) return false;
-        if (nGAct + len > Math.max(1, Math.floor(nCw * 0.35))) return false;
+        if (nGAct + len > Math.max(1, Math.floor(nCw * 0.25))) return false;
         if (cw.wall === 'W' && nWAct - len < 1) return false;
         if (cw.wall === 'B' && nBAct - len < 1) return false;
         if ((isHybrid || isFull) && (nWAct + nBAct - len) < Math.max(2, Math.ceil(nCw * 0.5))) {
@@ -3362,16 +3401,22 @@ function generateCastlePuzzle({
     if (!skipPass2 && mediumOnly && Date.now() < deadline) {
       const cur = extract();
       r1Pre = rate(compileC(cur.castle, cur.clues, cur.slither, cur.midloop));
-      if (!r1Pre.solved || TIERS.indexOf(r1Pre.tier) >= 1) { cachedRated = r1Pre; skipPass2 = true; }
+      if (!r1Pre.solved || TIERS.indexOf(r1Pre.tier) > effectiveMaxTier) {
+        pass2Failed = true;
+        skipPass2 = true;
+      }
     }
     if (!skipPass2 && Date.now() < deadline) {
-      const rem = buildActions();
-      const maxStrips = N >= 144
-        ? (deepStrip ? 14 : 6)
-        : deepStrip ? rem.length
-          : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(2, Math.min(8, Math.ceil(rem.length * 0.30)))
-            : Math.max(3, Math.min(12, Math.ceil(rem.length * 0.50)));
-      const maxPass2Tries = N >= 144 ? 40 : rem.length;
+      const alreadyMed = Boolean(mediumOnly && r1Pre && TIERS.indexOf(r1Pre.tier) === 1);
+      const rem = buildActions(true, alreadyMed && !isFull);
+      const maxStrips = alreadyMed
+        ? Math.min(rem.length, N >= 144 ? 8 : 6)
+        : N >= 144
+          ? (deepStrip ? 24 : 12)
+          : deepStrip ? rem.length
+            : (stripMode === 'medium' || targetTier === 'Medium') ? Math.max(4, Math.min(12, Math.ceil(rem.length * 0.40)))
+              : Math.max(4, Math.min(14, Math.ceil(rem.length * 0.55)));
+      const maxPass2Tries = N >= 144 ? Math.min(rem.length, 50) : rem.length;
       const pass2Log = []; // [{ act, undo, sol }]
       let tried = 0;
       for (const a of rem) {
@@ -3463,11 +3508,11 @@ function generateCastlePuzzle({
       if (Math.min(...qCnt) < reqQuadItems) continue;
     }
 
-    const P = compileC(fin.castle, fin.clues, fin.slither, fin.midloop);
+    let P = compileC(fin.castle, fin.clues, fin.slither, fin.midloop);
     // Guard against unnumbered exterior Black, exterior Gray, or unnumbered Gray tiles
     if (P.castle.some((cw) => (cw.wall === 'G' && (!cw.dir || cw.isExterior)) || (cw.wall === 'B' && !cw.dir && cw.isExterior))) continue;
 
-    const rated = cachedRated || rate(P);
+    let rated = cachedRated || rate(P);
     if (wantUnsolved) {
       if (rated.solved) continue;
     } else if (!rated.solved) {
@@ -3475,6 +3520,73 @@ function generateCastlePuzzle({
     } else {
       if (TIERS.indexOf(rated.tier) > maxTierIdx) continue;
       if (targetTier && rated.tier !== targetTier) continue;
+    }
+
+    // Tier-preserving redundant-number stripping pass: turn interior W/B arrows into bare walls
+    // whenever removing the number preserves uniqueness and does not raise the puzzle's tier.
+    if (!isAllGray && !wantUnsolved && rated.solved && Date.now() < deadline) {
+      const curTierIdx = TIERS.indexOf(rated.tier);
+      const extNow = new Set(P.castle.filter((c) => c.isExterior).map((c) => c.r * cols + c.c));
+      const bareOrbits = [];
+      for (const idxs of cwOrbits) {
+        const cw = cwState[idxs[0]];
+        if (!cw.active || cw.wall === 'G' || !cw.dir) continue;
+        if (idxs.some((idx) => extNow.has(cwState[idx].r * cols + cwState[idx].c))) continue;
+        bareOrbits.push(idxs);
+      }
+      if (bareOrbits.length) {
+        shuffle(bareOrbits, rand);
+        // Prefer stripping 0-arrows first so we reduce zero clues and respect the 30% zero cap
+        bareOrbits.sort((a, b) => (cwState[a[0]].n === 0 ? 0 : 1) - (cwState[b[0]].n === 0 ? 0 : 1));
+        let curZero = nZero;
+        let needReRate = false;
+        for (const idxs of bareOrbits) {
+          if (Date.now() >= deadline) break;
+          if (nNumAct - idxs.length < minNumFloor) continue;
+          const act = { kind: 'bareCw', idxs };
+          const dropZero = idxs.reduce((s, idx) => s + (cwState[idx].n === 0 ? 1 : 0), 0);
+          if (curZero - dropZero > Math.max(2, Math.floor((nNumAct - idxs.length) * 0.30))) continue;
+          const undo = applyAct(act);
+          const cur = extract();
+          const altP = compileC(cur.castle, cur.clues, cur.slither, cur.midloop);
+          let okBare = false;
+          if (curTierIdx === 0) {
+            const rb = solvedByRules(altP, BEGINNER_UPTO);
+            if (rb.solved) { okBare = true; provedSol = rb.state; needReRate = true; }
+          } else {
+            const fastLimit = curTierIdx === 1 ? MEDIUM_UPTO : FIRST_LOOKAHEAD;
+            const rf = solvedByRules(altP, fastLimit);
+            if (rf.solved) {
+              okBare = true;
+              provedSol = rf.state;
+              needReRate = true;
+            } else {
+              const ex = solve(altP, { limit: 2, maxNodes: pruneNodeCap });
+              if (!ex.exceeded && ex.count === 1) {
+                const rr = rate(altP);
+                if (rr.solved && TIERS.indexOf(rr.tier) <= curTierIdx && (!targetTier || rr.tier === targetTier)) {
+                  okBare = true;
+                  rated = rr;
+                  provedSol = ex.solutions[0];
+                  needReRate = false;
+                }
+              }
+            }
+          }
+          if (okBare) {
+            curZero -= dropZero;
+            P = altP;
+            fin.castle = cur.castle;
+          } else {
+            undo();
+          }
+        }
+        if (needReRate) {
+          const rr = rate(P);
+          if (!rr.solved || TIERS.indexOf(rr.tier) > maxTierIdx || (targetTier && rr.tier !== targetTier)) continue;
+          rated = rr;
+        }
+      }
     }
 
     let sol = provedSol;
