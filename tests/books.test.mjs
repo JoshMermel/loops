@@ -85,7 +85,10 @@ test('following hints from an empty board solves shipped Beginner and Medium puz
     'castle-allgray-8x8', 'castle-allwhite-8x8', 'castle-allblack-8x8',
     'castle-sky-6x18', 'castle-sym-9x9',
     'hybrid-castle-masyu', 'hybrid-castle-gray', 'hybrid-castle-slither', 'hybrid-castle-midloop', 'hybrid-castle-full',
-    'corral-7x7', 'corral-10x10',
+    'corral-7x7-beginner', 'corral-7x7-medium',
+    'corral-10x10-beginner', 'corral-10x10-medium',
+    'corral-12x12-beginner', 'corral-12x12-medium',
+    'corral-10x16-beginner', 'corral-10x16-medium',
     'hybrid-corral-masyu', 'hybrid-corral-slither', 'hybrid-corral-midloop', 'hybrid-corral-castle', 'hybrid-corral-full',
     'bonus-gray', 'swiss-10x10',
   ];

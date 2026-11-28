@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/fill_pools.mjs [--workers 9] [--only groupName]
 //
-// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | slither-classic | midloop | midloop-classic | midloop-bonus | slither-hybrid-grow | gray-hybrid-token | castle-hybrids | castle-classic | castle-bonus | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
+// Groups: core | giants | bonus | bonus-cookie | bonus-gray | full-board | swiss | slither | slither-classic | midloop | midloop-classic | midloop-bonus | slither-hybrid-grow | gray-hybrid-token | castle-hybrids | castle-classic | castle-bonus | corral-intro | corral-hybrids | corral-classic | variants-token | intro-extra | bonus-patterns | bonus-finales | all (default: all)
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -751,43 +751,53 @@ if (!isMainThread) {
       budgetSec: 90, perPuzzleMs: 15000,
     },
 
-    // ---- Corral (Bag / Cave) intro + tasting pools
+    // ---- Corral (Bag / Cave) intro + full Classic (4 sizes x 4 tiers x 500) + full Hybrids (5 x 500)
     { group: 'corral-intro', pool: 'intro_corral_5x5', cols: 5, rows: 5, style: 'corral', tier: 'Beginner', total: 55, budgetSec: 40, perPuzzleMs: 6000 },
     { group: 'corral-intro', pool: 'intro_corral_6x6', cols: 6, rows: 6, style: 'corral', tier: 'Beginner', total: 55, budgetSec: 40, perPuzzleMs: 8000 },
     {
-      group: 'corral-token', pool: 'corral_8x8', cols: 8, rows: 8, style: 'corral',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 120, perPuzzleMs: 15000,
+      group: 'corral-hybrids', pool: 'hybrid_corral_masyu_8x8', cols: 8, rows: 8, style: 'corral-masyu',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
     {
-      group: 'corral-token', pool: 'corral_11x11', cols: 11, rows: 11, style: 'corral',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 180, perPuzzleMs: 20000,
+      group: 'corral-hybrids', pool: 'hybrid_corral_slither_8x8', cols: 8, rows: 8, style: 'corral-slither',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
     {
-      group: 'corral-token', pool: 'hybrid_corral_masyu_8x8', cols: 8, rows: 8, style: 'corral-masyu',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 150, perPuzzleMs: 15000,
+      group: 'corral-hybrids', pool: 'hybrid_corral_midloop_8x8', cols: 8, rows: 8, style: 'corral-midloop',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
     {
-      group: 'corral-token', pool: 'hybrid_corral_slither_8x8', cols: 8, rows: 8, style: 'corral-slither',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 150, perPuzzleMs: 15000,
+      group: 'corral-hybrids', pool: 'hybrid_corral_castle_8x8', cols: 8, rows: 8, style: 'corral-castle',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 480, perPuzzleMs: 18000,
     },
     {
-      group: 'corral-token', pool: 'hybrid_corral_midloop_8x8', cols: 8, rows: 8, style: 'corral-midloop',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 150, perPuzzleMs: 15000,
+      group: 'corral-hybrids', pool: 'hybrid_corral_full_8x8', cols: 8, rows: 8, style: 'corral-full',
+      buckets: { Beginner: { need: 52 }, Medium: { need: 204 }, Hard: { need: 204 }, Expert: { need: 52 } },
+      budgetSec: 420, perPuzzleMs: 15000,
     },
     {
-      group: 'corral-token', pool: 'hybrid_corral_castle_8x8', cols: 8, rows: 8, style: 'corral-castle',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 180, perPuzzleMs: 18000,
+      group: 'corral-classic', pool: 'corral_8x8', cols: 8, rows: 8, style: 'corral',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 420, perPuzzleMs: 12000,
     },
     {
-      group: 'corral-token', pool: 'hybrid_corral_full_8x8', cols: 8, rows: 8, style: 'corral-full',
-      buckets: { Beginner: { need: 5 }, Medium: { need: 10 }, Hard: { need: 10 }, Expert: { need: 5 } },
-      budgetSec: 150, perPuzzleMs: 15000,
+      group: 'corral-classic', pool: 'corral_11x11', cols: 11, rows: 11, style: 'corral',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 900, perPuzzleMs: 20000,
+    },
+    {
+      group: 'corral-classic', pool: 'corral_13x13', cols: 13, rows: 13, style: 'corral',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 1500, perPuzzleMs: 25000,
+    },
+    {
+      group: 'corral-classic', pool: 'corral_11x17', cols: 11, rows: 17, style: 'corral',
+      buckets: { Beginner: { need: 505 }, Medium: { need: 505 }, Hard: { need: 505 }, Expert: { need: 505 } },
+      budgetSec: 1800, perPuzzleMs: 30000,
     },
   ];
 

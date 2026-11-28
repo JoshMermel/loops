@@ -157,7 +157,25 @@
       "subs": {
         "Classic": {
           "icon": "📚",
-          "blurb": "Standard Corral boards by size (counted in squares)."
+          "blurb": "Standard Corral boards by size (counted in squares), from 7×7 up to tall 10×16.",
+          "subs": {
+            "7×7": {
+              "icon": "7️⃣",
+              "blurb": "Compact 7×7-square boards across all four difficulties."
+            },
+            "10×10": {
+              "icon": "🔟",
+              "blurb": "Classic 10×10-square boards across all four difficulties."
+            },
+            "12×12": {
+              "icon": "🔷",
+              "blurb": "Big 12×12-square boards across all four difficulties."
+            },
+            "10×16": {
+              "icon": "📏",
+              "blurb": "Tall magazine-page 10×16-square boards across all four difficulties."
+            }
+          }
         }
       }
     },
@@ -1343,24 +1361,180 @@
       "blurb": "Mirror, diagonal, and 180° symmetric Castle Wall tiles, arrows, and loops."
     },
     {
-      "id": "corral-7x7",
-      "name": "Corral 7×7",
-      "label": "7️⃣ 7×7",
-      "file": "data/corral-7x7.csv",
-      "count": 24,
+      "id": "corral-7x7-beginner",
+      "name": "Corral 7×7 Beginner",
+      "label": "Beginner",
+      "file": "data/corral-7x7-beginner.csv",
+      "count": 500,
       "group": "Corral",
       "sub": "Classic",
-      "blurb": "Compact 7×7-square Corral (Bag / Cave) puzzles across all four difficulties."
+      "sub2": "7×7",
+      "blurb": "Border anchors, adjacent-clue crosses, and direct sightline reach & overshoot bounds."
     },
     {
-      "id": "corral-10x10",
-      "name": "Corral 10×10",
-      "label": "🔟 10×10",
-      "file": "data/corral-10x10.csv",
-      "count": 24,
+      "id": "corral-7x7-medium",
+      "name": "Corral 7×7 Medium",
+      "label": "Medium",
+      "file": "data/corral-7x7-medium.csv",
+      "count": 500,
       "group": "Corral",
       "sub": "Classic",
-      "blurb": "Classic 10×10-square Corral (Bag / Cave) puzzles across all four difficulties."
+      "sub2": "7×7",
+      "blurb": "Degree-2 wall caps, aligned sightlines, collinear separation, and Inside/Outside shading."
+    },
+    {
+      "id": "corral-7x7-hard",
+      "name": "Corral 7×7 Hard",
+      "label": "Hard",
+      "file": "data/corral-7x7-hard.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Loop topology, crossing parity, and short single-thread lookahead."
+    },
+    {
+      "id": "corral-7x7-expert",
+      "name": "Corral 7×7 Expert",
+      "label": "Expert",
+      "file": "data/corral-7x7-expert.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "7×7",
+      "blurb": "Deep lookahead chains on pure Corral grids."
+    },
+    {
+      "id": "corral-10x10-beginner",
+      "name": "Corral 10×10 Beginner",
+      "label": "Beginner",
+      "file": "data/corral-10x10-beginner.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Border anchors, adjacent-clue crosses, and direct sightline reach & overshoot bounds."
+    },
+    {
+      "id": "corral-10x10-medium",
+      "name": "Corral 10×10 Medium",
+      "label": "Medium",
+      "file": "data/corral-10x10-medium.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Degree-2 wall caps, aligned sightlines, collinear separation, and Inside/Outside shading."
+    },
+    {
+      "id": "corral-10x10-hard",
+      "name": "Corral 10×10 Hard",
+      "label": "Hard",
+      "file": "data/corral-10x10-hard.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Loop topology, crossing parity, and short single-thread lookahead."
+    },
+    {
+      "id": "corral-10x10-expert",
+      "name": "Corral 10×10 Expert",
+      "label": "Expert",
+      "file": "data/corral-10x10-expert.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×10",
+      "blurb": "Deep lookahead chains on pure Corral grids."
+    },
+    {
+      "id": "corral-12x12-beginner",
+      "name": "Corral 12×12 Beginner",
+      "label": "Beginner",
+      "file": "data/corral-12x12-beginner.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Border anchors, adjacent-clue crosses, and direct sightline reach & overshoot bounds."
+    },
+    {
+      "id": "corral-12x12-medium",
+      "name": "Corral 12×12 Medium",
+      "label": "Medium",
+      "file": "data/corral-12x12-medium.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Degree-2 wall caps, aligned sightlines, collinear separation, and Inside/Outside shading."
+    },
+    {
+      "id": "corral-12x12-hard",
+      "name": "Corral 12×12 Hard",
+      "label": "Hard",
+      "file": "data/corral-12x12-hard.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Loop topology, crossing parity, and short single-thread lookahead."
+    },
+    {
+      "id": "corral-12x12-expert",
+      "name": "Corral 12×12 Expert",
+      "label": "Expert",
+      "file": "data/corral-12x12-expert.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "12×12",
+      "blurb": "Deep lookahead chains on pure Corral grids."
+    },
+    {
+      "id": "corral-10x16-beginner",
+      "name": "Corral 10×16 Beginner",
+      "label": "Beginner",
+      "file": "data/corral-10x16-beginner.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Border anchors, adjacent-clue crosses, and direct sightline reach & overshoot bounds."
+    },
+    {
+      "id": "corral-10x16-medium",
+      "name": "Corral 10×16 Medium",
+      "label": "Medium",
+      "file": "data/corral-10x16-medium.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Degree-2 wall caps, aligned sightlines, collinear separation, and Inside/Outside shading."
+    },
+    {
+      "id": "corral-10x16-hard",
+      "name": "Corral 10×16 Hard",
+      "label": "Hard",
+      "file": "data/corral-10x16-hard.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Loop topology, crossing parity, and short single-thread lookahead."
+    },
+    {
+      "id": "corral-10x16-expert",
+      "name": "Corral 10×16 Expert",
+      "label": "Expert",
+      "file": "data/corral-10x16-expert.csv",
+      "count": 500,
+      "group": "Corral",
+      "sub": "Classic",
+      "sub2": "10×16",
+      "blurb": "Deep lookahead chains on pure Corral grids."
     },
     {
       "id": "full-masyu-8x8",
@@ -1537,7 +1711,7 @@
       "name": "Corral + Masyu",
       "label": "🐄⚪ Classic (8×8)",
       "file": "data/hybrid-corral-masyu.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Corral + Masyu",
       "blurb": "Circled Corral sightline numbers paired with Masyu circles — every puzzle requires both."
@@ -1547,7 +1721,7 @@
       "name": "Corral + Slitherlink",
       "label": "🐄🔢 Classic (8×8)",
       "file": "data/hybrid-corral-slither.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Corral + Slitherlink",
       "blurb": "Circled Corral sightline numbers paired with plain Slitherlink edge counts — every puzzle requires both."
@@ -1557,7 +1731,7 @@
       "name": "Corral + Mid-loop",
       "label": "🐄🎯 Classic (8×8)",
       "file": "data/hybrid-corral-midloop.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Corral + Mid-loop",
       "blurb": "Circled Corral sightline numbers paired with teal Mid-loop dots — every puzzle requires both."
@@ -1567,7 +1741,7 @@
       "name": "Corral + Castle Wall",
       "label": "🐄🏰 Classic (8×8)",
       "file": "data/hybrid-corral-castle.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Corral + Castle Wall",
       "blurb": "Circled Corral sightline numbers paired with Castle Wall blocks and arrows — every puzzle requires both."
@@ -1577,7 +1751,7 @@
       "name": "Corral + Hamilton cycle",
       "label": "🐄🔁 Classic (8×8)",
       "file": "data/hybrid-corral-full.csv",
-      "count": 24,
+      "count": 500,
       "group": "Hybrids",
       "sub": "Corral + Hamilton cycle",
       "blurb": "Circled Corral sightline numbers on a Hamilton cycle visiting every dot."
